@@ -99,6 +99,7 @@ def parse_setup():
                     "open": values.get("aperta", False),
                     "locked": values.get("chiusa_a_chiave", False),
                     "requiredKey": values.get("chiave_richiesta"),
+                    "strength": values.get("resistenza", 10),
                 }
             elif func == "Personaggio":
                 values = arg_values(node.value, ["name", "friendly", "strength", "position", "movementMode"])

@@ -2241,49 +2241,56 @@ window.HOBBIT_DATA = {
       "name": "round green door",
       "open": false,
       "locked": false,
-      "requiredKey": null
+      "requiredKey": null,
+      "strength": 10
     },
     "porta_hidden_path_trolls_cave": {
       "id": "porta_hidden_path_trolls_cave",
       "name": "heavy rock door",
       "open": false,
       "locked": true,
-      "requiredKey": "the large key"
+      "requiredKey": "the large key",
+      "strength": 10
     },
     "porta_large_dry_cave_dark_stuffy_passage_5": {
       "id": "porta_large_dry_cave_dark_stuffy_passage_5",
       "name": "small hidden crevice",
       "open": false,
       "locked": true,
-      "requiredKey": "strange curious key"
+      "requiredKey": "strange curious key",
+      "strength": 10
     },
     "porta_elvenkings_halls_dark_dungeon": {
       "id": "porta_elvenkings_halls_dark_dungeon",
       "name": "rusty door",
       "open": false,
       "locked": true,
-      "requiredKey": "golden key"
+      "requiredKey": "golden key",
+      "strength": 10
     },
     "porta_dark_dungeon_cellar": {
       "id": "porta_dark_dungeon_cellar",
       "name": "red door",
       "open": false,
       "locked": true,
-      "requiredKey": "red key"
+      "requiredKey": "red key",
+      "strength": 10
     },
     "porta_cellar_long_lake": {
       "id": "porta_cellar_long_lake",
       "name": "large trap door",
       "open": false,
       "locked": false,
-      "requiredKey": null
+      "requiredKey": null,
+      "strength": 10
     },
     "porta_green_dragon_inn_green_dragon_inn_outside": {
       "id": "porta_green_dragon_inn_green_dragon_inn_outside",
       "name": "weathered oak door",
       "open": false,
       "locked": false,
-      "requiredKey": null
+      "requiredKey": null,
+      "strength": 10
     }
   },
   "characters": {

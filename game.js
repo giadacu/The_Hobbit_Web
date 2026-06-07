@@ -436,7 +436,7 @@
         for (const id of itemIds) {
           const item = this.items[id];
           if (!item) continue;
-          if ((item.visible || item.broken) && matches(item.name, name)) candidates.push({ item, parent });
+          if (item.visible && matches(item.name, name)) candidates.push({ item, parent });
           if (item.container && (item.open || item.noLid || options.closedContainers)) scan(item.contents, item);
         }
       };
@@ -555,11 +555,11 @@
       const found = this.visibleSearch(targetName, { includeInventory: false });
       if (!found) {
         const carried = this.findInInventory(targetName);
-        return carried ? this.print(`You are already carrying the ${carried.name}.`) : this.print("I don't see that here.");
+        return carried ? this.print(`${actorSubject(this.player, true)} ${this.player.name === "You" ? "are" : "is"} already carrying the ${carried.name}.`) : this.print("I don't see that here.");
       }
       const item = found.item;
       if (item.location?.type === "character" && item.location.id === this.player.id) {
-        return this.print(`You are already carrying the ${item.name}.`);
+        return this.print(`${actorSubject(this.player, true)} ${this.player.name === "You" ? "are" : "is"} already carrying the ${item.name}.`);
       }
       if (!item.portable) return this.print(`The ${item.name} can't be taken.`);
       if (item.weight > this.player.strength * 5) return this.print(`The ${item.name} is too heavy to take.`);
@@ -567,7 +567,7 @@
       item.location = { type: "character", id: this.player.id };
       this.player.inventory.push(item.id);
       const source = found.parent?.id ? ` from the ${found.parent.name}` : "";
-      this.print(`You take the ${item.name}${source}.`);
+      this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "take")} the ${item.name}${source}.`);
     }
 
     takeAll(objectName) {
@@ -586,21 +586,31 @@
 
     drop(objectName) {
       if (!objectName) return this.print("What would you like to leave?");
-      const item = this.findInInventory(objectName);
-      if (!item) return this.print(`You don't have the ${objectName}.`);
       const inParts = objectName.split(" in ");
+      const itemName = inParts[0].trim();
+      const item = this.findInInventory(itemName);
+      if (!item) return this.print(`You don't have the ${itemName}.`);
       if (inParts.length === 2) {
         const container = this.visibleSearch(inParts[1])?.item;
         if (!container || !container.container) return this.print(`I don't see the ${inParts[1]} here.`);
         if (!container.open && !container.noLid) return this.print(`The ${container.name} is closed.`);
+        if (container.id === item.id || this.isInside(item.id, container.id)) return this.print(`You cannot put the ${item.name} in itself.`);
+        if ((item.weight || 0) >= (container.weight || 0)) return this.print(`The ${item.name} is too big for the ${container.name}.`);
         this.detachItem(item.id);
         item.location = { type: "item", id: container.id };
         container.contents.push(item.id);
-        return this.print(`You put the ${item.name} in the ${container.name}.`);
+        return this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "put")} the ${item.name} in the ${container.name}.`);
       }
       this.detachItem(item.id);
       item.location = { type: "room", id: this.currentRoom };
-      this.print(`You leave the ${item.name}.`);
+      this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "leave")} the ${item.name}.`);
+    }
+
+    isInside(containerId, itemId) {
+      const container = this.items[containerId];
+      if (!container?.contents?.length) return false;
+      if (container.contents.includes(itemId)) return true;
+      return container.contents.some((childId) => this.isInside(childId, itemId));
     }
 
     open(objectName) {
@@ -966,17 +976,41 @@
 
     breakThing(command) {
       const targetName = command.split(" with ")[0];
+      const weaponName = command.includes(" with ") ? command.split(" with ").slice(1).join(" with ") : "";
+      const weapon = weaponName ? this.findInInventory(weaponName) : null;
+      if (weaponName && !weapon) return this.print(`${this.player.name} does not have the ${weaponName}.`);
+      const attackStrength = (this.player.strength || 1) + (weapon ? (weapon.weight || 0) : 0);
+
       const door = this.findDoor(targetName)?.door;
       if (door) {
+        if (door.broken) return this.print(`The ${door.name} is already broken.`);
+        if (attackStrength < (door.strength || 10)) return this.print(`You strike the ${door.name}. The ${door.name} resists the attempt to break it.`);
+        door.broken = true;
         door.open = true;
         door.locked = false;
-        return this.print(`You break the ${door.name}.`);
+        this.setFlag(`${compact(door.name)}open`, true);
+        return this.print(`You strike the ${door.name}. The ${door.name} breaks into pieces.`);
       }
+
       const item = this.visibleSearch(targetName)?.item;
       if (!item) return this.print("I don't see that here.");
+      if (item.broken) return this.print(`You strike the broken ${item.name}. The ${item.name} is already broken.`);
+      if (!item.visible) return this.print(`The ${item.name} is not visible.`);
+      if (item.portable && item.location?.type !== "character") return this.print(`To break the ${item.name}, you need to pick it up first.`);
+      if (attackStrength < (item.strength || 10)) return this.print(`You strike the ${item.name}. The ${item.name} resists the attempt to break it.`);
+
       item.broken = true;
-      item.open = item.container ? true : item.open;
-      this.print(`You break the ${item.name}.`);
+      item.visible = true;
+      if (item.container) {
+        item.open = true;
+        this.setFlag(`${compact(item.name)}open`, true);
+      }
+      const contents = item.contents.map((id) => this.items[id]).filter(Boolean);
+      if (item.container) {
+        const inside = contents.length ? ` Inside there is ${contents.map((child) => `${articleFor(child.name)} ${child.name}`).join(", ")}.` : " It's empty.";
+        return this.print(`You strike the ${item.name}. The ${item.name} breaks into pieces.${inside}`);
+      }
+      this.print(`You strike the ${item.name}. The ${item.name} breaks into pieces.`);
     }
 
     pushPull(action, objectName) {
@@ -1554,6 +1588,20 @@
   function displayCharacterName(character) {
     if (character.id === "you" || character.name === "You") return "you";
     return isProperName(character.name) ? character.name : `the ${character.name}`;
+  }
+
+  function actorSubject(character, capital = false) {
+    if (character.name === "You") return capital ? "You" : "you";
+    return character.name;
+  }
+
+  function actorVerb(character, verb) {
+    if (character.name === "You") return verb;
+    const irregular = { are: "is", have: "has" };
+    if (irregular[verb]) return irregular[verb];
+    if (verb.endsWith("y")) return `${verb.slice(0, -1)}ies`;
+    if (verb.endsWith("s") || verb.endsWith("sh") || verb.endsWith("ch") || verb.endsWith("x")) return `${verb}es`;
+    return `${verb}s`;
   }
 
   function capitalize(text) {
