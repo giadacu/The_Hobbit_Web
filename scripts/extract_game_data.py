@@ -106,8 +106,8 @@ def parse_setup():
                 data["characters"][var] = {
                     "id": var,
                     "name": values.get("name", var),
-                    "friendly": values.get("friendly", True),
-                    "strength": values.get("strength", 1),
+                    "friendly": values.get("amico", values.get("friendly", True)),
+                    "strength": values.get("forza", values.get("strength", 1)),
                     "position": position.get("$ref") if isinstance(position, dict) else position,
                     "movementMode": values.get("movement_mode", values.get("movementMode", "always")),
                     "visible": True,

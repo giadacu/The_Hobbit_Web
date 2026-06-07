@@ -2291,7 +2291,7 @@ window.HOBBIT_DATA = {
       "id": "you",
       "name": "You",
       "friendly": true,
-      "strength": 1,
+      "strength": 5,
       "position": null,
       "movementMode": "never",
       "visible": true
@@ -2299,8 +2299,8 @@ window.HOBBIT_DATA = {
     "red_golden_dragon": {
       "id": "red_golden_dragon",
       "name": "red golden dragon",
-      "friendly": true,
-      "strength": 1,
+      "friendly": false,
+      "strength": 50,
       "position": null,
       "movementMode": "never",
       "visible": true
@@ -2308,8 +2308,8 @@ window.HOBBIT_DATA = {
     "nasty_goblin": {
       "id": "nasty_goblin",
       "name": "nasty goblin",
-      "friendly": true,
-      "strength": 1,
+      "friendly": false,
+      "strength": 7,
       "position": null,
       "movementMode": "never",
       "visible": true
@@ -2318,7 +2318,7 @@ window.HOBBIT_DATA = {
       "id": "gandalf",
       "name": "Gandalf",
       "friendly": true,
-      "strength": 1,
+      "strength": 10,
       "position": null,
       "movementMode": "always",
       "visible": true
@@ -2327,7 +2327,7 @@ window.HOBBIT_DATA = {
       "id": "thorin",
       "name": "Thorin",
       "friendly": true,
-      "strength": 1,
+      "strength": 8,
       "position": null,
       "movementMode": "follow",
       "visible": true
@@ -2335,8 +2335,8 @@ window.HOBBIT_DATA = {
     "wood_elf": {
       "id": "wood_elf",
       "name": "wood elf",
-      "friendly": true,
-      "strength": 1,
+      "friendly": "neutral",
+      "strength": 7,
       "position": null,
       "movementMode": "on_first_meet",
       "visible": true
@@ -2344,8 +2344,8 @@ window.HOBBIT_DATA = {
     "elrond": {
       "id": "elrond",
       "name": "Elrond",
-      "friendly": true,
-      "strength": 1,
+      "friendly": "neutral",
+      "strength": 9,
       "position": null,
       "movementMode": "never",
       "visible": true
@@ -2353,8 +2353,8 @@ window.HOBBIT_DATA = {
     "butler": {
       "id": "butler",
       "name": "butler",
-      "friendly": true,
-      "strength": 1,
+      "friendly": "neutral",
+      "strength": 8,
       "position": null,
       "movementMode": "never",
       "visible": true
@@ -2362,8 +2362,8 @@ window.HOBBIT_DATA = {
     "vicious_warg": {
       "id": "vicious_warg",
       "name": "vicious warg",
-      "friendly": true,
-      "strength": 1,
+      "friendly": false,
+      "strength": 3,
       "position": null,
       "movementMode": "always",
       "visible": true
@@ -2371,8 +2371,8 @@ window.HOBBIT_DATA = {
     "gollum": {
       "id": "gollum",
       "name": "Gollum",
-      "friendly": true,
-      "strength": 1,
+      "friendly": false,
+      "strength": 8,
       "position": null,
       "movementMode": "on_first_meet",
       "visible": true
@@ -2380,8 +2380,8 @@ window.HOBBIT_DATA = {
     "hideous_goblin": {
       "id": "hideous_goblin",
       "name": "hideous goblin",
-      "friendly": true,
-      "strength": 1,
+      "friendly": false,
+      "strength": 7,
       "position": null,
       "movementMode": "on_first_meet",
       "visible": true
@@ -2390,7 +2390,7 @@ window.HOBBIT_DATA = {
       "id": "bard",
       "name": "Bard",
       "friendly": true,
-      "strength": 1,
+      "strength": 15,
       "position": null,
       "movementMode": "on_first_meet",
       "visible": true
@@ -2398,8 +2398,8 @@ window.HOBBIT_DATA = {
     "hideous_troll": {
       "id": "hideous_troll",
       "name": "Hideous troll",
-      "friendly": true,
-      "strength": 1,
+      "friendly": false,
+      "strength": 10,
       "position": null,
       "movementMode": "never",
       "visible": true
@@ -2407,8 +2407,8 @@ window.HOBBIT_DATA = {
     "vicious_troll": {
       "id": "vicious_troll",
       "name": "Vicious troll",
-      "friendly": true,
-      "strength": 1,
+      "friendly": false,
+      "strength": 10,
       "position": null,
       "movementMode": "never",
       "visible": true
@@ -2416,8 +2416,8 @@ window.HOBBIT_DATA = {
     "horrible_goblin": {
       "id": "horrible_goblin",
       "name": "horrible goblin",
-      "friendly": true,
-      "strength": 1,
+      "friendly": false,
+      "strength": 7,
       "position": null,
       "movementMode": "on_first_meet",
       "visible": true
@@ -2425,8 +2425,8 @@ window.HOBBIT_DATA = {
     "mean_goblin": {
       "id": "mean_goblin",
       "name": "mean goblin",
-      "friendly": true,
-      "strength": 1,
+      "friendly": false,
+      "strength": 7,
       "position": null,
       "movementMode": "on_first_meet",
       "visible": true
@@ -2434,8 +2434,8 @@ window.HOBBIT_DATA = {
     "vicious_goblin": {
       "id": "vicious_goblin",
       "name": "vicious goblin",
-      "friendly": true,
-      "strength": 1,
+      "friendly": false,
+      "strength": 7,
       "position": null,
       "movementMode": "on_first_meet",
       "visible": true
@@ -2443,8 +2443,8 @@ window.HOBBIT_DATA = {
     "disgusting_goblin": {
       "id": "disgusting_goblin",
       "name": "disgusting goblin",
-      "friendly": true,
-      "strength": 1,
+      "friendly": false,
+      "strength": 7,
       "position": null,
       "movementMode": "on_first_meet",
       "visible": true
@@ -4600,7 +4600,8 @@ window.HOBBIT_DATA = {
       "release": "leave",
       "put": "leave",
       "shut": "close",
-      "speak": "talk",
+      "speak": "say",
+      "retrieve": "take",
       "attack": "kill",
       "slay": "kill",
       "hit": "kill",
