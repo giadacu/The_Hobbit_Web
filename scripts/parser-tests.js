@@ -98,6 +98,17 @@ function runDialogueCase(testCase) {
   return { ...testCase, actual, ok: actual === testCase.expected };
 }
 
+function runGameCase(testCase) {
+  window.hobbitGame.restartGame();
+  outputLines.length = 0;
+  for (const input of testCase.inputs) {
+    window.hobbitGame.execute(input);
+  }
+  const actual = outputLines.slice();
+  const ok = testCase.expectedIncluded.every((line) => actual.includes(line));
+  return { ...testCase, actual, expected: testCase.expectedIncluded, ok };
+}
+
 const cases = [
   {
     name: "object manipulation",
@@ -223,6 +234,16 @@ const cases = [
     name: "give then tell pronoun",
     input: "Give the Arkenstone to Bard and tell him to negotiate with Thorin.",
     expected: ["give arkenstone to bard", "ask bard to negotiate with thorin"],
+  },
+  {
+    name: "mend object",
+    input: "Mend the map.",
+    expected: ["mend map"],
+  },
+  {
+    name: "repair object",
+    input: "Repair the map.",
+    expected: ["repair map"],
   },
 ];
 
@@ -436,6 +457,32 @@ const dialogueCases = [
   ["Gandalf, are you certain this is the right path?", "Gandalf says 'It is the safest path available to us.'"],
 ];
 
+const gameCases = [
+  {
+    name: "broken map cannot be read as intact",
+    inputs: ["ask gandalf for the map", "break map", "read map"],
+    expectedIncluded: ["You try to read the broken curious map, but its markings are torn into useless fragments."],
+  },
+  {
+    name: "broken map examination mentions damage",
+    inputs: ["ask gandalf for the map", "break map", "examine map"],
+    expectedIncluded: ["You see the broken remains of the curious map. Its markings are torn into useless fragments."],
+  },
+  {
+    name: "mended map can be read again",
+    inputs: ["ask gandalf for the map", "break map", "mend map", "read map"],
+    expectedIncluded: [
+      "You carefully piece the curious map back together. It is readable again, though the joins are still visible.",
+      "You read the carefully mended curious map. You see a map with strange markings, its torn lines pieced back together.",
+    ],
+  },
+  {
+    name: "mended map examination mentions repair",
+    inputs: ["ask gandalf for the map", "break map", "repair map", "examine map"],
+    expectedIncluded: ["You see a carefully mended map with strange markings. The torn lines have been pieced back together, though the joins are still visible."],
+  },
+];
+
 const Splitter = bootGame();
 const results = cases.map((testCase) => runCase(Splitter, testCase));
 const dialogueResults = dialogueCases.map(([input, expected], index) => runDialogueCase({
@@ -443,7 +490,8 @@ const dialogueResults = dialogueCases.map(([input, expected], index) => runDialo
   input,
   expected,
 }));
-const allResults = [...results, ...dialogueResults];
+const gameResults = gameCases.map(runGameCase);
+const allResults = [...results, ...dialogueResults, ...gameResults];
 const failed = allResults.filter((result) => !result.ok);
 
 for (const result of allResults) {

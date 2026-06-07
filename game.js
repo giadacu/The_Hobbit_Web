@@ -42,7 +42,7 @@
     "lift", "turn", "hold", "catch", "find", "read", "answer", "thank",
     "flatter", "insult", "sneak", "escape", "follow", "show", "guard",
     "help", "explain", "negotiate", "print", "call", "wash", "check",
-    "start", "refill", "inform", "review",
+    "start", "refill", "inform", "review", "mend", "repair", "fix",
   ];
 
   const CANONICAL_DIALOGUES = [
@@ -267,6 +267,7 @@
         item.location = null;
         item.contents = [];
         item.broken = false;
+        item.mended = false;
       }
       for (const character of Object.values(this.characters)) {
         character.inventory = [];
@@ -562,6 +563,9 @@
         refill: () => this.physicalAction("refill", object),
         inform: () => this.socialAction("inform", object),
         review: () => this.examine(object),
+        mend: () => this.mend(object),
+        repair: () => this.mend(object),
+        fix: () => this.mend(object),
         kill: () => this.attack(object),
         attack: () => this.attack(object),
         break: () => this.breakThing(object),
@@ -575,7 +579,7 @@
         turn: () => this.touch("turn", object),
         use: () => this.touch("use", object),
         find: () => this.examine(object),
-        read: () => this.examine(object),
+        read: () => this.read(object),
         answer: () => this.socialAction("answer", object),
         thank: () => this.socialAction("thank", object),
         flatter: () => this.socialAction("flatter", object),
@@ -1254,6 +1258,11 @@
         return this.inspectEnvironment("examine", objectName);
       }
       let description = item.description;
+      if (item.broken) {
+        const ruin = this.brokenItemDescription(item);
+        return this.print(`${subject} ${actorVerb(this.player, "see")} ${ruin}.`);
+      }
+      if (item.mended) description = this.mendedItemDescription(item);
       if (item.container && item.open && item.contents.length) {
         const visible = item.contents.map((id) => this.items[id]).filter((child) => child?.visible);
         if (visible.length) description += `; inside there is: ${visible.map((child) => this.describeItemShort(child)).join(", ")}`;
@@ -1263,6 +1272,40 @@
         return this.print(`${subject} ${actorVerb(this.player, "examine")} the ${item.name} in ${displayCharacterName(this.player)}'s possession. ${subject} ${actorVerb(this.player, "see")} ${description}.`);
       }
       this.print(`${subject} ${actorVerb(this.player, "see")} ${description}.`);
+    }
+
+    read(objectName = "") {
+      const text = normalize(objectName);
+      if (!text) return this.print("Read what?");
+      const item = this.visibleSearch(objectName)?.item;
+      if (!item) {
+        const heldMessage = this.heldItemMessage(objectName);
+        if (heldMessage) return this.print(heldMessage);
+        return this.print("I don't see that here.");
+      }
+      if (item.broken) {
+        const subject = actorSubject(this.player, true);
+        return this.print(`${subject} ${actorVerb(this.player, "try")} to read the broken ${item.name}, but its markings are torn into useless fragments.`);
+      }
+      if (item.mended && matches(item.name, "curious map")) {
+        const subject = actorSubject(this.player, true);
+        return this.print(`${subject} ${actorVerb(this.player, "read")} the carefully mended ${item.name}. ${subject} ${actorVerb(this.player, "see")} a map with strange markings, its torn lines pieced back together.`);
+      }
+      return this.examine(objectName);
+    }
+
+    brokenItemDescription(item) {
+      if (matches(item.name, "curious map")) {
+        return `the broken remains of the ${item.name}. Its markings are torn into useless fragments`;
+      }
+      return `the broken remains of the ${item.name}`;
+    }
+
+    mendedItemDescription(item) {
+      if (matches(item.name, "curious map")) {
+        return `a carefully mended map with strange markings. The torn lines have been pieced back together, though the joins are still visible`;
+      }
+      return `a repaired ${item.name}`;
     }
 
     examineCharacter(character) {
@@ -1457,7 +1500,7 @@
         crawl: 1, leap: 1, dive: 1, swim: 1, ride: 1, listen: 1, smell: 1,
         touch: 1, feel: 1, knock: 1, watch: 1, search: 1,
         push: 1, pull: 1, wear: 1, remove: 1, hello: 1, combine: 1, autoplay: 1,
-        map: 1, tips: 1, music: 1,
+        map: 1, tips: 1, music: 1, mend: 1, repair: 1, fix: 1,
       });
       const special = this.data.specialActions.map((action) => action.verb);
       this.print("Allowed verbs are: " + [...new Set([...base, ...special])].sort().join(", "));
@@ -2145,6 +2188,7 @@
       if (attackStrength < (item.strength || 10)) return this.print(`You strike the ${item.name}. The ${item.name} resists the attempt to break it.`);
 
       item.broken = true;
+      item.mended = false;
       item.visible = true;
       if (item.container) {
         item.open = true;
@@ -2156,6 +2200,25 @@
         return this.print(`You strike the ${item.name}. The ${item.name} breaks into pieces.${inside}`);
       }
       this.print(`You strike the ${item.name}. The ${item.name} breaks into pieces.`);
+    }
+
+    mend(command) {
+      const targetName = command.split(" with ")[0].trim();
+      if (!targetName) return this.print("Mend what?");
+      const item = this.visibleSearch(targetName)?.item;
+      if (!item) return this.print(this.heldItemMessage(targetName) || "I don't see that here.");
+      if (item.portable && item.location?.type !== "character") return this.print(`To mend the ${item.name}, you need to pick it up first.`);
+      if (!item.broken) {
+        if (item.mended) return this.print(`The ${item.name} has already been mended.`);
+        return this.print(`The ${item.name} does not need mending.`);
+      }
+      item.broken = false;
+      item.mended = true;
+      if (item.container) item.open = false;
+      if (matches(item.name, "curious map")) {
+        return this.print("You carefully piece the curious map back together. It is readable again, though the joins are still visible.");
+      }
+      this.print(`You mend the ${item.name}. It is usable again, though the repair is visible.`);
     }
 
     pushPull(action, objectName) {
@@ -3173,6 +3236,7 @@
     describeItemShort(item) {
       const flags = [];
       if (item.broken) flags.push("broken");
+      else if (item.mended) flags.push("mended");
       if (item.container && !item.noLid && item.open) flags.push("open");
       return `${flags.length ? `${flags.join(", ")} ` : ""}${item.description || item.name}`;
     }
