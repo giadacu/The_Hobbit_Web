@@ -469,6 +469,16 @@ const gameCases = [
     expectedIncluded: ["You see the broken remains of the curious map. Its markings are torn into useless fragments."],
   },
   {
+    name: "open map unfolds readable map",
+    inputs: ["ask gandalf for the map", "open map"],
+    expectedIncluded: ["You unfold the curious map. You see a map with strange markings."],
+  },
+  {
+    name: "open broken map notices fragments",
+    inputs: ["ask gandalf for the map", "break map", "open map"],
+    expectedIncluded: ["You try to unfold the broken curious map, but it only separates into useless fragments."],
+  },
+  {
     name: "mended map can be read again",
     inputs: ["ask gandalf for the map", "break map", "mend map", "read map"],
     expectedIncluded: [
@@ -480,6 +490,11 @@ const gameCases = [
     name: "mended map examination mentions repair",
     inputs: ["ask gandalf for the map", "break map", "repair map", "examine map"],
     expectedIncluded: ["You see a carefully mended map with strange markings. The torn lines have been pieced back together, though the joins are still visible."],
+  },
+  {
+    name: "open mended map mentions repair",
+    inputs: ["ask gandalf for the map", "break map", "mend map", "open map"],
+    expectedIncluded: ["You carefully unfold the mended curious map. The strange markings are readable again, though the joins are still visible."],
   },
 ];
 

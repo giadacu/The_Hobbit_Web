@@ -1124,6 +1124,7 @@
       }
       const item = this.visibleSearch(objectName)?.item;
       if (!item) return this.print(this.heldItemMessage(objectName) || "I don't see that here.");
+      if (!item.container && this.openReadableItem(item)) return;
       if (!item.container) return this.print(`The ${item.name} cannot be opened.`);
       if (item.noLid) return this.print(`The ${item.name} has no lid and is always open.`);
       if (item.open) return this.print(`The ${item.name} is already open.`);
@@ -1157,6 +1158,25 @@
         messages.push(`You open the ${item.name}.`);
       }
       this.print(messages.length ? messages.join(" ") : "I don't see anything like that here that can be opened.");
+    }
+
+    openReadableItem(item) {
+      if (!matches(item.name, "curious map")) return false;
+      if (item.broken) {
+        this.print("You try to unfold the broken curious map, but it only separates into useless fragments.");
+        return true;
+      }
+      if (item.open) {
+        this.print("The curious map is already unfolded.");
+        return true;
+      }
+      item.open = true;
+      if (item.mended) {
+        this.print("You carefully unfold the mended curious map. The strange markings are readable again, though the joins are still visible.");
+        return true;
+      }
+      this.print("You unfold the curious map. You see a map with strange markings.");
+      return true;
     }
 
     close(objectName) {
@@ -2189,6 +2209,7 @@
 
       item.broken = true;
       item.mended = false;
+      item.open = false;
       item.visible = true;
       if (item.container) {
         item.open = true;
