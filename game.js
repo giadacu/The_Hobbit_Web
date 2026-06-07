@@ -10,6 +10,9 @@
   const input = $("command-input");
   const form = $("command-form");
   const roomImage = $("room-image");
+  const imageReveal = $("image-reveal");
+  const imageRevealOutline = $("image-reveal-outline");
+  const imageRevealFill = $("image-reveal-fill");
   const musicPlayer = $("music-player");
   const inventoryList = $("inventory-list");
   const exitsList = $("exits-list");
@@ -34,7 +37,65 @@
 
   const NATURAL_VERBS = [
     "drink", "smell", "sniff", "touch", "feel", "knock", "watch", "eavesdrop",
-    "scout", "patrol", "dig",
+    "scout", "patrol", "dig", "tell", "request", "place", "set", "store",
+    "hand", "pass", "bring", "send", "return", "deliver", "move", "use",
+    "lift", "turn", "hold", "catch", "find", "read", "answer", "thank",
+    "flatter", "insult", "sneak", "escape", "follow", "show", "guard",
+    "help", "explain", "negotiate", "print", "call", "wash", "check",
+    "start", "refill", "inform", "review",
+  ];
+
+  const CANONICAL_DIALOGUES = [
+    ["Bilbo", "Gandalf", "are you certain this is the right path", "It is the safest path available to us."],
+    ["Bilbo", "Thorin", "what lies beyond those hills", "The road to our homeland, if fortune favors us."],
+    ["Bilbo", "Thorin", "should we make camp here", "Not yet. We must put more distance behind us."],
+    ["Bilbo", "Gandalf", "do you expect trouble tonight", "Trouble often arrives when it is least expected."],
+    ["Bilbo", "Elrond", "can you read these markings", "Yes, but their meaning is hidden to most eyes."],
+    ["Bilbo", "Elrond", "what does the map reveal", "A secret entrance and a narrow chance of success."],
+    ["Bilbo", "Beorn", "may we stay the night", "You may, provided you cause no mischief."],
+    ["Bilbo", "Beorn", "what dangers await in Mirkwood", "Many, and few travelers return unchanged."],
+    ["Bilbo", "Bard", "do you trust Thorin", "I trust his courage more than his judgment."],
+    ["Thorin", "Bilbo", "have you seen the Arkenstone", "Not since we entered the mountain."],
+    ["Thorin", "Gandalf", "why have you returned", "Because events are moving faster than expected."],
+    ["Thorin", "Elrond", "can you help us", "Advice I can offer; victory you must earn."],
+    ["Thorin", "Beorn", "will you aid our cause", "If your cause is just, perhaps."],
+    ["Thorin", "Bard", "what do the people want", "Fair treatment and a share of what was promised."],
+    ["Gandalf", "Bilbo", "what did you discover", "A passage leading deeper underground."],
+    ["Gandalf", "Thorin", "are your companions ready", "Ready or not, we must proceed."],
+    ["Gandalf", "Elrond", "what do you make of this sign", "It warns of old powers at work."],
+    ["Gandalf", "Beorn", "have enemies crossed your lands", "More than usual, and that concerns me."],
+    ["Gandalf", "Bard", "can peace still be achieved", "Only if pride yields to reason."],
+    ["Elrond", "Bilbo", "what troubles you", "The feeling that we are being watched."],
+    ["Elrond", "Thorin", "what do you seek above all", "My kingdom restored."],
+    ["Elrond", "Gandalf", "why choose a hobbit", "Because others overlook what hobbits can do."],
+    ["Elrond", "Beorn", "what news do you bring", "Wolves and goblins have been seen together."],
+    ["Elrond", "Bard", "what is your greatest concern", "The safety of my people."],
+    ["Beorn", "Bilbo", "can you handle a pony", "Better than I can handle a dragon."],
+    ["Beorn", "Thorin", "how long will your quest take", "Longer than I would like."],
+    ["Beorn", "Gandalf", "what is your plan", "To stay one step ahead of disaster."],
+    ["Beorn", "Elrond", "do you trust these travelers", "Enough to offer them shelter."],
+    ["Beorn", "Bard", "have you faced Smaug", "Only from a distance."],
+    ["Bard", "Bilbo", "what did you see inside", "Treasure beyond counting."],
+    ["Bard", "Thorin", "will you honor your word", "I intend to."],
+    ["Bard", "Gandalf", "what happens next", "That depends on choices made today."],
+    ["Bard", "Elrond", "would you have acted differently", "Wisdom is easier after the fact."],
+    ["Bard", "Beorn", "will you stand with us", "Against tyranny, yes."],
+    ["Bilbo", "Thorin", "listen to reason", "Reason is difficult when one's heart is burdened."],
+    ["Thorin", "Bilbo", "why are you hesitant", "Because courage and caution are both necessary."],
+    ["Gandalf", "Bilbo", "do you regret coming", "Often, but never completely."],
+    ["Elrond", "Bilbo", "what have you learned", "That small people can influence great events."],
+    ["Beorn", "Bilbo", "are you hungry", "That is rarely a difficult question."],
+    ["Bard", "Bilbo", "whom do you support", "Whoever seeks a fair outcome."],
+    ["Thorin", "Gandalf", "can we trust Bard", "Trust must be built, not assumed."],
+    ["Gandalf", "Thorin", "what matters most now", "Preventing our hard-won victory from becoming a disaster."],
+    ["Elrond", "Thorin", "what do you fear", "Losing what I fought to reclaim."],
+    ["Beorn", "Gandalf", "are we too late", "Not yet."],
+    ["Bard", "Thorin", "is there room for compromise", "There may be, though I do not welcome it."],
+    ["Bilbo", "Gandalf", "what should i do", "The next right thing."],
+    ["Thorin", "Bilbo", "will you stand with us", "I will stand for what is right."],
+    ["Gandalf", "Bilbo", "are you ready", "As ready as I am likely to be."],
+    ["Bard", "Bilbo", "what kind of hero are you", "The reluctant kind."],
+    ["Elrond", "Gandalf", "do you still believe in him", "More than ever."],
   ];
 
   class CommandSplitter {
@@ -57,8 +118,9 @@
         siediti: "sit",
         sniff: "smell",
         smash: "break",
+        tell: "ask",
       };
-      this.adverbs = data.parser.adverbs || [];
+      this.adverbs = (data.parser.adverbs || []).filter((adverb) => adverb !== "next");
       this.lastAdverb = null;
       this.lastObject = null;
       this.lastDirectObject = null;
@@ -67,6 +129,8 @@
 
     split(text) {
       let command = text.trim().toLowerCase();
+      command = normalizeNaturalCommand(command);
+      command = normalizeVocativeCommand(command, this.verbs);
       command = command.replace(/\bthe\b\s*/gi, "").replace(/\ba\b\s*/gi, "");
       this.lastAdverb = null;
       for (const adverb of this.adverbs) {
@@ -91,9 +155,11 @@
       for (const part of raw) {
         let words = part.split(/\s+/);
         const currentVerb = this.verbs.includes(words[0]) ? words[0] : lastVerb;
-        words = words.map((word) => {
+        const askToIndex = currentVerb === "ask" ? words.indexOf("to") : -1;
+        words = words.map((word, wordIndex) => {
+          if (askToIndex >= 0 && wordIndex > askToIndex) return word;
           if (["it", "him", "her", "one"].includes(word) && (this.lastDirectObject || this.lastTargetObject)) {
-            const directVerbs = new Set(["take", "get", "retrieve", "wear", "remove", "eat", "drink", "catch", "borrow"]);
+            const directVerbs = new Set(["take", "get", "retrieve", "wear", "remove", "eat", "drink", "catch", "borrow", "give", "show", "hand", "pass", "bring", "send", "return", "deliver", "put", "drop", "leave", "place", "set", "store", "hide", "open", "close", "throw", "combine"]);
             if (word === "one" || directVerbs.has(currentVerb)) return this.lastDirectObject || this.lastTargetObject;
             return this.lastTargetObject || this.lastDirectObject;
           }
@@ -125,7 +191,7 @@
 
     rememberObjects(verb, object) {
       const words = object.split(/\s+/).filter(Boolean);
-      const prepositions = new Set(["in", "on", "at", "to", "with", "for"]);
+      const prepositions = new Set(["in", "on", "at", "to", "with", "for", "from", "into", "inside", "under", "behind", "beside", "near", "about", "where", "whether", "if", "that", "past"]);
       let direct = [];
       let target = [];
       for (let index = 0; index < words.length; index += 1) {
@@ -138,6 +204,9 @@
       if (verb === "say" && words[0] === "to" && words.length > 1) {
         direct = words.slice(1);
         target = words.slice(1);
+      }
+      if (verb === "ask" && direct.length) {
+        target = direct.slice(0, 1);
       }
       if (direct.length) this.lastDirectObject = direct.at(-1);
       this.lastTargetObject = target.length ? target.at(-1) : this.lastDirectObject;
@@ -173,9 +242,17 @@
       this.commandIssuer = null;
       this.autoplayRunning = false;
       this.autoplayTimer = null;
+      this.autoplayTypingTimer = null;
       this.autoplayDelay = 450;
+      this.autoplayMode = "normal";
       this.autoplayWaits = 0;
       this.autoplayRunId = 0;
+      this.autoplayCapturedText = "";
+      this.autoplayCapturingOutput = false;
+      this.endgameRestartArmed = false;
+      this.arrivalNoticeTimers = [];
+      this.imageRevealTimer = null;
+      this.lastRevealedImage = "";
       this.audio = musicPlayer;
       this.audio.loop = true;
       this.audio.preload = "auto";
@@ -300,6 +377,15 @@
         this.print(`> ${command}`, "command");
         this.execute(command);
       });
+      document.addEventListener("keydown", (event) => {
+        if (!this.endgameRestartArmed) return;
+        event.preventDefault();
+        this.restartGame();
+      });
+      document.addEventListener("click", () => {
+        if (!this.endgameRestartArmed) return;
+        this.restartGame();
+      });
       roomImage.addEventListener("error", () => {
         const failedUrl = roomImage.src;
         roomImage.removeAttribute("src");
@@ -315,11 +401,33 @@
     }
 
     execute(rawCommand) {
+      const lower = rawCommand.toLowerCase();
       if (this.endgame) {
-        this.print("The adventure has ended. Load a saved game to continue.", "danger");
+        if (normalize(lower) === "restart") {
+          this.restartGame();
+          return;
+        }
+        this.print("The adventure has ended. Press any key or type 'restart' to begin again.", "system");
         return;
       }
-      const lower = rawCommand.toLowerCase();
+      if (normalize(lower) === "stop autoplay") {
+        this.stopAutoplay("Autoplay stopped.");
+        this.render();
+        return;
+      }
+      if (this.respondToCanonicalDialogue(rawCommand)) {
+        this.render();
+        return;
+      }
+      const normalizedCommand = normalizeNaturalCommand(lower);
+      if (this.isUnsupportedConditional(normalizedCommand)) {
+        this.print("Conditional commands are not supported yet. Try the action when the condition is true.", "system");
+        return;
+      }
+      if (this.isUnsupportedQuestion(normalizedCommand)) {
+        this.print("Questions are not supported as commands yet. Try a direct command, such as 'ask Gandalf to examine map'.", "system");
+        return;
+      }
       if (this.pendingClarification) {
         this.handleClarification(rawCommand);
         this.render();
@@ -359,7 +467,9 @@
         return this.handleGo(command.slice(3).trim());
       }
 
-      if (command.startsWith("say to ") || command.startsWith("talk to ")) {
+      if (this.handleCharacterFirstCommand(command)) return false;
+
+      if (this.isTalkCommand(command)) {
         this.handleTalk(command);
         return false;
       }
@@ -426,12 +536,53 @@
         wear: () => this.wear(object),
         remove: () => this.remove(object),
         give: () => this.give(object),
+        show: () => this.show(object),
+        hand: () => this.give(object),
+        pass: () => this.give(object),
+        bring: () => this.give(object),
+        send: () => this.give(object),
+        return: () => this.give(object),
+        deliver: () => this.give(object),
+        ask: () => this.askFor(object),
+        borrow: () => this.askFor(object),
+        request: () => this.askFor(object),
         carry: () => this.take(object),
+        hold: () => this.take(object),
+        catch: () => this.take(object),
+        follow: () => this.followCharacter(object),
+        guard: () => this.physicalAction("guard", object),
+        help: () => this.physicalAction("help", object),
+        explain: () => this.physicalAction("explain", object),
+        negotiate: () => this.physicalAction("negotiate", object),
+        print: () => this.physicalAction("print", object),
+        call: () => this.socialAction("call", object),
+        wash: () => this.physicalAction("wash", object),
+        check: () => this.examine(object),
+        start: () => this.physicalAction("start", object),
+        refill: () => this.physicalAction("refill", object),
+        inform: () => this.socialAction("inform", object),
+        review: () => this.examine(object),
         kill: () => this.attack(object),
         attack: () => this.attack(object),
         break: () => this.breakThing(object),
         push: () => this.pushPull("push", object),
         pull: () => this.pushPull("pull", object),
+        move: () => this.pushPull("move", object),
+        place: () => this.drop(object),
+        set: () => this.drop(object),
+        store: () => this.drop(object),
+        lift: () => this.touch("lift", object),
+        turn: () => this.touch("turn", object),
+        use: () => this.touch("use", object),
+        find: () => this.examine(object),
+        read: () => this.examine(object),
+        answer: () => this.socialAction("answer", object),
+        thank: () => this.socialAction("thank", object),
+        flatter: () => this.socialAction("flatter", object),
+        insult: () => this.socialAction("insult", object),
+        hide: () => this.physicalAction("hide", object),
+        sneak: () => this.physicalAction("sneak", object),
+        escape: () => this.physicalAction("escape", object),
         throw: () => this.throwItem(object),
         climb: () => this.climb(object),
         eat: () => this.eat(object),
@@ -470,6 +621,53 @@
       return result;
     }
 
+    isTalkCommand(command) {
+      return /^(?:say|talk|speak|whisper|yell)\s+/.test(command);
+    }
+
+    handleCharacterFirstCommand(command) {
+      const people = this.peopleInRoom()
+        .filter((character) => character.id !== this.player.id && character.visible)
+        .sort((a, b) => b.name.length - a.name.length);
+      for (const character of people) {
+        const name = normalize(character.name);
+        if (command === name) {
+          this.print(`${character.name} listens intently, expecting your words.`);
+          return true;
+        }
+        if (!command.startsWith(`${name} `)) continue;
+        const order = command.slice(name.length).trim().replace(/^to\s+/, "");
+        if (!order) continue;
+        if (character.friendly === false) {
+          this.respondToTalk(character);
+          return true;
+        }
+        for (const action of this.splitter.split(order)) {
+          const moved = this.processCommand(action, character);
+          if (moved) break;
+        }
+        return true;
+      }
+      return false;
+    }
+
+    isUnsupportedConditional(command) {
+      return /^(if|when|before|after)\b/.test(command);
+    }
+
+    isUnsupportedQuestion(command) {
+      return /^(who|where|what|why|how|did|does|do)\b/.test(command);
+    }
+
+    respondToCanonicalDialogue(rawCommand) {
+      const parsed = parseCanonicalDialogueInput(rawCommand);
+      if (!parsed) return false;
+      const response = canonicalDialogueResponse(parsed.speaker, parsed.addressee, parsed.line);
+      if (!response) return false;
+      this.print(`${displayDialogueName(parsed.addressee)} says '${response}'`);
+      return true;
+    }
+
     room() {
       return this.rooms[this.currentRoom];
     }
@@ -503,22 +701,44 @@
       const objects = this.itemsInRoom(this.currentRoom).filter((item) => item.visible);
       const objectText = objects.length ? `You see: ${objects.map((item) => this.describeItemShort(item)).join(", ")}.` : "";
       const people = this.peopleInRoom().filter((p) => p.name !== "You" && p.visible);
-      const peopleText = people.map((p) => {
-        const text = characterPresence(p);
-        p.justEntered = false;
-        return text;
-      }).join(" ");
+      const arrivingPeople = people.filter((p) => p.justEntered);
+      const peopleText = people.filter((p) => !p.justEntered).map((p) => this.characterPresence(p)).join(" ");
       this.print([room.description, doorText, objectText, peopleText].filter(Boolean).join(" "));
+      for (const person of arrivingPeople) {
+        this.scheduleCharacterArrivalNotice(person);
+        person.justEntered = false;
+      }
       if (initial) {
         this.print('Type "tips" for a hint, "commands" or "verbs" for recognized words, "save name" to save.', "system");
       }
       this.render();
     }
 
+    scheduleCharacterArrivalNotice(character, delay = 650) {
+      const roomId = character.position;
+      const characterId = character.id;
+      const timer = setTimeout(() => {
+        this.arrivalNoticeTimers = this.arrivalNoticeTimers.filter((id) => id !== timer);
+        const current = this.characters[characterId];
+        if (!current || !current.visible || current.position !== this.currentRoom || current.position !== roomId) return;
+        this.print(this.characterArrivalMessage(current));
+      }, delay);
+      this.arrivalNoticeTimers.push(timer);
+    }
+
+    clearArrivalNoticeTimers() {
+      for (const timer of this.arrivalNoticeTimers) clearTimeout(timer);
+      this.arrivalNoticeTimers = [];
+    }
+
     render() {
       const room = this.room();
       if (room?.image) {
-        roomImage.src = assetUrl(IMAGE_ROOT, room.image);
+        const src = assetUrl(IMAGE_ROOT, room.image);
+        const currentSrc = roomImage.getAttribute("src");
+        if (currentSrc !== src) this.revealRoomImage(src);
+        if (currentSrc !== src) roomImage.src = src;
+        if (!currentSrc) this.revealRoomImage(src);
         roomImage.alt = room.name;
       }
       const carriedCharacters = Object.values(this.characters).filter((character) => character.carriedBy === this.player.id).map((character) => character.name);
@@ -527,9 +747,37 @@
       fillList(peopleList, this.peopleInRoom().filter((p) => p.name !== "You" && p.visible).map((p) => p.name), "none");
     }
 
+    revealRoomImage(src) {
+      if (!imageReveal || !imageRevealOutline || !imageRevealFill || this.lastRevealedImage === src) return;
+      this.lastRevealedImage = src;
+      const scene = roomImage.closest(".scene");
+      clearTimeout(this.imageRevealTimer);
+      imageRevealOutline.src = src;
+      imageRevealFill.src = src;
+      scene.classList.remove("is-revealing");
+      imageReveal.style.animation = "none";
+      imageRevealOutline.style.animation = "none";
+      imageRevealFill.style.animation = "none";
+      imageReveal.offsetHeight;
+      imageReveal.style.animation = "";
+      imageRevealOutline.style.animation = "";
+      imageRevealFill.style.animation = "";
+      scene.classList.add("is-revealing");
+      this.imageRevealTimer = setTimeout(() => this.finishImageReveal(scene), 3650);
+    }
+
+    finishImageReveal(scene) {
+      clearTimeout(this.imageRevealTimer);
+      this.imageRevealTimer = null;
+      scene?.classList.remove("is-revealing");
+    }
+
     print(text, kind = "") {
       if (!text) return;
-      for (const part of String(text).split(/(?<=\.)2|(?<=\.)3|(?<=\.)4|\n/).filter(Boolean)) {
+      for (const part of String(text).split(/(?<=[.!?])(?:2|3|4)(?!\d)|\n/).filter(Boolean)) {
+        if (this.autoplayCapturingOutput && kind !== "command" && kind !== "system") {
+          this.autoplayCapturedText = [this.autoplayCapturedText, part.trim()].filter(Boolean).join(" ");
+        }
         const line = document.createElement("p");
         line.className = `line ${kind}`.trim();
         line.textContent = part.trim();
@@ -544,6 +792,31 @@
 
     peopleInRoom() {
       return Object.values(this.characters).filter((character) => character.position === this.currentRoom);
+    }
+
+    characterPresence(character) {
+      const base = character.justEntered ? this.characterArrivalMessage(character) : this.characterHereMessage(character);
+      const loadout = this.characterLoadoutText(character);
+      return [base, loadout].filter(Boolean).join(" ");
+    }
+
+    characterHereMessage(character) {
+      if (isProperName(character.name)) return `${character.name} is here.`;
+      return `${articleFor(character.name, true)} ${character.name} is here.`;
+    }
+
+    characterArrivalMessage(character) {
+      if (isProperName(character.name)) return `${character.name} enters.`;
+      return `${articleFor(character.name, true)} ${character.name} enters.`;
+    }
+
+    characterLoadoutText(character, options = {}) {
+      const carried = (character.inventory || []).map((id) => this.items[id]).filter(Boolean);
+      const worn = (character.worn || []).map((id) => this.items[id]).filter(Boolean);
+      if (options.includeEmpty && !carried.length && !worn.length) return "He is carrying nothing. He is wearing nothing.";
+      const carriedText = carried.length ? `He is carrying ${carried.map((item) => itemLabel(item.name)).join(", ")}.` : "";
+      const wornText = worn.length ? `He is wearing ${worn.map((item) => itemLabel(item.name)).join(", ")}.` : "";
+      return [carriedText, wornText].filter(Boolean).join(" ");
     }
 
     visibleSearch(objectName, options = {}) {
@@ -577,6 +850,30 @@
       }
       const id = this.player.inventory.find((itemId) => matches(this.items[itemId]?.name, name));
       return id ? this.items[id] : null;
+    }
+
+    findKnownItem(objectName) {
+      const name = normalize(objectName);
+      return Object.values(this.items).find((item) => matches(item?.name, name)) || null;
+    }
+
+    findVisibleCharacterHolding(objectName) {
+      const name = normalize(objectName);
+      for (const character of this.peopleInRoom()) {
+        if (character.id === this.player.id || !character.visible) continue;
+        const inventoryId = (character.inventory || []).find((id) => matches(this.items[id]?.name, name));
+        if (inventoryId) return { character, item: this.items[inventoryId], worn: false };
+        const wornId = (character.worn || []).find((id) => matches(this.items[id]?.name, name));
+        if (wornId) return { character, item: this.items[wornId], worn: true };
+      }
+      return null;
+    }
+
+    heldItemMessage(objectName) {
+      const held = this.findVisibleCharacterHolding(objectName);
+      if (!held) return "";
+      const verb = held.worn ? "wearing" : "carrying";
+      return `${held.character.name} is ${verb} the ${held.item.name}.`;
     }
 
     findDoor(name) {
@@ -676,12 +973,19 @@
       const request = parseAllTarget(fromMatch[0]);
       const targetName = normalize(request.target);
       if (request.all) return this.takeAll(targetName);
+      if (fromMatch.length === 2) {
+        const character = this.resolveCharacterTarget(fromMatch[1]);
+        if (character) return this.receiveItemFromCharacter(character, targetName);
+      }
       const found = this.visibleSearch(targetName);
       if (!found) {
         const character = this.peopleInRoom().find((candidate) => candidate.id !== this.player.id && candidate.visible && matches(candidate.name, targetName));
         if (character) return this.carryCharacter(character);
         const carried = this.findInInventory(targetName);
-        return carried ? this.print(`${actorSubject(this.player, true)} ${this.player.name === "You" ? "are" : "is"} already carrying the ${carried.name}.`) : this.print("I don't see that here.");
+        if (carried) return this.print(`${actorSubject(this.player, true)} ${this.player.name === "You" ? "are" : "is"} already carrying the ${carried.name}.`);
+        const heldMessage = this.heldItemMessage(targetName);
+        if (heldMessage) return this.print(heldMessage);
+        return this.print("I don't see that here.");
       }
       const item = found.item;
       if (item.location?.type === "character" && item.location.id === this.player.id) {
@@ -732,30 +1036,44 @@
 
     drop(objectName) {
       if (!objectName) return this.print("What would you like to leave?");
+      const placement = this.parsePlacementCommand(objectName);
       const inParts = objectName.split(" in ");
-      const itemName = inParts[0].trim();
+      const itemName = placement?.itemName || inParts[0].trim();
       const carriedCharacter = Object.values(this.characters).find((character) => {
         return character.carriedBy === this.player.id && matches(character.name, normalize(itemName));
       });
       if (carriedCharacter && inParts.length === 1) return this.dropCharacter(carriedCharacter);
       const item = this.findInInventory(itemName);
-      if (!item) return this.print(`You don't have the ${itemName}.`);
-      if (inParts.length === 2) {
-        const container = this.visibleSearch(inParts[1])?.item;
-        if (!container || !container.container) return this.print(`I don't see the ${inParts[1]} here.`);
+      if (!item) return this.print(this.heldItemMessage(itemName) || `You don't have the ${itemName}.`);
+      if (placement) {
+        const container = this.visibleSearch(placement.targetName)?.item;
+        if (!container || !container.container) {
+          this.detachItem(item.id);
+          item.location = { type: "room", id: this.currentRoom };
+          return this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "place")} the ${item.name} ${placement.relation} the ${placement.targetName}.`);
+        }
         if (!container.open && !container.noLid) return this.print(`The ${container.name} is closed.`);
         if (container.id === item.id || this.isInside(item.id, container.id)) return this.print(`You cannot put the ${item.name} in itself.`);
         if ((item.weight || 0) >= (container.weight || 0)) return this.print(`The ${item.name} is too big for the ${container.name}.`);
         this.detachItem(item.id);
         item.location = { type: "item", id: container.id };
         container.contents.push(item.id);
-        this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "put")} the ${item.name} in the ${container.name}.`);
+        this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "put")} the ${item.name} ${placement.relation} the ${container.name}.`);
         this.checkVictory(item, container);
         return;
       }
       this.detachItem(item.id);
       item.location = { type: "room", id: this.currentRoom };
       this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "leave")} the ${item.name}.`);
+    }
+
+    parsePlacementCommand(objectName) {
+      const text = normalize(objectName);
+      const relationPattern = "(?:in front of|next to|to the left of|to the right of|on top of|inside|into|under|behind|beside|near|at|on|in)";
+      const match = text.match(new RegExp(`^(.+?)\\s+(${relationPattern})\\s+(.+)$`));
+      if (!match) return null;
+      const relation = match[2].replace(/^into$|^inside$/, "in");
+      return { itemName: match[1].trim(), relation, targetName: match[3].trim() };
     }
 
     dropCharacter(character) {
@@ -801,7 +1119,7 @@
         return this.print(`You open the ${door.name}.`);
       }
       const item = this.visibleSearch(objectName)?.item;
-      if (!item) return this.print("I don't see that here.");
+      if (!item) return this.print(this.heldItemMessage(objectName) || "I don't see that here.");
       if (!item.container) return this.print(`The ${item.name} cannot be opened.`);
       if (item.noLid) return this.print(`The ${item.name} has no lid and is always open.`);
       if (item.open) return this.print(`The ${item.name} is already open.`);
@@ -847,7 +1165,7 @@
         return this.print(`You close the ${doorFound.door.name}.`);
       }
       const item = this.visibleSearch(objectName)?.item;
-      if (!item) return this.print("I don't see that here.");
+      if (!item) return this.print(this.heldItemMessage(objectName) || "I don't see that here.");
       if (!item.container) return this.print(`The ${item.name} cannot be closed.`);
       if (item.noLid) return this.print(`The ${item.name} has no lid.`);
       item.open = false;
@@ -872,11 +1190,11 @@
     unlock(objectName) {
       const cleanName = objectName.split(" with ")[0].trim();
       const target = this.findDoor(cleanName)?.door || this.visibleSearch(cleanName)?.item;
-      if (!target) return this.print("I don't see that here.");
+      if (!target) return this.print(this.heldItemMessage(cleanName) || "I don't see that here.");
       if (matches(target.name, "secret door") && !this.flags.secretdoorsun) return this.print("The rock face shows no door yet.");
       if (!target.locked) return this.print(`The ${target.name} is already unlocked.`);
       const key = this.keyFor(target);
-      if (!key) return this.print(`You do not have the required key for the ${target.name}.`);
+      if (!key) return this.print(this.heldItemMessage(target.requiredKey || "key") || `You do not have the required key for the ${target.name}.`);
       target.locked = false;
       this.print(`You unlock the ${target.name} with the ${key.name}.`);
     }
@@ -884,9 +1202,9 @@
     lock(objectName) {
       const cleanName = objectName.split(" with ")[0].trim();
       const target = this.findDoor(cleanName)?.door || this.visibleSearch(cleanName)?.item;
-      if (!target) return this.print("I don't see that here.");
+      if (!target) return this.print(this.heldItemMessage(cleanName) || "I don't see that here.");
       const key = this.keyFor(target);
-      if (!key) return this.print(`You do not have the required key for the ${target.name}.`);
+      if (!key) return this.print(this.heldItemMessage(target.requiredKey || "key") || `You do not have the required key for the ${target.name}.`);
       target.locked = true;
       target.open = false;
       this.print(`You lock the ${target.name} with the ${key.name}.`);
@@ -921,16 +1239,36 @@
         return this.inspectEnvironment("search", "area");
       }
       const door = this.findDoor(objectName)?.door;
-      if (door) return this.print(`You see the ${door.name}. It is ${door.open ? "open" : "closed"}.`);
+      const subject = actorSubject(this.player, true);
+      if (door) return this.print(`${subject} ${actorVerb(this.player, "see")} the ${door.name}. It is ${door.open ? "open" : "closed"}.`);
+      const character = this.resolveCharacterTarget(text);
+      if (character) return this.examineCharacter(character);
       const item = this.visibleSearch(objectName)?.item;
-      if (!item) return this.inspectEnvironment("examine", objectName);
+      if (!item) {
+        const heldMessage = this.heldItemMessage(objectName);
+        if (heldMessage) return this.print(heldMessage);
+        const knownItem = this.findKnownItem(objectName);
+        if (knownItem?.portable) {
+          return this.print(`${subject} ${actorVerb(this.player, "do")} not have the ${knownItem.name}.`);
+        }
+        return this.inspectEnvironment("examine", objectName);
+      }
       let description = item.description;
       if (item.container && item.open && item.contents.length) {
         const visible = item.contents.map((id) => this.items[id]).filter((child) => child?.visible);
         if (visible.length) description += `; inside there is: ${visible.map((child) => this.describeItemShort(child)).join(", ")}`;
       }
       this.revealFromSpecial("examine", objectName);
-      this.print(`You see ${description}.`);
+      if (item.location?.type === "character" && item.location.id === this.player.id && this.player.name !== "You") {
+        return this.print(`${subject} ${actorVerb(this.player, "examine")} the ${item.name} in ${displayCharacterName(this.player)}'s possession. ${subject} ${actorVerb(this.player, "see")} ${description}.`);
+      }
+      this.print(`${subject} ${actorVerb(this.player, "see")} ${description}.`);
+    }
+
+    examineCharacter(character) {
+      const loadout = this.characterLoadoutText(character, { includeEmpty: true });
+      const temperament = character.friendly === false ? "They look dangerous." : "";
+      this.print([`You examine ${character.name}.`, loadout, temperament].filter(Boolean).join(" "));
     }
 
     sense(verb, objectName = "") {
@@ -938,17 +1276,21 @@
       if (text) {
         const item = this.visibleSearch(text)?.item;
         if (item) {
-          if (verb === "listen") return this.print(`You listen to the ${item.name}, but hear nothing useful.`);
-          if (verb === "smell") return this.print(`You smell the ${item.name}, but learn nothing new.`);
-          if (verb === "watch") return this.print(`You watch the ${item.name} for a while, but it does not change.`);
-          return this.print(`You study the ${item.name}, but discover nothing new.`);
+          const subject = actorSubject(this.player, true);
+          if (verb === "listen") return this.print(`${subject} ${actorVerb(this.player, "listen")} to the ${item.name}, but hear${this.player.name === "You" ? "" : "s"} nothing useful.`);
+          if (verb === "smell") return this.print(`${subject} ${actorVerb(this.player, "smell")} the ${item.name}, but learn${this.player.name === "You" ? "" : "s"} nothing new.`);
+          if (verb === "watch") return this.print(`${subject} ${actorVerb(this.player, "watch")} the ${item.name} for a while, but it does not change.`);
+          return this.print(`${subject} ${actorVerb(this.player, "study")} the ${item.name}, but discover${this.player.name === "You" ? "" : "s"} nothing new.`);
         }
         const door = this.findDoor(text)?.door;
         if (door) {
-          if (verb === "listen") return this.print(`You listen at the ${door.name}, but hear nothing clear beyond it.`);
-          if (verb === "watch") return this.print(`You watch the ${door.name}. It remains ${door.open ? "open" : "closed"}.`);
-          return this.print(`You notice nothing unusual about the ${door.name}.`);
+          const subject = actorSubject(this.player, true);
+          if (verb === "listen") return this.print(`${subject} ${actorVerb(this.player, "listen")} at the ${door.name}, but hear${this.player.name === "You" ? "" : "s"} nothing clear beyond it.`);
+          if (verb === "watch") return this.print(`${subject} ${actorVerb(this.player, "watch")} the ${door.name}. It remains ${door.open ? "open" : "closed"}.`);
+          return this.print(`${subject} ${actorVerb(this.player, "notice")} nothing unusual about the ${door.name}.`);
         }
+        const heldMessage = this.heldItemMessage(text);
+        if (heldMessage) return this.print(heldMessage);
       }
       this.inspectEnvironment(verb, text || (verb === "smell" ? "air" : "area"));
     }
@@ -968,6 +1310,8 @@
         if (verb === "knock") return this.print(`You knock on the ${door.name}, but no one answers.`);
         return this.print(`You ${verb} the ${door.name}. It is ${door.open ? "open" : "closed"}.`);
       }
+      const heldMessage = this.heldItemMessage(text);
+      if (heldMessage) return this.print(heldMessage);
       this.inspectEnvironment(verb, text);
     }
 
@@ -995,25 +1339,25 @@
         if (lower.includes("footprint") || lower.includes("imprint")) return this.print("The ground bears heavy marks, worth remembering but not something you can pick up.");
         if (lower.includes("drop") || lower.includes("cliff")) return this.print("The footing is dangerous. One careless step would be a poor idea.");
         if (lower.includes("moss")) return this.print("The ground is soft with moss and earth.");
-        return this.print(`You study the ${text}. It shows no hidden passage or useful object.`);
+        return this.print(`${subject} ${actorVerb(this.player, "study")} the ${text}. It shows no hidden passage or useful object.`);
       }
 
       if (matchesAny(text, ["wall", "walls", "rock", "rocks", "stone", "stones", "ceiling", "crack", "cracks"])) {
-        if (lower.includes("cave") || lower.includes("cavern") || lower.includes("passage")) return this.print("The stone is cold and rough. You find no loose block or hidden catch.");
+        if (lower.includes("cave") || lower.includes("cavern") || lower.includes("passage")) return this.print(`The stone is cold and rough. ${subject} ${actorVerb(this.player, "find")} no loose block or hidden catch.`);
         if (lower.includes("secret door") || lower.includes("rock face")) return this.print("The rock face gives away nothing yet.");
-        return this.print(`You inspect the ${text}. Nothing moves.`);
+        return this.print(`${subject} ${actorVerb(this.player, "inspect")} the ${text}. Nothing moves.`);
       }
 
       if (matchesAny(text, ["tree", "trees", "branch", "branches", "forest", "vines", "roots"])) {
         if (lower.includes("forest") || lower.includes("tree") || lower.includes("branch") || lower.includes("root")) {
-          return this.print("You study the trees and roots. They are part of the landscape, not an object you can use here.");
+          return this.print(`${subject} ${actorVerb(this.player, "study")} the trees and roots. They are part of the landscape, not an object you can use here.`);
         }
         return this.print("There are no useful trees or branches here.");
       }
 
       if (matchesAny(text, ["river", "water", "stream", "lake", "boat", "shore", "bank"])) {
         if (lower.includes("river") || lower.includes("water") || lower.includes("stream") || lower.includes("lake") || lower.includes("bank")) {
-          return this.print("You examine the water and its banks. The current looks important, but you find nothing loose.");
+          return this.print(`${subject} ${actorVerb(this.player, "examine")} the water and its banks. The current looks important, but ${this.player.name === "You" ? "you find" : `${this.player.name} finds`} nothing loose.`);
         }
         return this.print("There is no useful water here.");
       }
@@ -1024,17 +1368,17 @@
       }
 
       if (matchesAny(text, ["shadow", "shadows", "dark", "darkness", "mist", "mists"])) {
-        return this.print("You peer into the gloom, but it keeps its secrets.");
+        return this.print(`${subject} ${actorVerb(this.player, "peer")} into the gloom, but it keeps its secrets.`);
       }
 
       if (relation === "under" || relation === "behind") {
-        return this.print(`You look ${relation} the ${text}, but find nothing hidden.`);
+        return this.print(`${subject} ${actorVerb(this.player, "look")} ${relation} the ${text}, but find${this.player.name === "You" ? "" : "s"} nothing hidden.`);
       }
       if (verb === "listen") return this.print(this.ambientSoundMessage(lower));
       if (verb === "smell") return this.print(this.ambientSmellMessage(lower));
-      if (verb === "knock") return this.print(`You knock on the ${text}, but nothing answers.`);
-      if (verb === "touch" || verb === "feel") return this.print(`You ${verb} the ${text}, but learn nothing useful.`);
-      this.print(`You find nothing special about the ${text}.`);
+      if (verb === "knock") return this.print(`${subject} ${actorVerb(this.player, "knock")} on the ${text}, but nothing answers.`);
+      if (verb === "touch" || verb === "feel") return this.print(`${subject} ${actorVerb(this.player, verb)} the ${text}, but learn${this.player.name === "You" ? "" : "s"} nothing useful.`);
+      this.print(`${subject} ${actorVerb(this.player, "find")} nothing special about the ${text}.`);
     }
 
     descriptionSentenceFor(target) {
@@ -1143,6 +1487,7 @@
       const raw = localStorage.getItem(SAVE_PREFIX + name);
       if (!raw) return this.print(`No saved game named "${name}" was found.`);
       const save = JSON.parse(raw);
+      this.clearArrivalNoticeTimers();
       this.items = save.items;
       this.doors = save.doors;
       this.characters = save.characters;
@@ -1167,7 +1512,7 @@
     }
 
     quit() {
-      this.endGame(this.player.name === "You" ? "You quit." : `${this.player.name} quits.`);
+      this.endGame(this.player.name === "You" ? "You quit" : `${this.player.name} quits`);
     }
 
     showMap() {
@@ -1198,20 +1543,21 @@
     autoplay(object = "") {
       const mode = normalize(object);
       if (mode === "stop" || mode === "off") return this.stopAutoplay("Autoplay stopped.");
-      if (this.autoplayRunning) return this.print("Autoplay is already running. Type 'autoplay stop' to stop it.", "system");
-      this.autoplayDelay = mode === "fast" ? 80 : mode === "slow" ? 2700 : 450;
+      if (this.autoplayRunning) return this.print("Autoplay is already running. Type 'stop autoplay' or 'autoplay stop' to stop it.", "system");
+      this.autoplayMode = mode === "fast" ? "fast" : "slow";
+      this.autoplayDelay = this.autoplayMode === "fast" ? 450 : 2700;
       this.autoplayRunning = true;
       this.autoplayWaits = 0;
       this.autoplayRunId += 1;
-      this.print("Autoplay test started. Type 'autoplay stop' to stop it.", "system");
+      this.print(`Autoplay ${this.autoplayMode} started. Type 'stop autoplay' or 'autoplay stop' to stop it.`, "system");
       this.scheduleAutoplayStep();
     }
 
-    scheduleAutoplayStep() {
+    scheduleAutoplayStep(delay = this.autoplayDelay) {
       if (!this.autoplayRunning) return;
       const runId = this.autoplayRunId;
       clearTimeout(this.autoplayTimer);
-      this.autoplayTimer = setTimeout(() => this.runAutoplayStep(runId), this.autoplayDelay);
+      this.autoplayTimer = setTimeout(() => this.runAutoplayStep(runId), delay);
     }
 
     runAutoplayStep(runId = this.autoplayRunId) {
@@ -1219,19 +1565,64 @@
       if (this.endgame) return this.stopAutoplay("Autoplay finished.");
       const command = this.nextAutoplayCommand();
       if (!command) return this.stopAutoplay("Autoplay stopped: no safe next command was found.");
+      this.typeAutoplayCommand(command, runId);
+    }
+
+    typeAutoplayCommand(command, runId) {
+      clearTimeout(this.autoplayTypingTimer);
+      input.value = "";
+      input.focus();
+      let index = 0;
+      const typeDelay = this.autoplayMode === "slow" ? 42 : 6;
+      const submitDelay = this.autoplayMode === "slow" ? 180 : 20;
+      const typeNext = () => {
+        if (!this.autoplayRunning || runId !== this.autoplayRunId) return;
+        input.value = command.slice(0, index);
+        if (index >= command.length) {
+          this.autoplayTypingTimer = setTimeout(() => this.executeAutoplayCommand(command, runId), submitDelay);
+          return;
+        }
+        index += 1;
+        this.autoplayTypingTimer = setTimeout(typeNext, typeDelay);
+      };
+      typeNext();
+    }
+
+    executeAutoplayCommand(command, runId) {
+      if (!this.autoplayRunning || runId !== this.autoplayRunId) return;
+      input.value = "";
       this.print(`> ${command}`, "command");
-      this.execute(command);
+      this.autoplayCapturedText = "";
+      this.autoplayCapturingOutput = true;
+      try {
+        this.execute(command);
+      } finally {
+        this.autoplayCapturingOutput = false;
+      }
       if (!this.autoplayRunning || runId !== this.autoplayRunId) return;
       if (this.endgame) return this.stopAutoplay("Autoplay finished.");
-      this.scheduleAutoplayStep();
+      this.scheduleAutoplayStep(this.autoplayDelayForText(this.autoplayCapturedText));
     }
 
     stopAutoplay(message) {
       clearTimeout(this.autoplayTimer);
+      clearTimeout(this.autoplayTypingTimer);
       this.autoplayTimer = null;
+      this.autoplayTypingTimer = null;
       this.autoplayRunning = false;
       this.autoplayRunId += 1;
+      input.value = "";
       if (message) this.print(message, "system");
+    }
+
+    autoplayDelayForText(text) {
+      if (this.autoplayMode !== "slow") return this.autoplayDelay;
+      const cleaned = String(text || "").replace(/\s+/g, " ").trim();
+      if (!cleaned) return this.autoplayDelay;
+      const words = cleaned.split(/\s+/).filter(Boolean).length;
+      const sentencePauses = (cleaned.match(/[.!?]/g) || []).length;
+      const readingDelay = 1050 + words * 248 + sentencePauses * 338;
+      return Math.max(this.autoplayDelay, Math.min(readingDelay, 16500));
     }
 
     nextAutoplayCommand() {
@@ -1476,7 +1867,7 @@
 
     wear(objectName) {
       const item = this.findInInventory(objectName);
-      if (!item) return this.print("You don't have that.");
+      if (!item) return this.print(this.heldItemMessage(objectName) || "You don't have that.");
       if (matches(item.name, "golden ring") || normalize(objectName).includes("ring")) {
         this.detachItem(item.id);
         item.worn = true;
@@ -1502,7 +1893,7 @@
       if (!id && name.includes("ring") && this.player.wearingRing) {
         return this.removeRing();
       }
-      if (!id) return this.print(`You don't have the ${objectName} to remove.`);
+      if (!id) return this.print(this.heldItemMessage(objectName) || `You don't have the ${objectName} to remove.`);
       if (matches(this.items[id].name, "golden ring")) {
         return this.removeRing(id);
       }
@@ -1533,7 +1924,7 @@
       if (!parsed) return this.print("Use: give [item] to [character].");
       const item = this.findInInventory(parsed.itemName);
       const target = this.resolveCharacterTarget(parsed.targetName);
-      if (!item) return this.print(`${this.player.name} does not have the ${parsed.itemName}.`);
+      if (!item) return this.print(this.heldItemMessage(parsed.itemName) || `${this.player.name} does not have the ${parsed.itemName}.`);
       if (!target) return this.print(`There is no one named ${parsed.targetName} here.`);
       if (target.id === this.player.id) return this.print(`${this.player.name} already has the ${item.name}.`);
       this.detachItem(item.id);
@@ -1543,12 +1934,125 @@
       this.reactToGift(target, item);
     }
 
+    show(command) {
+      const parsed = this.parseGiveCommand(command);
+      if (!parsed) return this.print("Use: show [item] to [character].");
+      const item = this.findInInventory(parsed.itemName);
+      const target = this.resolveCharacterTarget(parsed.targetName);
+      if (!item) return this.print(this.heldItemMessage(parsed.itemName) || `${this.player.name} does not have the ${parsed.itemName}.`);
+      if (!target) return this.print(`There is no one named ${parsed.targetName} here.`);
+      this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "show")} the ${item.name} to ${target.name}.`);
+      this.reactToShownItem(target, item);
+    }
+
+    reactToShownItem(character, item) {
+      if ((matches(character.name, "gandalf") || matches(character.name, "elrond")) && matches(item.name, "curious map")) {
+        return this.print(`${character.name} studies the ${item.name} carefully.`);
+      }
+      this.print(`${character.name} looks at the ${item.name}, but says nothing useful.`);
+    }
+
+    askFor(command) {
+      const parsed = this.parseAskForCommand(command);
+      const conversation = parsed || this.parseAskConversationCommand(command);
+      const delegated = conversation || this.parseAskToCommand(command);
+      if (!delegated) return this.print("Use: ask [character] for [item], or ask [character] to [command].");
+      if (delegated.topic) return this.askCharacterAbout(delegated.characterName, delegated.topic);
+      if (delegated.order) return this.askCharacterTo(delegated.characterName, delegated.order);
+      return this.askCharacterForItem(delegated.characterName, delegated.itemName);
+    }
+
+    askCharacterForItem(characterName, itemName) {
+      const character = this.resolveCharacterTarget(characterName);
+      if (!character) return this.print(`There is no one named ${characterName} here.`);
+      return this.receiveItemFromCharacter(character, itemName);
+    }
+
+    receiveItemFromCharacter(character, itemName) {
+      if (character.friendly === false) return this.respondToTalk(character);
+      if (this.player.name === "You" && this.player.noticeable === false) return this.print(`${character.name} says 'who's talking?'`);
+      const held = this.findCharacterItem(character, itemName);
+      if (!held) return this.print(`${character.name} does not have the ${itemName}.`);
+      if (held.worn) return this.print(`${character.name} is wearing the ${held.item.name}.`);
+      this.detachItem(held.item.id);
+      held.item.location = { type: "character", id: this.player.id };
+      this.player.inventory.push(held.item.id);
+      this.print(`${character.name} gives you the ${held.item.name}.`);
+    }
+
+    askCharacterTo(characterName, order) {
+      const character = this.resolveCharacterTarget(characterName);
+      if (!character) return this.print(`There is no one named ${characterName} here.`);
+      if (character.friendly === false) return this.respondToTalk(character);
+      if (this.player.name === "You" && this.player.noticeable === false) return this.print(`${character.name} says 'who's talking?'`);
+      const delegatedSplitter = new CommandSplitter(this.data);
+      for (const action of delegatedSplitter.split(order)) {
+        const moved = this.processCommand(action, character);
+        if (moved) break;
+      }
+    }
+
+    askCharacterAbout(characterName, topic) {
+      const character = this.resolveCharacterTarget(characterName);
+      if (!character) return this.print(`There is no one named ${characterName} here.`);
+      if (character.friendly === false) return this.respondToTalk(character);
+      if (this.player.name === "You" && this.player.noticeable === false) return this.print(`${character.name} says 'who's talking?'`);
+      this.print(`${character.name} considers ${topic}, but gives no clear answer.`);
+    }
+
+    parseAskForCommand(command) {
+      const text = normalize(command);
+      if (!text) return null;
+      const polite = text.replace(/^(?:please\s+)?/, "").replace(/\s+please$/, "").trim();
+      const match = polite.match(/^(.+?)\s+for\s+(.+)$/);
+      if (match) return { characterName: match[1].trim(), itemName: match[2].trim() };
+      const fromMatch = polite.match(/^(.+?)\s+from\s+(.+)$/);
+      if (fromMatch) return { characterName: fromMatch[2].trim(), itemName: fromMatch[1].trim() };
+      return null;
+    }
+
+    parseAskConversationCommand(command) {
+      const text = normalize(command);
+      if (!text) return null;
+      const match = text.match(/^(.+?)\s+(?:about|where|whether|if|what|why|how|that)\s+(.+)$/);
+      if (match) return { characterName: match[1].trim(), topic: match[2].trim() };
+      const riddle = text.match(/^(.+?)\s+(?:a\s+)?riddle$/);
+      if (riddle) return { characterName: riddle[1].trim(), topic: "a riddle" };
+      return null;
+    }
+
+    parseAskToCommand(command) {
+      const text = normalize(command);
+      if (!text) return null;
+      const match = text.match(/^(.+?)\s+to\s+(.+)$/);
+      if (match) return { characterName: match[1].trim(), order: match[2].trim() };
+      const people = this.peopleInRoom()
+        .filter((character) => character.id !== this.player.id && character.visible)
+        .sort((a, b) => b.name.length - a.name.length);
+      for (const character of people) {
+        const name = normalize(character.name);
+        if (text.startsWith(`${name} `)) {
+          return { characterName: name, order: text.slice(name.length).trim() };
+        }
+      }
+      return null;
+    }
+
+    findCharacterItem(character, itemName) {
+      const name = normalize(itemName);
+      const inventoryId = (character.inventory || []).find((id) => matches(this.items[id]?.name, name));
+      if (inventoryId) return { item: this.items[inventoryId], worn: false };
+      const wornId = (character.worn || []).find((id) => matches(this.items[id]?.name, name));
+      if (wornId) return { item: this.items[wornId], worn: true };
+      return null;
+    }
+
     reactToGift(character, item) {
       if (matches(character.name, "gandalf")) {
         if (matches(item.name, "curious map")) {
           this.flags.gandalf_has_been_given_map = true;
           this.flags.initiative_gandalf_offer_map = true;
-          return this.print("Gandalf studies the curious map and says 'I will keep it safe. Ask me for it when you need it.'");
+          return this.print("Gandalf studies the curious map and says 'I will keep it near; old roads dislike being hurried.'");
         }
         if (matches(item.name, "pipe") || matches(item.name, "firestone")) {
           return this.print("Gandalf smiles through his beard and says 'A thoughtful gift. But keep your wits sharper than any trinket.'");
@@ -1557,15 +2061,15 @@
       if (matches(character.name, "elrond") && matches(item.name, "curious map")) {
         this.flags.elrond_has_been_given_map = true;
         this.flags.initiative_elrond_read_prompt = true;
-        return this.print("Elrond studies the curious map and says 'Ask me to read the map, and I will tell you what I can.'");
+        return this.print("Elrond studies the curious map and says 'Its lines are patient. So should be the one who seeks them.'");
       }
       if (matches(character.name, "thorin")) {
-        if (matches(item.name, "curious key")) return this.print("Thorin weighs the curious key in his hand and says 'This may matter at the mountain door.'");
+        if (matches(item.name, "curious key")) return this.print("Thorin weighs the curious key in his hand and says 'Some doors remember the shape of old promises.'");
         if (matches(item.name, "rope")) return this.print("Thorin nods and says 'Rope is rarely wasted on a dangerous road.'");
         if (matches(item.name, "sword")) return this.print("Thorin grips the sword and looks more certain of himself.");
       }
       if (matches(character.name, "bard")) {
-        if (matches(item.name, "bow") || matches(item.name, "arrow")) return this.print("Bard checks the weapon carefully and says 'When the dragon comes, tell me to shoot.'");
+        if (matches(item.name, "bow") || matches(item.name, "arrow")) return this.print("Bard checks the weapon carefully and says 'A clean shot asks for a steady hour.'");
       }
     }
 
@@ -1575,19 +2079,33 @@
       if (text.startsWith("me ")) {
         return { itemName: text.slice(3).trim(), targetName: "me" };
       }
+      const giveMeNatural = text.match(/^(.+?)\s+(?:to\s+)?me$/);
+      if (giveMeNatural) return { itemName: giveMeNatural[1].trim(), targetName: "me" };
       const giveMeMatch = text.match(/^(.+)\s+to\s+(me|you)$/);
       if (giveMeMatch) return { itemName: giveMeMatch[1].trim(), targetName: giveMeMatch[2] };
-      const parts = text.split(" to ");
+      const parts = text.split(/\s+(?:to|at|into)\s+/);
       if (parts.length !== 2) return null;
       return { itemName: parts[0].trim(), targetName: parts[1].trim() };
     }
 
     resolveCharacterTarget(targetName) {
-      const name = normalize(targetName);
+      const name = this.normalizeCharacterAlias(targetName);
       if (["me", "you"].includes(name) && this.commandIssuer) {
         return this.peopleInRoom().find((p) => p.id === this.commandIssuer.id) || null;
       }
       return this.peopleInRoom().find((p) => p.id !== this.player.id && matches(p.name, name)) || null;
+    }
+
+    normalizeCharacterAlias(targetName) {
+      const name = normalize(targetName);
+      const aliases = {
+        smaug: "dragon",
+        elves: "wood elf",
+        elf: "wood elf",
+        dwarves: "thorin",
+        dwarf: "thorin",
+      };
+      return aliases[name] || name;
     }
 
     attack(command) {
@@ -1596,15 +2114,16 @@
       const target = this.resolveCharacterTarget(targetName);
       if (!target) return this.print(`There is no one named ${targetName} here to attack.`);
       const weapon = weaponName ? this.findInInventory(weaponName) : null;
-      if (weaponName && !weapon) return this.print(`${this.player.name} does not have the ${weaponName}.`);
-      this.print(this.attackCharacter(this.player, target, weapon), target.id === this.data.player || this.endgame ? "danger" : "");
+      if (weaponName && !weapon) return this.print(this.heldItemMessage(weaponName) || `${this.player.name} does not have the ${weaponName}.`);
+      const result = this.attackCharacter(this.player, target, weapon);
+      if (!this.endgame) this.print(result, target.id === this.data.player ? "danger" : "");
     }
 
     breakThing(command) {
       const targetName = command.split(" with ")[0];
       const weaponName = command.includes(" with ") ? command.split(" with ").slice(1).join(" with ") : "";
       const weapon = weaponName ? this.findInInventory(weaponName) : null;
-      if (weaponName && !weapon) return this.print(`${this.player.name} does not have the ${weaponName}.`);
+      if (weaponName && !weapon) return this.print(this.heldItemMessage(weaponName) || `${this.player.name} does not have the ${weaponName}.`);
       const attackStrength = (this.player.strength || 1) + (weapon ? (weapon.weight || 0) : 0);
 
       const door = this.findDoor(targetName)?.door;
@@ -1619,7 +2138,7 @@
       }
 
       const item = this.visibleSearch(targetName)?.item;
-      if (!item) return this.print("I don't see that here.");
+      if (!item) return this.print(this.heldItemMessage(targetName) || "I don't see that here.");
       if (item.broken) return this.print(`You strike the broken ${item.name}. The ${item.name} is already broken.`);
       if (!item.visible) return this.print(`The ${item.name} is not visible.`);
       if (item.portable && item.location?.type !== "character") return this.print(`To break the ${item.name}, you need to pick it up first.`);
@@ -1641,7 +2160,7 @@
 
     pushPull(action, objectName) {
       const item = this.visibleSearch(objectName)?.item;
-      if (!item) return this.print(`You cannot find the ${objectName} to ${action}.`);
+      if (!item) return this.print(this.heldItemMessage(objectName) || `You cannot find the ${objectName} to ${action}.`);
       if (item.weight >= 3 * this.player.strength) return this.print(`The ${item.name} is too heavy to be ${action}ed.`);
       this.print(`You ${action} the ${item.name}.`);
     }
@@ -1652,7 +2171,7 @@
       if (text.startsWith("into ") || text.startsWith("in ")) {
         const targetName = text.replace(/^(into|in)\s+/, "");
         const item = this.visibleSearch(targetName)?.item;
-        if (!item) return this.print(`There is no ${targetName} to climb into.`);
+        if (!item) return this.print(this.heldItemMessage(targetName) || `There is no ${targetName} to climb into.`);
         if (!item.container) return this.print(`The ${targetName} is not a container.`);
         if (!item.open && !item.noLid) return this.print(`The ${targetName} is closed.`);
         const contentsWeight = item.contents.reduce((sum, id) => sum + (this.items[id]?.weight || 0), 0);
@@ -1696,6 +2215,28 @@
       this.print(generic);
     }
 
+    followCharacter(objectName = "") {
+      const target = this.resolveCharacterTarget(objectName);
+      if (!target) return this.print(`There is no one named ${objectName} here to follow.`);
+      this.print(`You follow ${target.name} as closely as you can.`);
+    }
+
+    socialAction(verb, objectName = "") {
+      const text = normalize(objectName);
+      const target = this.resolveCharacterTarget(text.replace(/^(?:from|to)\s+/, ""));
+      if (target) {
+        const messages = {
+          thank: `You thank ${target.name}.`,
+          flatter: `You flatter ${target.name}.`,
+          insult: `You insult ${target.name}.`,
+          answer: `You answer ${target.name}.`,
+        };
+        this.print(messages[verb] || `You ${verb} ${target.name}.`);
+        return;
+      }
+      this.print(`You ${verb}${objectName ? ` ${objectName}` : ""}, but nothing useful happens.`);
+    }
+
     standardResponse(command) {
       const responses = this.data.responses.responses || {};
       const response = responses[command];
@@ -1707,7 +2248,7 @@
     eat(objectName) {
       if (!EDIBLE_ITEMS.has(normalize(objectName))) return this.print("I would not eat that.");
       const item = this.findInInventory(objectName);
-      if (!item) return this.print(this.player.name === "You" ? "You do not have it with you." : `${this.player.name} does not have it.`);
+      if (!item) return this.print(this.heldItemMessage(objectName) || (this.player.name === "You" ? "You do not have it with you." : `${this.player.name} does not have it.`));
       this.detachItem(item.id);
       this.player.strength += 5;
       this.print(this.player.name === "You" ? `You eat the ${item.name} and gain strength.` : `${this.player.name} eats the ${item.name} and gains strength.`);
@@ -1716,7 +2257,7 @@
     drink(objectName) {
       if (!DRINKABLE_ITEMS.has(normalize(objectName))) return this.print("I would not drink that.");
       const item = this.findInInventory(objectName);
-      if (!item) return this.print(this.player.name === "You" ? "You do not have it with you." : `${this.player.name} does not have it.`);
+      if (!item) return this.print(this.heldItemMessage(objectName) || (this.player.name === "You" ? "You do not have it with you." : `${this.player.name} does not have it.`));
       this.detachItem(item.id);
       this.print(this.player.name === "You" ? `You drink the ${item.name}.` : `${this.player.name} drinks the ${item.name}.`);
     }
@@ -1732,13 +2273,19 @@
       const itemName = parts[0].trim();
       const targetName = parts.slice(1).join(" at ").trim();
       const item = this.findInInventory(itemName);
-      if (!item) return this.print(this.player.name === "You" ? "You do not have it." : `${this.player.name} does not have it.`);
+      if (!item) return this.print(this.heldItemMessage(itemName) || (this.player.name === "You" ? "You do not have it." : `${this.player.name} does not have it.`));
       const targetCharacter = targetName ? this.resolveCharacterTarget(targetName) : null;
       if (targetCharacter && item.weapon) {
-        return this.print(this.attackCharacter(this.player, targetCharacter, item), targetCharacter.id === this.data.player || this.endgame ? "danger" : "");
+        const result = this.attackCharacter(this.player, targetCharacter, item);
+        if (!this.endgame) this.print(result, targetCharacter.id === this.data.player ? "danger" : "");
+        return;
       }
       const targetItem = targetName ? this.visibleSearch(targetName)?.item : null;
       const targetDoor = targetName ? this.findDoor(targetName)?.door : null;
+      if (targetName && !targetCharacter && !targetItem && !targetDoor) {
+        const heldMessage = this.heldItemMessage(targetName);
+        if (heldMessage) return this.print(heldMessage);
+      }
       this.detachItem(item.id);
       item.location = { type: "room", id: this.currentRoom };
       const actor = this.player.name === "You" ? "You" : this.player.name;
@@ -1754,7 +2301,7 @@
       if (parts.length !== 2) return this.print("Use: combine [item] with [item].");
       const first = this.findInInventory(parts[0]);
       const second = this.findInInventory(parts[1]);
-      if (!first || !second) return this.print("You need both objects before combining them.");
+      if (!first || !second) return this.print(this.heldItemMessage(!first ? parts[0] : parts[1]) || "You need both objects before combining them.");
       const key = Object.keys(this.data.combinations).find((combo) => combo.includes(first.name) && combo.includes(second.name));
       if (!key) return this.print("Those objects do not combine into anything useful.");
       const spec = this.data.combinations[key];
@@ -1952,7 +2499,7 @@
       if (matches(character.name, "wood elf")) {
         return {
           flag: "initiative_wood_elf_warning",
-          message: "The wood elf watches you closely and says 'Strangers in this wood should explain themselves quickly.'",
+          message: "The wood elf watches you closely and says 'This wood listens more kindly to honest footsteps than to hurried tongues.'",
         };
       }
       if (matches(character.name, "butler")) {
@@ -1968,13 +2515,13 @@
       if (this.characterHas(character, "curious map") && !this.autoplayHas("curious map")) {
         return {
           flag: "initiative_gandalf_offer_map",
-          message: "Gandalf taps the curious map and says 'You may need this before long. Ask me for the map when you are ready.'",
+          message: "Gandalf taps the curious map and says 'Some roads are easier to see when a map has passed through wise hands.'",
         };
       }
       if (this.autoplayHas("curious map") && !this.flags.mapread) {
         return {
           flag: "initiative_gandalf_asks_for_map",
-          message: "Gandalf says 'Let me see the curious map if you want counsel. Give it to me, or better still, show it to Elrond in Rivendell.'",
+          message: "Gandalf says 'That map has slept long enough. Rivendell may wake more from it than I can.'",
         };
       }
       if (this.autoplayHas("smoking pipe") && !this.flags.initiative_gandalf_pipe) {
@@ -1991,30 +2538,30 @@
         if (!this.flags.lanternon) {
           return {
             flag: "initiative_thorin_lantern",
-            message: "Thorin says 'There is something outside, but the window is too dark. Light a lantern and ask me to look through it.'",
+            message: "Thorin says 'There is something beyond the glass, but dwarf eyes are not made for this dark.'",
           };
         }
         return {
           flag: "initiative_thorin_window",
-          message: "Thorin points at the window and says 'Tell me to look through it. I may be tall enough to see what waits outside.'",
+          message: "Thorin glances at the window and says 'That pane sits higher than it seems. Height may matter here.'",
         };
       }
       if (this.currentRoom === "dark_dungeon" && !this.flags.initiative_thorin_window_escape) {
         return {
           flag: "initiative_thorin_window_escape",
-          message: "Thorin whispers 'If I can reach the window, perhaps I can help you out of here.'",
+          message: "Thorin whispers 'Stone walls are stern things, but not every opening is useless.'",
         };
       }
       if (this.currentRoom === "front_gate" && this.flags.secretdoorsun && !this.doorOpenByName("secret door") && this.characterHas(character, "curious key")) {
         return {
           flag: "initiative_thorin_secret_door",
-          message: "Thorin holds up the curious key and says 'The sun has shown the door. Tell me to unlock it.'",
+          message: "Thorin turns the curious key in his fingers and watches the sunlit stone in silence.",
         };
       }
       if (this.currentRoom === "west_bank" && !this.flags.ropeinboat && this.autoplayHas("sturdy rope")) {
         return {
           flag: "initiative_thorin_rope_boat",
-          message: "Thorin says 'That boat will not come by wishing. Try throwing the rope across the river.'",
+          message: "Thorin says 'A boat across the water is near enough to tempt a rope, if the hand is bold.'",
         };
       }
       return null;
@@ -2024,19 +2571,19 @@
       if (this.autoplayHas("curious map") && !this.flags.mapread) {
         return {
           flag: "initiative_elrond_requests_map",
-          message: "Elrond says 'That map is older than it looks. Give it to me, and then ask me to read it.'",
+          message: "Elrond says 'That map is older than it looks. It may speak more clearly under Rivendell's light.'",
         };
       }
       if (this.characterHas(character, "curious map") && !this.flags.mapread) {
         return {
           flag: "initiative_elrond_read_prompt",
-          message: "Elrond traces the markings on the map and says 'Ask me to read the map, and listen carefully.'",
+          message: "Elrond traces the markings on the map and says 'These signs are not idle decoration.'",
         };
       }
       if (!this.flags.elrond_lunch_given && this.currentRoom === "rivendell") {
         return {
           flag: "initiative_elrond_lunch",
-          message: "Elrond says 'Rest here a little. Good counsel is easier on a full stomach.'",
+          message: "Elrond says 'Road-worn minds hear counsel better after rest and food.'",
         };
       }
       return null;
@@ -2047,20 +2594,20 @@
         return {
           flag: "initiative_bard_dragon_order",
           message: this.flags.bardreadiedarrow
-            ? "Bard says 'The dragon will come for the treasure. Tell me to shoot the dragon.'"
-            : "Bard says 'The dragon will come for the treasure. Tell me to get the strong arrow, then tell me to shoot the dragon.'",
+            ? "Bard says 'When fire descends, a single true shot may matter more than treasure.'"
+            : "Bard says 'Against such fire, no ordinary shaft should be trusted.'",
         };
       }
       if (this.liveDragon() && ["front_gate", "lonely_mountain", "stoe_of_ravenhill", "little_steep_bay"].includes(this.currentRoom)) {
         return {
           flag: "initiative_bard_ready",
-          message: "Bard tests his bowstring and says 'If Smaug appears, command me clearly.'",
+          message: "Bard tests his bowstring and says 'A bowman likes to know his moment before the sky darkens.'",
         };
       }
       if (!this.flags.dragondefeated && this.currentRoom === "wooden_town") {
         return {
           flag: "initiative_bard_join",
-          message: "Bard says 'If your road leads to the dragon, take me with you.'",
+          message: "Bard says 'Some roads should not be walked without a bow at your side.'",
         };
       }
       return null;
@@ -2105,7 +2652,8 @@
         return character.friendly !== true || candidate.friendly !== true;
       });
       if (!target) return false;
-      this.print(this.attackCharacter(character, target, null, { forced: true }), target.id === this.data.player || this.endgame ? "danger" : "");
+      const result = this.attackCharacter(character, target, null, { forced: true });
+      if (!this.endgame) this.print(result, target.id === this.data.player ? "danger" : "");
       return true;
     }
 
@@ -2134,7 +2682,10 @@
       character.justEntered = toRoom === this.currentRoom;
       if (options.silent) return;
       if (fromRoom === this.currentRoom) this.print(`${character.name} goes ${direction}.`);
-      if (toRoom === this.currentRoom) this.print(`${character.name} enters.`);
+      if (toRoom === this.currentRoom) {
+        this.scheduleCharacterArrivalNotice(character);
+        character.justEntered = false;
+      }
     }
 
     attackCharacter(attacker, target, weapon = null, options = {}) {
@@ -2193,13 +2744,69 @@
     }
 
     endGame(message) {
+      this.stopAutoplay();
+      this.clearArrivalNoticeTimers();
+      output.replaceChildren();
+      output.classList.add("end-screen");
       this.endgame = true;
-      if (message) this.print(message, "danger");
+      this.endgameRestartArmed = true;
+      const totalRooms = Math.max(Object.keys(this.rooms).length, 1);
+      const percentage = (this.visitedRooms.size / totalRooms) * 100;
+      const endMessage = message ? `${message.replace(/[.!?]*$/, "")}. ` : "";
+      this.print(`${endMessage}You have mastered ${percentage.toFixed(2)}% of this adventure.`, "danger");
+      this.print("Press any key or click to restart.", "system");
     }
 
     winGame(message) {
+      this.stopAutoplay();
+      this.clearArrivalNoticeTimers();
+      output.replaceChildren();
+      output.classList.add("end-screen");
       this.endgame = true;
-      if (message) this.print(message, "success");
+      this.endgameRestartArmed = true;
+      const totalRooms = Math.max(Object.keys(this.rooms).length, 1);
+      const percentage = (this.visitedRooms.size / totalRooms) * 100;
+      const endMessage = message ? `${message.replace(/[.!?]*$/, "")}. ` : "";
+      this.print(`${endMessage}You have mastered ${percentage.toFixed(2)}% of this adventure.`, "success");
+      this.print("Press any key or click to restart.", "system");
+    }
+
+    restartGame() {
+      this.stopAutoplay();
+      this.clearArrivalNoticeTimers();
+      this.rooms = clone(this.data.rooms);
+      this.items = clone(this.data.items);
+      this.doors = clone(this.data.doors);
+      this.characters = clone(this.data.characters);
+      this.connections = this.normalizeConnections(clone(this.data.connections));
+      this.currentRoom = this.data.startRoom;
+      this.flags = {};
+      this.endgame = false;
+      this.endgameRestartArmed = false;
+      this.visitedTrollsClearing = false;
+      this.waitCounter = 0;
+      this.secretDoorWaitCounter = 0;
+      this.trollsTransformed = false;
+      this.trollsDefeated = false;
+      this.visitedRooms = new Set();
+      this.tipsEnabled = false;
+      this.tipIndex = 0;
+      this.autoplayDelay = 450;
+      this.autoplayMode = "normal";
+      this.autoplayWaits = 0;
+      this.autoplayTypingTimer = null;
+      this.autoplayCapturedText = "";
+      this.autoplayCapturingOutput = false;
+      this.pendingClarification = null;
+      this.forcedChoice = null;
+      this.commandIssuer = null;
+      this.splitter = new CommandSplitter(this.data);
+      output.replaceChildren();
+      output.classList.remove("end-screen");
+      this.initState();
+      this.describeRoom(true);
+      input.value = "";
+      input.focus();
     }
 
     handleTimedSpecials() {
@@ -2298,24 +2905,38 @@
     }
 
     handleTalk(command) {
-      const quoted = command.match(/^(?:say|talk) to ([^"]+) "(.+)"$/);
-      if (quoted) {
-        const character = this.peopleInRoom().find((p) => p.name !== "You" && matches(p.name, normalize(quoted[1])));
-        if (!character) return this.print("You speak, but only silence meets your words.");
-        if (character.friendly === false) return this.respondToTalk(character);
-        if (this.player.name === "You" && this.player.noticeable === false) return this.print(`${character.name} says 'who's talking?'`);
-        if (this.handleBardDragonCommand(character, quoted[2])) return;
-        for (const action of this.splitter.split(quoted[2])) {
+      const parsed = this.parseTalkCommand(command);
+      if (!parsed) return this.print("You speak, but only silence meets your words.");
+      const character = this.resolveCharacterTarget(parsed.characterName);
+      if (!character) return this.print("You speak, but only silence meets your words.");
+      if (character.friendly === false) return this.respondToTalk(character);
+      if (this.player.name === "You" && this.player.noticeable === false) return this.print(`${character.name} says 'who's talking?'`);
+      if (parsed.order) {
+        if (this.handleBardDragonCommand(character, parsed.order)) return;
+        for (const action of this.splitter.split(parsed.order)) {
           const moved = this.processCommand(action, character);
           if (moved) break;
         }
         return;
       }
-      const name = command.replace(/^(say|talk) to /, "");
-      const character = this.peopleInRoom().find((p) => p.name !== "You" && matches(p.name, normalize(name)));
-      if (!character) return this.print("You speak, but only silence meets your words.");
-      if (character.friendly === false) return this.respondToTalk(character);
       this.print(`${character.name} listens intently, expecting your words.`);
+    }
+
+    parseTalkCommand(command) {
+      let text = normalize(command).replace(/^(say|talk|speak|whisper|yell)\s+/, "").trim();
+      text = text.replace(/^(to|with)\s+/, "").trim();
+      if (!text) return null;
+      const quoted = text.match(/^(.+?)\s+"(.+)"$/);
+      if (quoted) return { characterName: quoted[1].trim(), order: quoted[2].trim() };
+      const people = this.peopleInRoom()
+        .filter((character) => character.id !== this.player.id && character.visible)
+        .sort((a, b) => b.name.length - a.name.length);
+      for (const character of people) {
+        const name = normalize(character.name);
+        if (text === name) return { characterName: name, order: "" };
+        if (text.startsWith(`${name} `)) return { characterName: name, order: text.slice(name.length).trim().replace(/^to\s+/, "") };
+      }
+      return { characterName: text, order: "" };
     }
 
     respondToTalk(character) {
@@ -2442,6 +3063,8 @@
         if (roomItem?.portable) return `${actorSubject(this.player, true)} ${actorVerb(this.player, "do")} not have the ${roomItem.name}.`;
         if (roomItem) continue;
         if (this.findDoor(query)) continue;
+        const heldMessage = this.heldItemMessage(query);
+        if (heldMessage) return heldMessage;
         const knownPortable = Object.values(this.items).find((item) => item.portable && matches(item.name, query));
         if (knownPortable) return `${actorSubject(this.player, true)} ${actorVerb(this.player, "do")} not have the ${knownPortable.name}.`;
         return "I do not see that here.";
@@ -2596,14 +3219,21 @@
       const char = text[index];
       if (char === '"') inQuote = !inQuote;
       if (!inQuote && text.slice(index, index + 5) === " and ") {
-        if (current.trim()) parts.push(current.trim());
+        if (/^(ask|tell)\b/.test(current.trim()) && /\bto\b/.test(current)) {
+          current += " and ";
+          index += 4;
+          continue;
+        }
+        const cleaned = current.trim().replace(/^(?:and|then)\s+/, "");
+        if (cleaned) parts.push(cleaned);
         current = "";
         index += 4;
         continue;
       }
       current += char;
     }
-    if (current.trim()) parts.push(current.trim());
+    const cleaned = current.trim().replace(/^(?:and|then)\s+/, "");
+    if (cleaned) parts.push(cleaned);
     return parts;
   }
 
@@ -2618,6 +3248,13 @@
         continue;
       }
       if (!inQuote && char === ",") {
+        const before = output.trim();
+        const after = text.slice(index + 1).trim();
+        const beforeWords = before.split(/\s+/);
+        if (beforeWords.length === 1 && after) {
+          output += " ";
+          continue;
+        }
         output += " and ";
         continue;
       }
@@ -2629,6 +3266,83 @@
       output += char;
     }
     return output;
+  }
+
+  function normalizeNaturalCommand(command) {
+    return command
+      .replace(/[.?!]+$/g, "")
+      .replace(/^bilbo\s+(?:gives|give)\s+/, "give ")
+      .replace(/^bilbo\s+(?:takes|take)\s+/, "take ")
+      .replace(/\band\s+then\b/g, "and")
+      .replace(/\b(this|my|your)\b/g, " ")
+      .replace(/^(?:please\s+)?(?:can|could|would|will)\s+you\s+/, "")
+      .replace(/^(?:please\s+)?(?:can|could|would|will)\s+/, "")
+      .replace(/^please\s+/, "")
+      .replace(/\s+please$/g, "")
+      .replace(/\bturn\s+off\b/g, "close")
+      .replace(/\bturn\s+on\b/g, "open")
+      .replace(/\bpick\s+up\b/g, "take")
+      .replace(/\bput\s+down\b/g, "leave")
+      .replace(/\bhand\s+me\b/g, "hand me")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function parseCanonicalDialogueInput(rawCommand) {
+    let text = String(rawCommand || "").trim();
+    if (!text) return null;
+    let speaker = "Bilbo";
+    const speakerMatch = text.match(/^([A-Za-z]+):\s*(.+)$/);
+    if (speakerMatch) {
+      speaker = speakerMatch[1];
+      text = speakerMatch[2].trim();
+    }
+    const spokenMatch = text.match(/^([A-Za-z]+),\s*(.+)$/);
+    if (!spokenMatch) return null;
+    return {
+      speaker,
+      addressee: spokenMatch[1],
+      line: spokenMatch[2],
+    };
+  }
+
+  function canonicalDialogueResponse(speaker, addressee, line) {
+    const wantedSpeaker = dialogueKeyPart(speaker);
+    const wantedAddressee = dialogueKeyPart(addressee);
+    const wantedLine = dialogueLineKey(line);
+    const match = CANONICAL_DIALOGUES.find(([entrySpeaker, entryAddressee, entryLine]) => {
+      return dialogueKeyPart(entrySpeaker) === wantedSpeaker
+        && dialogueKeyPart(entryAddressee) === wantedAddressee
+        && dialogueLineKey(entryLine) === wantedLine;
+    });
+    return match?.[3] || "";
+  }
+
+  function dialogueKeyPart(text) {
+    return normalizeWords(text);
+  }
+
+  function dialogueLineKey(text) {
+    return normalizeWords(String(text || "").replace(/[.,!?;:"“”]/g, " "))
+      .replace(/\b(the|a|an)\b/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function displayDialogueName(name) {
+    const normalized = normalizeWords(name);
+    const entry = CANONICAL_DIALOGUES.find((dialogue) => dialogueKeyPart(dialogue[1]) === normalized);
+    return entry?.[1] || capitalize(name);
+  }
+
+  function normalizeVocativeCommand(command, verbs) {
+    const match = command.match(/^([a-z][a-z ]{1,30})\s*,?\s+(.+)$/);
+    if (!match) return command;
+    const firstWord = match[1].split(/\s+/)[0];
+    if (verbs.includes(firstWord)) return command;
+    const restVerb = match[2].split(/\s+/)[0];
+    if (!verbs.includes(restVerb)) return command;
+    return `ask ${match[1].trim()} to ${match[2].trim()}`;
   }
 
   function isBoundary(char) {
@@ -2644,6 +3358,13 @@
   function articleFor(name, capital = false) {
     const article = /^[aeiou]/i.test(name) ? "an" : "a";
     return capital ? article[0].toUpperCase() + article.slice(1) : article;
+  }
+
+  function itemLabel(name) {
+    const text = String(name || "");
+    if (!text) return "";
+    if (/^(a|an|the)\s/i.test(text) || isProperName(text)) return text;
+    return `${articleFor(text)} ${text}`;
   }
 
   function displayCharacterName(character) {
@@ -2672,11 +3393,15 @@
 
   function characterPresence(character) {
     if (character.justEntered) {
-      if (isProperName(character.name)) return `${character.name} enters.`;
-      return `${articleFor(character.name, true)} ${character.name} enters.`;
+      return characterArrivalMessage(character);
     }
     if (isProperName(character.name)) return `${character.name} is here.`;
     return `${articleFor(character.name, true)} ${character.name} is here.`;
+  }
+
+  function characterArrivalMessage(character) {
+    if (isProperName(character.name)) return `${character.name} enters.`;
+    return `${articleFor(character.name, true)} ${character.name} enters.`;
   }
 
   function parseAllTarget(text) {
@@ -2851,4 +3576,12 @@
   }
 
   window.hobbitGame = new HobbitGame(DATA);
+  const fontReady = document.fonts?.ready || Promise.resolve();
+  fontReady.finally(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document.body.classList.remove("booting");
+      });
+    });
+  });
 })();

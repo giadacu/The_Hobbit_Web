@@ -1,0 +1,463 @@
+const fs = require("fs");
+const vm = require("vm");
+
+const outputLines = [];
+
+function makeElement(id = "") {
+  return {
+    id,
+    value: "",
+    textContent: "",
+    className: "",
+    children: [],
+    style: {},
+    attributes: {},
+    classList: { add() {}, remove() {}, contains() { return false; } },
+    append(child) {
+      this.children.push(child);
+      if (this.id === "output" && child.textContent) outputLines.push(child.textContent);
+    },
+    replaceChildren() {
+      this.children = [];
+      if (this.id === "output") outputLines.length = 0;
+    },
+    addEventListener() {},
+    removeAttribute(name) { delete this.attributes[name]; },
+    getAttribute(name) { return this.attributes[name] || ""; },
+    setAttribute(name, value) { this.attributes[name] = value; },
+    focus() {},
+    closest() { return makeElement("scene"); },
+    getBoundingClientRect() { return { width: 800, height: 500 }; },
+    play() { return Promise.resolve(); },
+    pause() {},
+    load() {},
+    get offsetHeight() { return 1; },
+    set src(value) { this.attributes.src = value; },
+    get src() { return this.attributes.src || ""; },
+  };
+}
+
+function bootGame() {
+  const elements = new Map();
+  for (const id of [
+    "output",
+    "command-input",
+    "command-form",
+    "room-image",
+    "image-reveal",
+    "image-reveal-outline",
+    "image-reveal-fill",
+    "music-player",
+    "inventory-list",
+    "exits-list",
+    "people-list",
+  ]) {
+    elements.set(id, makeElement(id));
+  }
+
+  global.window = global;
+  global.document = {
+    getElementById: (id) => elements.get(id) || makeElement(id),
+    createElement: () => makeElement(),
+    addEventListener() {},
+    body: makeElement("body"),
+    fonts: { ready: Promise.resolve() },
+  };
+  global.localStorage = {
+    getItem() { return null; },
+    setItem() {},
+    removeItem() {},
+    key() { return null; },
+    get length() { return 0; },
+  };
+  global.requestAnimationFrame = (fn) => setTimeout(() => fn(Date.now()), 0);
+  global.cancelAnimationFrame = clearTimeout;
+
+  vm.runInThisContext(fs.readFileSync("assets/game-data.js", "utf8"));
+  vm.runInThisContext(fs.readFileSync("game.js", "utf8"));
+  return window.hobbitGame.splitter.constructor;
+}
+
+function sameArray(actual, expected) {
+  return actual.length === expected.length && actual.every((value, index) => value === expected[index]);
+}
+
+function runCase(Splitter, testCase) {
+  const splitter = new Splitter(window.HOBBIT_DATA);
+  const actual = [];
+  for (const input of testCase.inputs || [testCase.input]) {
+    actual.push(...splitter.split(input));
+  }
+  return { ...testCase, actual, ok: sameArray(actual, testCase.expected) };
+}
+
+function runDialogueCase(testCase) {
+  outputLines.length = 0;
+  window.hobbitGame.execute(testCase.input);
+  const actual = outputLines.at(-1) || "";
+  return { ...testCase, actual, ok: actual === testCase.expected };
+}
+
+const cases = [
+  {
+    name: "object manipulation",
+    input: "Pick up the red box.",
+    expected: ["take red box"],
+  },
+  {
+    name: "placement on object",
+    input: "Put the book on the table.",
+    expected: ["leave book on table"],
+  },
+  {
+    name: "spatial placement keeps phrase",
+    input: "Place the pen next to the notebook.",
+    expected: ["place pen next to notebook"],
+  },
+  {
+    name: "transfer to person",
+    input: "Give the key to Thorin.",
+    expected: ["give key to thorin"],
+  },
+  {
+    name: "hand me",
+    input: "Hand me the screwdriver.",
+    expected: ["hand me screwdriver"],
+  },
+  {
+    name: "polite command",
+    input: "Could you bring me a glass of water?",
+    expected: ["bring me glass of water"],
+  },
+  {
+    name: "ask about topic",
+    input: "Ask Thorin about the treasure.",
+    expected: ["ask thorin about treasure"],
+  },
+  {
+    name: "tell person to act",
+    input: "Tell Thorin to unlock the door.",
+    expected: ["ask thorin to unlock door"],
+  },
+  {
+    name: "vocative",
+    input: "Gandalf, follow me.",
+    expected: ["ask gandalf to follow me"],
+  },
+  {
+    name: "third-person Bilbo command",
+    input: "Bilbo gives the Arkenstone to Bard.",
+    expected: ["give arkenstone to bard"],
+  },
+  {
+    name: "multi-step direct",
+    input: "Take the sword, attack the goblin, and then follow Gandalf.",
+    expected: ["take sword", "kill goblin", "follow gandalf"],
+  },
+  {
+    name: "multi-step with pronoun",
+    input: "Get the key from Balin and give it to Thorin.",
+    expected: ["get key from balin", "give key to thorin"],
+  },
+  {
+    name: "delegated chain remains delegated",
+    input: "Tell Bombur to take the treasure and bring it here.",
+    expected: ["ask bombur to take treasure and bring it here"],
+  },
+  {
+    name: "delegated pronoun remains inside delegation",
+    input: "Ask Elrond to read the map and explain it.",
+    expected: ["ask elrond to read map and explain it"],
+  },
+  {
+    name: "nested command request",
+    input: "Ask Gandalf to tell Thorin to follow me.",
+    expected: ["ask gandalf to tell thorin to follow me"],
+  },
+  {
+    name: "indirect speech treated as topic",
+    input: "Tell Thorin that Gandalf wants to leave.",
+    expected: ["ask thorin that gandalf wants to leave"],
+  },
+  {
+    name: "question to character treated as topic",
+    input: "Ask Gandalf if he knows where Gollum is.",
+    expected: ["ask gandalf if he knows where gollum is"],
+  },
+  {
+    name: "context pronouns across inputs",
+    inputs: ["Take the sword.", "Give it to Thorin.", "Tell him to wait."],
+    expected: ["take sword", "give sword to thorin", "ask thorin to wait"],
+  },
+  {
+    name: "open and inspect pronoun",
+    inputs: ["Open the chest.", "Look inside it."],
+    expected: ["open chest", "look inside chest"],
+  },
+  {
+    name: "give then ask pronoun",
+    input: "Give the key to Thorin and ask him to unlock the door.",
+    expected: ["give key to thorin", "ask thorin to unlock door"],
+  },
+  {
+    name: "delegated while clause kept together",
+    input: "Ask Balin to guard the entrance while I search the cave.",
+    expected: ["ask balin to guard entrance while i search cave"],
+  },
+  {
+    name: "follow into and act",
+    input: "Follow Gandalf into the tunnel and light the lantern.",
+    expected: ["follow gandalf into tunnel", "light lantern"],
+  },
+  {
+    name: "steal from and return",
+    input: "Steal the cup from Smaug and return to the dwarves.",
+    expected: ["steal cup from smaug", "return to dwarves"],
+  },
+  {
+    name: "tell about then follow pronoun",
+    input: "Tell Bard about the secret door and follow him.",
+    expected: ["ask bard about secret door", "follow bard"],
+  },
+  {
+    name: "give then tell pronoun",
+    input: "Give the Arkenstone to Bard and tell him to negotiate with Thorin.",
+    expected: ["give arkenstone to bard", "ask bard to negotiate with thorin"],
+  },
+];
+
+const originalListCases = [
+  ["Pick up the red box.", ["take red box"]],
+  ["Put the book on the table.", ["leave book on table"]],
+  ["Move the chair closer to the window.", ["move chair closer to window"]],
+  ["Take the cup from the shelf.", ["take cup from shelf"]],
+  ["Open the drawer.", ["open drawer"]],
+  ["Close the door.", ["close door"]],
+  ["Lift the package carefully.", ["lift package"]],
+  ["Drop the keys into the basket.", ["leave keys into basket"]],
+  ["Turn the bottle upside down.", ["turn bottle upside down"]],
+  ["Place the pen next to the notebook.", ["place pen next to notebook"]],
+  ["Give the ball to John.", ["give ball to john"]],
+  ["Hand me the screwdriver.", ["hand me screwdriver"]],
+  ["Pass the salt to Sarah.", ["pass salt to sarah"]],
+  ["Bring the documents to the manager.", ["bring documents to manager"]],
+  ["Send the package to the warehouse.", ["send package to warehouse"]],
+  ["Return the book to Mary.", ["return book to mary"]],
+  ["Deliver the letter to the receptionist.", ["deliver letter to receptionist"]],
+  ["Take this folder to my office.", ["take folder to office"]],
+  ["Leave the box at the front desk.", ["leave box at front desk"]],
+  ["Carry the groceries into the kitchen.", ["carry groceries into kitchen"]],
+  ["Ask John to open the window.", ["ask john to open window"]],
+  ["Tell Sarah to call me.", ["ask sarah to call me"]],
+  ["Ask the technician to check the machine.", ["ask technician to check machine"]],
+  ["Tell everyone to sit down.", ["ask everyone to sit down"]],
+  ["Ask Mike to move the car.", ["ask mike to move car"]],
+  ["Tell the team to start the meeting.", ["ask team to start meeting"]],
+  ["Ask Anna to bring some coffee.", ["ask anna to bring coffee"]],
+  ["Tell the driver to wait outside.", ["ask driver to wait outside"]],
+  ["Ask Peter to send the report.", ["ask peter to send report"]],
+  ["Tell the assistant to print the document.", ["ask assistant to print document"]],
+  ["Pick up the book and place it on the desk.", ["take book", "place book on desk"]],
+  ["Open the box and remove the contents.", ["open box", "remove contents"]],
+  ["Take the keys, unlock the door, and enter the room.", ["take keys", "unlock door", "go room"]],
+  ["Find the folder and give it to Susan.", ["find folder", "give folder to susan"]],
+  ["Turn off the light and close the door.", ["close light", "close door"]],
+  ["Get the package from the office and bring it here.", ["get package from office", "bring package here"]],
+  ["Wash the cup and put it back on the shelf.", ["wash cup", "leave cup back on shelf"]],
+  ["Open the cabinet, take the file, and hand it to me.", ["open cabinet", "take file", "hand file to me"]],
+  ["Pick up the phone and call John.", ["take phone", "call john"]],
+  ["Find the missing tool and return it to the toolbox.", ["find missing tool", "return tool to toolbox"]],
+  ["Put the box under the table.", ["leave box under table"]],
+  ["Move the chair behind the desk.", ["move chair behind desk"]],
+  ["Place the lamp between the two chairs.", ["place lamp between two chairs"]],
+  ["Set the package near the entrance.", ["set package near entrance"]],
+  ["Put the notebook inside the drawer.", ["leave notebook inside drawer"]],
+  ["Move the cart to the left of the machine.", ["move cart to left of machine"]],
+  ["Place the bottle in front of the monitor.", ["place bottle in front of monitor"]],
+  ["Put the suitcase beside the bed.", ["leave suitcase beside bed"]],
+  ["Move the pallet to the back of the warehouse.", ["move pallet to back of warehouse"]],
+  ["Store the boxes on the top shelf.", ["store boxes on top shelf"]],
+  ["Talk to Thorin.", ["talk to thorin"]],
+  ["Ask Thorin about the treasure.", ["ask thorin about treasure"]],
+  ["Give the key to Thorin.", ["give key to thorin"]],
+  ["Follow Thorin.", ["follow thorin"]],
+  ["Tell Thorin to wait here.", ["ask thorin to wait here"]],
+  ["Tell Thorin to unlock the door.", ["ask thorin to unlock door"]],
+  ["Ask Balin for advice.", ["ask balin for advice"]],
+  ["Give the map to Balin.", ["give map to balin"]],
+  ["Tell Dwalin to attack the goblin.", ["ask dwalin to attack goblin"]],
+  ["Wake Bombur.", ["wake bombur"]],
+  ["Tell Bombur to follow me.", ["ask bombur to follow me"]],
+  ["Ask Fili to carry the treasure.", ["ask fili to carry treasure"]],
+  ["Ask Kili to climb the tree.", ["ask kili to climb tree"]],
+  ["Give the rope to Oin.", ["give rope to oin"]],
+  ["Tell Gloin to guard the entrance.", ["ask gloin to guard entrance"]],
+  ["Ask Bifur to search the cave.", ["ask bifur to search cave"]],
+  ["Tell Bofur to open the chest.", ["ask bofur to open chest"]],
+  ["Ask Nori about the tunnel.", ["ask nori about tunnel"]],
+  ["Tell Dori to help Bilbo.", ["ask dori to help bilbo"]],
+  ["Ask Ori to read the map.", ["ask ori to read map"]],
+  ["Talk to Gandalf.", ["talk to gandalf"]],
+  ["Ask Gandalf where to go.", ["ask gandalf where to go"]],
+  ["Show the map to Gandalf.", ["show map to gandalf"]],
+  ["Give the key to Gandalf.", ["give key to gandalf"]],
+  ["Ask Gandalf to light the way.", ["ask gandalf to light way"]],
+  ["Tell Gandalf to attack the goblin.", ["ask gandalf to attack goblin"]],
+  ["Follow Gandalf.", ["follow gandalf"]],
+  ["Ask Gandalf about the dragon.", ["ask gandalf about dragon"]],
+  ["Tell Gandalf to wait outside.", ["ask gandalf to wait outside"]],
+  ["Ask Gandalf whether the path is safe.", ["ask gandalf whether path is safe"]],
+  ["Talk to Gollum.", ["talk to gollum"]],
+  ["Ask Gollum a riddle.", ["ask gollum riddle"]],
+  ["Answer Gollum's riddle.", ["answer gollum's riddle"]],
+  ["Follow Gollum.", ["follow gollum"]],
+  ["Show the ring to Gollum.", ["show ring to gollum"]],
+  ["Give the fish to Gollum.", ["give fish to gollum"]],
+  ["Hide from Gollum.", ["hide from gollum"]],
+  ["Sneak past Gollum.", ["sneak past gollum"]],
+  ["Ask Gollum where the exit is.", ["ask gollum where exit is"]],
+  ["Escape from Gollum.", ["escape from gollum"]],
+  ["Talk to Elrond.", ["talk to elrond"]],
+  ["Show the map to Elrond.", ["show map to elrond"]],
+  ["Ask Elrond to read the moon letters.", ["ask elrond to read moon letters"]],
+  ["Follow Elrond.", ["follow elrond"]],
+  ["Give the sword to Elrond.", ["give sword to elrond"]],
+  ["Ask the elves for food.", ["ask elves for food"]],
+  ["Tell the elves about the dragon.", ["ask elves about dragon"]],
+  ["Ask Elrond about the secret door.", ["ask elrond about secret door"]],
+  ["Thank Elrond.", ["thank elrond"]],
+  ["Ask Elrond where Rivendell is.", ["ask elrond where rivendell is"]],
+  ["Talk to Beorn.", ["talk to beorn"]],
+  ["Ask Beorn for shelter.", ["ask beorn for shelter"]],
+  ["Ask Beorn about Mirkwood.", ["ask beorn about mirkwood"]],
+  ["Give honey to Beorn.", ["give honey to beorn"]],
+  ["Follow Beorn.", ["follow beorn"]],
+  ["Tell Beorn about the goblins.", ["ask beorn about goblins"]],
+  ["Ask Beorn for food.", ["ask beorn for food"]],
+  ["Ask Beorn to help the dwarves.", ["ask beorn to help dwarves"]],
+  ["Show the map to Beorn.", ["show map to beorn"]],
+  ["Thank Beorn for his hospitality.", ["thank beorn for his hospitality"]],
+  ["Talk to Smaug.", ["talk to smaug"]],
+  ["Ask Smaug about the treasure.", ["ask smaug about treasure"]],
+  ["Flatter Smaug.", ["flatter smaug"]],
+  ["Insult Smaug.", ["insult smaug"]],
+  ["Sneak past Smaug.", ["sneak past smaug"]],
+  ["Steal a cup from Smaug.", ["steal cup from smaug"]],
+  ["Show the Arkenstone to Smaug.", ["show arkenstone to smaug"]],
+  ["Hide from Smaug.", ["hide from smaug"]],
+  ["Attack Smaug with the sword.", ["kill smaug with sword"]],
+  ["Run away from Smaug.", ["run away from smaug"]],
+  ["Talk to Bard.", ["talk to bard"]],
+  ["Give the Arkenstone to Bard.", ["give arkenstone to bard"]],
+  ["Ask Bard for help.", ["ask bard for help"]],
+  ["Follow Bard.", ["follow bard"]],
+  ["Tell Bard about Smaug.", ["ask bard about smaug"]],
+  ["Show Bard the secret map.", ["show bard secret map"]],
+  ["Ask Bard to negotiate with Thorin.", ["ask bard to negotiate with thorin"]],
+  ["Give Bard the treasure.", ["give bard treasure"]],
+  ["Thank Bard.", ["thank bard"]],
+  ["Ask Bard about Lake-town.", ["ask bard about lake-town"]],
+  ["Ask Gandalf to tell Thorin to follow me.", ["ask gandalf to tell thorin to follow me"]],
+  ["Give the key to Thorin and ask him to unlock the door.", ["give key to thorin", "ask thorin to unlock door"]],
+  ["Tell Bombur to take the treasure and bring it here.", ["ask bombur to take treasure and bring it here"]],
+  ["Ask Balin to guard the entrance while I search the cave.", ["ask balin to guard entrance while i search cave"]],
+  ["Follow Gandalf into the tunnel and light the lantern.", ["follow gandalf into tunnel", "light lantern"]],
+  ["Steal the cup from Smaug and return to the dwarves.", ["steal cup from smaug", "return to dwarves"]],
+  ["Ask Elrond to read the map and explain it.", ["ask elrond to read map and explain it"]],
+  ["Tell Bard about the secret door and follow him.", ["ask bard about secret door", "follow bard"]],
+  ["Ask Gollum where the exit is and then run away.", ["ask gollum where exit is", "run away"]],
+  ["Give the Arkenstone to Bard and tell him to negotiate with Thorin.", ["give arkenstone to bard", "ask bard to negotiate with thorin"]],
+  ["Gandalf, follow me.", ["ask gandalf to follow me"]],
+  ["Thorin, unlock the door.", ["ask thorin to unlock door"]],
+  ["Bilbo gives the Arkenstone to Bard.", ["give arkenstone to bard"]],
+  ["Tell Thorin that Gandalf wants to leave.", ["ask thorin that gandalf wants to leave"]],
+  ["Ask Gandalf if he knows where Gollum is.", ["ask gandalf if he knows where gollum is"]],
+  ["Get the key from Balin and give it to Thorin.", ["get key from balin", "give key to thorin"]],
+  ["Take the sword, attack the goblin, and then follow Gandalf.", ["take sword", "kill goblin", "follow gandalf"]],
+];
+
+cases.push(...originalListCases.map(([input, expected], index) => ({
+  name: `original list ${String(index + 1).padStart(3, "0")}`,
+  input,
+  expected,
+})));
+
+const dialogueCases = [
+  ["BILBO: Gandalf, are you certain this is the right path?", "Gandalf says 'It is the safest path available to us.'"],
+  ["BILBO: Thorin, what lies beyond those hills?", "Thorin says 'The road to our homeland, if fortune favors us.'"],
+  ["BILBO: Thorin, should we make camp here?", "Thorin says 'Not yet. We must put more distance behind us.'"],
+  ["BILBO: Gandalf, do you expect trouble tonight?", "Gandalf says 'Trouble often arrives when it is least expected.'"],
+  ["BILBO: Elrond, can you read these markings?", "Elrond says 'Yes, but their meaning is hidden to most eyes.'"],
+  ["BILBO: Elrond, what does the map reveal?", "Elrond says 'A secret entrance and a narrow chance of success.'"],
+  ["BILBO: Beorn, may we stay the night?", "Beorn says 'You may, provided you cause no mischief.'"],
+  ["BILBO: Beorn, what dangers await in Mirkwood?", "Beorn says 'Many, and few travelers return unchanged.'"],
+  ["BILBO: Bard, do you trust Thorin?", "Bard says 'I trust his courage more than his judgment.'"],
+  ["THORIN: Bilbo, have you seen the Arkenstone?", "Bilbo says 'Not since we entered the mountain.'"],
+  ["THORIN: Gandalf, why have you returned?", "Gandalf says 'Because events are moving faster than expected.'"],
+  ["THORIN: Elrond, can you help us?", "Elrond says 'Advice I can offer; victory you must earn.'"],
+  ["THORIN: Beorn, will you aid our cause?", "Beorn says 'If your cause is just, perhaps.'"],
+  ["THORIN: Bard, what do the people want?", "Bard says 'Fair treatment and a share of what was promised.'"],
+  ["GANDALF: Bilbo, what did you discover?", "Bilbo says 'A passage leading deeper underground.'"],
+  ["GANDALF: Thorin, are your companions ready?", "Thorin says 'Ready or not, we must proceed.'"],
+  ["GANDALF: Elrond, what do you make of this sign?", "Elrond says 'It warns of old powers at work.'"],
+  ["GANDALF: Beorn, have enemies crossed your lands?", "Beorn says 'More than usual, and that concerns me.'"],
+  ["GANDALF: Bard, can peace still be achieved?", "Bard says 'Only if pride yields to reason.'"],
+  ["ELROND: Bilbo, what troubles you?", "Bilbo says 'The feeling that we are being watched.'"],
+  ["ELROND: Thorin, what do you seek above all?", "Thorin says 'My kingdom restored.'"],
+  ["ELROND: Gandalf, why choose a hobbit?", "Gandalf says 'Because others overlook what hobbits can do.'"],
+  ["ELROND: Beorn, what news do you bring?", "Beorn says 'Wolves and goblins have been seen together.'"],
+  ["ELROND: Bard, what is your greatest concern?", "Bard says 'The safety of my people.'"],
+  ["BEORN: Bilbo, can you handle a pony?", "Bilbo says 'Better than I can handle a dragon.'"],
+  ["BEORN: Thorin, how long will your quest take?", "Thorin says 'Longer than I would like.'"],
+  ["BEORN: Gandalf, what is your plan?", "Gandalf says 'To stay one step ahead of disaster.'"],
+  ["BEORN: Elrond, do you trust these travelers?", "Elrond says 'Enough to offer them shelter.'"],
+  ["BEORN: Bard, have you faced Smaug?", "Bard says 'Only from a distance.'"],
+  ["BARD: Bilbo, what did you see inside?", "Bilbo says 'Treasure beyond counting.'"],
+  ["BARD: Thorin, will you honor your word?", "Thorin says 'I intend to.'"],
+  ["BARD: Gandalf, what happens next?", "Gandalf says 'That depends on choices made today.'"],
+  ["BARD: Elrond, would you have acted differently?", "Elrond says 'Wisdom is easier after the fact.'"],
+  ["BARD: Beorn, will you stand with us?", "Beorn says 'Against tyranny, yes.'"],
+  ["BILBO: Thorin, listen to reason.", "Thorin says 'Reason is difficult when one's heart is burdened.'"],
+  ["THORIN: Bilbo, why are you hesitant?", "Bilbo says 'Because courage and caution are both necessary.'"],
+  ["GANDALF: Bilbo, do you regret coming?", "Bilbo says 'Often, but never completely.'"],
+  ["ELROND: Bilbo, what have you learned?", "Bilbo says 'That small people can influence great events.'"],
+  ["BEORN: Bilbo, are you hungry?", "Bilbo says 'That is rarely a difficult question.'"],
+  ["BARD: Bilbo, whom do you support?", "Bilbo says 'Whoever seeks a fair outcome.'"],
+  ["THORIN: Gandalf, can we trust Bard?", "Gandalf says 'Trust must be built, not assumed.'"],
+  ["GANDALF: Thorin, what matters most now?", "Thorin says 'Preventing our hard-won victory from becoming a disaster.'"],
+  ["ELROND: Thorin, what do you fear?", "Thorin says 'Losing what I fought to reclaim.'"],
+  ["BEORN: Gandalf, are we too late?", "Gandalf says 'Not yet.'"],
+  ["BARD: Thorin, is there room for compromise?", "Thorin says 'There may be, though I do not welcome it.'"],
+  ["BILBO: Gandalf, what should I do?", "Gandalf says 'The next right thing.'"],
+  ["THORIN: Bilbo, will you stand with us?", "Bilbo says 'I will stand for what is right.'"],
+  ["GANDALF: Bilbo, are you ready?", "Bilbo says 'As ready as I am likely to be.'"],
+  ["BARD: Bilbo, what kind of hero are you?", "Bilbo says 'The reluctant kind.'"],
+  ["ELROND: Gandalf, do you still believe in him?", "Gandalf says 'More than ever.'"],
+  ["Gandalf, are you certain this is the right path?", "Gandalf says 'It is the safest path available to us.'"],
+];
+
+const Splitter = bootGame();
+const results = cases.map((testCase) => runCase(Splitter, testCase));
+const dialogueResults = dialogueCases.map(([input, expected], index) => runDialogueCase({
+  name: `dialogue ${String(index + 1).padStart(3, "0")}`,
+  input,
+  expected,
+}));
+const allResults = [...results, ...dialogueResults];
+const failed = allResults.filter((result) => !result.ok);
+
+for (const result of allResults) {
+  const mark = result.ok ? "PASS" : "FAIL";
+  console.log(`${mark} ${result.name}`);
+  if (!result.ok) {
+    console.log(`  expected: ${JSON.stringify(result.expected)}`);
+    console.log(`  actual:   ${JSON.stringify(result.actual)}`);
+  }
+}
+
+if (failed.length) {
+  console.error(`\n${failed.length} parser test(s) failed.`);
+  process.exit(1);
+}
+
+console.log(`\n${allResults.length} parser/dialogue tests passed.`);

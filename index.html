@@ -1,23 +1,62 @@
 <!doctype html>
-<html lang="en">
+<html lang="it" translate="no" class="notranslate">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="google" content="notranslate">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="The Hobbit">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>The Hobbit</title>
-    <link rel="stylesheet" href="style.css?v=20260606-2007">
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #090a08;
+        overflow: hidden;
+      }
+
+      body.booting .game-shell {
+        visibility: hidden;
+      }
+
+    </style>
+    <link rel="stylesheet" href="style.css?v=20260607-2235">
   </head>
-  <body>
+  <body class="booting notranslate" translate="no">
+    <svg class="visual-filters" width="0" height="0" aria-hidden="true" focusable="false">
+      <filter id="retro-edge-filter" color-interpolation-filters="sRGB">
+        <feColorMatrix in="SourceGraphic" type="matrix" values="
+          0.333 0.333 0.333 0 0
+          0.333 0.333 0.333 0 0
+          0.333 0.333 0.333 0 0
+          0     0     0     1 0
+        " />
+        <feConvolveMatrix order="3" kernelMatrix="-1 -1 -1 -1 8 -1 -1 -1 -1" preserveAlpha="true" />
+        <feComponentTransfer>
+          <feFuncR type="linear" slope="3.8" intercept="-0.18" />
+          <feFuncG type="linear" slope="3.8" intercept="-0.18" />
+          <feFuncB type="linear" slope="3.8" intercept="-0.18" />
+        </feComponentTransfer>
+      </filter>
+    </svg>
     <main class="game-shell">
       <section class="scene" aria-label="Current location">
-        <img id="room-image" alt="">
-        <audio id="music-player" controls preload="none"></audio>
+        <img id="room-image" src="assets/local-images/hobbit_hole.jpeg?v=20260607-1855" alt="Hobbit_hole">
+        <div id="image-reveal" class="image-reveal" aria-hidden="true">
+          <img id="image-reveal-outline" class="image-reveal-outline" alt="">
+          <img id="image-reveal-fill" class="image-reveal-fill" alt="">
+        </div>
+        <audio id="music-player" preload="none"></audio>
       </section>
 
       <section class="console" aria-label="Game console">
         <div id="output" class="output" aria-live="polite"></div>
         <form id="command-form" class="command-form">
           <label for="command-input">&gt;</label>
-          <input id="command-input" name="command" autocomplete="off" spellcheck="false" autofocus>
+          <input id="command-input" name="command" autocomplete="off" spellcheck="false">
         </form>
       </section>
 
@@ -38,6 +77,6 @@
     </main>
 
     <script src="assets/game-data.js?v=20260607-1630"></script>
-    <script src="game.js?v=20260607-1630"></script>
+    <script src="game.js?v=20260608-0115"></script>
   </body>
 </html>
