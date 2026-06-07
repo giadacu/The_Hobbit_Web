@@ -19,7 +19,8 @@
     "look", "wait", "inventory", "i", "save", "load", "quit", "verbs",
     "mysaves", "hello", "tips", "map", "location", "music", "autoplay",
     "jump", "sit", "stand", "sleep", "rest", "run", "wake", "crawl", "leap",
-    "dive", "swim",
+    "dive", "swim", "listen", "smell", "sniff", "search", "explore",
+    "investigate", "examine", "inspect", "watch", "eavesdrop", "scout",
   ]);
 
   const EDIBLE_ITEMS = new Set([
@@ -31,9 +32,14 @@
     "wine", "ale", "beer",
   ]);
 
+  const NATURAL_VERBS = [
+    "drink", "smell", "sniff", "touch", "feel", "knock", "watch", "eavesdrop",
+    "scout", "patrol", "dig",
+  ];
+
   class CommandSplitter {
     constructor(data) {
-      this.verbs = [...new Set([...(data.parser.verbs || []), "drink"])];
+      this.verbs = [...new Set([...(data.parser.verbs || []), ...NATURAL_VERBS])];
       this.directions = [
         "north", "south", "east", "west", "north east", "north west",
         "south east", "south west", "up", "down", "n", "s", "e", "w",
@@ -49,6 +55,7 @@
         salta: "jump",
         scala: "climb",
         siediti: "sit",
+        sniff: "smell",
         smash: "break",
       };
       this.adverbs = data.parser.adverbs || [];
@@ -387,9 +394,21 @@
         close: () => this.close(object),
         unlock: () => this.unlock(object),
         lock: () => this.lock(object),
-        look: () => this.describeRoom(),
+        look: () => this.look(object),
         examine: () => this.examine(object),
         inspect: () => this.examine(object),
+        search: () => this.examine(object),
+        explore: () => this.examine(object),
+        investigate: () => this.examine(object),
+        listen: () => this.sense("listen", object),
+        smell: () => this.sense("smell", object),
+        sniff: () => this.sense("smell", object),
+        watch: () => this.sense("watch", object),
+        eavesdrop: () => this.sense("listen", object),
+        scout: () => this.sense("search", object),
+        touch: () => this.touch("touch", object),
+        feel: () => this.touch("feel", object),
+        knock: () => this.touch("knock", object),
         inventory: () => this.inventory(),
         i: () => this.inventory(),
         wait: () => this.wait(),
@@ -880,11 +899,31 @@
       });
     }
 
-    examine(objectName) {
+    look(objectName = "") {
+      const text = normalize(objectName);
+      if (!text || ["around", "room", "place", "area", "here", "surroundings"].includes(text)) {
+        return this.describeRoom();
+      }
+      const direction = text.match(/^(across|at|in|inside|into|under|behind|through|over|around)\s+(.+)$/);
+      if (direction) {
+        const relation = direction[1];
+        const target = direction[2];
+        if (relation === "at") return this.examine(target);
+        if (["in", "inside", "into"].includes(relation)) return this.examine(target);
+        return this.inspectEnvironment("look", target, relation);
+      }
+      return this.examine(text);
+    }
+
+    examine(objectName = "") {
+      const text = normalize(objectName);
+      if (!text || ["around", "room", "place", "area", "here", "surroundings"].includes(text)) {
+        return this.inspectEnvironment("search", "area");
+      }
       const door = this.findDoor(objectName)?.door;
       if (door) return this.print(`You see the ${door.name}. It is ${door.open ? "open" : "closed"}.`);
       const item = this.visibleSearch(objectName)?.item;
-      if (!item) return this.print("I don't see that here.");
+      if (!item) return this.inspectEnvironment("examine", objectName);
       let description = item.description;
       if (item.container && item.open && item.contents.length) {
         const visible = item.contents.map((id) => this.items[id]).filter((child) => child?.visible);
@@ -892,6 +931,135 @@
       }
       this.revealFromSpecial("examine", objectName);
       this.print(`You see ${description}.`);
+    }
+
+    sense(verb, objectName = "") {
+      const text = normalize(objectName);
+      if (text) {
+        const item = this.visibleSearch(text)?.item;
+        if (item) {
+          if (verb === "listen") return this.print(`You listen to the ${item.name}, but hear nothing useful.`);
+          if (verb === "smell") return this.print(`You smell the ${item.name}, but learn nothing new.`);
+          if (verb === "watch") return this.print(`You watch the ${item.name} for a while, but it does not change.`);
+          return this.print(`You study the ${item.name}, but discover nothing new.`);
+        }
+        const door = this.findDoor(text)?.door;
+        if (door) {
+          if (verb === "listen") return this.print(`You listen at the ${door.name}, but hear nothing clear beyond it.`);
+          if (verb === "watch") return this.print(`You watch the ${door.name}. It remains ${door.open ? "open" : "closed"}.`);
+          return this.print(`You notice nothing unusual about the ${door.name}.`);
+        }
+      }
+      this.inspectEnvironment(verb, text || (verb === "smell" ? "air" : "area"));
+    }
+
+    touch(verb, objectName = "") {
+      const text = normalize(objectName);
+      if (!text) return this.inspectEnvironment(verb, "area");
+      const item = this.visibleSearch(text)?.item;
+      if (item) {
+        if (verb === "knock") {
+          return this.print(item.container || item.strength > 8 ? `You knock on the ${item.name}. It sounds solid.` : `You knock on the ${item.name}, but nothing happens.`);
+        }
+        return this.print(`You ${verb} the ${item.name}, but discover nothing new.`);
+      }
+      const door = this.findDoor(text)?.door;
+      if (door) {
+        if (verb === "knock") return this.print(`You knock on the ${door.name}, but no one answers.`);
+        return this.print(`You ${verb} the ${door.name}. It is ${door.open ? "open" : "closed"}.`);
+      }
+      this.inspectEnvironment(verb, text);
+    }
+
+    inspectEnvironment(verb, target = "", relation = "") {
+      const room = this.room();
+      const text = normalize(target);
+      const description = room?.description || "";
+      const lower = normalize(description);
+      const sample = this.descriptionSentenceFor(text);
+      const subject = actorSubject(this.player, true);
+      const suffix = sample ? ` ${sample}` : "";
+
+      if (!text || ["area", "room", "place", "here", "surroundings"].includes(text)) {
+        if (["search", "examine", "look"].includes(verb)) {
+          return this.print(`${subject} search${subject === "You" ? "" : "es"} the area carefully.${suffix || " Nothing else is revealed."}`);
+        }
+        if (verb === "listen") return this.print(this.ambientSoundMessage(lower));
+        if (verb === "smell") return this.print(this.ambientSmellMessage(lower));
+      }
+
+      if (["air", "smell", "scent", "odor", "odour"].includes(text)) return this.print(this.ambientSmellMessage(lower));
+      if (["sound", "sounds", "noise", "noises", "silence", "music"].includes(text)) return this.print(this.ambientSoundMessage(lower));
+
+      if (matchesAny(text, ["ground", "floor", "earth", "path", "trail", "road", "footprints"])) {
+        if (lower.includes("footprint") || lower.includes("imprint")) return this.print("The ground bears heavy marks, worth remembering but not something you can pick up.");
+        if (lower.includes("drop") || lower.includes("cliff")) return this.print("The footing is dangerous. One careless step would be a poor idea.");
+        if (lower.includes("moss")) return this.print("The ground is soft with moss and earth.");
+        return this.print(`You study the ${text}. It shows no hidden passage or useful object.`);
+      }
+
+      if (matchesAny(text, ["wall", "walls", "rock", "rocks", "stone", "stones", "ceiling", "crack", "cracks"])) {
+        if (lower.includes("cave") || lower.includes("cavern") || lower.includes("passage")) return this.print("The stone is cold and rough. You find no loose block or hidden catch.");
+        if (lower.includes("secret door") || lower.includes("rock face")) return this.print("The rock face gives away nothing yet.");
+        return this.print(`You inspect the ${text}. Nothing moves.`);
+      }
+
+      if (matchesAny(text, ["tree", "trees", "branch", "branches", "forest", "vines", "roots"])) {
+        if (lower.includes("forest") || lower.includes("tree") || lower.includes("branch") || lower.includes("root")) {
+          return this.print("You study the trees and roots. They are part of the landscape, not an object you can use here.");
+        }
+        return this.print("There are no useful trees or branches here.");
+      }
+
+      if (matchesAny(text, ["river", "water", "stream", "lake", "boat", "shore", "bank"])) {
+        if (lower.includes("river") || lower.includes("water") || lower.includes("stream") || lower.includes("lake") || lower.includes("bank")) {
+          return this.print("You examine the water and its banks. The current looks important, but you find nothing loose.");
+        }
+        return this.print("There is no useful water here.");
+      }
+
+      if (matchesAny(text, ["fire", "embers", "pit", "ashes", "smoke"])) {
+        if (lower.includes("fire") || lower.includes("ember") || lower.includes("smoke")) return this.print("The remains of fire tell you someone has been here, but there is nothing useful to take.");
+        return this.print("There is no fire here.");
+      }
+
+      if (matchesAny(text, ["shadow", "shadows", "dark", "darkness", "mist", "mists"])) {
+        return this.print("You peer into the gloom, but it keeps its secrets.");
+      }
+
+      if (relation === "under" || relation === "behind") {
+        return this.print(`You look ${relation} the ${text}, but find nothing hidden.`);
+      }
+      if (verb === "listen") return this.print(this.ambientSoundMessage(lower));
+      if (verb === "smell") return this.print(this.ambientSmellMessage(lower));
+      if (verb === "knock") return this.print(`You knock on the ${text}, but nothing answers.`);
+      if (verb === "touch" || verb === "feel") return this.print(`You ${verb} the ${text}, but learn nothing useful.`);
+      this.print(`You find nothing special about the ${text}.`);
+    }
+
+    descriptionSentenceFor(target) {
+      const text = normalize(target);
+      if (!text || ["area", "room", "place", "here", "surroundings"].includes(text)) return "";
+      const sentences = (this.room()?.description || "").match(/[^.?!]+[.?!]/g) || [];
+      return sentences.find((sentence) => normalize(sentence).includes(text))?.trim() || "";
+    }
+
+    ambientSoundMessage(description) {
+      if (description.includes("music")) return "You listen. Music and distant voices drift through the air.";
+      if (description.includes("dripping") || description.includes("drips")) return "You listen. Water drips somewhere in the dark.";
+      if (description.includes("wind") || description.includes("howl")) return "You listen. The wind moves restlessly around you.";
+      if (description.includes("river") || description.includes("stream") || description.includes("water")) return "You listen. Water murmurs nearby.";
+      if (description.includes("silence")) return "You listen. The silence feels heavy.";
+      return "You listen carefully, but hear nothing useful.";
+    }
+
+    ambientSmellMessage(description) {
+      if (description.includes("damp") || description.includes("moss") || description.includes("mold")) return "The air smells damp, earthy, and old.";
+      if (description.includes("forest") || description.includes("foliage") || description.includes("pine")) return "The air smells of leaves, bark, and wild earth.";
+      if (description.includes("fire") || description.includes("ember") || description.includes("smoke")) return "The air carries a faint smoky smell.";
+      if (description.includes("food") || description.includes("meal") || description.includes("wine")) return "There is a homely smell of food and drink.";
+      if (description.includes("dragon") || description.includes("smaug")) return "The air smells hot, dry, and dangerous.";
+      return "You smell the air, but notice nothing useful.";
     }
 
     inventory() {
@@ -942,7 +1110,8 @@
         examine: 1, wait: 1, attack: 1, give: 1, eat: 1, break: 1,
         drink: 1, inventory: 1, save: 1, load: 1, go: 1, climb: 1, throw: 1,
         jump: 1, sit: 1, stand: 1, sleep: 1, rest: 1, run: 1, wake: 1,
-        crawl: 1, leap: 1, dive: 1, swim: 1, ride: 1,
+        crawl: 1, leap: 1, dive: 1, swim: 1, ride: 1, listen: 1, smell: 1,
+        touch: 1, feel: 1, knock: 1, watch: 1, search: 1,
         push: 1, pull: 1, wear: 1, remove: 1, hello: 1, combine: 1, autoplay: 1,
         map: 1, tips: 1, music: 1,
       });
@@ -1371,6 +1540,33 @@
       item.location = { type: "character", id: target.id };
       target.inventory.push(item.id);
       this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "give")} the ${item.name} to ${target.name}.`);
+      this.reactToGift(target, item);
+    }
+
+    reactToGift(character, item) {
+      if (matches(character.name, "gandalf")) {
+        if (matches(item.name, "curious map")) {
+          this.flags.gandalf_has_been_given_map = true;
+          this.flags.initiative_gandalf_offer_map = true;
+          return this.print("Gandalf studies the curious map and says 'I will keep it safe. Ask me for it when you need it.'");
+        }
+        if (matches(item.name, "pipe") || matches(item.name, "firestone")) {
+          return this.print("Gandalf smiles through his beard and says 'A thoughtful gift. But keep your wits sharper than any trinket.'");
+        }
+      }
+      if (matches(character.name, "elrond") && matches(item.name, "curious map")) {
+        this.flags.elrond_has_been_given_map = true;
+        this.flags.initiative_elrond_read_prompt = true;
+        return this.print("Elrond studies the curious map and says 'Ask me to read the map, and I will tell you what I can.'");
+      }
+      if (matches(character.name, "thorin")) {
+        if (matches(item.name, "curious key")) return this.print("Thorin weighs the curious key in his hand and says 'This may matter at the mountain door.'");
+        if (matches(item.name, "rope")) return this.print("Thorin nods and says 'Rope is rarely wasted on a dangerous road.'");
+        if (matches(item.name, "sword")) return this.print("Thorin grips the sword and looks more certain of himself.");
+      }
+      if (matches(character.name, "bard")) {
+        if (matches(item.name, "bow") || matches(item.name, "arrow")) return this.print("Bard checks the weapon carefully and says 'When the dragon comes, tell me to shoot.'");
+      }
     }
 
     parseGiveCommand(command) {
@@ -1725,8 +1921,162 @@
       for (const character of Object.values(this.characters)) {
         if (character.id === this.player.id) continue;
         if (this.maybeAutoAttack(character)) continue;
+        if (this.maybeCharacterInitiative(character)) continue;
         this.decideCharacterMovement(character);
       }
+    }
+
+    maybeCharacterInitiative(character) {
+      if (!character.visible || character.carriedBy || character.position !== this.currentRoom) return false;
+      if (character.id === this.player.id || character.friendly === false) return false;
+      if (this.player.noticeable === false) {
+        const flag = `initiative_${character.id}_unseen`;
+        if (this.flags[flag]) return false;
+        this.flags[flag] = true;
+        this.print(`${character.name} looks around, puzzled, unable to see who is there.`);
+        return true;
+      }
+      const action = this.characterInitiative(character);
+      if (!action || this.flags[action.flag]) return false;
+      this.flags[action.flag] = true;
+      if (action.effect) action.effect();
+      this.print(action.message);
+      return true;
+    }
+
+    characterInitiative(character) {
+      if (matches(character.name, "gandalf")) return this.gandalfInitiative(character);
+      if (matches(character.name, "thorin")) return this.thorinInitiative(character);
+      if (matches(character.name, "elrond")) return this.elrondInitiative(character);
+      if (matches(character.name, "bard")) return this.bardInitiative(character);
+      if (matches(character.name, "wood elf")) {
+        return {
+          flag: "initiative_wood_elf_warning",
+          message: "The wood elf watches you closely and says 'Strangers in this wood should explain themselves quickly.'",
+        };
+      }
+      if (matches(character.name, "butler")) {
+        return {
+          flag: "initiative_butler_barrels",
+          message: "The butler mutters 'Barrels are for wine, not for wandering burglars.'",
+        };
+      }
+      return null;
+    }
+
+    gandalfInitiative(character) {
+      if (this.characterHas(character, "curious map") && !this.autoplayHas("curious map")) {
+        return {
+          flag: "initiative_gandalf_offer_map",
+          message: "Gandalf taps the curious map and says 'You may need this before long. Ask me for the map when you are ready.'",
+        };
+      }
+      if (this.autoplayHas("curious map") && !this.flags.mapread) {
+        return {
+          flag: "initiative_gandalf_asks_for_map",
+          message: "Gandalf says 'Let me see the curious map if you want counsel. Give it to me, or better still, show it to Elrond in Rivendell.'",
+        };
+      }
+      if (this.autoplayHas("smoking pipe") && !this.flags.initiative_gandalf_pipe) {
+        return {
+          flag: "initiative_gandalf_pipe",
+          message: "Gandalf eyes the pipe and says 'A wizard never objects to a good pipe, though the road needs your courage more.'",
+        };
+      }
+      return null;
+    }
+
+    thorinInitiative(character) {
+      if (this.currentRoom === "green_dragon_inn" && !this.flags.seenpony) {
+        if (!this.flags.lanternon) {
+          return {
+            flag: "initiative_thorin_lantern",
+            message: "Thorin says 'There is something outside, but the window is too dark. Light a lantern and ask me to look through it.'",
+          };
+        }
+        return {
+          flag: "initiative_thorin_window",
+          message: "Thorin points at the window and says 'Tell me to look through it. I may be tall enough to see what waits outside.'",
+        };
+      }
+      if (this.currentRoom === "dark_dungeon" && !this.flags.initiative_thorin_window_escape) {
+        return {
+          flag: "initiative_thorin_window_escape",
+          message: "Thorin whispers 'If I can reach the window, perhaps I can help you out of here.'",
+        };
+      }
+      if (this.currentRoom === "front_gate" && this.flags.secretdoorsun && !this.doorOpenByName("secret door") && this.characterHas(character, "curious key")) {
+        return {
+          flag: "initiative_thorin_secret_door",
+          message: "Thorin holds up the curious key and says 'The sun has shown the door. Tell me to unlock it.'",
+        };
+      }
+      if (this.currentRoom === "west_bank" && !this.flags.ropeinboat && this.autoplayHas("sturdy rope")) {
+        return {
+          flag: "initiative_thorin_rope_boat",
+          message: "Thorin says 'That boat will not come by wishing. Try throwing the rope across the river.'",
+        };
+      }
+      return null;
+    }
+
+    elrondInitiative(character) {
+      if (this.autoplayHas("curious map") && !this.flags.mapread) {
+        return {
+          flag: "initiative_elrond_requests_map",
+          message: "Elrond says 'That map is older than it looks. Give it to me, and then ask me to read it.'",
+        };
+      }
+      if (this.characterHas(character, "curious map") && !this.flags.mapread) {
+        return {
+          flag: "initiative_elrond_read_prompt",
+          message: "Elrond traces the markings on the map and says 'Ask me to read the map, and listen carefully.'",
+        };
+      }
+      if (!this.flags.elrond_lunch_given && this.currentRoom === "rivendell") {
+        return {
+          flag: "initiative_elrond_lunch",
+          message: "Elrond says 'Rest here a little. Good counsel is easier on a full stomach.'",
+        };
+      }
+      return null;
+    }
+
+    bardInitiative(character) {
+      if (this.liveDragon() && this.currentRoom === "lonely_mountain" && this.autoplayHas("treasure")) {
+        return {
+          flag: "initiative_bard_dragon_order",
+          message: this.flags.bardreadiedarrow
+            ? "Bard says 'The dragon will come for the treasure. Tell me to shoot the dragon.'"
+            : "Bard says 'The dragon will come for the treasure. Tell me to get the strong arrow, then tell me to shoot the dragon.'",
+        };
+      }
+      if (this.liveDragon() && ["front_gate", "lonely_mountain", "stoe_of_ravenhill", "little_steep_bay"].includes(this.currentRoom)) {
+        return {
+          flag: "initiative_bard_ready",
+          message: "Bard tests his bowstring and says 'If Smaug appears, command me clearly.'",
+        };
+      }
+      if (!this.flags.dragondefeated && this.currentRoom === "wooden_town") {
+        return {
+          flag: "initiative_bard_join",
+          message: "Bard says 'If your road leads to the dragon, take me with you.'",
+        };
+      }
+      return null;
+    }
+
+    characterHas(character, itemName) {
+      return [...(character.inventory || []), ...(character.worn || [])].some((itemId) => matches(this.items[itemId]?.name, itemName));
+    }
+
+    doorOpenByName(name) {
+      const found = this.roomConnections().find((connection) => {
+        const door = connection.door && this.doors[connection.door];
+        return door && matches(door.name, name);
+      });
+      const door = found?.door && this.doors[found.door];
+      return Boolean(door && door.open && !door.locked);
     }
 
     updateRingTimers() {
@@ -2223,6 +2573,10 @@
     query = normalizeWords(query);
     if (!query) return false;
     return query.split(/\s+/).every((word) => name.split(/\s+/).some((nameWord) => nameWord === word || nameWord.includes(word)));
+  }
+
+  function matchesAny(text, choices) {
+    return choices.some((choice) => matches(text, choice) || matches(choice, text));
   }
 
   function commandObjectMatches(commandText, requiredName) {
