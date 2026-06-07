@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>The Hobbit</title>
+    <link rel="stylesheet" href="style.css?v=20260606-2007">
+  </head>
+  <body>
+    <main class="game-shell">
+      <section class="scene" aria-label="Current location">
+        <img id="room-image" alt="">
+        <audio id="music-player" controls preload="none"></audio>
+      </section>
+
+      <section class="console" aria-label="Game console">
+        <div id="output" class="output" aria-live="polite"></div>
+        <form id="command-form" class="command-form">
+          <label for="command-input">&gt;</label>
+          <input id="command-input" name="command" autocomplete="off" spellcheck="false" autofocus>
+        </form>
+      </section>
+
+      <aside class="sidebar" aria-label="Status">
+        <section>
+          <h2>Inventory</h2>
+          <ul id="inventory-list"></ul>
+        </section>
+        <section>
+          <h2>Exits</h2>
+          <ul id="exits-list"></ul>
+        </section>
+        <section>
+          <h2>People</h2>
+          <ul id="people-list"></ul>
+        </section>
+      </aside>
+    </main>
+
+    <script src="assets/game-data.js?v=20260606-1931"></script>
+    <script src="game.js?v=20260606-2034"></script>
+  </body>
+</html>

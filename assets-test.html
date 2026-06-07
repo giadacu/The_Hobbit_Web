@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hobbit Asset Test</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        gap: 20px;
+        padding: 24px;
+        background: #111;
+        color: #f4ecd0;
+        font-family: system-ui, sans-serif;
+      }
+      img {
+        width: min(900px, 100%);
+        max-height: 60vh;
+        object-fit: contain;
+        border: 1px solid #665c38;
+      }
+      audio {
+        width: min(900px, 100%);
+      }
+      code {
+        color: #d8b65f;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <h1>Asset test</h1>
+      <p>Image: <code>assets/local-images/hobbit_hole.jpeg</code></p>
+      <p>Audio: <code>assets/local-music/Almost New relaxed.mp3</code></p>
+    </div>
+    <img src="assets/local-images/hobbit_hole.jpeg?v=20260606-1931" alt="Hobbit hole">
+    <audio controls src="assets/local-music/Almost%20New%20relaxed.mp3?v=20260606-1931"></audio>
+  </body>
+</html>
