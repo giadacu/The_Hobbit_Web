@@ -22,7 +22,7 @@
     "look", "wait", "inventory", "i", "save", "load", "quit", "verbs",
     "mysaves", "hello", "tips", "map", "location", "music", "autoplay",
     "jump", "sit", "stand", "sleep", "rest", "run", "wake", "crawl", "leap",
-    "dive", "swim", "listen", "smell", "sniff", "search", "explore",
+    "dive", "swim", "lie", "listen", "smell", "sniff", "search", "explore",
     "investigate", "examine", "inspect", "watch", "eavesdrop", "scout",
   ]);
 
@@ -43,6 +43,7 @@
     "flatter", "insult", "sneak", "escape", "follow", "show", "guard",
     "help", "explain", "negotiate", "print", "call", "wash", "check",
     "start", "refill", "inform", "review", "mend", "repair", "fix",
+    "write", "lie", "pick", "trim", "fill", "water", "plant", "rake",
   ];
 
   const CANONICAL_DIALOGUES = [
@@ -429,11 +430,12 @@
         this.print("Questions are not supported as commands yet. Try a direct command, such as 'ask Gandalf to examine map'.", "system");
         return;
       }
-      if (this.pendingClarification) {
+      if (this.pendingClarification && this.isClarificationAnswer(rawCommand)) {
         this.handleClarification(rawCommand);
         this.render();
         return;
       }
+      this.pendingClarification = null;
       if (lower === "white") {
         document.documentElement.style.colorScheme = "light";
         document.body.style.filter = "invert(1) hue-rotate(180deg)";
@@ -566,6 +568,16 @@
         mend: () => this.mend(object),
         repair: () => this.mend(object),
         fix: () => this.mend(object),
+        write: () => this.write(object),
+        light: () => this.light(object),
+        pick: () => this.pick(object),
+        cut: () => this.cutTrim("cut", object),
+        trim: () => this.cutTrim("trim", object),
+        fill: () => this.fill(object),
+        water: () => this.water(object),
+        plant: () => this.plant(object),
+        rake: () => this.rakeGarden(object),
+        dig: () => this.dig(object),
         kill: () => this.attack(object),
         attack: () => this.attack(object),
         break: () => this.breakThing(object),
@@ -593,6 +605,7 @@
         drink: () => this.drink(object),
         jump: () => this.physicalAction("jump", object),
         sit: () => this.physicalAction("sit", object),
+        lie: () => this.physicalAction("lie", object),
         stand: () => this.physicalAction("stand", object),
         sleep: () => this.physicalAction("sleep", object),
         rest: () => this.physicalAction("rest", object),
@@ -913,6 +926,17 @@
       return true;
     }
 
+    isClarificationAnswer(response) {
+      const pending = this.pendingClarification;
+      if (!pending) return false;
+      const answer = normalize(response);
+      if (!answer) return false;
+      if (["cancel", "stop", "no"].includes(answer)) return true;
+      const number = Number.parseInt(answer, 10);
+      if (Number.isInteger(number) && number >= 1 && number <= pending.choices.length) return true;
+      return pending.choices.some((choice) => matches(choice.name, answer));
+    }
+
     ambiguousChoices(verb, objectText) {
       const itemVerbs = new Set(["take", "get", "open", "close", "unlock", "lock", "examine", "inspect", "break", "push", "pull", "drop", "leave", "put", "wear", "remove", "eat", "drink", "give", "combine"]);
       const doorVerbs = new Set(["open", "close", "unlock", "lock", "examine", "inspect", "break"]);
@@ -1124,7 +1148,7 @@
       }
       const item = this.visibleSearch(objectName)?.item;
       if (!item) return this.print(this.heldItemMessage(objectName) || "I don't see that here.");
-      if (!item.container && this.openReadableItem(item)) return;
+      if (!item.container && this.openNonContainerItem(item)) return;
       if (!item.container) return this.print(`The ${item.name} cannot be opened.`);
       if (item.noLid) return this.print(`The ${item.name} has no lid and is always open.`);
       if (item.open) return this.print(`The ${item.name} is already open.`);
@@ -1160,23 +1184,34 @@
       this.print(messages.length ? messages.join(" ") : "I don't see anything like that here that can be opened.");
     }
 
-    openReadableItem(item) {
-      if (!matches(item.name, "curious map")) return false;
-      if (item.broken) {
-        this.print("You try to unfold the broken curious map, but it only separates into useless fragments.");
+    openNonContainerItem(item) {
+      if (matches(item.name, "curious map")) {
+        if (item.broken) {
+          this.print("You try to unfold the broken curious map, but it only separates into useless fragments.");
+          return true;
+        }
+        if (item.open) {
+          this.print("The curious map is already unfolded.");
+          return true;
+        }
+        item.open = true;
+        if (item.mended) {
+          this.print("You carefully unfold the mended curious map. The strange markings are readable again, though the joins are still visible.");
+          return true;
+        }
+        this.print("You unfold the curious map. You see a map with strange markings.");
         return true;
       }
-      if (item.open) {
-        this.print("The curious map is already unfolded.");
+      if (matches(item.name, "elegant lamp")) {
+        return this.lightItem(item);
+      }
+      if (matches(item.name, "dark glass inkwell")) {
+        if (item.open) return this.print("The dark glass inkwell is already open.");
+        item.open = true;
+        this.print("You unstopper the dark glass inkwell.");
         return true;
       }
-      item.open = true;
-      if (item.mended) {
-        this.print("You carefully unfold the mended curious map. The strange markings are readable again, though the joins are still visible.");
-        return true;
-      }
-      this.print("You unfold the curious map. You see a map with strange markings.");
-      return true;
+      return false;
     }
 
     close(objectName) {
@@ -1190,6 +1225,7 @@
       }
       const item = this.visibleSearch(objectName)?.item;
       if (!item) return this.print(this.heldItemMessage(objectName) || "I don't see that here.");
+      if (!item.container && this.closeNonContainerItem(item)) return;
       if (!item.container) return this.print(`The ${item.name} cannot be closed.`);
       if (item.noLid) return this.print(`The ${item.name} has no lid.`);
       item.open = false;
@@ -1209,6 +1245,39 @@
         closed.push(item.name);
       }
       this.print(closed.length ? `You close the ${joinNames(closed)}.` : "I don't see anything like that here that can be closed.");
+    }
+
+    closeNonContainerItem(item) {
+      if (matches(item.name, "curious map")) {
+        if (item.broken) {
+          this.print("The broken curious map cannot be folded neatly.");
+          return true;
+        }
+        if (!item.open) {
+          this.print("The curious map is already folded.");
+          return true;
+        }
+        item.open = false;
+        if (item.mended) {
+          this.print("You carefully fold the mended curious map, keeping the repaired joins aligned.");
+          return true;
+        }
+        this.print("You fold the curious map.");
+        return true;
+      }
+      if (matches(item.name, "elegant lamp")) {
+        if (!item.open) return this.print("The elegant lamp is already unlit.");
+        item.open = false;
+        this.print("You turn off the elegant lamp.");
+        return true;
+      }
+      if (matches(item.name, "dark glass inkwell")) {
+        if (!item.open) return this.print("The dark glass inkwell is already closed.");
+        item.open = false;
+        this.print("You stopper the dark glass inkwell.");
+        return true;
+      }
+      return false;
     }
 
     unlock(objectName) {
@@ -2242,10 +2311,144 @@
       this.print(`You mend the ${item.name}. It is usable again, though the repair is visible.`);
     }
 
+    light(objectName = "") {
+      const text = normalize(objectName);
+      if (!text) return this.print("Light what?");
+      const item = this.visibleSearch(objectName)?.item;
+      if (!item) return this.print(this.heldItemMessage(objectName) || "I don't see that here.");
+      return this.lightItem(item);
+    }
+
+    lightItem(item) {
+      if (matches(item.name, "elegant lamp")) {
+        if (item.open) return this.print("The elegant lamp is already lit.");
+        item.open = true;
+        return this.print("You light the elegant lamp. Its engraved metal catches the warm glow.");
+      }
+      if (matches(item.name, "brass lantern")) {
+        if (this.flags.lanternon) return this.print("The brass lantern is already lit.");
+        this.flags.lanternon = true;
+        return this.print("You light the brass lantern. It gives off a steady glow.");
+      }
+      this.print(`You try to light the ${item.name}, but it does not catch.`);
+    }
+
+    write(objectName = "") {
+      const text = normalize(objectName).replace(/^(?:on|in|with)\s+/, "");
+      if (!text) return this.print("Write on what?");
+      const item = this.visibleSearch(text)?.item;
+      if (!item) return this.print(this.heldItemMessage(text) || "I don't see that here.");
+      if (matches(item.name, "stack of parchment")) {
+        const inkwell = this.visibleSearch("inkwell")?.item || this.findInInventory("inkwell");
+        if (inkwell) {
+          return this.print("You make a few uncertain marks on the parchment. They do not change the adventure, but at least the ink still flows.");
+        }
+        return this.print("You have parchment, but nothing useful to write with.");
+      }
+      this.print(`Writing on the ${item.name} would not help.`);
+    }
+
+    pick(objectName = "") {
+      const text = normalize(objectName).replace(/^(?:up|some)\s+/, "");
+      if (!text) return this.print("Pick what?");
+      const item = this.visibleSearch(text)?.item;
+      if (!item) return this.print(this.heldItemMessage(text) || "I don't see that here.");
+      if (matches(item.name, "rose bush")) return this.print("You pick a rose. It smells sweet, but it is too delicate to be useful.");
+      if (matches(item.name, "herbs patch")) return this.print("You pick a few herbs. They smell pleasant, but you do not need them right now.");
+      if (item.portable) return this.take(item.name);
+      this.print(`You cannot pick the ${item.name}.`);
+    }
+
+    cutTrim(verb, objectName = "") {
+      const parsed = this.parseToolCommand(objectName);
+      if (!parsed.targetName) return this.print(`${capitalize(verb)} what?`);
+      const item = this.visibleSearch(parsed.targetName)?.item;
+      if (!item) return this.print(this.heldItemMessage(parsed.targetName) || "I don't see that here.");
+      if (matches(item.name, "rose bush") || matches(item.name, "herbs patch")) {
+        const tool = parsed.toolName ? this.findInInventory(parsed.toolName) : this.findInInventory("pruner");
+        if (!tool) return this.print(`You would need something sharp to ${verb} the ${item.name}.`);
+        if (!matches(tool.name, "sharp pruner") && !matches(tool.name, "sword") && !matches(tool.name, "dagger")) {
+          return this.print(`The ${tool.name} is not the right tool to ${verb} the ${item.name}.`);
+        }
+        return this.print(`You ${verb} the ${item.name} carefully. It looks a little neater.`);
+      }
+      this.print(`You ${verb} the ${item.name}, but nothing useful happens.`);
+    }
+
+    fill(objectName = "") {
+      const text = normalize(objectName).replace(/^(?:up|the)\s+/, "");
+      const can = this.findInInventory("watering can") || this.visibleSearch("watering can")?.item;
+      if (!text || matches("watering can", text)) {
+        if (!can) return this.print("You need a watering can to fill.");
+        if (!this.visibleSearch("bird bath")?.item && this.currentRoom !== "bilbos_garden") return this.print("There is no water here to fill it with.");
+        this.flags.wateringcanfull = true;
+        return this.print("You fill the watering can from the bird bath.");
+      }
+      const item = this.visibleSearch(text)?.item;
+      if (!item) return this.print(this.heldItemMessage(text) || "I don't see that here.");
+      this.print(`You cannot fill the ${item.name}.`);
+    }
+
+    water(objectName = "") {
+      const text = normalize(objectName).replace(/^(?:the|some)\s+/, "");
+      if (!text) return this.print("Water what?");
+      const item = this.visibleSearch(text)?.item;
+      if (!item && !["garden", "plants", "flowers"].includes(text)) return this.print(this.heldItemMessage(text) || "I don't see that here.");
+      const can = this.findInInventory("watering can");
+      if (!can) return this.print("You need the watering can to water anything.");
+      if (!this.flags.wateringcanfull) return this.print("The watering can is empty.");
+      if (item && (matches(item.name, "rose bush") || matches(item.name, "herbs patch"))) {
+        return this.print(`You water the ${item.name}. The leaves look fresher.`);
+      }
+      if (["garden", "plants", "flowers"].includes(text)) return this.print("You water the garden lightly. Nothing dramatic happens, but Bilbo would approve.");
+      this.print(`Watering the ${item.name} would not help.`);
+    }
+
+    plant(objectName = "") {
+      const text = normalize(objectName).replace(/^(?:the|some)\s+/, "");
+      const seeds = this.findInInventory("seed packet");
+      if (!seeds) return this.print("You need seeds before you can plant anything.");
+      if (this.currentRoom !== "bilbos_garden") return this.print("This does not seem like a good place to plant seeds.");
+      if (text && !matches("seed packet", text) && !matches("seeds", text)) {
+        const item = this.visibleSearch(text)?.item;
+        if (!item && !["garden", "soil"].includes(text)) return this.print(this.heldItemMessage(text) || "I don't see that here.");
+      }
+      this.flags.seedsplanted = true;
+      this.print("You plant a few seeds in a soft patch of earth. They will need time and care.");
+    }
+
+    rakeGarden(objectName = "") {
+      const rake = this.findInInventory("rake");
+      if (!rake) return this.print("You need a rake for that.");
+      if (this.currentRoom !== "bilbos_garden") return this.print("There is nothing here that needs raking.");
+      this.print("You rake the garden path into a tidier state.");
+    }
+
+    dig(objectName = "") {
+      const parsed = this.parseToolCommand(objectName);
+      const targetName = parsed.targetName.replace(/^(?:in|up)\s+/, "");
+      const tool = parsed.toolName ? this.findInInventory(parsed.toolName) : (this.findInInventory("garden spade") || this.findInInventory("hand trowel"));
+      if (!tool) return this.print("You need a digging tool for that.");
+      if (targetName) {
+        const item = this.visibleSearch(targetName)?.item;
+        if (!item && !["garden", "soil", "earth", "ground"].includes(targetName)) return this.print(this.heldItemMessage(targetName) || "I don't see that here.");
+      }
+      if (this.currentRoom === "bilbos_garden") return this.print(`You dig carefully with the ${tool.name}, but uncover nothing unexpected.`);
+      this.print(`You dig with the ${tool.name}, but find nothing useful.`);
+    }
+
+    parseToolCommand(objectName = "") {
+      const text = normalize(objectName);
+      const withMatch = text.match(/^(.+?)\s+with\s+(.+)$/);
+      if (withMatch) return { targetName: withMatch[1].trim(), toolName: withMatch[2].trim() };
+      if (text.startsWith("with ")) return { targetName: "", toolName: text.slice(5).trim() };
+      return { targetName: text, toolName: "" };
+    }
+
     pushPull(action, objectName) {
       const item = this.visibleSearch(objectName)?.item;
       if (!item) return this.print(this.heldItemMessage(objectName) || `You cannot find the ${objectName} to ${action}.`);
-      if (item.weight >= 3 * this.player.strength) return this.print(`The ${item.name} is too heavy to be ${action}ed.`);
+      if (item.weight >= 3 * this.player.strength) return this.print(`The ${item.name} is too heavy to be ${pastTense(action)}.`);
       this.print(`You ${action} the ${item.name}.`);
     }
 
@@ -2282,11 +2485,14 @@
 
       const subject = actorSubject(this.player, true);
       const conjugated = actorVerb(this.player, verb === "jump" ? "jump" : verb);
-      const target = text ? ` ${text}` : "";
+      const targetText = this.physicalActionTarget(verb, text);
+      if (targetText === null) return;
+      const target = targetText ? ` ${targetText}` : "";
       const generic = {
         crawl: `${subject} ${conjugated}${target}, but it makes no difference.`,
         dive: `${subject} ${conjugated}${target}, but there is nowhere useful to dive.`,
         jump: `${subject} ${conjugated}${target}, but nothing happens.`,
+        lie: `${subject} ${conjugated}${target || " down"} for a while.`,
         rest: `${subject} ${conjugated}${target} for a while.`,
         ride: `${subject} ${conjugated}${target}, but nothing happens.`,
         run: `${subject} ${conjugated}${target}, but nothing happens.`,
@@ -2297,6 +2503,20 @@
         wake: `${subject} ${conjugated}${target || " up"}, already alert.`,
       }[verb] || `${subject} ${conjugated}${target}, but nothing happens.`;
       this.print(generic);
+    }
+
+    physicalActionTarget(verb, text) {
+      if (!text) return "";
+      if (["sit", "lie"].includes(verb)) {
+        const target = text.replace(/^(?:on|in|inside|onto|upon)\s+/, "");
+        if (["down", "up"].includes(target)) return target;
+        if (!this.visibleSearch(target)?.item && !this.findDoor(target) && !this.resolveCharacterTarget(target)) {
+          this.print(this.heldItemMessage(target) || "I don't see that here.");
+          return null;
+        }
+        return `on the ${target}`;
+      }
+      return text;
     }
 
     followCharacter(objectName = "") {

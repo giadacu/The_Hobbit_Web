@@ -245,6 +245,46 @@ const cases = [
     input: "Repair the map.",
     expected: ["repair map"],
   },
+  {
+    name: "write on object",
+    input: "Write on the parchment.",
+    expected: ["write on parchment"],
+  },
+  {
+    name: "lie on object",
+    input: "Lie on the settee.",
+    expected: ["lie on settee"],
+  },
+  {
+    name: "pick garden object",
+    input: "Pick a rose.",
+    expected: ["pick rose"],
+  },
+  {
+    name: "water garden object",
+    input: "Water the rose bush.",
+    expected: ["water rose bush"],
+  },
+  {
+    name: "trim with tool",
+    input: "Trim the rose bush with the pruner.",
+    expected: ["trim rose bush with pruner"],
+  },
+  {
+    name: "dig with tool",
+    input: "Dig with the spade.",
+    expected: ["dig with spade"],
+  },
+  {
+    name: "plant seeds",
+    input: "Plant seeds.",
+    expected: ["plant seeds"],
+  },
+  {
+    name: "rake leaves",
+    input: "Rake leaves.",
+    expected: ["rake leaves"],
+  },
 ];
 
 const originalListCases = [
@@ -474,9 +514,24 @@ const gameCases = [
     expectedIncluded: ["You unfold the curious map. You see a map with strange markings."],
   },
   {
+    name: "close map folds unfolded map",
+    inputs: ["ask gandalf for the map", "open map", "close map"],
+    expectedIncluded: ["You fold the curious map."],
+  },
+  {
+    name: "close folded map says already folded",
+    inputs: ["ask gandalf for the map", "close map"],
+    expectedIncluded: ["The curious map is already folded."],
+  },
+  {
     name: "open broken map notices fragments",
     inputs: ["ask gandalf for the map", "break map", "open map"],
     expectedIncluded: ["You try to unfold the broken curious map, but it only separates into useless fragments."],
+  },
+  {
+    name: "close broken map notices fragments",
+    inputs: ["ask gandalf for the map", "break map", "close map"],
+    expectedIncluded: ["The broken curious map cannot be folded neatly."],
   },
   {
     name: "mended map can be read again",
@@ -495,6 +550,119 @@ const gameCases = [
     name: "open mended map mentions repair",
     inputs: ["ask gandalf for the map", "break map", "mend map", "open map"],
     expectedIncluded: ["You carefully unfold the mended curious map. The strange markings are readable again, though the joins are still visible."],
+  },
+  {
+    name: "close mended map mentions repair",
+    inputs: ["ask gandalf for the map", "break map", "mend map", "open map", "close map"],
+    expectedIncluded: ["You carefully fold the mended curious map, keeping the repaired joins aligned."],
+  },
+  {
+    name: "new command clears unresolved clarification",
+    inputs: ["open books", "look under carpet"],
+    expectedIncluded: ["Under the carpet there is a small key."],
+  },
+  {
+    name: "lamp can be lit and turned off",
+    inputs: ["light lamp", "turn off lamp"],
+    expectedIncluded: [
+      "You light the elegant lamp. Its engraved metal catches the warm glow.",
+      "You turn off the elegant lamp.",
+    ],
+  },
+  {
+    name: "turn on lamp is handled as lighting",
+    inputs: ["turn on lamp"],
+    expectedIncluded: ["You light the elegant lamp. Its engraved metal catches the warm glow."],
+  },
+  {
+    name: "inkwell can be opened and closed",
+    inputs: ["open inkwell", "close inkwell"],
+    expectedIncluded: [
+      "You unstopper the dark glass inkwell.",
+      "You stopper the dark glass inkwell.",
+    ],
+  },
+  {
+    name: "write on parchment has contextual response",
+    inputs: ["write on parchment"],
+    expectedIncluded: ["You make a few uncertain marks on the parchment. They do not change the adventure, but at least the ink still flows."],
+  },
+  {
+    name: "move settee grammar",
+    inputs: ["move settee"],
+    expectedIncluded: ["The plush settee is too heavy to be moved."],
+  },
+  {
+    name: "lie on settee accepted",
+    inputs: ["lie on settee"],
+    expectedIncluded: ["You lie on the settee for a while."],
+  },
+  {
+    name: "lie on absent settee rejected",
+    inputs: ["open door", "go east", "lie on settee"],
+    expectedIncluded: ["I don't see that here."],
+  },
+  {
+    name: "pick rose has garden response",
+    inputs: ["open door", "go east", "pick rose"],
+    expectedIncluded: ["You pick a rose. It smells sweet, but it is too delicate to be useful."],
+  },
+  {
+    name: "fill and water garden",
+    inputs: [
+      "open bottom drawer",
+      "take sturdy key",
+      "open door",
+      "go east",
+      "unlock shed with sturdy key",
+      "open shed",
+      "take watering can",
+      "fill watering can",
+      "water rose bush",
+    ],
+    expectedIncluded: [
+      "You fill the watering can from the bird bath.",
+      "You water the rose bush. The leaves look fresher.",
+    ],
+  },
+  {
+    name: "garden tools support natural actions",
+    inputs: [
+      "open bottom drawer",
+      "take sturdy key",
+      "take brass key",
+      "open door",
+      "go east",
+      "unlock shed with sturdy key",
+      "open shed",
+      "unlock tool rack with brass key",
+      "open tool rack",
+      "take spade",
+      "take rake",
+      "take pruner",
+      "dig garden",
+      "rake leaves",
+      "trim rose bush with pruner",
+    ],
+    expectedIncluded: [
+      "You dig carefully with the garden spade, but uncover nothing unexpected.",
+      "You rake the garden path into a tidier state.",
+      "You trim the rose bush carefully. It looks a little neater.",
+    ],
+  },
+  {
+    name: "plant seeds in garden",
+    inputs: [
+      "open bottom drawer",
+      "take sturdy key",
+      "open door",
+      "go east",
+      "unlock shed with sturdy key",
+      "open shed",
+      "take seed packet",
+      "plant seeds",
+    ],
+    expectedIncluded: ["You plant a few seeds in a soft patch of earth. They will need time and care."],
   },
 ];
 
