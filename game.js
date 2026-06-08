@@ -3539,7 +3539,7 @@
       const char = text[index];
       if (char === '"') inQuote = !inQuote;
       if (!inQuote && text.slice(index, index + 5) === " and ") {
-        if (/^(ask|tell)\b/.test(current.trim()) && /\bto\b/.test(current)) {
+        if (/^(ask|tell|say)\b/.test(current.trim()) && /\bto\b/.test(current)) {
           current += " and ";
           index += 4;
           continue;

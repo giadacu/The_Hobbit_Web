@@ -576,6 +576,12 @@ const gameCases = [
     notExpectedIncluded: ["You are in a beautiful garden, amidst verdant foliage and blossoms bright."],
   },
   {
+    name: "say to delegated movement keeps npc actor",
+    inputs: ["say to gandalf to open the door and go east"],
+    expectedIncluded: ["Gandalf opens the round green door.", "Gandalf goes east."],
+    notExpectedIncluded: ["You are in a beautiful garden, amidst verdant foliage and blossoms bright."],
+  },
+  {
     name: "delegated special action keeps npc subject",
     inputs: ["ask gandalf to open the door and lift the carpet"],
     expectedIncluded: [
