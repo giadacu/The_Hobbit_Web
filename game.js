@@ -449,11 +449,13 @@
       }
 
       const commands = this.splitter.split(rawCommand);
+      let forceNpcMovement = false;
       for (const command of commands) {
+        if (normalize(command) === "wait") forceNpcMovement = true;
         const moved = this.processCommand(command);
         if (moved) break;
       }
-      if (!this.endgame) this.advanceCharacterTurn();
+      if (!this.endgame) this.advanceCharacterTurn({ forceMove: forceNpcMovement });
       this.render();
     }
 
@@ -1144,7 +1146,7 @@
         }
         door.open = true;
         this.setFlag(`${compact(door.name)}open`, true);
-        return this.print(`You open the ${door.name}.`);
+        return this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "open")} the ${door.name}.`);
       }
       const item = this.visibleSearch(objectName)?.item;
       if (!item) return this.print(this.heldItemMessage(objectName) || "I don't see that here.");
@@ -1159,7 +1161,7 @@
       }
       item.open = true;
       this.setFlag(`${compact(item.name)}open`, true);
-      this.print(`You open the ${item.name}.`);
+      this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "open")} the ${item.name}.`);
     }
 
     openAll(objectName) {
@@ -1179,7 +1181,7 @@
         }
         item.open = true;
         this.setFlag(`${compact(item.name)}open`, true);
-        messages.push(`You open the ${item.name}.`);
+        messages.push(`${actorSubject(this.player, true)} ${actorVerb(this.player, "open")} the ${item.name}.`);
       }
       this.print(messages.length ? messages.join(" ") : "I don't see anything like that here that can be opened.");
     }
@@ -1221,7 +1223,7 @@
       if (doorFound) {
         doorFound.door.open = false;
         this.setFlag(`${compact(doorFound.door.name)}open`, false);
-        return this.print(`You close the ${doorFound.door.name}.`);
+        return this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "close")} the ${doorFound.door.name}.`);
       }
       const item = this.visibleSearch(objectName)?.item;
       if (!item) return this.print(this.heldItemMessage(objectName) || "I don't see that here.");
@@ -1230,7 +1232,7 @@
       if (item.noLid) return this.print(`The ${item.name} has no lid.`);
       item.open = false;
       this.setFlag(`${compact(item.name)}open`, false);
-      this.print(`You close the ${item.name}.`);
+      this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "close")} the ${item.name}.`);
     }
 
     closeAll(objectName) {
@@ -1244,7 +1246,7 @@
         this.setFlag(`${compact(item.name)}open`, false);
         closed.push(item.name);
       }
-      this.print(closed.length ? `You close the ${joinNames(closed)}.` : "I don't see anything like that here that can be closed.");
+      this.print(closed.length ? `${actorSubject(this.player, true)} ${actorVerb(this.player, "close")} the ${joinNames(closed)}.` : "I don't see anything like that here that can be closed.");
     }
 
     closeNonContainerItem(item) {
@@ -1289,7 +1291,7 @@
       const key = this.keyFor(target);
       if (!key) return this.print(this.heldItemMessage(target.requiredKey || "key") || `You do not have the required key for the ${target.name}.`);
       target.locked = false;
-      this.print(`You unlock the ${target.name} with the ${key.name}.`);
+      this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "unlock")} the ${target.name} with the ${key.name}.`);
     }
 
     lock(objectName) {
@@ -1300,7 +1302,7 @@
       if (!key) return this.print(this.heldItemMessage(target.requiredKey || "key") || `You do not have the required key for the ${target.name}.`);
       target.locked = true;
       target.open = false;
-      this.print(`You lock the ${target.name} with the ${key.name}.`);
+      this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "lock")} the ${target.name} with the ${key.name}.`);
     }
 
     keyFor(target) {
@@ -2669,13 +2671,20 @@
         this.print(`You cannot find an open route to ${name} from here.`);
         return false;
       }
-      if (distance <= 1) this.print(`You remember the way to ${name} clearly, reaching it in just a few steps.`);
-      else if (distance <= 3) this.print(`You recall the route to ${name} well, covering a short but steady walk.`);
-      else if (distance <= 5) this.print(`The path to ${name} is still familiar to you, and after a solid journey, you arrive.`);
-      else if (distance <= 9) this.print(`The way to ${name} spans quite a distance, but your memory guides you to your destination.`);
-      else this.print(`The route to ${name} is long and winding, yet your memory leads you through every turn until you arrive.`);
+      const delegated = Boolean(this.commandIssuer);
+      if (!delegated) {
+        if (distance <= 1) this.print(`You remember the way to ${name} clearly, reaching it in just a few steps.`);
+        else if (distance <= 3) this.print(`You recall the route to ${name} well, covering a short but steady walk.`);
+        else if (distance <= 5) this.print(`The path to ${name} is still familiar to you, and after a solid journey, you arrive.`);
+        else if (distance <= 9) this.print(`The way to ${name} spans quite a distance, but your memory guides you to your destination.`);
+        else this.print(`The route to ${name} is long and winding, yet your memory leads you through every turn until you arrive.`);
+      }
       this.currentRoom = roomId;
       this.player.position = roomId;
+      if (delegated) {
+        this.print(`${this.player.name} goes to ${name}.`);
+        return true;
+      }
       this.visitedRooms.add(roomId);
       this.describeRoom();
       this.checkSpecialSituations();
@@ -2709,11 +2718,12 @@
     }
 
     move(direction) {
-      const connection = this.roomConnections().find((c) => c.direction === direction);
-      if (!connection) {
+      const candidates = this.connectionsFrom(this.currentRoom).filter((connection) => connection.direction === direction);
+      if (!candidates.length) {
         this.print('That direction is not recognized. Type "go <direction>" or "go through <door name>".');
         return false;
       }
+      const connection = candidates.find((candidate) => this.canTravelConnection(candidate)) || candidates[0];
       const web = this.blockingWebFor(connection);
       if (web && !web.broken) {
         this.print("A thick spider web blocks your path.");
@@ -2735,8 +2745,12 @@
       const previousRoom = this.currentRoom;
       this.currentRoom = connection.to;
       this.player.position = connection.to;
-      this.visitedRooms.add(connection.to);
       this.moveFollowers(previousRoom, connection.to, direction);
+      if (this.commandIssuer) {
+        this.print(`${this.player.name} goes ${direction}.`);
+        return true;
+      }
+      this.visitedRooms.add(connection.to);
       this.describeRoom();
       this.checkSpecialSituations();
       return true;
@@ -2764,7 +2778,8 @@
       }
     }
 
-    advanceCharacterTurn() {
+    advanceCharacterTurn(options = {}) {
+      const { forceMove = false } = options;
       this.updateRingTimers();
       for (const character of this.peopleInRoom()) {
         if (character.id !== this.player.id) character.attackFlag = (character.attackFlag || 0) + 1;
@@ -2773,7 +2788,7 @@
         if (character.id === this.player.id) continue;
         if (this.maybeAutoAttack(character)) continue;
         if (this.maybeCharacterInitiative(character)) continue;
-        this.decideCharacterMovement(character);
+        this.decideCharacterMovement(character, { forceMove });
       }
     }
 
@@ -2961,18 +2976,18 @@
       return true;
     }
 
-    decideCharacterMovement(character) {
+    decideCharacterMovement(character, options = {}) {
+      const { forceMove = false } = options;
       if (!character.visible || character.carriedBy || character.movementMode === "never") return;
       if (character.movementMode === "on_first_meet" && !character.hasMetPlayer) {
         if (character.position !== this.currentRoom) return;
         character.hasMetPlayer = true;
       }
-      if (Math.random() >= 0.1) return;
+      if (!forceMove && Math.random() >= 0.1) return;
 
-      const exits = shuffled(this.connectionsFromVisible(character.position));
+      const exits = shuffled(this.connectionsFrom(character.position));
       for (const connection of exits) {
-        const door = connection.door && this.doors[connection.door];
-        if (door && (!door.open || door.locked)) continue;
+        if (!this.canTravelConnection(connection)) continue;
         this.moveCharacter(character, connection.to, connection.direction);
         break;
       }
@@ -3310,7 +3325,7 @@
           }
           continue;
         }
-        if (action.desc1) this.print(`You ${action.desc1}`);
+        if (action.desc1) this.print(actorActionSentence(this.player, action.desc1));
         if (action.desc2) this.print(action.desc2, action.destination?.includes("endgame") ? "danger" : "");
         if (action.flag_out) this.setFlag(action.flag_out.replace("*", ""), true);
         if (action.reveals) this.reveal(action.reveals);
@@ -3689,6 +3704,13 @@
     if (verb.endsWith("y")) return `${verb.slice(0, -1)}ies`;
     if (verb.endsWith("s") || verb.endsWith("sh") || verb.endsWith("ch") || verb.endsWith("x")) return `${verb}es`;
     return `${verb}s`;
+  }
+
+  function actorActionSentence(character, phrase) {
+    const text = String(phrase || "").trim();
+    const match = text.match(/^([a-z]+)(\b.*)$/i);
+    if (!match) return `${actorSubject(character, true)} ${text}`;
+    return `${actorSubject(character, true)} ${actorVerb(character, match[1].toLowerCase())}${match[2]}`;
   }
 
   function capitalize(text) {

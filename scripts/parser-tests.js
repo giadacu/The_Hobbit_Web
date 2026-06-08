@@ -99,13 +99,21 @@ function runDialogueCase(testCase) {
 }
 
 function runGameCase(testCase) {
+  const originalRandom = Math.random;
   window.hobbitGame.restartGame();
-  outputLines.length = 0;
-  for (const input of testCase.inputs) {
-    window.hobbitGame.execute(input);
+  Math.random = () => 0.99;
+  try {
+    outputLines.length = 0;
+    for (const input of testCase.inputs) {
+      window.hobbitGame.execute(input);
+    }
+  } finally {
+    Math.random = originalRandom;
   }
   const actual = outputLines.slice();
-  const ok = testCase.expectedIncluded.every((line) => actual.includes(line));
+  const includesExpected = testCase.expectedIncluded.every((line) => actual.includes(line));
+  const excludesForbidden = (testCase.notExpectedIncluded || []).every((line) => !actual.includes(line));
+  const ok = includesExpected && excludesForbidden;
   return { ...testCase, actual, expected: testCase.expectedIncluded, ok };
 }
 
@@ -560,6 +568,22 @@ const gameCases = [
     name: "new command clears unresolved clarification",
     inputs: ["open books", "look under carpet"],
     expectedIncluded: ["Under the carpet there is a small key."],
+  },
+  {
+    name: "delegated movement does not describe npc destination",
+    inputs: ["tell gandalf to open the door and go east"],
+    expectedIncluded: ["Gandalf opens the round green door.", "Gandalf goes east."],
+    notExpectedIncluded: ["You are in a beautiful garden, amidst verdant foliage and blossoms bright."],
+  },
+  {
+    name: "delegated special action keeps npc subject",
+    inputs: ["ask gandalf to open the door and lift the carpet"],
+    expectedIncluded: [
+      "Gandalf opens the round green door.",
+      "Gandalf lifts the carpet.",
+      "Under the carpet there is a small key.",
+    ],
+    notExpectedIncluded: ["You lift the carpet."],
   },
   {
     name: "lamp can be lit and turned off",
