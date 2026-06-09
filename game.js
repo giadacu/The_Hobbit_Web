@@ -15,8 +15,12 @@
   const imageRevealFill = $("image-reveal-fill");
   const musicPlayer = $("music-player");
   const inventoryList = $("inventory-list");
+  const inventoryStatus = $("inventory-status");
   const exitsList = $("exits-list");
   const peopleList = $("people-list");
+  const BASE_CARRY_CAPACITY = 15;
+  const CARRY_CAPACITY_PER_STRENGTH = 5;
+  const LANTERN_BURN_TURNS = 10;
 
   const commandsWithoutObject = new Set([
     "look", "wait", "inventory", "i", "save", "load", "quit", "verbs",
@@ -824,6 +828,7 @@
       }
       const carriedCharacters = Object.values(this.characters).filter((character) => character.carriedBy === this.player.id).map((character) => character.name);
       fillList(inventoryList, [...this.player.inventory.map((id) => this.items[id]?.name).filter(Boolean), ...carriedCharacters], "nothing");
+      if (inventoryStatus) inventoryStatus.textContent = `Weight ${this.currentCarryWeight()}/${this.carryCapacity()}`;
       fillList(exitsList, this.roomConnections().map((c) => c.direction), "none");
       fillList(peopleList, this.peopleInRoom().filter((p) => p.name !== "You" && p.visible).map((p) => p.name), "none");
     }
@@ -1098,6 +1103,7 @@
       }
       if (!item.portable) return this.print(`The ${item.name} can't be taken.`);
       if (item.weight > this.player.strength * 5) return this.print(`The ${item.name} is too heavy to take.`);
+      if (!this.canCarryAdditionalWeight(item.weight || 0)) return this.print(this.carryTooMuchMessage(item));
       this.detachItem(item.id);
       item.location = { type: "character", id: this.player.id };
       this.player.inventory.push(item.id);
@@ -1126,14 +1132,24 @@
       }
       if (!foundItems.length) return this.print("I don't see anything like that here that can be taken.");
       const taken = [];
+      const leftBehind = [];
       for (const { item } of foundItems) {
+        if (!this.canCarryAdditionalWeight(item.weight || 0)) {
+          leftBehind.push(item.name);
+          continue;
+        }
         this.detachItem(item.id);
         item.location = { type: "character", id: this.player.id };
         this.player.inventory.push(item.id);
         if (matches(item.name, "treasure")) this.flags.treasuretaken = true;
         taken.push(item.name);
       }
-      this.print(`You take the ${joinNames(taken)}.`);
+      if (taken.length) {
+        this.print(`You take the ${joinNames(taken)}.`);
+        if (leftBehind.length) this.print(`You leave behind ${joinNames(leftBehind)} because carrying more would exceed your limit.`);
+        return;
+      }
+      this.print(leftBehind.length ? `You cannot carry the ${joinNames(leftBehind)} because carrying more would exceed your limit.` : "You cannot carry any more.");
     }
 
     drop(objectName) {
@@ -1617,11 +1633,12 @@
 
     inventory() {
       const carriedCharacters = Object.values(this.characters).filter((character) => character.carriedBy === this.player.id);
-      if (!this.player.inventory.length && !carriedCharacters.length) return this.print("You are carrying: nothing.");
+      const weightText = ` Carry weight: ${this.currentCarryWeight()}/${this.carryCapacity()}.`;
+      if (!this.player.inventory.length && !carriedCharacters.length) return this.print(`You are carrying: nothing.${weightText}`);
       const items = this.player.inventory.map((id) => this.describeItemShort(this.items[id]));
       items.push(...carriedCharacters.map((character) => character.name));
       const worn = this.player.worn?.length ? ` You are wearing: ${this.player.worn.map((id) => this.items[id].name).join(", ")}.` : "";
-      this.print(`You are carrying: ${items.join(", ")}.${worn}`);
+      this.print(`You are carrying: ${items.join(", ")}.${worn}${weightText}`);
     }
 
     wait() {
@@ -1726,6 +1743,7 @@
       this.spiderEyesState = save.spiderEyesState || null;
       this.endgame = Boolean(save.endgame);
       this.player = this.characters[this.data.player];
+      this.normalizeLanternState();
       this.addZXFinaleState();
       this.print(`Game "${name}" loaded.`);
       this.describeRoom({ full: true });
@@ -2211,6 +2229,7 @@
       const held = this.findCharacterItem(character, itemName);
       if (!held) return this.print(`${character.name} does not have the ${itemName}.`);
       if (held.worn) return this.print(`${character.name} is wearing the ${held.item.name}.`);
+      if (!this.canCarryAdditionalWeight(held.item.weight || 0)) return this.print(this.carryTooMuchMessage(held.item));
       this.detachItem(held.item.id);
       held.item.location = { type: "character", id: this.player.id };
       this.player.inventory.push(held.item.id);
@@ -2580,9 +2599,7 @@
         return this.print("You light the elegant lamp. Its engraved metal catches the warm glow.");
       }
       if (matches(item.name, "brass lantern")) {
-        if (this.flags.lanternon) return this.print("The brass lantern is already lit.");
-        this.flags.lanternon = true;
-        return this.print("You light the brass lantern. It gives off a steady glow.");
+        return this.igniteLantern();
       }
       this.print(`You try to light the ${item.name}, but it does not catch.`);
     }
@@ -2871,14 +2888,20 @@
       const key = Object.keys(this.data.combinations).find((combo) => combo.includes(first.name) && combo.includes(second.name));
       if (!key) return this.print("Those objects do not combine into anything useful.");
       const spec = this.data.combinations[key];
-      const id = uniqueId(this.items, spec.nome || "combined item");
+      const combinedName = spec.nome || "combined item";
+      const combinedWeight = spec.peso || 1;
+      const removedWeight = (first.weight || 0) + (second.weight || 0);
+      if (!this.canCarryAdditionalWeight(combinedWeight, { removedWeight })) {
+        return this.print(`The ${combinedName} would be too much to carry (${this.currentCarryWeight() - removedWeight + combinedWeight}/${this.carryCapacity()}).`);
+      }
+      const id = uniqueId(this.items, combinedName);
       this.items[id] = {
         id,
-        name: spec.nome,
+        name: combinedName,
         description: spec.descrizione,
         container: spec.contenitore || false,
         portable: spec.needs_to_be_picked_up !== false,
-        weight: spec.peso || 1,
+        weight: combinedWeight,
         strength: spec.resistenza || 1,
         visible: spec.visibile !== false,
         open: spec.aperto || false,
@@ -2891,7 +2914,7 @@
       this.detachItem(first.id);
       this.detachItem(second.id);
       this.player.inventory.push(id);
-      this.print(`You combine the ${first.name} with the ${second.name}, making the ${spec.nome}.`);
+      this.print(`You combine the ${first.name} with the ${second.name}, making the ${combinedName}.`);
     }
 
     liveDragon() {
@@ -3094,6 +3117,7 @@
     advanceCharacterTurn(options = {}) {
       const { forceMove = false } = options;
       this.updateRingTimers();
+      this.updateLanternTimer();
       for (const character of this.peopleInRoom()) {
         if (character.id !== this.player.id) character.attackFlag = (character.attackFlag || 0) + 1;
       }
@@ -3713,6 +3737,9 @@
           }
           continue;
         }
+        if (this.isLanternLightAction(action)) {
+          return this.igniteLantern(actorActionSentence(this.player, action.desc1));
+        }
         if (action.desc1) this.print(actorActionSentence(this.player, action.desc1));
         if (action.desc2) this.print(action.desc2, action.destination?.includes("endgame") ? "danger" : "");
         if (action.flag_out) this.setFlag(action.flag_out.replace("*", ""), true);
@@ -3751,6 +3778,12 @@
         && action.verb === "look"
         && action.special_char === "Thorin"
         && action.obj2 === "window";
+    }
+
+    isLanternLightAction(action) {
+      return action.verb === "light"
+        && matches(action.obj1 || "", "brass lantern")
+        && matches(action.obj2 || "", "firestone");
     }
 
     matchesSpecialActionObjects(action, objectText, adverb) {
@@ -3856,6 +3889,41 @@
       if (name.endsWith("open")) this.flags[name.replace(/open$/, "closed")] = !value;
     }
 
+    lanternTurnsRemaining() {
+      return Math.max(0, Number(this.flags.lanternturns) || 0);
+    }
+
+    normalizeLanternState() {
+      if (!this.flags.lanternon) {
+        this.flags.lanternturns = 0;
+        return;
+      }
+      if (this.lanternTurnsRemaining() === 0) this.flags.lanternturns = LANTERN_BURN_TURNS;
+    }
+
+    igniteLantern(message = "You light the brass lantern. It gives off a steady glow for a while.") {
+      if (this.flags.lanternon && this.lanternTurnsRemaining() > 0) {
+        this.print("The brass lantern is already lit.");
+        return true;
+      }
+      this.flags.lanternon = true;
+      this.flags.lanternturns = LANTERN_BURN_TURNS;
+      this.print(message);
+      return true;
+    }
+
+    updateLanternTimer() {
+      if (!this.flags.lanternon) return;
+      const remaining = this.lanternTurnsRemaining() - 1;
+      if (remaining > 0) {
+        this.flags.lanternturns = remaining;
+        return;
+      }
+      this.flags.lanternon = false;
+      this.flags.lanternturns = 0;
+      this.print("The brass lantern flickers and goes out.");
+    }
+
     unrecognized(command) {
       const responses = this.data.responses.responses || {};
       if (responses[command]) return this.print(responses[command]);
@@ -3895,6 +3963,26 @@
         character.worn = (character.worn || []).filter((id) => id !== itemId);
       }
       item.location = null;
+    }
+
+    currentCarryWeight(character = this.player) {
+      if (!character) return 0;
+      const heldIds = [...(character.inventory || []), ...(character.worn || [])];
+      return heldIds.reduce((total, itemId) => total + (this.items[itemId]?.weight || 0), 0);
+    }
+
+    carryCapacity(character = this.player) {
+      return BASE_CARRY_CAPACITY + ((character?.strength || 0) * CARRY_CAPACITY_PER_STRENGTH);
+    }
+
+    canCarryAdditionalWeight(weight, { character = this.player, removedWeight = 0 } = {}) {
+      const nextWeight = this.currentCarryWeight(character) - removedWeight + (weight || 0);
+      return nextWeight <= this.carryCapacity(character);
+    }
+
+    carryTooMuchMessage(item) {
+      const nextWeight = this.currentCarryWeight() + (item?.weight || 0);
+      return `The ${item.name} would be too much to carry (${nextWeight}/${this.carryCapacity()}).`;
     }
 
     describeItemShort(item) {

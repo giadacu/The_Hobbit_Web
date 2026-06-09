@@ -41,6 +41,14 @@ input {
   overflow: hidden;
 }
 
+.inventory-status {
+  margin: -0.45rem 0 0.7rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .game-shell {
   display: grid;
   grid-template-columns: minmax(420px, 58fr) minmax(360px, 42fr);
