@@ -104,8 +104,13 @@ function runGameCase(testCase) {
   Math.random = () => 0.99;
   try {
     outputLines.length = 0;
-    for (const input of testCase.inputs) {
-      window.hobbitGame.execute(input);
+    if (typeof testCase.setup === "function") testCase.setup(window.hobbitGame);
+    if (typeof testCase.drive === "function") {
+      testCase.drive(window.hobbitGame);
+    } else {
+      for (const input of testCase.inputs) {
+        window.hobbitGame.execute(input);
+      }
     }
   } finally {
     Math.random = originalRandom;
@@ -115,6 +120,19 @@ function runGameCase(testCase) {
   const excludesForbidden = (testCase.notExpectedIncluded || []).every((line) => !actual.includes(line));
   const ok = includesExpected && excludesForbidden;
   return { ...testCase, actual, expected: testCase.expectedIncluded, ok };
+}
+
+function placeCharacterWithPlayer(game, characterId) {
+  game.characters[characterId].position = game.player.position;
+}
+
+function giveItemToCharacter(game, itemId, characterId = "gandalf") {
+  const item = game.items[itemId];
+  if (!item) throw new Error(`Unknown item: ${itemId}`);
+  game.detachItem(item.id);
+  item.location = { type: "character", id: characterId };
+  const inventory = game.characters[characterId].inventory;
+  if (!inventory.includes(item.id)) inventory.push(item.id);
 }
 
 const cases = [
@@ -733,6 +751,219 @@ const gameCases = [
       "Under the carpet there is a small key.",
     ],
     notExpectedIncluded: ["You lift the carpet."],
+  },
+  {
+    name: "delegated break keeps npc subject",
+    setup(game) {
+      placeCharacterWithPlayer(game, "gandalf");
+      game.items.heavy_wooden_chest.location = { type: "room", id: game.player.position };
+      game.items.heavy_wooden_chest.visible = true;
+      game.items.heavy_wooden_chest.broken = false;
+    },
+    inputs: ["ask gandalf to break the chest"],
+    expectedIncluded: ["Gandalf strikes the heavy wooden chest. The heavy wooden chest resists the attempt to break it."],
+    notExpectedIncluded: ["You strike the heavy wooden chest. The heavy wooden chest resists the attempt to break it."],
+  },
+  {
+    name: "delegated reporting actions keep npc subject",
+    setup(game) {
+      placeCharacterWithPlayer(game, "gandalf");
+    },
+    inputs: ["ask gandalf to location", "ask gandalf to inventory", "ask gandalf to smell air"],
+    expectedIncluded: [
+      "Gandalf is currently in Hobbit hole.",
+      "Gandalf is carrying: a map with strange markings (5). Carry weight: 5/35.",
+      "Gandalf smells the air, but notices nothing useful.",
+    ],
+    notExpectedIncluded: [
+      "You are currently in Hobbit hole.",
+      "You are carrying: a map with strange markings (5). Carry weight: 5/35.",
+      "You smell the air, but notice nothing useful.",
+    ],
+  },
+  {
+    name: "delegated utility item actions keep npc subject",
+    setup(game) {
+      placeCharacterWithPlayer(game, "gandalf");
+    },
+    inputs: ["ask gandalf to open map", "ask gandalf to close map", "ask gandalf to light lamp", "ask gandalf to open inkwell", "ask gandalf to close inkwell"],
+    expectedIncluded: [
+      "Gandalf unfolds the curious map. Gandalf sees a map with strange markings.",
+      "Gandalf folds the curious map.",
+      "Gandalf lights the elegant lamp. Its engraved metal catches the warm glow.",
+      "Gandalf unstoppers the dark glass inkwell.",
+      "Gandalf stoppers the dark glass inkwell.",
+    ],
+    notExpectedIncluded: [
+      "You unfold the curious map. You see a map with strange markings.",
+      "You fold the curious map.",
+      "You light the elegant lamp. Its engraved metal catches the warm glow.",
+      "You unstopper the dark glass inkwell.",
+      "You stopper the dark glass inkwell.",
+    ],
+  },
+  {
+    name: "delegated wear remove and garden actions keep npc subject",
+    setup(game) {
+      game.currentRoom = "bilbos_garden";
+      game.player.position = "bilbos_garden";
+      placeCharacterWithPlayer(game, "gandalf");
+      ["golden_ring", "watering_can", "seed_packet", "garden_spade", "sharp_pruner", "rake"].forEach((itemId) => giveItemToCharacter(game, itemId));
+      game.flags.wateringcanfull = true;
+    },
+    inputs: [
+      "ask gandalf to wear golden ring",
+      "ask gandalf to remove golden ring",
+      "ask gandalf to water rose bush",
+      "ask gandalf to plant seeds",
+      "ask gandalf to trim rose bush with pruner",
+      "ask gandalf to rake garden",
+      "ask gandalf to dig garden",
+    ],
+    expectedIncluded: [
+      "Gandalf wears the golden ring and becomes unnoticeable.",
+      "Gandalf removes the golden ring and becomes noticeable again.",
+      "Gandalf waters the rose bush. The leaves look fresher.",
+      "Gandalf plants a few seeds in a soft patch of earth. They will need time and care.",
+      "Gandalf trims the rose bush carefully. It looks a little neater.",
+      "Gandalf rakes the garden path into a tidier state.",
+      "Gandalf digs carefully with the garden spade, but uncovers nothing unexpected.",
+    ],
+    notExpectedIncluded: [
+      "You wear the golden ring and become unnoticeable.",
+      "You remove the golden ring and become noticeable again.",
+      "You water the rose bush. The leaves look fresher.",
+      "You plant a few seeds in a soft patch of earth. They will need time and care.",
+      "You trim the rose bush carefully. It looks a little neater.",
+      "You rake the garden path into a tidier state.",
+      "You dig carefully with the garden spade, but uncover nothing unexpected.",
+    ],
+  },
+  {
+    name: "delegated push climb social and combine actions keep npc subject",
+    setup(game) {
+      placeCharacterWithPlayer(game, "gandalf");
+      placeCharacterWithPlayer(game, "thorin");
+      game.items.heavy_wooden_chest.location = { type: "room", id: game.player.position };
+      game.items.heavy_wooden_chest.visible = true;
+      game.items.heavy_wooden_chest.open = true;
+      game.items.heavy_wooden_chest.locked = false;
+      ["golden_ring", "small_key"].forEach((itemId) => giveItemToCharacter(game, itemId));
+      game.data.combinations["golden ring+small key"] = { nome: "odd trinket", descrizione: "an odd trinket", peso: 1 };
+    },
+    inputs: [
+      "ask gandalf to push inkwell",
+      "ask gandalf to climb into chest",
+      "ask gandalf to climb out",
+      "ask gandalf to thank thorin",
+      "ask gandalf to combine golden ring with small key",
+    ],
+    expectedIncluded: [
+      "Gandalf pushes the dark glass inkwell.",
+      "Gandalf climbs into the heavy wooden chest.",
+      "Gandalf climbs out of the heavy wooden chest.",
+      "Gandalf thanks Thorin.",
+      "Gandalf combines the golden ring with the small key, making the odd trinket.",
+    ],
+    notExpectedIncluded: [
+      "You push the dark glass inkwell.",
+      "You climb into the heavy wooden chest.",
+      "You climb out of the heavy wooden chest.",
+      "You thank Thorin.",
+      "You combine the golden ring with the small key, making the odd trinket.",
+    ],
+  },
+  {
+    name: "troll clearing hidden dialogue includes troll exchange",
+    setup(game) {
+      game.currentRoom = "trolls_clearing";
+      game.player.position = "trolls_clearing";
+      game.visitedTrollsClearing = false;
+      game.checkSpecialSituations();
+    },
+    inputs: [],
+    expectedIncluded: [
+      "You crouch low behind a mossy boulder, heart pounding, as the trolls argue by the flickering campfire in the moonlit clearing.",
+      "What shall us do with him?",
+      "Roast him!",
+      "He wouldn't make above a mouthful.",
+      "P'raps there are more like him round about.",
+    ],
+  },
+  {
+    name: "transformed trolls drop visible large key",
+    setup(game) {
+      game.currentRoom = "trolls_clearing";
+      game.player.position = "trolls_clearing";
+      game.transformTrolls();
+    },
+    drive(game) {
+      game.execute("take large key");
+    },
+    expectedIncluded: ["You take the large key."],
+    notExpectedIncluded: ["I don't see that here."],
+  },
+  {
+    name: "carefully taking large key works while trolls are alive",
+    setup(game) {
+      game.currentRoom = "trolls_clearing";
+      game.player.position = "trolls_clearing";
+      game.visitedTrollsClearing = true;
+    },
+    drive(game) {
+      game.execute("carefully take large key and south west");
+      if (!game.player.inventory.includes("the_large_key")) throw new Error("Expected player to take the large key.");
+      if (game.endgame) throw new Error("Expected player to escape after taking the large key carefully.");
+    },
+    expectedIncluded: [
+      "You carefully approach the troll, eyes fixed on the gleaming key.",
+      "He nearly notices you, then shifts his great bulk, grumbling to himself.",
+      "You take the large key.",
+    ],
+    notExpectedIncluded: ["The hideous troll eats you. You are dead."],
+  },
+  {
+    name: "player can carry sword and rope together",
+    setup(game) {
+      game.player.strength = 5;
+      game.currentRoom = "trolls_cave";
+      game.player.position = "trolls_cave";
+      game.items.majestic_sword.location = { type: "room", id: game.player.position };
+      game.items.majestic_sword.visible = true;
+      game.items.sturdy_rope.location = { type: "room", id: game.player.position };
+      game.items.sturdy_rope.visible = true;
+    },
+    inputs: ["take sword", "take rope", "inventory"],
+    expectedIncluded: [
+      "You take the majestic sword.",
+      "You take the sturdy rope.",
+      "You are carrying: a majestic sword, ancient and luminous (12), a sturdy rope (8). Carry weight: 20/52.",
+    ],
+  },
+  {
+    name: "autoplay wins without weight drops",
+    drive(game) {
+      const originalRandom = Math.random;
+      const issued = [];
+      Math.random = () => 0.99;
+      try {
+        for (let step = 0; step < 250 && !game.endgame; step += 1) {
+          const command = game.nextAutoplayCommand();
+          if (!command) throw new Error(`Autoplay stopped unexpectedly at step ${step} in ${game.currentRoom}.`);
+          issued.push(command);
+          if (command.startsWith("drop ")) throw new Error(`Autoplay should not need weight drops, but issued: ${command}`);
+          game.execute(command);
+        }
+      } finally {
+        Math.random = originalRandom;
+      }
+      if (!game.endgame) throw new Error("Expected autoplay to finish the adventure.");
+      if (!outputLines.includes("Congratulations. You have killed Smaug and found the treasure - a real thief. You have mastered 51.19% of this adventure.")) {
+        throw new Error(`Expected autoplay victory message. Commands: ${issued.slice(-12).join(" | ")}`);
+      }
+    },
+    expectedIncluded: ["Congratulations. You have killed Smaug and found the treasure - a real thief. You have mastered 51.19% of this adventure."],
+    notExpectedIncluded: ["You leave the", "You drop the"],
   },
   {
     name: "lamp can be lit and turned off",

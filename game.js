@@ -20,6 +20,7 @@
   const peopleList = $("people-list");
   const BASE_CARRY_CAPACITY = 5;
   const CARRY_CAPACITY_PER_STRENGTH = 3;
+  const PLAYER_CARRY_BONUS = 32;
   const LANTERN_BURN_TURNS = 10;
 
   const commandsWithoutObject = new Set([
@@ -560,7 +561,7 @@
         load: () => this.load(object),
         quit: () => this.quit(),
         map: () => this.showMap(),
-        location: () => this.print(`You are currently in ${this.room().name.replace(/_/g, " ")}.`),
+        location: () => this.print(actorizeSecondPerson(this.player, `You are currently in ${this.room().name.replace(/_/g, " ")}.`)),
         music: () => this.handleMusicCommand(object),
         autoplay: () => this.autoplay(object),
         wear: () => this.wear(object),
@@ -1121,7 +1122,7 @@
       character.position = this.currentRoom;
       character.followingPlayer = false;
       character.justEntered = false;
-      this.print(`You pick up ${character.name}.`);
+      this.print(actorizeSecondPerson(this.player, `You pick up ${character.name}.`));
     }
 
     takeAll(objectName) {
@@ -1145,11 +1146,13 @@
         taken.push(item.name);
       }
       if (taken.length) {
-        this.print(`You take the ${joinNames(taken)}.`);
-        if (leftBehind.length) this.print(`You leave behind ${joinNames(leftBehind)} because carrying more would exceed your limit.`);
+        this.print(actorizeSecondPerson(this.player, `You take the ${joinNames(taken)}.`));
+        if (leftBehind.length) this.print(actorizeSecondPerson(this.player, `You leave behind ${joinNames(leftBehind)} because carrying more would exceed your limit.`));
         return;
       }
-      this.print(leftBehind.length ? `You cannot carry the ${joinNames(leftBehind)} because carrying more would exceed your limit.` : "You cannot carry any more.");
+      this.print(leftBehind.length
+        ? actorizeSecondPerson(this.player, `You cannot carry the ${joinNames(leftBehind)} because carrying more would exceed your limit.`)
+        : actorizeSecondPerson(this.player, "You cannot carry any more."));
     }
 
     drop(objectName) {
@@ -1162,7 +1165,7 @@
       });
       if (carriedCharacter && inParts.length === 1) return this.dropCharacter(carriedCharacter);
       const item = this.findInInventory(itemName);
-      if (!item) return this.print(this.heldItemMessage(itemName) || `You don't have the ${itemName}.`);
+      if (!item) return this.print(this.heldItemMessage(itemName) || actorizeSecondPerson(this.player, `You don't have the ${itemName}.`));
       if (placement) {
         const container = this.visibleSearch(placement.targetName)?.item;
         if (!container || !container.container) {
@@ -1171,7 +1174,7 @@
           return this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "place")} the ${item.name} ${placement.relation} the ${placement.targetName}.`);
         }
         if (!container.open && !container.noLid) return this.print(`The ${container.name} is closed.`);
-        if (container.id === item.id || this.isInside(item.id, container.id)) return this.print(`You cannot put the ${item.name} in itself.`);
+        if (container.id === item.id || this.isInside(item.id, container.id)) return this.print(actorizeSecondPerson(this.player, `You cannot put the ${item.name} in itself.`));
         if ((item.weight || 0) >= (container.weight || 0)) return this.print(`The ${item.name} is too big for the ${container.name}.`);
         this.detachItem(item.id);
         item.location = { type: "item", id: container.id };
@@ -1198,7 +1201,7 @@
       character.carriedBy = null;
       character.position = this.currentRoom;
       character.justEntered = false;
-      this.print(`You put ${character.name} down.`);
+      this.print(actorizeSecondPerson(this.player, `You put ${character.name} down.`));
     }
 
     checkVictory(item, container) {
@@ -1277,7 +1280,7 @@
     openNonContainerItem(item) {
       if (matches(item.name, "curious map")) {
         if (item.broken) {
-          this.print("You try to unfold the broken curious map, but it only separates into useless fragments.");
+          this.print(actorizeSecondPerson(this.player, "You try to unfold the broken curious map, but it only separates into useless fragments."));
           return true;
         }
         if (item.open) {
@@ -1286,10 +1289,10 @@
         }
         item.open = true;
         if (item.mended) {
-          this.print("You carefully unfold the mended curious map. The strange markings are readable again, though the joins are still visible.");
+          this.print(actorizeSecondPerson(this.player, "You carefully unfold the mended curious map. The strange markings are readable again, though the joins are still visible."));
           return true;
         }
-        this.print("You unfold the curious map. You see a map with strange markings.");
+        this.print(actorizeSecondPerson(this.player, "You unfold the curious map. You see a map with strange markings."));
         return true;
       }
       if (matches(item.name, "elegant lamp")) {
@@ -1298,7 +1301,7 @@
       if (matches(item.name, "dark glass inkwell")) {
         if (item.open) return this.print("The dark glass inkwell is already open.");
         item.open = true;
-        this.print("You unstopper the dark glass inkwell.");
+        this.print(actorizeSecondPerson(this.player, "You unstopper the dark glass inkwell."));
         return true;
       }
       return false;
@@ -1349,22 +1352,22 @@
         }
         item.open = false;
         if (item.mended) {
-          this.print("You carefully fold the mended curious map, keeping the repaired joins aligned.");
+          this.print(actorizeSecondPerson(this.player, "You carefully fold the mended curious map, keeping the repaired joins aligned."));
           return true;
         }
-        this.print("You fold the curious map.");
+        this.print(actorizeSecondPerson(this.player, "You fold the curious map."));
         return true;
       }
       if (matches(item.name, "elegant lamp")) {
         if (!item.open) return this.print("The elegant lamp is already unlit.");
         item.open = false;
-        this.print("You turn off the elegant lamp.");
+        this.print(actorizeSecondPerson(this.player, "You turn off the elegant lamp."));
         return true;
       }
       if (matches(item.name, "dark glass inkwell")) {
         if (!item.open) return this.print("The dark glass inkwell is already closed.");
         item.open = false;
-        this.print("You stopper the dark glass inkwell.");
+        this.print(actorizeSecondPerson(this.player, "You stopper the dark glass inkwell."));
         return true;
       }
       return false;
@@ -1493,7 +1496,7 @@
     examineCharacter(character) {
       const loadout = this.characterLoadoutText(character, { includeEmpty: true });
       const temperament = character.friendly === false ? "They look dangerous." : "";
-      this.print([`You examine ${character.name}.`, loadout, temperament].filter(Boolean).join(" "));
+      this.print([actorizeSecondPerson(this.player, `You examine ${character.name}.`), loadout, temperament].filter(Boolean).join(" "));
     }
 
     sense(verb, objectName = "") {
@@ -1526,14 +1529,16 @@
       const item = this.visibleSearch(text)?.item;
       if (item) {
         if (verb === "knock") {
-          return this.print(item.container || item.strength > 8 ? `You knock on the ${item.name}. It sounds solid.` : `You knock on the ${item.name}, but nothing happens.`);
+          return this.print(item.container || item.strength > 8
+            ? actorizeSecondPerson(this.player, `You knock on the ${item.name}. It sounds solid.`)
+            : actorizeSecondPerson(this.player, `You knock on the ${item.name}, but nothing happens.`));
         }
-        return this.print(`You ${verb} the ${item.name}, but discover nothing new.`);
+        return this.print(actorizeSecondPerson(this.player, `You ${verb} the ${item.name}, but discover nothing new.`));
       }
       const door = this.findDoor(text)?.door;
       if (door) {
-        if (verb === "knock") return this.print(`You knock on the ${door.name}, but no one answers.`);
-        return this.print(`You ${verb} the ${door.name}. It is ${door.open ? "open" : "closed"}.`);
+        if (verb === "knock") return this.print(actorizeSecondPerson(this.player, `You knock on the ${door.name}, but no one answers.`));
+        return this.print(actorizeSecondPerson(this.player, `You ${verb} the ${door.name}. It is ${door.open ? "open" : "closed"}.`));
       }
       const heldMessage = this.heldItemMessage(text);
       if (heldMessage) return this.print(heldMessage);
@@ -1553,12 +1558,12 @@
         if (["search", "examine", "look"].includes(verb)) {
           return this.print(`${subject} search${subject === "You" ? "" : "es"} the area carefully.${suffix || " Nothing else is revealed."}`);
         }
-        if (verb === "listen") return this.print(this.ambientSoundMessage(lower));
-        if (verb === "smell") return this.print(this.ambientSmellMessage(lower));
+        if (verb === "listen") return this.print(actorizeSecondPerson(this.player, this.ambientSoundMessage(lower)));
+        if (verb === "smell") return this.print(actorizeSecondPerson(this.player, this.ambientSmellMessage(lower)));
       }
 
-      if (["air", "smell", "scent", "odor", "odour"].includes(text)) return this.print(this.ambientSmellMessage(lower));
-      if (["sound", "sounds", "noise", "noises", "silence", "music"].includes(text)) return this.print(this.ambientSoundMessage(lower));
+      if (["air", "smell", "scent", "odor", "odour"].includes(text)) return this.print(actorizeSecondPerson(this.player, this.ambientSmellMessage(lower)));
+      if (["sound", "sounds", "noise", "noises", "silence", "music"].includes(text)) return this.print(actorizeSecondPerson(this.player, this.ambientSoundMessage(lower)));
 
       if (matchesAny(text, ["ground", "floor", "earth", "path", "trail", "road", "footprints"])) {
         if (lower.includes("footprint") || lower.includes("imprint")) return this.print("The ground bears heavy marks, worth remembering but not something you can pick up.");
@@ -1599,8 +1604,8 @@
       if (relation === "under" || relation === "behind") {
         return this.print(`${subject} ${actorVerb(this.player, "look")} ${relation} the ${text}, but find${this.player.name === "You" ? "" : "s"} nothing hidden.`);
       }
-      if (verb === "listen") return this.print(this.ambientSoundMessage(lower));
-      if (verb === "smell") return this.print(this.ambientSmellMessage(lower));
+      if (verb === "listen") return this.print(actorizeSecondPerson(this.player, this.ambientSoundMessage(lower)));
+      if (verb === "smell") return this.print(actorizeSecondPerson(this.player, this.ambientSmellMessage(lower)));
       if (verb === "knock") return this.print(`${subject} ${actorVerb(this.player, "knock")} on the ${text}, but nothing answers.`);
       if (verb === "touch" || verb === "feel") return this.print(`${subject} ${actorVerb(this.player, verb)} the ${text}, but learn${this.player.name === "You" ? "" : "s"} nothing useful.`);
       this.print(`${subject} ${actorVerb(this.player, "find")} nothing special about the ${text}.`);
@@ -1614,12 +1619,13 @@
     }
 
     ambientSoundMessage(description) {
-      if (description.includes("music")) return "You listen. Music and distant voices drift through the air.";
-      if (description.includes("dripping") || description.includes("drips")) return "You listen. Water drips somewhere in the dark.";
-      if (description.includes("wind") || description.includes("howl")) return "You listen. The wind moves restlessly around you.";
-      if (description.includes("river") || description.includes("stream") || description.includes("water")) return "You listen. Water murmurs nearby.";
-      if (description.includes("silence")) return "You listen. The silence feels heavy.";
-      return "You listen carefully, but hear nothing useful.";
+      const subject = actorSubject(this.player, true);
+      if (description.includes("music")) return `${subject} ${actorVerb(this.player, "listen")}. Music and distant voices drift through the air.`;
+      if (description.includes("dripping") || description.includes("drips")) return `${subject} ${actorVerb(this.player, "listen")}. Water drips somewhere in the dark.`;
+      if (description.includes("wind") || description.includes("howl")) return `${subject} ${actorVerb(this.player, "listen")}. The wind moves restlessly around you.`;
+      if (description.includes("river") || description.includes("stream") || description.includes("water")) return `${subject} ${actorVerb(this.player, "listen")}. Water murmurs nearby.`;
+      if (description.includes("silence")) return `${subject} ${actorVerb(this.player, "listen")}. The silence feels heavy.`;
+      return `${subject} ${actorVerb(this.player, "listen")} carefully, but hear${this.player.name === "You" ? "" : "s"} nothing useful.`;
     }
 
     ambientSmellMessage(description) {
@@ -1628,28 +1634,28 @@
       if (description.includes("fire") || description.includes("ember") || description.includes("smoke")) return "The air carries a faint smoky smell.";
       if (description.includes("food") || description.includes("meal") || description.includes("wine")) return "There is a homely smell of food and drink.";
       if (description.includes("dragon") || description.includes("smaug")) return "The air smells hot, dry, and dangerous.";
-      return "You smell the air, but notice nothing useful.";
+      return `${actorSubject(this.player, true)} ${actorVerb(this.player, "smell")} the air, but notice${this.player.name === "You" ? "" : "s"} nothing useful.`;
     }
 
     inventory() {
       const carriedCharacters = Object.values(this.characters).filter((character) => character.carriedBy === this.player.id);
       const weightText = ` Carry weight: ${this.currentCarryWeight()}/${this.carryCapacity()}.`;
-      if (!this.player.inventory.length && !carriedCharacters.length) return this.print(`You are carrying: nothing.${weightText}`);
+      if (!this.player.inventory.length && !carriedCharacters.length) return this.print(actorizeSecondPerson(this.player, `You are carrying: nothing.${weightText}`));
       const items = this.player.inventory.map((id) => this.inventoryItemLabel(this.items[id]));
       items.push(...carriedCharacters.map((character) => character.name));
       const worn = this.player.worn?.length ? ` You are wearing: ${this.player.worn.map((id) => this.inventoryItemLabel(this.items[id])).join(", ")}.` : "";
-      this.print(`You are carrying: ${items.join(", ")}.${worn}${weightText}`);
+      this.print(actorizeSecondPerson(this.player, `You are carrying: ${items.join(", ")}.${worn}${weightText}`));
     }
 
     wait() {
       if (this.spiderEyesState?.active && this.currentRoom === this.spiderEyesState.room) {
         this.spiderEyesState.waits += 1;
         if (this.spiderEyesState.waits === 1) {
-          this.print("You wait. The pale bulbous eyes linger in the dark.");
+          this.print(actorizeSecondPerson(this.player, "You wait. The pale bulbous eyes linger in the dark."));
           return;
         }
         if (this.spiderEyesState.waits === 2) {
-          this.print("You wait again. The eyes drift aside for a moment.");
+          this.print(actorizeSecondPerson(this.player, "You wait again. The eyes drift aside for a moment."));
           return;
         }
         this.killBySpiderEyes();
@@ -1668,8 +1674,11 @@
           .map((p) => `${p.name} says 'who's talking?'`);
         return this.print(replies.length ? replies.join("\n") : "No one responds to your greeting.");
       }
-      const replies = this.peopleInRoom().filter((p) => p.name !== "You" && p.friendly === true).map((p) => `${p.name} says hello to you.`);
-      this.print(replies.length ? replies.join("\n") : "No one responds to your greeting.");
+      const greeter = this.player.name === "You" ? "you" : this.player.name;
+      const replies = this.peopleInRoom()
+        .filter((p) => p.name !== "You" && p.friendly === true)
+        .map((p) => `${p.name} says hello to ${greeter}.`);
+      this.print(replies.length ? replies.join("\n") : (this.player.name === "You" ? "No one responds to your greeting." : `No one responds to ${this.player.name}'s greeting.`));
     }
 
     tips(object) {
@@ -1869,18 +1878,24 @@
     }
 
     nextAutoplayCommand() {
+      const beforeDragonDefeat = !this.flags.dragondefeated;
+
       if (this.spiderEyesState?.active && this.currentRoom === this.spiderEyesState.room) {
         if ((this.spiderEyesState.waits || 0) < 2) return "wait";
         return this.spiderEyesState.safeDirections?.[0] || null;
       }
 
-      if (!this.autoplayHas("small key")) {
+      if (this.currentRoom === "lower_halls" && this.liveDragon() && this.flags.bardreadiedarrow) {
+        return "say to bard \"shoot dragon\"";
+      }
+
+      if (beforeDragonDefeat && !this.autoplayHas("small key")) {
         if (this.currentRoom !== "hobbit_hole") return this.autoplayRouteCommandTo("hobbit_hole");
         if (!this.visibleSearch("small key")) return "lift carpet";
         return "take small key";
       }
 
-      if (!this.autoplayHas("firestone")) {
+      if (beforeDragonDefeat && !this.autoplayHas("firestone")) {
         if (this.currentRoom !== "hobbit_hole") return this.autoplayRouteCommandTo("hobbit_hole");
         const topDrawer = this.items.top_drawer;
         const ornateBox = this.items.ornate_box;
@@ -1892,7 +1907,7 @@
         return "take firestone";
       }
 
-      if (!this.autoplayHas("sturdy key")) {
+      if (beforeDragonDefeat && !this.autoplayHas("sturdy key")) {
         if (this.currentRoom !== "hobbit_hole") return this.autoplayRouteCommandTo("hobbit_hole");
         const bottomDrawer = this.items.bottom_drawer;
         if (bottomDrawer && !bottomDrawer.open) return "open bottom drawer";
@@ -1900,7 +1915,7 @@
         return "take sturdy key";
       }
 
-      if (!this.autoplayHas("brass lantern")) {
+      if (beforeDragonDefeat && !this.autoplayHas("brass lantern")) {
         if (this.currentRoom !== "bilbos_garden") return this.autoplayRouteCommandTo("bilbos_garden");
         const shed = this.items.garden_shed;
         if (shed?.locked) return "unlock garden shed";
@@ -1909,56 +1924,56 @@
         return "take lantern";
       }
 
-      if (!this.flags.lanternon) return "light lantern";
+      if (beforeDragonDefeat && !this.flags.lanternon) return "light lantern";
 
-      if (!this.flags.seenpony) {
+      if (beforeDragonDefeat && !this.flags.seenpony) {
         const thorin = Object.values(this.characters).find((character) => matches(character.name, "thorin"));
         if (this.currentRoom !== "green_dragon_inn") return this.autoplayRouteCommandTo("green_dragon_inn");
         if (thorin?.position !== this.currentRoom) thorin.position = this.currentRoom;
         return "say to thorin \"look through window\"";
       }
 
-      if (!this.visitedRooms.has("dreary") && this.currentRoom !== "dreary") {
+      if (beforeDragonDefeat && !this.visitedRooms.has("dreary") && this.currentRoom !== "dreary") {
         if (this.currentRoom !== "green_dragon_inn_outside") return this.autoplayRouteCommandTo("green_dragon_inn_outside");
         if (!this.items.low_branch?.visible) return "examine oak tree";
         return "climb branch";
       }
 
-      if (!this.autoplayHas("large key")) {
+      if (beforeDragonDefeat && !this.autoplayHas("large key")) {
         if (!this.visitedTrollsClearing) return this.autoplayRouteCommandTo("trolls_clearing");
-        if (!this.trollsTransformed) {
-          if (this.currentRoom === "trolls_clearing") return "south west";
-          return "wait";
-        }
         if (this.currentRoom !== "trolls_clearing") return this.autoplayRouteCommandTo("trolls_clearing");
+        if (!this.trollsTransformed) return "carefully take large key and south west";
         return "take large key";
       }
 
-      if (!this.autoplayHas("sturdy rope") || !this.autoplayHas("majestic sword")) {
+      if (beforeDragonDefeat && !this.autoplayHas("majestic sword")) {
         if (this.currentRoom !== "trolls_cave") return this.autoplayRouteCommandTo("trolls_cave");
-        if (!this.autoplayHas("majestic sword")) {
-          const chest = this.items.arcane_chest;
-          if (!chest.visible) return "carefully examine discarded armor";
-          if (!chest.open) return "open arcane chest";
-          if (!this.flags.autoplayexaminedarcanechest) return this.autoplayOnce("autoplayexaminedarcanechest", "examine arcane chest");
-          return "take sword";
-        }
-        return "take rope";
+        const chest = this.items.arcane_chest;
+        if (!chest.visible) return "carefully examine discarded armor";
+        if (!chest.open) return "open arcane chest";
+        if (!this.flags.autoplayexaminedarcanechest) return this.autoplayOnce("autoplayexaminedarcanechest", "examine arcane chest");
+        const prepSwordLoad = this.autoplayRequiredPickupPrepCommand("majestic sword");
+        if (prepSwordLoad) return prepSwordLoad;
+        return "take sword";
       }
 
       const hostile = this.peopleInRoom().find((character) => {
         return character.visible && character.friendly === false && !matches(character.name, "dragon");
       });
-      if (hostile && this.autoplayHas("majestic sword")) return `kill ${hostile.name} with sword`;
+      if (beforeDragonDefeat && hostile && this.autoplayHas("majestic sword")) return `kill ${hostile.name} with sword`;
 
-      if (!this.autoplayHas("golden ring")) {
-        if (this.currentRoom === "dark_stuffy_passage_9") return "take ring";
+      if (beforeDragonDefeat && this.visitedTrollsClearing && this.autoplayHas("large key") && !this.trollsTransformed && this.currentRoom !== "trolls_clearing") return "wait";
+
+      if (beforeDragonDefeat && !this.autoplayHas("golden ring")) {
+        if (this.currentRoom === "dark_stuffy_passage_9") {
+          const prepRingLoad = this.autoplayRequiredPickupPrepCommand("golden ring");
+          if (prepRingLoad) return prepRingLoad;
+          return "take ring";
+        }
         return this.autoplayRouteCommandTo("dark_stuffy_passage_9");
       }
 
-      if (this.visitedTrollsClearing && !this.trollsTransformed && this.currentRoom !== "trolls_clearing") return "wait";
-
-      if ((this.player.strength || 1) < 6) {
+      if (beforeDragonDefeat && (this.player.strength || 1) < 6) {
         if (this.currentRoom !== "beorns_house") return this.autoplayRouteCommandTo("beorns_house");
         if (this.autoplayHas("meal")) return "eat meal";
         const curtain = this.items.curtain;
@@ -1967,6 +1982,13 @@
         if (cupboard && !cupboard.open) return "open cupboard";
         if (!this.flags.autoplayexaminedcupboard) return this.autoplayOnce("autoplayexaminedcupboard", "examine cupboard");
         return "take meal";
+      }
+
+      if (beforeDragonDefeat && !this.autoplayHas("sturdy rope")) {
+        if (this.currentRoom !== "trolls_cave") return this.autoplayRouteCommandTo("trolls_cave");
+        const prepRopeLoad = this.autoplayRequiredPickupPrepCommand("sturdy rope");
+        if (prepRopeLoad) return prepRopeLoad;
+        return "take rope";
       }
 
       if (this.currentRoom === "west_bank") {
@@ -2006,17 +2028,16 @@
 
       if (!this.flags.bardreadiedarrow) return "say to bard \"get strong arrow from quiver\"";
 
-      const prepTreasureLoad = this.autoplayTreasurePickupPrepCommand();
-      if (prepTreasureLoad) return prepTreasureLoad;
-
-      if (this.currentRoom !== "lower_halls" && !this.autoplayHas("treasure")) return this.autoplayRouteCommandTo("lower_halls");
-
       if (this.currentRoom === "lower_halls" && !this.autoplayHas("treasure")) {
         if (this.liveDragon()) {
           return "say to bard \"shoot dragon\"";
         }
+        const prepTreasureLoad = this.autoplayTreasurePickupPrepCommand();
+        if (prepTreasureLoad) return prepTreasureLoad;
         return "take treasure";
       }
+
+      if (!this.autoplayHas("treasure")) return this.autoplayRouteCommandTo("lower_halls");
 
       if (this.autoplayHas("treasure") && this.currentRoom !== "hobbit_hole") return this.autoplayRouteCommandTo("hobbit_hole");
 
@@ -2042,14 +2063,32 @@
       const spareCapacity = this.carryCapacity() - this.currentCarryWeight();
       if (spareCapacity >= (treasure.weight || 0)) return null;
       const expendable = [
-        "small key",
+        "golden ring",
+        "firestone",
         "sturdy key",
         "brass lantern",
-        "firestone",
-        "large key",
         "sturdy rope",
         "majestic sword",
+        "large key",
+        "small key",
       ];
+      for (const name of expendable) {
+        if (this.autoplayHas(name)) return `drop ${name}`;
+      }
+      return null;
+    }
+
+    autoplayRequiredPickupPrepCommand(itemName) {
+      const item = this.findKnownItem(itemName);
+      if (!item) return null;
+      const spareCapacity = this.carryCapacity() - this.currentCarryWeight();
+      if (spareCapacity >= (item.weight || 0)) return null;
+      const expendableByNeed = {
+        "majestic sword": ["ornate box", "small key", "sturdy key"],
+        "sturdy rope": ["ornate box", "small key", "sturdy key", "firestone", "brass lantern"],
+        "golden ring": ["ornate box"],
+      };
+      const expendable = expendableByNeed[item.name] || [];
       for (const name of expendable) {
         if (this.autoplayHas(name)) return `drop ${name}`;
       }
@@ -2157,7 +2196,7 @@
       this.detachItem(item.id);
       item.worn = true;
       this.player.worn.push(item.id);
-      this.print(`You wear the ${item.name}.`);
+      this.print(actorizeSecondPerson(this.player, `You wear the ${item.name}.`));
     }
 
     remove(objectName) {
@@ -2166,7 +2205,7 @@
       if (!id && name.includes("ring") && this.player.wearingRing) {
         return this.removeRing();
       }
-      if (!id) return this.print(this.heldItemMessage(objectName) || `You don't have the ${objectName} to remove.`);
+      if (!id) return this.print(this.heldItemMessage(objectName) || actorizeSecondPerson(this.player, `You don't have the ${objectName} to remove.`));
       if (matches(this.items[id].name, "golden ring")) {
         return this.removeRing(id);
       }
@@ -2174,7 +2213,7 @@
       this.items[id].worn = false;
       this.items[id].location = { type: "character", id: this.player.id };
       this.player.inventory.push(id);
-      this.print(`You remove the ${this.items[id].name}.`);
+      this.print(actorizeSecondPerson(this.player, `You remove the ${this.items[id].name}.`));
     }
 
     removeRing(ringId = null) {
@@ -2555,24 +2594,25 @@
       const weapon = weaponName ? this.findInInventory(weaponName) : null;
       if (weaponName && !weapon) return this.print(this.heldItemMessage(weaponName) || `${this.player.name} does not have the ${weaponName}.`);
       const attackStrength = (this.player.strength || 1) + (weapon ? (weapon.weight || 0) : 0);
+      const strikeMessage = (target) => `${actorSubject(this.player, true)} ${actorVerb(this.player, "strike")} the ${target}.`;
 
       const door = this.findDoor(targetName)?.door;
       if (door) {
         if (door.broken) return this.print(`The ${door.name} is already broken.`);
-        if (attackStrength < (door.strength || 10)) return this.print(`You strike the ${door.name}. The ${door.name} resists the attempt to break it.`);
+        if (attackStrength < (door.strength || 10)) return this.print(`${strikeMessage(door.name)} The ${door.name} resists the attempt to break it.`);
         door.broken = true;
         door.open = true;
         door.locked = false;
         this.setFlag(`${compact(door.name)}open`, true);
-        return this.print(`You strike the ${door.name}. The ${door.name} breaks into pieces.`);
+        return this.print(`${strikeMessage(door.name)} The ${door.name} breaks into pieces.`);
       }
 
       const item = this.visibleSearch(targetName)?.item;
       if (!item) return this.print(this.heldItemMessage(targetName) || "I don't see that here.");
-      if (item.broken) return this.print(`You strike the broken ${item.name}. The ${item.name} is already broken.`);
+      if (item.broken) return this.print(`${strikeMessage(`broken ${item.name}`)} The ${item.name} is already broken.`);
       if (!item.visible) return this.print(`The ${item.name} is not visible.`);
       if (item.portable && item.location?.type !== "character") return this.print(`To break the ${item.name}, you need to pick it up first.`);
-      if (attackStrength < (item.strength || 10)) return this.print(`You strike the ${item.name}. The ${item.name} resists the attempt to break it.`);
+      if (attackStrength < (item.strength || 10)) return this.print(`${strikeMessage(item.name)} The ${item.name} resists the attempt to break it.`);
 
       item.broken = true;
       item.mended = false;
@@ -2585,9 +2625,9 @@
       const contents = item.contents.map((id) => this.items[id]).filter(Boolean);
       if (item.container) {
         const inside = contents.length ? ` Inside there is ${contents.map((child) => `${articleFor(child.name)} ${child.name}`).join(", ")}.` : " It's empty.";
-        return this.print(`You strike the ${item.name}. The ${item.name} breaks into pieces.${inside}`);
+        return this.print(`${strikeMessage(item.name)} The ${item.name} breaks into pieces.${inside}`);
       }
-      this.print(`You strike the ${item.name}. The ${item.name} breaks into pieces.`);
+      this.print(`${strikeMessage(item.name)} The ${item.name} breaks into pieces.`);
     }
 
     mend(command) {
@@ -2604,9 +2644,9 @@
       item.mended = true;
       if (item.container) item.open = false;
       if (matches(item.name, "curious map")) {
-        return this.print("You carefully piece the curious map back together. It is readable again, though the joins are still visible.");
+        return this.print(actorizeSecondPerson(this.player, "You carefully piece the curious map back together. It is readable again, though the joins are still visible."));
       }
-      this.print(`You mend the ${item.name}. It is usable again, though the repair is visible.`);
+      this.print(actorizeSecondPerson(this.player, `You mend the ${item.name}. It is usable again, though the repair is visible.`));
     }
 
     light(objectName = "") {
@@ -2621,12 +2661,12 @@
       if (matches(item.name, "elegant lamp")) {
         if (item.open) return this.print("The elegant lamp is already lit.");
         item.open = true;
-        return this.print("You light the elegant lamp. Its engraved metal catches the warm glow.");
+        return this.print(actorizeSecondPerson(this.player, "You light the elegant lamp. Its engraved metal catches the warm glow."));
       }
       if (matches(item.name, "brass lantern")) {
         return this.igniteLantern();
       }
-      this.print(`You try to light the ${item.name}, but it does not catch.`);
+      this.print(actorizeSecondPerson(this.player, `You try to light the ${item.name}, but it does not catch.`));
     }
 
     write(objectName = "") {
@@ -2637,9 +2677,9 @@
       if (matches(item.name, "stack of parchment")) {
         const inkwell = this.visibleSearch("inkwell")?.item || this.findInInventory("inkwell");
         if (inkwell) {
-          return this.print("You make a few uncertain marks on the parchment. They do not change the adventure, but at least the ink still flows.");
+          return this.print(actorizeSecondPerson(this.player, "You make a few uncertain marks on the parchment. They do not change the adventure, but at least the ink still flows."));
         }
-        return this.print("You have parchment, but nothing useful to write with.");
+        return this.print(actorizeSecondPerson(this.player, "You have parchment, but nothing useful to write with."));
       }
       this.print(`Writing on the ${item.name} would not help.`);
     }
@@ -2649,10 +2689,10 @@
       if (!text) return this.print("Pick what?");
       const item = this.visibleSearch(text)?.item;
       if (!item) return this.print(this.heldItemMessage(text) || "I don't see that here.");
-      if (matches(item.name, "rose bush")) return this.print("You pick a rose. It smells sweet, but it is too delicate to be useful.");
-      if (matches(item.name, "herbs patch")) return this.print("You pick a few herbs. They smell pleasant, but you do not need them right now.");
+      if (matches(item.name, "rose bush")) return this.print(actorizeSecondPerson(this.player, "You pick a rose. It smells sweet, but it is too delicate to be useful."));
+      if (matches(item.name, "herbs patch")) return this.print(actorizeSecondPerson(this.player, "You pick a few herbs. They smell pleasant, but you do not need them right now."));
       if (item.portable) return this.take(item.name);
-      this.print(`You cannot pick the ${item.name}.`);
+      this.print(actorizeSecondPerson(this.player, `You cannot pick the ${item.name}.`));
     }
 
     cutTrim(verb, objectName = "") {
@@ -2662,23 +2702,23 @@
       if (!item) return this.print(this.heldItemMessage(parsed.targetName) || "I don't see that here.");
       if (matches(item.name, "rose bush") || matches(item.name, "herbs patch")) {
         const tool = parsed.toolName ? this.findInInventory(parsed.toolName) : this.findInInventory("pruner");
-        if (!tool) return this.print(`You would need something sharp to ${verb} the ${item.name}.`);
+        if (!tool) return this.print(actorizeSecondPerson(this.player, `You would need something sharp to ${verb} the ${item.name}.`));
         if (!matches(tool.name, "sharp pruner") && !matches(tool.name, "sword") && !matches(tool.name, "dagger")) {
           return this.print(`The ${tool.name} is not the right tool to ${verb} the ${item.name}.`);
         }
-        return this.print(`You ${verb} the ${item.name} carefully. It looks a little neater.`);
+        return this.print(actorizeSecondPerson(this.player, `You ${verb} the ${item.name} carefully. It looks a little neater.`));
       }
-      this.print(`You ${verb} the ${item.name}, but nothing useful happens.`);
+      this.print(actorizeSecondPerson(this.player, `You ${verb} the ${item.name}, but nothing useful happens.`));
     }
 
     fill(objectName = "") {
       const text = normalize(objectName).replace(/^(?:up|the)\s+/, "");
       const can = this.findInInventory("watering can") || this.visibleSearch("watering can")?.item;
       if (!text || matches("watering can", text)) {
-        if (!can) return this.print("You need a watering can to fill.");
+        if (!can) return this.print(actorizeSecondPerson(this.player, "You need a watering can to fill."));
         if (!this.visibleSearch("bird bath")?.item && this.currentRoom !== "bilbos_garden") return this.print("There is no water here to fill it with.");
         this.flags.wateringcanfull = true;
-        return this.print("You fill the watering can from the bird bath.");
+        return this.print(actorizeSecondPerson(this.player, "You fill the watering can from the bird bath."));
       }
       const item = this.visibleSearch(text)?.item;
       if (!item) return this.print(this.heldItemMessage(text) || "I don't see that here.");
@@ -2691,46 +2731,46 @@
       const item = this.visibleSearch(text)?.item;
       if (!item && !["garden", "plants", "flowers"].includes(text)) return this.print(this.heldItemMessage(text) || "I don't see that here.");
       const can = this.findInInventory("watering can");
-      if (!can) return this.print("You need the watering can to water anything.");
+      if (!can) return this.print(actorizeSecondPerson(this.player, "You need the watering can to water anything."));
       if (!this.flags.wateringcanfull) return this.print("The watering can is empty.");
       if (item && (matches(item.name, "rose bush") || matches(item.name, "herbs patch"))) {
-        return this.print(`You water the ${item.name}. The leaves look fresher.`);
+        return this.print(actorizeSecondPerson(this.player, `You water the ${item.name}. The leaves look fresher.`));
       }
-      if (["garden", "plants", "flowers"].includes(text)) return this.print("You water the garden lightly. Nothing dramatic happens, but Bilbo would approve.");
+      if (["garden", "plants", "flowers"].includes(text)) return this.print(actorizeSecondPerson(this.player, "You water the garden lightly. Nothing dramatic happens, but Bilbo would approve."));
       this.print(`Watering the ${item.name} would not help.`);
     }
 
     plant(objectName = "") {
       const text = normalize(objectName).replace(/^(?:the|some)\s+/, "");
       const seeds = this.findInInventory("seed packet");
-      if (!seeds) return this.print("You need seeds before you can plant anything.");
+      if (!seeds) return this.print(actorizeSecondPerson(this.player, "You need seeds before you can plant anything."));
       if (this.currentRoom !== "bilbos_garden") return this.print("This does not seem like a good place to plant seeds.");
       if (text && !matches("seed packet", text) && !matches("seeds", text)) {
         const item = this.visibleSearch(text)?.item;
         if (!item && !["garden", "soil"].includes(text)) return this.print(this.heldItemMessage(text) || "I don't see that here.");
       }
       this.flags.seedsplanted = true;
-      this.print("You plant a few seeds in a soft patch of earth. They will need time and care.");
+      this.print(actorizeSecondPerson(this.player, "You plant a few seeds in a soft patch of earth. They will need time and care."));
     }
 
     rakeGarden(objectName = "") {
       const rake = this.findInInventory("rake");
-      if (!rake) return this.print("You need a rake for that.");
+      if (!rake) return this.print(actorizeSecondPerson(this.player, "You need a rake for that."));
       if (this.currentRoom !== "bilbos_garden") return this.print("There is nothing here that needs raking.");
-      this.print("You rake the garden path into a tidier state.");
+      this.print(actorizeSecondPerson(this.player, "You rake the garden path into a tidier state."));
     }
 
     dig(objectName = "") {
       const parsed = this.parseToolCommand(objectName);
       const targetName = parsed.targetName.replace(/^(?:in|up)\s+/, "");
       const tool = parsed.toolName ? this.findInInventory(parsed.toolName) : (this.findInInventory("garden spade") || this.findInInventory("hand trowel"));
-      if (!tool) return this.print("You need a digging tool for that.");
+      if (!tool) return this.print(actorizeSecondPerson(this.player, "You need a digging tool for that."));
       if (targetName) {
         const item = this.visibleSearch(targetName)?.item;
         if (!item && !["garden", "soil", "earth", "ground"].includes(targetName)) return this.print(this.heldItemMessage(targetName) || "I don't see that here.");
       }
-      if (this.currentRoom === "bilbos_garden") return this.print(`You dig carefully with the ${tool.name}, but uncover nothing unexpected.`);
-      this.print(`You dig with the ${tool.name}, but find nothing useful.`);
+      if (this.currentRoom === "bilbos_garden") return this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "dig")} carefully with the ${tool.name}, but uncover${this.player.name === "You" ? "" : "s"} nothing unexpected.`);
+      this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "dig")} with the ${tool.name}, but find${this.player.name === "You" ? "" : "s"} nothing useful.`);
     }
 
     parseToolCommand(objectName = "") {
@@ -2743,9 +2783,9 @@
 
     pushPull(action, objectName) {
       const item = this.visibleSearch(objectName)?.item;
-      if (!item) return this.print(this.heldItemMessage(objectName) || `You cannot find the ${objectName} to ${action}.`);
+      if (!item) return this.print(this.heldItemMessage(objectName) || actorizeSecondPerson(this.player, `You cannot find the ${objectName} to ${action}.`));
       if (item.weight >= 3 * this.player.strength) return this.print(`The ${item.name} is too heavy to be ${pastTense(action)}.`);
-      this.print(`You ${action} the ${item.name}.`);
+      this.print(actorizeSecondPerson(this.player, `You ${action} the ${item.name}.`));
     }
 
     climb(objectName) {
@@ -2770,7 +2810,7 @@
         this.player.insideContainer = null;
         return this.print(this.player.name === "You" ? `You climb out of the ${item?.name || "container"}.` : `${this.player.name} climbs out of the ${item?.name || "container"}.`);
       }
-      this.print(`You try to climb ${objectName}, but nothing special happens.`);
+      this.print(actorizeSecondPerson(this.player, `You try to climb ${objectName}, but nothing special happens.`));
     }
 
     physicalAction(verb, objectName = "") {
@@ -2834,23 +2874,22 @@
       const target = this.resolveCharacterTarget(text.replace(/^(?:from|to)\s+/, ""));
       if (target) {
         const messages = {
-          thank: `You thank ${target.name}.`,
-          flatter: `You flatter ${target.name}.`,
-          insult: `You insult ${target.name}.`,
-          answer: `You answer ${target.name}.`,
+          thank: actorizeSecondPerson(this.player, `You thank ${target.name}.`),
+          flatter: actorizeSecondPerson(this.player, `You flatter ${target.name}.`),
+          insult: actorizeSecondPerson(this.player, `You insult ${target.name}.`),
+          answer: actorizeSecondPerson(this.player, `You answer ${target.name}.`),
         };
-        this.print(messages[verb] || `You ${verb} ${target.name}.`);
+        this.print(messages[verb] || actorizeSecondPerson(this.player, `You ${verb} ${target.name}.`));
         return;
       }
-      this.print(`You ${verb}${objectName ? ` ${objectName}` : ""}, but nothing useful happens.`);
+      this.print(actorizeSecondPerson(this.player, `You ${verb}${objectName ? ` ${objectName}` : ""}, but nothing useful happens.`));
     }
 
     standardResponse(command) {
       const responses = this.data.responses.responses || {};
       const response = responses[command];
       if (!response) return "";
-      if (this.player.name === "You") return response;
-      return response.replace(/^You\b/, this.player.name).replace(/\byou\b/g, this.player.name);
+      return actorizeSecondPerson(this.player, response);
     }
 
     eat(objectName) {
@@ -2939,7 +2978,7 @@
       this.detachItem(first.id);
       this.detachItem(second.id);
       this.player.inventory.push(id);
-      this.print(`You combine the ${first.name} with the ${second.name}, making the ${combinedName}.`);
+      this.print(actorizeSecondPerson(this.player, `You combine the ${first.name} with the ${second.name}, making the ${combinedName}.`));
     }
 
     liveDragon() {
@@ -2966,7 +3005,7 @@
         const connection = this.roomConnections().find((c) => c.to === target.id);
         if (connection) return this.move(connection.direction);
         if (!this.visitedRooms.has(target.id)) {
-          this.print(`You haven't visited ${target.name.replace(/_/g, " ")} yet, so you cannot go there directly.`);
+          this.print(actorizeSecondPerson(this.player, `You haven't visited ${target.name.replace(/_/g, " ")} yet, so you cannot go there directly.`));
           return false;
         }
         return this.goDirectlyTo(target.id);
@@ -3003,11 +3042,11 @@
       }
       const delegated = Boolean(this.commandIssuer);
       if (!delegated) {
-        if (distance <= 1) this.print(`You remember the way to ${name} clearly, reaching it in just a few steps.`);
-        else if (distance <= 3) this.print(`You recall the route to ${name} well, covering a short but steady walk.`);
-        else if (distance <= 5) this.print(`The path to ${name} is still familiar to you, and after a solid journey, you arrive.`);
-        else if (distance <= 9) this.print(`The way to ${name} spans quite a distance, but your memory guides you to your destination.`);
-        else this.print(`The route to ${name} is long and winding, yet your memory leads you through every turn until you arrive.`);
+        if (distance <= 1) this.print(actorizeSecondPerson(this.player, `You remember the way to ${name} clearly, reaching it in just a few steps.`));
+        else if (distance <= 3) this.print(actorizeSecondPerson(this.player, `You recall the route to ${name} well, covering a short but steady walk.`));
+        else if (distance <= 5) this.print(actorizeSecondPerson(this.player, `The path to ${name} is still familiar to you, and after a solid journey, you arrive.`));
+        else if (distance <= 9) this.print(actorizeSecondPerson(this.player, `The way to ${name} spans quite a distance, but your memory guides you to your destination.`));
+        else this.print(actorizeSecondPerson(this.player, `The route to ${name} is long and winding, yet your memory leads you through every turn until you arrive.`));
       }
       this.currentRoom = roomId;
       this.player.position = roomId;
@@ -3418,6 +3457,7 @@
         const item = this.items[itemId];
         if (item) {
           item.worn = false;
+          item.visible = true;
           item.location = { type: "room", id: character.position || this.currentRoom };
         }
       }
@@ -3591,6 +3631,10 @@
         this.visitedTrollsClearing = true;
         this.waitCounter = 0;
         this.print("You crouch low behind a mossy boulder, heart pounding, as the trolls argue by the flickering campfire in the moonlit clearing.");
+        this.print("What shall us do with him?");
+        this.print("Roast him!");
+        this.print("He wouldn't make above a mouthful.");
+        this.print("P'raps there are more like him round about.");
         return;
       }
       if (this.trollsTransformed) {
@@ -3767,6 +3811,7 @@
         }
         if (action.desc1) this.print(actorActionSentence(this.player, action.desc1));
         if (action.desc2) this.print(action.desc2, action.destination?.includes("endgame") ? "danger" : "");
+        this.performSpecialActionTransfer(action);
         if (action.flag_out) this.setFlag(action.flag_out.replace("*", ""), true);
         if (action.reveals) this.reveal(action.reveals);
         if (this.isPonySequenceAction(action)) {
@@ -3787,6 +3832,30 @@
         return Boolean(action.desc1 || action.desc2 || action.reveals || action.destination);
       }
       return false;
+    }
+
+    performSpecialActionTransfer(action) {
+      if (!["take", "steal"].includes(action.verb)) return false;
+      const targetName = String(action.obj1 || "").trim();
+      if (!targetName.startsWith("*")) return false;
+
+      const held = this.findVisibleCharacterHolding(targetName.replace(/^\*/, ""));
+      if (!held?.item || held.worn || !held.item.portable) return false;
+      if (held.item.weight > this.player.strength * 5) {
+        this.print(`The ${held.item.name} is too heavy to take.`);
+        return true;
+      }
+      if (!this.canCarryAdditionalWeight(held.item.weight || 0)) {
+        this.print(this.carryTooMuchMessage(held.item));
+        return true;
+      }
+
+      this.detachItem(held.item.id);
+      held.item.location = { type: "character", id: this.player.id };
+      this.player.inventory.push(held.item.id);
+      if (matches(held.item.name, "treasure")) this.flags.treasuretaken = true;
+      this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "take")} the ${held.item.name}.`);
+      return true;
     }
 
     isPonySequenceAction(action) {
@@ -3879,7 +3948,7 @@
     alreadyDidMessage(action) {
       const target = action.obj1 || action.obj2;
       const verb = pastTense(action.verb);
-      return target ? `You have already ${verb} the ${target.replace("*", "")}.` : "That has already been done.";
+      return target ? actorizeSecondPerson(this.player, `You have already ${verb} the ${target.replace("*", "")}.`) : "That has already been done.";
     }
 
     flagIn1Allowed(flag) {
@@ -3933,7 +4002,7 @@
       }
       this.flags.lanternon = true;
       this.flags.lanternturns = LANTERN_BURN_TURNS;
-      this.print(message);
+      this.print(actorizeSecondPerson(this.player, message));
       return true;
     }
 
@@ -3997,7 +4066,8 @@
     }
 
     carryCapacity(character = this.player) {
-      return BASE_CARRY_CAPACITY + ((character?.strength || 0) * CARRY_CAPACITY_PER_STRENGTH);
+      const baseCapacity = BASE_CARRY_CAPACITY + ((character?.strength || 0) * CARRY_CAPACITY_PER_STRENGTH);
+      return baseCapacity + (character?.id === this.data.player ? PLAYER_CARRY_BONUS : 0);
     }
 
     canCarryAdditionalWeight(weight, { character = this.player, removedWeight = 0 } = {}) {
@@ -4308,6 +4378,17 @@
     const match = text.match(/^([a-z]+)(\b.*)$/i);
     if (!match) return `${actorSubject(character, true)} ${text}`;
     return `${actorSubject(character, true)} ${actorVerb(character, match[1].toLowerCase())}${match[2]}`;
+  }
+
+  function actorizeSecondPerson(character, text) {
+    const value = String(text || "").trim();
+    if (!value || character.name === "You") return value;
+    const sentences = value.split(/(?<=[.!?])\s+/).filter(Boolean);
+    return sentences.map((sentence) => {
+      const match = sentence.match(/^You\s+([a-z]+)(\b.*)$/i);
+      if (!match) return sentence.replace(/^You\b/, actorSubject(character, true));
+      return `${actorSubject(character, true)} ${actorVerb(character, match[1].toLowerCase())}${match[2]}`;
+    }).join(" ");
   }
 
   function capitalize(text) {
