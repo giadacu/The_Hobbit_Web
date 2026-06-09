@@ -258,6 +258,7 @@
       this.autoplayCapturingOutput = false;
       this.endgameRestartArmed = false;
       this.arrivalNoticeTimers = [];
+      this.spiderEyesState = null;
       this.imageRevealTimer = null;
       this.lastRevealedImage = "";
       this.audio = musicPlayer;
@@ -310,6 +311,7 @@
       this.player = this.characters[this.data.player] || Object.values(this.characters).find((c) => c.name === "You");
       this.currentRoom = this.player.position || this.data.startRoom;
       this.visitedRooms.add(this.currentRoom);
+      this.spiderEyesState = null;
       this.addZXFinaleState();
     }
 
@@ -357,6 +359,16 @@
         if ((connection.from === "front_gate" && connection.to === "lower_halls") || (connection.from === "lower_halls" && connection.to === "front_gate")) {
           connection.door = "secret_door_front_gate";
         }
+      }
+      if (!this.connections.some((connection) => connection.from === "green_dragon_inn_outside" && connection.direction === "east" && connection.to === "dreary")) {
+        this.connections.push({
+          from: "green_dragon_inn_outside",
+          direction: "east",
+          to: "dreary",
+          door: null,
+          distance: 3,
+          requiredFlag: "ponypassageopen",
+        });
       }
     }
 
@@ -460,9 +472,9 @@
       for (const command of commands) {
         if (normalize(command) === "wait") forceNpcMovement = true;
         const moved = this.processCommand(command);
-        if (moved) break;
+        if (moved || this.pendingClarification) break;
       }
-      if (!this.endgame) this.advanceCharacterTurn({ forceMove: forceNpcMovement });
+      if (!this.endgame && !this.pendingClarification) this.advanceCharacterTurn({ forceMove: forceNpcMovement });
       this.render();
     }
 
@@ -470,6 +482,8 @@
       if (actor !== this.player) {
         return this.performAs(actor, () => this.processCommand(command));
       }
+
+      if (this.handleSpiderEyesCommand(command)) return false;
 
       if (this.isDirection(command)) {
         return this.move(this.normalizeDirection(command));
@@ -722,6 +736,7 @@
     connectionsFromVisible(roomId) {
       const seen = new Set();
       return this.connectionsFrom(roomId).filter((connection) => {
+        if (!this.canSeeConnection(connection)) return false;
         const key = connection.direction;
         if (seen.has(key)) return false;
         seen.add(key);
@@ -733,28 +748,51 @@
       return this.connections.filter((connection) => connection.from === roomId);
     }
 
-    describeRoom(initial = false) {
+    describeRoom(options = {}) {
+      const config = typeof options === "boolean"
+        ? { initial: options, full: options }
+        : { initial: false, full: false, ...options };
       const room = this.room();
       if (!room) return;
+      const wasVisited = this.visitedRooms.has(this.currentRoom);
       this.visitedRooms.add(this.currentRoom);
+      const showFullDetails = config.full || !wasVisited;
+      const roomText = showFullDetails ? room.description : this.firstSentence(room.description);
       const doorText = this.roomConnections()
         .filter((c) => c.door && this.doors[c.door])
-        .map((c) => `To the ${c.direction} there is the ${this.doors[c.door].name}. The ${this.doors[c.door].name} is ${this.doors[c.door].open ? "open" : "closed"}.`)
+        .map((c) => `${this.directionLead(c.direction)} there is the ${this.doors[c.door].name}. The ${this.doors[c.door].name} is ${this.doors[c.door].open ? "open" : "closed"}.`)
         .join(" ");
       const objects = this.itemsInRoom(this.currentRoom).filter((item) => item.visible);
       const objectText = objects.length ? `You see: ${objects.map((item) => this.describeItemShort(item)).join(", ")}.` : "";
       const people = this.peopleInRoom().filter((p) => p.name !== "You" && p.visible);
       const arrivingPeople = people.filter((p) => p.justEntered);
       const peopleText = people.filter((p) => !p.justEntered).map((p) => this.characterPresence(p)).join(" ");
-      this.print([room.description, doorText, objectText, peopleText].filter(Boolean).join(" "));
+      const detailsText = showFullDetails
+        ? [doorText, objectText, peopleText].filter(Boolean).join(" ")
+        : peopleText;
+      this.print([roomText, detailsText].filter(Boolean).join(" "));
       for (const person of arrivingPeople) {
         this.scheduleCharacterArrivalNotice(person);
         person.justEntered = false;
       }
-      if (initial) {
+      if (config.initial) {
         this.print('Type "tips" for a hint, "commands" or "verbs" for recognized words, "save name" to save.', "system");
       }
       this.render();
+    }
+
+    firstSentence(text = "") {
+      const trimmed = String(text || "").trim();
+      if (!trimmed) return "";
+      const match = trimmed.match(/^.*?[.?!](?=\s|$)/);
+      return match ? match[0].trim() : trimmed;
+    }
+
+    directionLead(direction = "") {
+      const text = normalize(direction);
+      if (text === "up") return "Above";
+      if (text === "down") return "Below";
+      return `To the ${direction}`;
     }
 
     scheduleCharacterArrivalNotice(character, delay = 650) {
@@ -856,8 +894,12 @@
     characterLoadoutText(character, options = {}) {
       const carried = (character.inventory || []).map((id) => this.items[id]).filter(Boolean);
       const worn = (character.worn || []).map((id) => this.items[id]).filter(Boolean);
-      if (options.includeEmpty && !carried.length && !worn.length) return "He is carrying nothing. He is wearing nothing.";
-      const carriedText = carried.length ? `He is carrying ${carried.map((item) => itemLabel(item.name)).join(", ")}.` : "";
+      const carriedLabels = carried.map((item) => itemLabel(item.name));
+      if (matches(character.name, "bard") && !carriedLabels.some((label) => normalize(label).includes("quiver"))) {
+        carriedLabels.push("a quiver");
+      }
+      if (options.includeEmpty && !carriedLabels.length && !worn.length) return "He is carrying nothing. He is wearing nothing.";
+      const carriedText = carriedLabels.length ? `He is carrying ${carriedLabels.join(", ")}.` : "";
       const wornText = worn.length ? `He is wearing ${worn.map((item) => itemLabel(item.name)).join(", ")}.` : "";
       return [carriedText, wornText].filter(Boolean).join(" ");
     }
@@ -946,7 +988,12 @@
       if (request.all || !request.target) return false;
       const choices = this.ambiguousChoices(verb, request.target);
       if (choices.length <= 1) return false;
-      this.pendingClarification = { verb, objectText, choices };
+      this.pendingClarification = {
+        verb,
+        objectText,
+        choices,
+        actorId: this.player?.id || null,
+      };
       const labels = choices.map((choice, index) => `${index + 1}. ${choice.name}`).join("; ");
       this.print(`Which ${request.target} do you mean? ${labels}.`, "system");
       return true;
@@ -1014,7 +1061,8 @@
       this.forcedChoice = matchesFound[0];
       try {
         const resolvedObject = replacePrimaryObject(pending.verb, pending.objectText, matchesFound[0].name);
-        this.processCommand(`${pending.verb} ${resolvedObject}`.trim());
+        const actor = pending.actorId ? this.characters[pending.actorId] || this.player : this.player;
+        this.processCommand(`${pending.verb} ${resolvedObject}`.trim(), actor);
       } finally {
         this.forcedChoice = null;
       }
@@ -1339,7 +1387,7 @@
     look(objectName = "") {
       const text = normalize(objectName).replace(/^(?:around\s+)?for\s+/, "").replace(/^around\s+/, "");
       if (!text || ["around", "room", "place", "area", "here", "surroundings"].includes(text)) {
-        return this.describeRoom();
+        return this.describeRoom({ full: true });
       }
       const direction = text.match(/^(across|at|in|inside|into|under|behind|through|over|around)\s+(.+)$/);
       if (direction) {
@@ -1577,6 +1625,19 @@
     }
 
     wait() {
+      if (this.spiderEyesState?.active && this.currentRoom === this.spiderEyesState.room) {
+        this.spiderEyesState.waits += 1;
+        if (this.spiderEyesState.waits === 1) {
+          this.print("You wait. The pale bulbous eyes linger in the dark.");
+          return;
+        }
+        if (this.spiderEyesState.waits === 2) {
+          this.print("You wait again. The eyes drift aside for a moment.");
+          return;
+        }
+        this.killBySpiderEyes();
+        return;
+      }
       const subject = actorSubject(this.player, true);
       this.print(`${subject} ${actorVerb(this.player, "wait")}.`);
       this.print("Time passes...");
@@ -1639,6 +1700,7 @@
         secretDoorWaitCounter: this.secretDoorWaitCounter,
         trollsTransformed: this.trollsTransformed,
         trollsDefeated: this.trollsDefeated,
+        spiderEyesState: this.spiderEyesState,
         endgame: this.endgame,
       }));
       this.print(`Game saved as "${name}".`);
@@ -1661,11 +1723,12 @@
       this.secretDoorWaitCounter = save.secretDoorWaitCounter || 0;
       this.trollsTransformed = Boolean(save.trollsTransformed);
       this.trollsDefeated = Boolean(save.trollsDefeated);
+      this.spiderEyesState = save.spiderEyesState || null;
       this.endgame = Boolean(save.endgame);
       this.player = this.characters[this.data.player];
       this.addZXFinaleState();
       this.print(`Game "${name}" loaded.`);
-      this.describeRoom();
+      this.describeRoom({ full: true });
     }
 
     listSaves() {
@@ -1788,6 +1851,11 @@
     }
 
     nextAutoplayCommand() {
+      if (this.spiderEyesState?.active && this.currentRoom === this.spiderEyesState.room) {
+        if ((this.spiderEyesState.waits || 0) < 2) return "wait";
+        return this.spiderEyesState.safeDirections?.[0] || null;
+      }
+
       if (!this.autoplayHas("small key")) {
         if (this.currentRoom !== "hobbit_hole") return this.autoplayRouteCommandTo("hobbit_hole");
         if (!this.visibleSearch("small key")) return "lift carpet";
@@ -2899,7 +2967,6 @@
         this.print(`${this.player.name} goes to ${name}.`);
         return true;
       }
-      this.visitedRooms.add(roomId);
       this.describeRoom();
       this.checkSpecialSituations();
       return true;
@@ -2923,12 +2990,19 @@
     }
 
     canTravelConnection(connection) {
+      if (!this.canSeeConnection(connection)) return false;
       const web = this.blockingWebFor(connection);
       if (web && !web.broken) return false;
       const door = connection.door && this.doors[connection.door];
       if (door && matches(door.name, "secret door") && !this.flags.secretdoorsun) return false;
       if (door && (!door.open || door.locked)) return false;
       return true;
+    }
+
+    canSeeConnection(connection) {
+      const requiredFlag = connection?.requiredFlag;
+      if (!requiredFlag) return true;
+      return Boolean(this.flags[requiredFlag]);
     }
 
     move(direction) {
@@ -2964,8 +3038,8 @@
         this.print(`${this.player.name} goes ${direction}.`);
         return true;
       }
-      this.visitedRooms.add(connection.to);
       this.describeRoom();
+      this.triggerSpiderEyesEncounter(previousRoom, connection.to, direction);
       this.checkSpecialSituations();
       return true;
     }
@@ -2987,9 +3061,34 @@
         if (character.carriedBy) continue;
         if (character.movementMode !== "follow") continue;
         if (!character.visible || character.position !== fromRoom) continue;
+        if (this.shouldHoldBardNearDale(character, toRoom)) continue;
         this.moveCharacter(character, toRoom, direction, { silent: true });
         character.justEntered = false;
       }
+    }
+
+    shouldHoldBardNearDale(character, toRoom) {
+      if (!matches(character.name, "bard") || !this.flags.dragondefeated) return false;
+      const allowedRooms = new Set([
+        "wooden_town",
+        "long_lake",
+        "strong_river",
+        "bleak_barren_land",
+        "ruins_of_the_town_of_dale",
+        "stoe_of_ravenhill",
+        "front_gate",
+        "little_steep_bay",
+        "lonely_mountain",
+        "lower_halls",
+      ]);
+      if (allowedRooms.has(toRoom)) return false;
+      character.movementMode = "never";
+      character.followingPlayer = false;
+      if (!this.flags.bardstoppedwestward) {
+        this.flags.bardstoppedwestward = true;
+        this.print("Bard says 'My place is with Dale and Lake-town. I will go no farther.'");
+      }
+      return true;
     }
 
     advanceCharacterTurn(options = {}) {
@@ -3241,24 +3340,27 @@
       if (attacker.id === this.data.player) {
         message = `You attack ${targetName}${weaponText}.`;
         message += successful
-          ? ` Your effort is successful. ${capitalize(targetName)} falls before your might.`
-          : ` But the effort is wasted. ${capitalize(targetName)}'s defense is too strong. You are dead.`;
+          ? ` ${capitalize(targetName)} counters, but you strike again and ${targetName} is dead.`
+          : ` ${capitalize(targetName)} counters at once and you are dead.`;
       } else if (target.id === this.data.player) {
         message = `${attackerName} attacks you${weaponText}.`;
         message += successful
-          ? ` The effort is successful. You fall before ${attackerName}'s might.`
-          : ` But the effort is wasted. Your defense is too strong. ${capitalize(attackerName)} is dead.`;
+          ? ` You strike back, but ${attackerName} attacks again and you are dead.`
+          : ` You counterattack and ${attackerName} is dead.`;
       } else {
         message = `${attackerName} attacks ${targetName}${weaponText}.`;
         message += successful
-          ? ` The effort is successful. ${capitalize(targetName)} falls before ${attackerName}'s might.`
-          : ` But the effort is wasted. ${capitalize(targetName)}'s defense is too strong. ${capitalize(attackerName)} is dead.`;
+          ? ` ${capitalize(targetName)} strikes back, but ${attackerName} attacks again and ${targetName} falls dead.`
+          : ` ${capitalize(targetName)} counters and ${attackerName} is dead.`;
       }
 
       this.dropInventory(fallen);
       fallen.visible = false;
       attacker.attackFlag = 0;
-      if (fallen.id === this.data.player) this.endGame(`You were killed by ${displayCharacterName(winner)}.`);
+      if (fallen.id === this.data.player) {
+        this.endGame(message);
+        return "";
+      }
       return message;
     }
 
@@ -3365,6 +3467,68 @@
       if (this.flags.treasuretaken && this.currentRoom === "lonely_mountain" && this.liveDragon()) {
         this.print("A shadow passes over the mountain. Smaug is searching for the thief.");
       }
+    }
+
+    triggerSpiderEyesEncounter(previousRoom, currentRoom, direction) {
+      if (!this.flags.dragondefeated) return;
+      const trigger = this.spiderEyesTriggerFor(previousRoom, currentRoom, direction);
+      if (!trigger) return;
+      if (this.flags[this.spiderEyesResolvedFlag(currentRoom)]) return;
+      this.spiderEyesState = {
+        active: true,
+        room: currentRoom,
+        waits: 0,
+        safeDirections: trigger.safeDirections,
+        safeDestination: trigger.safeDestination,
+      };
+      this.print("You see some pale bulbous eyes.");
+    }
+
+    handleSpiderEyesCommand(command) {
+      const state = this.spiderEyesState;
+      if (!state?.active || this.currentRoom !== state.room) return false;
+      const text = normalize(command);
+      if (text === "wait") return false;
+      const direction = this.isDirection(command)
+        ? this.normalizeDirection(command)
+        : command.startsWith("go ")
+          ? this.normalizeDirection(command.slice(3).trim())
+          : "";
+      if (state.waits === 2 && direction && (state.safeDirections || []).includes(direction)) {
+        this.flags[this.spiderEyesResolvedFlag(state.room)] = true;
+        const destination = state.safeDestination || null;
+        this.spiderEyesState = null;
+        if (destination) {
+          const previousRoom = this.currentRoom;
+          this.currentRoom = destination;
+          this.player.position = destination;
+          this.moveFollowers(previousRoom, destination, direction);
+          this.describeRoom();
+          this.checkSpecialSituations();
+          return true;
+        }
+        return false;
+      }
+      this.killBySpiderEyes();
+      return true;
+    }
+
+    spiderEyesTriggerFor(previousRoom, currentRoom, direction) {
+      if (currentRoom === "forest_road_2" && ["waterfall", "forest", "running_river"].includes(previousRoom) && direction === "west") {
+        return { safeDirections: ["west"], safeDestination: null };
+      }
+      if (currentRoom === "forest_road" && previousRoom === "forest_road_2" && direction === "west") {
+        return { safeDirections: ["west"], safeDestination: "beorns_house" };
+      }
+      return null;
+    }
+
+    spiderEyesResolvedFlag(roomId) {
+      return `spidereyesresolved_${roomId}`;
+    }
+
+    killBySpiderEyes() {
+      this.endGame("Something stings. You are dead.");
     }
 
     checkSpecialSituations() {
@@ -3519,6 +3683,14 @@
         if (action.location && action.location !== roomName) continue;
         if (action.special_char && !matches(this.player.name, normalize(action.special_char))) continue;
         if (!this.matchesSpecialActionObjects(action, objectText, adverb)) continue;
+        if (this.isPonyWindowAction(action) && this.flags.ponysequencecompleted) {
+          if (action.desc1) this.print(actorActionSentence(this.player, action.desc1));
+          this.print(this.flags.lanternon
+            ? "He peers through the window, but the stable stands empty now."
+            : "He peers through the window, his eyes narrowing, but it's too dark to see anything.");
+          return true;
+        }
+        if (this.isPonySequenceAction(action) && this.flags.ponysequencecompleted) continue;
         const unavailable = this.specialActionUnavailable(action);
         if (unavailable) {
           this.print(unavailable);
@@ -3545,13 +3717,17 @@
         if (action.desc2) this.print(action.desc2, action.destination?.includes("endgame") ? "danger" : "");
         if (action.flag_out) this.setFlag(action.flag_out.replace("*", ""), true);
         if (action.reveals) this.reveal(action.reveals);
+        if (this.isPonySequenceAction(action)) {
+          this.flags.ponysequencecompleted = true;
+          this.flags.ponypassageopen = true;
+          if (this.items.calm_pony) this.items.calm_pony.visible = false;
+        }
         if (action.destination) {
           if (action.destination.includes("endgame")) {
             this.endGame("The adventure ends.");
           } else if (this.roomByName(action.destination)) {
             this.currentRoom = this.roomByName(action.destination).id;
             this.player.position = this.currentRoom;
-            this.visitedRooms.add(this.currentRoom);
             this.describeRoom();
             this.checkSpecialSituations();
           }
@@ -3559,6 +3735,22 @@
         return Boolean(action.desc1 || action.desc2 || action.reveals || action.destination);
       }
       return false;
+    }
+
+    isPonySequenceAction(action) {
+      return action.location === "Green Dragon Inn Outside"
+        && action.verb === "climb"
+        && ["on", "onto"].includes(action.adverb)
+        && action.obj2 === "low branch"
+        && action.destination === "Dreary"
+        && action.flag_in1 === "seenpony";
+    }
+
+    isPonyWindowAction(action) {
+      return action.location === "Green Dragon Inn"
+        && action.verb === "look"
+        && action.special_char === "Thorin"
+        && action.obj2 === "window";
     }
 
     matchesSpecialActionObjects(action, objectText, adverb) {
@@ -3710,7 +3902,21 @@
       if (item.broken) flags.push("broken");
       else if (item.mended) flags.push("mended");
       if (item.container && !item.noLid && item.open) flags.push("open");
-      return `${flags.length ? `${flags.join(", ")} ` : ""}${item.description || item.name}`;
+      return this.insertFlagsIntoDescription(item.description || item.name, flags);
+    }
+
+    insertFlagsIntoDescription(text, flags = []) {
+      const description = String(text || "").trim();
+      if (!flags.length || !description) return description;
+      const joinedFlags = flags.join(", ");
+      const match = description.match(/^(a|an|the)\s+(.+)$/i);
+      if (!match) return `${joinedFlags} ${description}`;
+      const article = match[1];
+      const rest = match[2];
+      const adjustedArticle = /^(a|an)$/i.test(article)
+        ? (/^[aeiou]/i.test(joinedFlags) ? "an" : "a")
+        : article;
+      return `${adjustedArticle} ${joinedFlags} ${rest}`;
     }
 
     roomByName(name) {

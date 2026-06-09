@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[2] / "The Hobbit"
+ROOT = Path(__file__).resolve().parents[2] / "Archive" / "The Hobbit Python Legacy"
 OUT = Path(__file__).resolve().parents[1] / "assets" / "game-data.js"
 IMAGE_DIR = ROOT / "images"
 
