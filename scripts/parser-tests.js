@@ -368,6 +368,7 @@ const originalListCases = [
   ["Ask Ori to read the map.", ["ask ori to read map"]],
   ["Talk to Gandalf.", ["talk to gandalf"]],
   ["Ask Gandalf where to go.", ["ask gandalf where to go"]],
+  ["Gandalf, where is Thorin?", ["ask gandalf where is thorin"]],
   ["Show the map to Gandalf.", ["show map to gandalf"]],
   ["Give the key to Gandalf.", ["give key to gandalf"]],
   ["Ask Gandalf to light the way.", ["ask gandalf to light way"]],
@@ -506,6 +507,31 @@ const dialogueCases = [
 ];
 
 const gameCases = [
+  {
+    name: "ask where is keeps the full question",
+    inputs: ["ask gandalf where is thorin"],
+    expectedIncluded: ["Gandalf considers where thorin is, but gives no clear answer."],
+  },
+  {
+    name: "follow-up where question uses last conversation context",
+    inputs: ["ask gandalf where is thorin", "where is he?"],
+    expectedIncluded: ["Gandalf considers where thorin is, but gives no clear answer."],
+  },
+  {
+    name: "vocative where question becomes ask",
+    inputs: ["gandalf, where is thorin?"],
+    expectedIncluded: ["Gandalf considers where thorin is, but gives no clear answer."],
+  },
+  {
+    name: "ask for known character becomes location question",
+    inputs: ["ask gandalf for thorin"],
+    expectedIncluded: ["Gandalf considers where thorin is, but gives no clear answer."],
+  },
+  {
+    name: "look for character examines the character",
+    inputs: ["look for thorin"],
+    expectedIncluded: ["There is no one named Thorin here."],
+  },
   {
     name: "broken map cannot be read as intact",
     inputs: ["ask gandalf for the map", "break map", "read map"],

@@ -241,6 +241,8 @@
       this.pendingClarification = null;
       this.forcedChoice = null;
       this.commandIssuer = null;
+      this.lastConversationCharacterId = null;
+      this.lastReferencedCharacterId = null;
       this.autoplayRunning = false;
       this.autoplayTimer = null;
       this.autoplayTypingTimer = null;
@@ -421,7 +423,8 @@
         this.render();
         return;
       }
-      const normalizedCommand = normalizeNaturalCommand(lower);
+      rawCommand = this.normalizeConversationalQuestion(rawCommand);
+      const normalizedCommand = normalizeNaturalCommand(rawCommand.toLowerCase());
       if (this.isUnsupportedConditional(normalizedCommand)) {
         this.print("Conditional commands are not supported yet. Try the action when the condition is true.", "system");
         return;
@@ -676,6 +679,26 @@
 
     isUnsupportedQuestion(command) {
       return /^(who|where|what|why|how|did|does|do)\b/.test(command);
+    }
+
+    normalizeConversationalQuestion(rawCommand) {
+      const text = String(rawCommand || "").trim();
+      if (!text) return rawCommand;
+      const normalized = normalizeNaturalCommand(text.toLowerCase());
+      if (!/^(who|where|what|why|how)\b/.test(normalized)) return rawCommand;
+      const listener = this.lastConversationCharacter();
+      if (!listener) return rawCommand;
+
+      let question = normalized;
+      const referenced = this.lastReferencedCharacter();
+      if (referenced) {
+        question = question
+          .replace(/\bhe\b/g, normalize(referenced.name))
+          .replace(/\bhim\b/g, normalize(referenced.name))
+          .replace(/\bshe\b/g, normalize(referenced.name))
+          .replace(/\bher\b/g, normalize(referenced.name));
+      }
+      return `ask ${normalize(listener.name)} ${question}`;
     }
 
     respondToCanonicalDialogue(rawCommand) {
@@ -1313,7 +1336,7 @@
     }
 
     look(objectName = "") {
-      const text = normalize(objectName);
+      const text = normalize(objectName).replace(/^for\s+/, "");
       if (!text || ["around", "room", "place", "area", "here", "surroundings"].includes(text)) {
         return this.describeRoom();
       }
@@ -1329,24 +1352,26 @@
     }
 
     examine(objectName = "") {
-      const text = normalize(objectName);
+      const text = normalize(objectName).replace(/^for\s+/, "");
       if (!text || ["around", "room", "place", "area", "here", "surroundings"].includes(text)) {
         return this.inspectEnvironment("search", "area");
       }
-      const door = this.findDoor(objectName)?.door;
+      const door = this.findDoor(text)?.door;
       const subject = actorSubject(this.player, true);
       if (door) return this.print(`${subject} ${actorVerb(this.player, "see")} the ${door.name}. It is ${door.open ? "open" : "closed"}.`);
       const character = this.resolveCharacterTarget(text);
       if (character) return this.examineCharacter(character);
-      const item = this.visibleSearch(objectName)?.item;
+      const knownCharacter = this.findKnownCharacter(text);
+      if (knownCharacter) return this.print(`There is no one named ${knownCharacter.name} here.`);
+      const item = this.visibleSearch(text)?.item;
       if (!item) {
-        const heldMessage = this.heldItemMessage(objectName);
+        const heldMessage = this.heldItemMessage(text);
         if (heldMessage) return this.print(heldMessage);
-        const knownItem = this.findKnownItem(objectName);
+        const knownItem = this.findKnownItem(text);
         if (knownItem?.portable) {
           return this.print(`${subject} ${actorVerb(this.player, "do")} not have the ${knownItem.name}.`);
         }
-        return this.inspectEnvironment("examine", objectName);
+        return this.inspectEnvironment("examine", text);
       }
       let description = item.description;
       if (item.broken) {
@@ -1358,7 +1383,7 @@
         const visible = item.contents.map((id) => this.items[id]).filter((child) => child?.visible);
         if (visible.length) description += `; inside there is: ${visible.map((child) => this.describeItemShort(child)).join(", ")}`;
       }
-      this.revealFromSpecial("examine", objectName);
+      this.revealFromSpecial("examine", text);
       if (item.location?.type === "character" && item.location.id === this.player.id && this.player.name !== "You") {
         return this.print(`${subject} ${actorVerb(this.player, "examine")} the ${item.name} in ${displayCharacterName(this.player)}'s possession. ${subject} ${actorVerb(this.player, "see")} ${description}.`);
       }
@@ -2099,6 +2124,12 @@
     askCharacterForItem(characterName, itemName) {
       const character = this.resolveCharacterTarget(characterName);
       if (!character) return this.print(`There is no one named ${characterName} here.`);
+      const requestedCharacter = this.findKnownCharacter(itemName);
+      if (requestedCharacter) {
+        this.rememberConversationCharacter(character);
+        this.rememberReferencedCharacter(requestedCharacter);
+        return this.askCharacterAbout(character.name, `where ${requestedCharacter.name} is`);
+      }
       return this.receiveItemFromCharacter(character, itemName);
     }
 
@@ -2119,6 +2150,8 @@
       if (!character) return this.print(`There is no one named ${characterName} here.`);
       if (character.friendly === false) return this.respondToTalk(character);
       if (this.player.name === "You" && this.player.noticeable === false) return this.print(`${character.name} says 'who's talking?'`);
+      this.rememberConversationCharacter(character);
+      this.rememberReferencedCharacter(order);
       const delegatedSplitter = new CommandSplitter(this.data);
       for (const action of delegatedSplitter.split(order)) {
         const moved = this.processCommand(action, character);
@@ -2131,7 +2164,9 @@
       if (!character) return this.print(`There is no one named ${characterName} here.`);
       if (character.friendly === false) return this.respondToTalk(character);
       if (this.player.name === "You" && this.player.noticeable === false) return this.print(`${character.name} says 'who's talking?'`);
-      this.print(`${character.name} considers ${topic}, but gives no clear answer.`);
+      this.rememberConversationCharacter(character);
+      this.rememberReferencedCharacter(topic);
+      this.print(`${character.name} considers ${this.formatConversationTopic(topic)}, but gives no clear answer.`);
     }
 
     parseAskForCommand(command) {
@@ -2148,8 +2183,15 @@
     parseAskConversationCommand(command) {
       const text = normalize(command);
       if (!text) return null;
-      const match = text.match(/^(.+?)\s+(?:about|where|whether|if|what|why|how|that)\s+(.+)$/);
-      if (match) return { characterName: match[1].trim(), topic: match[2].trim() };
+      const aboutMatch = text.match(/^(.+?)\s+about\s+(.+)$/);
+      if (aboutMatch) return { characterName: aboutMatch[1].trim(), topic: aboutMatch[2].trim() };
+      const match = text.match(/^(.+?)\s+(where|whether|if|what|why|how|that)\s+(.+)$/);
+      if (match) {
+        return {
+          characterName: match[1].trim(),
+          topic: this.normalizeConversationTopic(match[2], match[3]),
+        };
+      }
       const riddle = text.match(/^(.+?)\s+(?:a\s+)?riddle$/);
       if (riddle) return { characterName: riddle[1].trim(), topic: "a riddle" };
       return null;
@@ -2170,6 +2212,24 @@
         }
       }
       return null;
+    }
+
+    normalizeConversationTopic(keyword, remainder) {
+      const lead = normalize(keyword);
+      const tail = normalize(remainder);
+      if (!lead || !tail) return normalize(`${lead} ${tail}`);
+      if (lead === "where") {
+        const inverted = tail.match(/^(is|are|was|were)\s+(.+)$/);
+        if (inverted) return `where ${inverted[2].trim()} ${inverted[1]}`;
+      }
+      return `${lead} ${tail}`.trim();
+    }
+
+    formatConversationTopic(topic) {
+      const text = normalize(topic);
+      if (!text) return "the matter";
+      if (text.startsWith("if ")) return `whether ${text.slice(3)}`;
+      return text;
     }
 
     findCharacterItem(character, itemName) {
@@ -2228,6 +2288,40 @@
         return this.peopleInRoom().find((p) => p.id === this.commandIssuer.id) || null;
       }
       return this.peopleInRoom().find((p) => p.id !== this.player.id && matches(p.name, name)) || null;
+    }
+
+    findKnownCharacter(targetName) {
+      const name = this.normalizeCharacterAlias(targetName);
+      if (!name || ["me", "you"].includes(name)) return null;
+      return Object.values(this.characters).find((character) => character.id !== this.player.id && matches(character.name, name)) || null;
+    }
+
+    lastConversationCharacter() {
+      return this.lastConversationCharacterId ? this.characters[this.lastConversationCharacterId] || null : null;
+    }
+
+    lastReferencedCharacter() {
+      return this.lastReferencedCharacterId ? this.characters[this.lastReferencedCharacterId] || null : null;
+    }
+
+    rememberConversationCharacter(character) {
+      if (!character?.id) return;
+      this.lastConversationCharacterId = character.id;
+    }
+
+    rememberReferencedCharacter(textOrCharacter) {
+      if (!textOrCharacter) return;
+      if (typeof textOrCharacter === "object" && textOrCharacter.id) {
+        if (textOrCharacter.id !== this.player.id) this.lastReferencedCharacterId = textOrCharacter.id;
+        return;
+      }
+      const text = normalize(textOrCharacter);
+      if (!text) return;
+      const candidates = Object.values(this.characters)
+        .filter((character) => character.id !== this.player.id)
+        .sort((a, b) => b.name.length - a.name.length);
+      const found = candidates.find((character) => matches(character.name, text) || wordInCommand(text, character.name));
+      if (found) this.lastReferencedCharacterId = found.id;
     }
 
     normalizeCharacterAlias(targetName) {
@@ -3119,6 +3213,8 @@
       this.pendingClarification = null;
       this.forcedChoice = null;
       this.commandIssuer = null;
+      this.lastConversationCharacterId = null;
+      this.lastReferencedCharacterId = null;
       this.splitter = new CommandSplitter(this.data);
       output.replaceChildren();
       output.classList.remove("end-screen");
@@ -3231,6 +3327,8 @@
       if (character.friendly === false) return this.respondToTalk(character);
       if (this.player.name === "You" && this.player.noticeable === false) return this.print(`${character.name} says 'who's talking?'`);
       if (parsed.order) {
+        this.rememberConversationCharacter(character);
+        this.rememberReferencedCharacter(parsed.order);
         if (this.handleBardDragonCommand(character, parsed.order)) return;
         for (const action of this.splitter.split(parsed.order)) {
           const moved = this.processCommand(action, character);
@@ -3238,6 +3336,7 @@
         }
         return;
       }
+      this.rememberConversationCharacter(character);
       this.print(`${character.name} listens intently, expecting your words.`);
     }
 
@@ -3661,6 +3760,9 @@
     const firstWord = match[1].split(/\s+/)[0];
     if (verbs.includes(firstWord)) return command;
     const restVerb = match[2].split(/\s+/)[0];
+    if (["who", "where", "what", "why", "how", "whether", "if"].includes(restVerb)) {
+      return `ask ${match[1].trim()} ${match[2].trim()}`;
+    }
     if (!verbs.includes(restVerb)) return command;
     return `ask ${match[1].trim()} to ${match[2].trim()}`;
   }
