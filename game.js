@@ -18,8 +18,8 @@
   const inventoryStatus = $("inventory-status");
   const exitsList = $("exits-list");
   const peopleList = $("people-list");
-  const BASE_CARRY_CAPACITY = 15;
-  const CARRY_CAPACITY_PER_STRENGTH = 5;
+  const BASE_CARRY_CAPACITY = 5;
+  const CARRY_CAPACITY_PER_STRENGTH = 3;
   const LANTERN_BURN_TURNS = 10;
 
   const commandsWithoutObject = new Set([
@@ -827,7 +827,7 @@
         roomImage.alt = room.name;
       }
       const carriedCharacters = Object.values(this.characters).filter((character) => character.carriedBy === this.player.id).map((character) => character.name);
-      fillList(inventoryList, [...this.player.inventory.map((id) => this.items[id]?.name).filter(Boolean), ...carriedCharacters], "nothing");
+      fillList(inventoryList, [...this.player.inventory.map((id) => this.inventorySidebarLabel(this.items[id])).filter(Boolean), ...carriedCharacters], "nothing");
       if (inventoryStatus) inventoryStatus.textContent = `Weight ${this.currentCarryWeight()}/${this.carryCapacity()}`;
       fillList(exitsList, this.roomConnections().map((c) => c.direction), "none");
       fillList(peopleList, this.peopleInRoom().filter((p) => p.name !== "You" && p.visible).map((p) => p.name), "none");
@@ -1635,9 +1635,9 @@
       const carriedCharacters = Object.values(this.characters).filter((character) => character.carriedBy === this.player.id);
       const weightText = ` Carry weight: ${this.currentCarryWeight()}/${this.carryCapacity()}.`;
       if (!this.player.inventory.length && !carriedCharacters.length) return this.print(`You are carrying: nothing.${weightText}`);
-      const items = this.player.inventory.map((id) => this.describeItemShort(this.items[id]));
+      const items = this.player.inventory.map((id) => this.inventoryItemLabel(this.items[id]));
       items.push(...carriedCharacters.map((character) => character.name));
-      const worn = this.player.worn?.length ? ` You are wearing: ${this.player.worn.map((id) => this.items[id].name).join(", ")}.` : "";
+      const worn = this.player.worn?.length ? ` You are wearing: ${this.player.worn.map((id) => this.inventoryItemLabel(this.items[id])).join(", ")}.` : "";
       this.print(`You are carrying: ${items.join(", ")}.${worn}${weightText}`);
     }
 
@@ -2006,6 +2006,9 @@
 
       if (!this.flags.bardreadiedarrow) return "say to bard \"get strong arrow from quiver\"";
 
+      const prepTreasureLoad = this.autoplayTreasurePickupPrepCommand();
+      if (prepTreasureLoad) return prepTreasureLoad;
+
       if (this.currentRoom !== "lower_halls" && !this.autoplayHas("treasure")) return this.autoplayRouteCommandTo("lower_halls");
 
       if (this.currentRoom === "lower_halls" && !this.autoplayHas("treasure")) {
@@ -2029,6 +2032,28 @@
 
     autoplayHas(name) {
       return [...this.player.inventory, ...(this.player.worn || [])].some((itemId) => matches(this.items[itemId]?.name, name));
+    }
+
+    autoplayTreasurePickupPrepCommand() {
+      if (this.autoplayHas("treasure")) return null;
+      if (!["front_gate", "lower_halls"].includes(this.currentRoom)) return null;
+      const treasure = this.items.treasure;
+      if (!treasure) return null;
+      const spareCapacity = this.carryCapacity() - this.currentCarryWeight();
+      if (spareCapacity >= (treasure.weight || 0)) return null;
+      const expendable = [
+        "small key",
+        "sturdy key",
+        "brass lantern",
+        "firestone",
+        "large key",
+        "sturdy rope",
+        "majestic sword",
+      ];
+      for (const name of expendable) {
+        if (this.autoplayHas(name)) return `drop ${name}`;
+      }
+      return null;
     }
 
     autoplayOnce(flag, command) {
@@ -3985,12 +4010,30 @@
       return `The ${item.name} would be too much to carry (${nextWeight}/${this.carryCapacity()}).`;
     }
 
-    describeItemShort(item) {
+    inventoryItemLabel(item) {
+      if (!item) return "";
+      return `${this.describeItemShort(item)} (${item.weight || 0})`;
+    }
+
+    inventorySidebarLabel(item) {
+      if (!item) return "";
+      const flags = this.itemStateFlags(item);
+      const state = flags.length ? ` [${flags.join(", ")}]` : "";
+      return `${item.name}${state} (${item.weight || 0})`;
+    }
+
+    itemStateFlags(item) {
       const flags = [];
       if (item.broken) flags.push("broken");
       else if (item.mended) flags.push("mended");
-      if (item.container && !item.noLid && item.open) flags.push("open");
-      return this.insertFlagsIntoDescription(item.description || item.name, flags);
+      if (matches(item.name, "brass lantern") && this.flags.lanternon) flags.push("lit");
+      else if (matches(item.name, "elegant lamp") && item.open) flags.push("lit");
+      else if (item.container && !item.noLid && item.open) flags.push("open");
+      return flags;
+    }
+
+    describeItemShort(item) {
+      return this.insertFlagsIntoDescription(item.description || item.name, this.itemStateFlags(item));
     }
 
     insertFlagsIntoDescription(text, flags = []) {
