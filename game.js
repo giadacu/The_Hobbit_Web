@@ -1957,6 +1957,13 @@
         return "take sword";
       }
 
+      if (beforeDragonDefeat && !this.autoplayHas("sturdy rope")) {
+        if (this.currentRoom !== "trolls_cave") return this.autoplayRouteCommandTo("trolls_cave");
+        const prepRopeLoad = this.autoplayRequiredPickupPrepCommand("sturdy rope");
+        if (prepRopeLoad) return prepRopeLoad;
+        return "take rope";
+      }
+
       const hostile = this.peopleInRoom().find((character) => {
         return character.visible && character.friendly === false && !matches(character.name, "dragon");
       });
@@ -1982,13 +1989,6 @@
         if (cupboard && !cupboard.open) return "open cupboard";
         if (!this.flags.autoplayexaminedcupboard) return this.autoplayOnce("autoplayexaminedcupboard", "examine cupboard");
         return "take meal";
-      }
-
-      if (beforeDragonDefeat && !this.autoplayHas("sturdy rope")) {
-        if (this.currentRoom !== "trolls_cave") return this.autoplayRouteCommandTo("trolls_cave");
-        const prepRopeLoad = this.autoplayRequiredPickupPrepCommand("sturdy rope");
-        if (prepRopeLoad) return prepRopeLoad;
-        return "take rope";
       }
 
       if (this.currentRoom === "west_bank") {

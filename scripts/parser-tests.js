@@ -966,6 +966,27 @@ const gameCases = [
     notExpectedIncluded: ["You leave the", "You drop the"],
   },
   {
+    name: "autoplay takes rope during same trolls cave visit as sword",
+    drive(game) {
+      game.restartGame();
+      game.visitedRooms.add("dreary");
+      game.player.position = "trolls_cave";
+      game.currentRoom = "trolls_cave";
+      game.visitedTrollsClearing = true;
+      game.trollsTransformed = true;
+      game.flags.dragondefeated = false;
+      game.flags.lanternon = true;
+      game.flags.seenpony = true;
+      game.player.inventory = ["small_key", "firestone", "sturdy_key", "brass_lantern", "the_large_key", "majestic_sword"];
+      const command = game.nextAutoplayCommand();
+      if (command !== "take rope") {
+        throw new Error(`Expected autoplay to take rope immediately after sword in trolls cave, got: ${command}`);
+      }
+      game.execute(command);
+    },
+    expectedIncluded: ["You take the sturdy rope."],
+  },
+  {
     name: "lamp can be lit and turned off",
     inputs: ["light lamp", "turn off lamp"],
     expectedIncluded: [
