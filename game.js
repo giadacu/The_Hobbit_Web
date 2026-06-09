@@ -119,6 +119,9 @@
         siediti: "sit",
         sniff: "smell",
         smash: "break",
+        seek: "find",
+        locate: "find",
+        track: "find",
         tell: "ask",
       };
       this.adverbs = (data.parser.adverbs || []).filter((adverb) => adverb !== "next");
@@ -132,6 +135,7 @@
       let command = text.trim().toLowerCase();
       command = normalizeNaturalCommand(command);
       command = normalizeVocativeCommand(command, this.verbs);
+      command = normalizeDelegatedTellCommand(command, this.verbs);
       command = command.replace(/\bthe\b\s*/gi, "").replace(/\ba\b\s*/gi, "");
       this.lastAdverb = null;
       for (const adverb of this.adverbs) {
@@ -664,10 +668,7 @@
           this.respondToTalk(character);
           return true;
         }
-        for (const action of this.splitter.split(order)) {
-          const moved = this.processCommand(action, character);
-          if (moved) break;
-        }
+        this.delegateCharacterOrder(character, order);
         return true;
       }
       return false;
@@ -1336,7 +1337,7 @@
     }
 
     look(objectName = "") {
-      const text = normalize(objectName).replace(/^for\s+/, "");
+      const text = normalize(objectName).replace(/^(?:around\s+)?for\s+/, "").replace(/^around\s+/, "");
       if (!text || ["around", "room", "place", "area", "here", "surroundings"].includes(text)) {
         return this.describeRoom();
       }
@@ -1352,7 +1353,7 @@
     }
 
     examine(objectName = "") {
-      const text = normalize(objectName).replace(/^for\s+/, "");
+      const text = normalize(objectName).replace(/^(?:around\s+)?for\s+/, "").replace(/^around\s+/, "");
       if (!text || ["around", "room", "place", "area", "here", "surroundings"].includes(text)) {
         return this.inspectEnvironment("search", "area");
       }
@@ -1361,7 +1362,8 @@
       if (door) return this.print(`${subject} ${actorVerb(this.player, "see")} the ${door.name}. It is ${door.open ? "open" : "closed"}.`);
       const character = this.resolveCharacterTarget(text);
       if (character) return this.examineCharacter(character);
-      const knownCharacter = this.findKnownCharacter(text);
+      const scopedCharacter = this.findKnownCharacter(text.replace(/\s+(?:in|inside|into|at|under|behind|near|around|through|over|on)\s+.+$/, ""));
+      const knownCharacter = scopedCharacter || this.findKnownCharacter(text);
       if (knownCharacter) return this.print(`There is no one named ${knownCharacter.name} here.`);
       const item = this.visibleSearch(text)?.item;
       if (!item) {
@@ -1575,7 +1577,8 @@
     }
 
     wait() {
-      this.print("You wait.");
+      const subject = actorSubject(this.player, true);
+      this.print(`${subject} ${actorVerb(this.player, "wait")}.`);
       this.print("Time passes...");
       this.handleTimedSpecials();
     }
@@ -2112,13 +2115,14 @@
     }
 
     askFor(command) {
-      const parsed = this.parseAskForCommand(command);
-      const conversation = parsed || this.parseAskConversationCommand(command);
-      const delegated = conversation || this.parseAskToCommand(command);
-      if (!delegated) return this.print("Use: ask [character] for [item], or ask [character] to [command].");
-      if (delegated.topic) return this.askCharacterAbout(delegated.characterName, delegated.topic);
-      if (delegated.order) return this.askCharacterTo(delegated.characterName, delegated.order);
-      return this.askCharacterForItem(delegated.characterName, delegated.itemName);
+      const delegated = this.parseAskToCommand(command);
+      const conversation = delegated || this.parseAskConversationCommand(command);
+      const parsed = conversation || this.parseAskForCommand(command);
+      const resolved = parsed || conversation || delegated;
+      if (!resolved) return this.print("Use: ask [character] for [item], or ask [character] to [command].");
+      if (resolved.topic) return this.askCharacterAbout(resolved.characterName, resolved.topic);
+      if (resolved.order) return this.askCharacterTo(resolved.characterName, resolved.order);
+      return this.askCharacterForItem(resolved.characterName, resolved.itemName);
     }
 
     askCharacterForItem(characterName, itemName) {
@@ -2150,13 +2154,97 @@
       if (!character) return this.print(`There is no one named ${characterName} here.`);
       if (character.friendly === false) return this.respondToTalk(character);
       if (this.player.name === "You" && this.player.noticeable === false) return this.print(`${character.name} says 'who's talking?'`);
+      this.delegateCharacterOrder(character, order);
+    }
+
+    delegateCharacterOrder(character, order) {
       this.rememberConversationCharacter(character);
       this.rememberReferencedCharacter(order);
       const delegatedSplitter = new CommandSplitter(this.data);
       for (const action of delegatedSplitter.split(order)) {
-        const moved = this.processCommand(action, character);
+        const interpreted = this.interpretFriendlyOrder(character, action);
+        if (interpreted.message) this.print(interpreted.message);
+        if (!interpreted.action) continue;
+        const moved = this.processCommand(interpreted.action, character);
         if (moved) break;
       }
+    }
+
+    interpretFriendlyOrder(character, action) {
+      const text = normalize(action);
+      const [verb, ...restWords] = text.split(/\s+/);
+      const object = restWords.join(" ").trim();
+
+      const progressive = this.progressiveFriendlyOrder(character, verb, object, text);
+      if (progressive) return progressive;
+
+      if (verb === "wait" && /\b(?:until|till)\b/.test(object)) {
+        return {
+          message: `${character.name} says 'I will wait a while, but not forever.'`,
+          action: "wait",
+        };
+      }
+
+      const protectedMessage = this.protectedOrderRefusal(character, verb, object);
+      if (protectedMessage) return { message: protectedMessage, action: "" };
+
+      return { message: "", action };
+    }
+
+    progressiveFriendlyOrder(character, verb, object, action) {
+      const guardedVerbs = new Set(["give", "hand", "pass", "send", "deliver", "return"]);
+      if (!guardedVerbs.has(verb) || !matches(character.name, "gandalf")) return null;
+
+      const parsed = this.parseGiveCommand(object);
+      const itemName = parsed?.itemName || object.split(" to ")[0]?.trim() || object;
+      const item = this.findCharacterItem(character, itemName)?.item;
+      const actualName = item?.name || itemName;
+      if (!matches(actualName, "curious map")) return null;
+
+      const key = "gandalf_map_transfer_requests";
+      const count = (this.flags[key] || 0) + 1;
+      this.flags[key] = count;
+
+      if (count === 1) {
+        return {
+          message: "Gandalf says 'I think the curious map is safer in my hands for now.'",
+          action: "",
+        };
+      }
+      if (count === 2) {
+        return {
+          message: "Gandalf says 'You may have it soon, but let me keep it a little longer.'",
+          action: "",
+        };
+      }
+      return {
+        message: "Gandalf sighs and says 'Very well. Take it, and use it wisely.'",
+        action,
+      };
+    }
+
+    protectedOrderRefusal(character, verb, object) {
+      const guardedVerbs = new Set(["drop", "leave", "give", "hand", "pass", "send", "deliver", "return"]);
+      if (!guardedVerbs.has(verb)) return "";
+
+      let itemName = object;
+      if (verb === "give" || ["hand", "pass", "send", "deliver", "return"].includes(verb)) {
+        const parsed = this.parseGiveCommand(object);
+        itemName = parsed?.itemName || object.split(" to ")[0]?.trim() || object;
+      }
+      const item = this.findCharacterItem(character, itemName)?.item;
+      const actualName = item?.name || itemName;
+
+      if (matches(character.name, "gandalf") && matches(actualName, "curious map")) {
+        return "Gandalf says 'I think the curious map is safer in my hands for now.'";
+      }
+      if (matches(character.name, "thorin") && (matches(actualName, "curious key") || matches(actualName, "treasure") || matches(actualName, "arkenstone"))) {
+        return "Thorin says 'That is not something I mean to part with lightly.'";
+      }
+      if (matches(character.name, "bilbo") && matches(actualName, "golden ring")) {
+        return "Bilbo says 'I would rather keep the ring to myself just now.'";
+      }
+      return "";
     }
 
     askCharacterAbout(characterName, topic) {
@@ -2200,8 +2288,10 @@
     parseAskToCommand(command) {
       const text = normalize(command);
       if (!text) return null;
+      if (/^.+?\s+(?:where|whether|if|what|why|how|that)\b/.test(text)) return null;
       const match = text.match(/^(.+?)\s+to\s+(.+)$/);
       if (match) return { characterName: match[1].trim(), order: match[2].trim() };
+      if (/^.+?\s+(?:for|about|where|whether|if|what|why|how|that)\b/.test(text)) return null;
       const people = this.peopleInRoom()
         .filter((character) => character.id !== this.player.id && character.visible)
         .sort((a, b) => b.name.length - a.name.length);
@@ -2618,7 +2708,15 @@
     followCharacter(objectName = "") {
       const target = this.resolveCharacterTarget(objectName);
       if (!target) return this.print(`There is no one named ${objectName} here to follow.`);
-      this.print(`You follow ${target.name} as closely as you can.`);
+      if (this.commandIssuer && target.id === this.commandIssuer.id) {
+        this.player.movementMode = "follow";
+        this.player.followingPlayer = true;
+        return this.print(`${this.player.name} follows you as closely as possible.`);
+      }
+      const subject = actorSubject(this.player, true);
+      const targetName = displayCharacterName(target);
+      const targetText = targetName === "you" ? "you" : target.name;
+      this.print(`${subject} ${actorVerb(this.player, "follow")} ${targetText} as closely as ${this.player.name === "You" ? "you can" : "possible"}.`);
     }
 
     socialAction(verb, objectName = "") {
@@ -2733,6 +2831,8 @@
     }
 
     handleGo(command) {
+      const relativeDirection = this.relativeDirectionCommand(command);
+      if (relativeDirection) return this.move(relativeDirection);
       if (command.startsWith("through ")) {
         const found = this.findDoor(command.slice(8));
         if (!found) {
@@ -2756,6 +2856,26 @@
         return this.goDirectlyTo(target.id);
       }
       return this.move(this.normalizeDirection(command));
+    }
+
+    relativeDirectionCommand(command) {
+      const text = normalize(command);
+      if (!text) return "";
+      const insideTerms = ["inside", "indoors", "back inside"];
+      const outsideTerms = ["outside", "outdoors", "back outside", "out"];
+      const preferred = insideTerms.includes(text)
+        ? ["inside", "interior", "hall", "home", "house", "hole", "room", "tunnel"]
+        : outsideTerms.includes(text)
+          ? ["outside", "garden", "yard", "path", "road", "forest", "exterior"]
+          : null;
+      if (!preferred) return "";
+      const candidates = this.roomConnections();
+      const match = candidates.find((connection) => {
+        const room = this.rooms[connection.to];
+        const haystack = normalize(`${connection.to} ${room?.name || ""}`);
+        return preferred.some((term) => haystack.includes(term));
+      });
+      return match?.direction || "";
     }
 
     goDirectlyTo(roomId) {
@@ -2868,7 +2988,7 @@
         if (character.movementMode !== "follow") continue;
         if (!character.visible || character.position !== fromRoom) continue;
         this.moveCharacter(character, toRoom, direction, { silent: true });
-        character.justEntered = true;
+        character.justEntered = false;
       }
     }
 
@@ -3330,10 +3450,7 @@
         this.rememberConversationCharacter(character);
         this.rememberReferencedCharacter(parsed.order);
         if (this.handleBardDragonCommand(character, parsed.order)) return;
-        for (const action of this.splitter.split(parsed.order)) {
-          const moved = this.processCommand(action, character);
-          if (moved) break;
-        }
+        this.delegateCharacterOrder(character, parsed.order);
         return;
       }
       this.rememberConversationCharacter(character);
@@ -3692,6 +3809,13 @@
       .replace(/[.?!]+$/g, "")
       .replace(/^bilbo\s+(?:gives|give)\s+/, "give ")
       .replace(/^bilbo\s+(?:takes|take)\s+/, "take ")
+      .replace(/\bseek\b/g, "find")
+      .replace(/\blocate\b/g, "find")
+      .replace(/\btrack\b/g, "find")
+      .replace(/\bgo\s+and\s+look\s+for\b/g, "look for")
+      .replace(/\bgo\s+and\s+search\s+for\b/g, "search for")
+      .replace(/\bgo\s+and\s+find\b/g, "find")
+      .replace(/\blook\s+around\s+for\b/g, "look for")
       .replace(/\band\s+then\b/g, "and")
       .replace(/\b(this|my|your)\b/g, " ")
       .replace(/^(?:please\s+)?(?:can|could|would|will)\s+you\s+/, "")
@@ -3705,6 +3829,40 @@
       .replace(/\bhand\s+me\b/g, "hand me")
       .replace(/\s+/g, " ")
       .trim();
+  }
+
+  function normalizeDelegatedTellCommand(command, verbs) {
+    const text = String(command || "").trim();
+    if (!text.startsWith("tell ")) return command;
+    const tail = text.slice(5).trim();
+    if (!tail) return command;
+
+    const commaIndex = tail.indexOf(",");
+    if (commaIndex >= 0) {
+      const target = tail.slice(0, commaIndex).trim();
+      const rest = tail.slice(commaIndex + 1).trim();
+      if (!target || !rest) return command;
+      if (/^(?:to|for|about|where|whether|if|what|why|how|that)\b/.test(rest)) return `tell ${target} ${rest}`;
+      const restVerb = rest.split(/\s+/)[0];
+      if (!verbs.includes(restVerb)) return command;
+      return `tell ${target} to ${rest}`;
+    }
+
+    const normalizedTail = tail.replace(/\b(?:the|a|an)\b/g, " ").replace(/\s+/g, " ").trim();
+    const words = normalizedTail.split(/\s+/).filter(Boolean);
+    if (["to", "for", "about", "where", "whether", "if", "what", "why", "how", "that"].includes(words[1])) return command;
+    let splitIndex = -1;
+    for (let index = 1; index < words.length; index += 1) {
+      if (verbs.includes(words[index])) {
+        splitIndex = index;
+        break;
+      }
+    }
+    if (splitIndex < 0) return command;
+    const target = words.slice(0, splitIndex).join(" ");
+    const rest = words.slice(splitIndex).join(" ");
+    if (!target || !rest) return command;
+    return `tell ${target} to ${rest}`;
   }
 
   function parseCanonicalDialogueInput(rawCommand) {
