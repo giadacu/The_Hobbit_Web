@@ -173,8 +173,11 @@
         const askToIndex = currentVerb === "ask" ? words.indexOf("to") : -1;
         words = words.map((word, wordIndex) => {
           if (askToIndex >= 0 && wordIndex > askToIndex) return word;
-          if (["him", "her"].includes(word) && (this.lastTargetObject || this.lastDirectObject)) {
-            return this.lastTargetObject || this.lastDirectObject;
+          if (["him", "her"].includes(word)) {
+            if (["ask", "tell"].includes(currentVerb)) {
+              return this.knownCharacterNames.includes(this.lastTargetObject) ? this.lastTargetObject : word;
+            }
+            if (this.lastTargetObject || this.lastDirectObject) return this.lastTargetObject || this.lastDirectObject;
           }
           if (["it", "one"].includes(word) && (this.lastDirectObject || this.lastTargetObject)) {
             const directVerbs = new Set(["take", "get", "retrieve", "wear", "remove", "eat", "drink", "catch", "borrow", "give", "show", "hand", "pass", "bring", "send", "return", "deliver", "put", "drop", "leave", "place", "set", "store", "hide", "open", "close", "throw", "combine"]);
@@ -2372,7 +2375,7 @@
     }
 
     askCharacterForItem(characterName, itemName) {
-      const character = this.resolveCharacterTarget(characterName);
+      const character = this.resolveAskForCharacterTarget(characterName, itemName);
       if (!character) return this.print(`There is no one named ${characterName} here.`);
       const requestedCharacter = this.findKnownCharacter(itemName);
       if (requestedCharacter) {
@@ -2381,6 +2384,20 @@
         return this.askCharacterAbout(character.name, `where ${requestedCharacter.name} is`);
       }
       return this.receiveItemFromCharacter(character, itemName);
+    }
+
+    resolveAskForCharacterTarget(characterName, itemName) {
+      const directTarget = this.resolveCharacterTarget(characterName);
+      if (directTarget) return directTarget;
+      const pronoun = normalize(characterName);
+      if (!["him", "her", "them"].includes(pronoun)) return null;
+      const visibleHolder = this.findVisibleCharacterHolding(itemName)?.character;
+      if (visibleHolder) return visibleHolder;
+      const lastConversation = this.lastConversationCharacter();
+      if (lastConversation?.position === this.currentRoom && lastConversation.visible) return lastConversation;
+      const lastReferenced = this.lastReferencedCharacter();
+      if (lastReferenced?.position === this.currentRoom && lastReferenced.visible) return lastReferenced;
+      return null;
     }
 
     receiveItemFromCharacter(character, itemName) {

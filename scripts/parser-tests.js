@@ -706,6 +706,12 @@ const gameCases = [
     expectedIncluded: ["There is no one named Thorin here."],
   },
   {
+    name: "ask pronoun for held item resolves visible holder",
+    inputs: ["get map", "ask him for the map"],
+    expectedIncluded: ["Gandalf is carrying the curious map.", "Gandalf gives you the curious map."],
+    notExpectedIncluded: ["There is no one named him here.", "There is no one named map here."],
+  },
+  {
     name: "broken map cannot be read as intact",
     inputs: ["ask gandalf for the map", "break map", "read map"],
     expectedIncluded: ["You try to read the broken curious map, but its markings are torn into useless fragments."],
