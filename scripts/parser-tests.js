@@ -994,6 +994,20 @@ const gameCases = [
     ],
   },
   {
+    name: "delegated bare cook and eat no longer require explicit object",
+    setup(game) {
+      placeCharacterWithPlayer(game, "gandalf");
+    },
+    inputs: ["ask gandalf to cook", "ask gandalf to eat"],
+    expectedIncluded: [
+      "Gandalf cooks, but nothing happens.",
+      "Gandalf has nothing suitable to eat.",
+    ],
+    notExpectedIncluded: [
+      "Please specify your action and the object. For example, type 'open door' or 'climb into tree'.",
+    ],
+  },
+  {
     name: "delegated container transfers work for npc",
     setup(game) {
       placeCharacterWithPlayer(game, "gandalf");

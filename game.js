@@ -29,6 +29,7 @@
     "jump", "sit", "stand", "sleep", "rest", "run", "wake", "crawl", "leap",
     "dive", "swim", "lie", "listen", "smell", "sniff", "search", "explore",
     "investigate", "examine", "inspect", "watch", "eavesdrop", "scout",
+    "eat", "drink", "cook",
   ]);
 
   const EDIBLE_ITEMS = new Set([
@@ -672,6 +673,7 @@
         dive: () => this.physicalAction("dive", object),
         swim: () => this.physicalAction("swim", object),
         ride: () => this.physicalAction("ride", object),
+        cook: () => this.physicalAction("cook", object),
         combine: () => this.combine(object),
       };
 
@@ -3046,19 +3048,41 @@
       return actorizeSecondPerson(this.player, response);
     }
 
+    firstConsumableInInventory(consumableNames) {
+      return this.player.inventory
+        .map((itemId) => this.items[itemId])
+        .find((item) => item && consumableNames.has(normalize(item.name)));
+    }
+
     eat(objectName) {
-      if (!EDIBLE_ITEMS.has(normalize(objectName))) return this.print("I would not eat that.");
-      const item = this.findInInventory(objectName);
-      if (!item) return this.print(this.heldItemMessage(objectName) || (this.player.name === "You" ? "You do not have it with you." : `${this.player.name} does not have it.`));
+      const normalizedObject = normalize(objectName);
+      const item = normalizedObject
+        ? this.findInInventory(objectName)
+        : this.firstConsumableInInventory(EDIBLE_ITEMS);
+      if (!item) {
+        if (!normalizedObject) {
+          return this.print(this.player.name === "You" ? "You have nothing suitable to eat." : `${this.player.name} has nothing suitable to eat.`);
+        }
+        return this.print(this.heldItemMessage(objectName) || (this.player.name === "You" ? "You do not have it with you." : `${this.player.name} does not have it.`));
+      }
+      if (!EDIBLE_ITEMS.has(normalize(item.name))) return this.print("I would not eat that.");
       this.detachItem(item.id);
       this.player.strength += 5;
       this.print(this.player.name === "You" ? `You eat the ${item.name} and gain strength.` : `${this.player.name} eats the ${item.name} and gains strength.`);
     }
 
     drink(objectName) {
-      if (!DRINKABLE_ITEMS.has(normalize(objectName))) return this.print("I would not drink that.");
-      const item = this.findInInventory(objectName);
-      if (!item) return this.print(this.heldItemMessage(objectName) || (this.player.name === "You" ? "You do not have it with you." : `${this.player.name} does not have it.`));
+      const normalizedObject = normalize(objectName);
+      const item = normalizedObject
+        ? this.findInInventory(objectName)
+        : this.firstConsumableInInventory(DRINKABLE_ITEMS);
+      if (!item) {
+        if (!normalizedObject) {
+          return this.print(this.player.name === "You" ? "You have nothing suitable to drink." : `${this.player.name} has nothing suitable to drink.`);
+        }
+        return this.print(this.heldItemMessage(objectName) || (this.player.name === "You" ? "You do not have it with you." : `${this.player.name} does not have it.`));
+      }
+      if (!DRINKABLE_ITEMS.has(normalize(item.name))) return this.print("I would not drink that.");
       this.detachItem(item.id);
       this.print(this.player.name === "You" ? `You drink the ${item.name}.` : `${this.player.name} drinks the ${item.name}.`);
     }
