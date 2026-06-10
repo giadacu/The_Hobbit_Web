@@ -916,11 +916,11 @@ const gameCases = [
     notExpectedIncluded: ["Gandalf woulds need something sharp to trim the rose bush."],
   },
   {
-    name: "following npc stays with player across rooms",
+    name: "following gandalf uses loose follow behavior across rooms",
     inputs: ["tell gandalf to follow me", "open the door", "go outside"],
     expectedIncluded: [
       "Gandalf follows you as closely as possible.",
-      "You are in a beautiful garden, amidst verdant foliage and blossoms bright. The air is sweet with nature's breath. Paths wind through hidden nooks, where secrets lie in wait. A tranquil haven, where the heart finds peace and the spirit, adventure. To the west there is the round green door. The round green door is open. You see: a weathered, moss-covered stone bench perfect for quiet contemplation, an ancient sun dial casting shadows to mark the hours, a vibrant, fragrant rose bush attracting bees and brightening the garden, a shallow bird bath inviting feathered friends to splash and drink, a fragrant herbs patch thriving in the sunlight, a small garden shed for storing tools and gardening supplies. Gandalf is here. He is carrying a curious map.",
+      "You are in a beautiful garden, amidst verdant foliage and blossoms bright. The air is sweet with nature's breath. Paths wind through hidden nooks, where secrets lie in wait. A tranquil haven, where the heart finds peace and the spirit, adventure. To the west there is the round green door. The round green door is open. You see: a weathered, moss-covered stone bench perfect for quiet contemplation, an ancient sun dial casting shadows to mark the hours, a vibrant, fragrant rose bush attracting bees and brightening the garden, a shallow bird bath inviting feathered friends to splash and drink, a fragrant herbs patch thriving in the sunlight, a small garden shed for storing tools and gardening supplies.",
     ],
   },
   {
@@ -1006,6 +1006,74 @@ const gameCases = [
     notExpectedIncluded: [
       "Please specify your action and the object. For example, type 'open door' or 'climb into tree'.",
     ],
+  },
+  {
+    name: "unexpected party starts with only gandalf in bilbos home",
+    drive(game) {
+      const visible = game.visiblePeopleInRoom()
+        .filter((character) => character.id !== "you")
+        .map((character) => character.name)
+        .join(", ");
+      game.print(`Party start: ${visible || "none"}`);
+    },
+    expectedIncluded: ["Party start: Gandalf"],
+    notExpectedIncluded: ["Party start: Gandalf, Dwalin"],
+  },
+  {
+    name: "unexpected party first dwarf arrives in small atmospheric steps",
+    drive(game) {
+      const controller = game.unexpectedParty;
+      for (let index = 0; index < 4; index += 1) {
+        controller.state.cooldown = 0;
+        controller.advanceTurn();
+      }
+    },
+    expectedIncluded: [
+      "There is a knock at the round green door.",
+      "The round green door opens, and Dwalin can be glimpsed outside.",
+      "Dwalin steps inside, brushing road dust from his cloak.",
+    ],
+    notExpectedIncluded: ["Thorin"],
+  },
+  {
+    name: "unexpected party opening the door updates traversal state",
+    drive(game) {
+      const controller = game.unexpectedParty;
+      controller.state.cooldown = 0;
+      controller.advanceTurn();
+      controller.state.cooldown = 0;
+      controller.advanceTurn();
+      game.execute("e");
+      game.print(`Door traversal room: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "The round green door opens, and Dwalin can be glimpsed outside.",
+      "Door traversal room: bilbos_garden",
+    ],
+    notExpectedIncluded: ["The round green door is closed."],
+  },
+  {
+    name: "unexpected party dwarves stay inside bag end and garden",
+    drive(game) {
+      const controller = game.unexpectedParty;
+      while (controller.state.arrivalIndex < controller.roster.length || controller.state.currentArrival || !controller.state.fullHouseAnnounced) {
+        controller.state.cooldown = 0;
+        controller.advanceTurn();
+      }
+      for (let index = 0; index < 12; index += 1) {
+        controller.state.cooldown = 0;
+        controller.advanceTurn();
+      }
+      const escaped = controller.arrivedDwarves()
+        .filter((character) => character.position && !["hobbit_hole", "bilbos_garden"].includes(character.position))
+        .map((character) => character.name);
+      game.print(escaped.length ? `Escaped dwarves: ${escaped.join(", ")}` : "Unexpected Party dwarves remain within Bag End.");
+    },
+    expectedIncluded: [
+      "The house is now crowded with dwarves. Cloaks hang from nearly every peg. The smell of food fills the room.",
+      "Unexpected Party dwarves remain within Bag End.",
+    ],
+    notExpectedIncluded: ["Escaped dwarves:"],
   },
   {
     name: "delegated container transfers work for npc",
@@ -1271,11 +1339,11 @@ const gameCases = [
         Math.random = originalRandom;
       }
       if (!game.endgame) throw new Error("Expected autoplay to finish the adventure.");
-      if (!outputLines.includes("Congratulations. You have killed Smaug and found the treasure - a real thief. You have mastered 51.19% of this adventure.")) {
+      if (!outputLines.some((line) => line.startsWith("Congratulations. You have killed Smaug and found the treasure - a real thief."))) {
         throw new Error(`Expected autoplay victory message. Commands: ${issued.slice(-12).join(" | ")}`);
       }
     },
-    expectedIncluded: ["Congratulations. You have killed Smaug and found the treasure - a real thief. You have mastered 51.19% of this adventure."],
+    expectedIncluded: ["Congratulations. You have killed Smaug and found the treasure - a real thief. You have mastered 48.81% of this adventure."],
     notExpectedIncluded: ["You leave the", "You drop the"],
   },
   {
@@ -1401,6 +1469,46 @@ const gameCases = [
       "plant seeds",
     ],
     expectedIncluded: ["You plant a few seeds in a soft patch of earth. They will need time and care."],
+  },
+  {
+    name: "elrond offers map counsel in rivendell",
+    setup(game) {
+      game.currentRoom = "rivendell";
+      game.player.position = "rivendell";
+    },
+    inputs: ["ask elrond about map"],
+    expectedIncluded: ["Elrond says 'Such maps do not speak plainly to hasty eyes. Patience, and the right light, reveal more than force ever could.'"],
+  },
+  {
+    name: "beorn answers food request in his house",
+    setup(game) {
+      game.currentRoom = "beorns_house";
+      game.player.position = "beorns_house";
+    },
+    inputs: ["ask beorn for food"],
+    expectedIncluded: ["Beorn says 'There is food and a roof for honest guests. Help yourself, but do not mistake hospitality for weakness.'"],
+  },
+  {
+    name: "gollum riddle path grants escape with ring",
+    setup(game) {
+      game.currentRoom = "dark_stuffy_passage_13";
+      game.player.position = "dark_stuffy_passage_13";
+    },
+    inputs: [
+      "south",
+      "ask gollum a riddle",
+      "answer fish",
+      "answer darkness",
+      "say to gollum \"what have i got in my pocket\"",
+      "wear ring",
+      "north",
+    ],
+    expectedIncluded: [
+      "Groping beside the water in the dark, your fingers close around a small cold ring. Almost without thinking, you slip it into your pocket.",
+      "Gollum narrows his pale eyes. 'Baggins has answered. Now Baggins asks, yes. Ask it, precious, ask it.'",
+      "You wear the golden ring and become unnoticeable.",
+      "Invisible under the ring, you slip past Gollum as he claws wildly about for his precious.",
+    ],
   },
 ];
 

@@ -105,6 +105,100 @@
     ["Elrond", "Gandalf", "do you still believe in him", "More than ever."],
   ];
 
+  const GANDALF_AMBIENT_LINES = {
+    bag_end: [
+      "Comfort is a fine hearth, Bilbo, but the world seldom knocks twice.",
+      "There is more road beyond this door than most hobbits ever dream.",
+    ],
+    green_dragon: [
+      "Ale loosens tongues, and loose tongues often run ahead of wisdom.",
+      "Many tales begin in comfort and end in courage.",
+    ],
+    trolls: [
+      "Stupidity leaves heavy footprints, and trolls are generous with both.",
+      "Best keep your wits brighter than their fire ever was.",
+    ],
+    rivendell: [
+      "In Rivendell even burdens grow lighter, though none are quite forgotten.",
+      "Listen well here; wisdom often speaks more softly than pride.",
+    ],
+    mountains: [
+      "The mountains do not hate us, but they care very little whether we live.",
+      "Keep your footing and your courage. Both are easily lost on these heights.",
+    ],
+    goblins: [
+      "Goblins love noise, darkness, and cruelty; let us offer them as little of ourselves as we can.",
+      "There are deep places under stone where even brave hearts must tread carefully.",
+    ],
+    deep_lake: [
+      "Still water in dark places is rarely as empty as it seems.",
+      "Some riddles are older than swords, and far more dangerous.",
+    ],
+    beorn: [
+      "Beorn's hospitality is a strong roof, but it is best not to test its beams.",
+      "In this house, honesty is wiser than cleverness.",
+    ],
+    mirkwood_gate: [
+      "The forest ahead is old, watchful, and not fond of strangers.",
+      "If you leave the path in Mirkwood, do not expect the path to forgive you.",
+    ],
+    mirkwood: [
+      "When the wood grows silent, pay closer attention, not less.",
+      "Weariness is a cunning enemy in places where the trees all look alike.",
+    ],
+    spiders: [
+      "There are hungers in this forest that do not sleep by day.",
+      "Steel and fire are useful things, but steadiness is better still.",
+    ],
+    elves: [
+      "In halls such as these, courtesy may open what force never could.",
+      "Escape often comes disguised as inconvenience.",
+    ],
+    laketown: [
+      "Water remembers roads that maps forget.",
+      "Where trade prospers, so do rumor and fear.",
+    ],
+    dale: [
+      "Stones remember what dragons would have men forget.",
+      "A ruined town is a stern book, if one has the heart to read it.",
+    ],
+    front_gate: [
+      "Doors made in wiser days seldom yield to haste.",
+      "Stand ready. Great thresholds rarely open without cost.",
+    ],
+    mountain_halls: [
+      "Gold may glitter in the dark, but so do the eyes of greed.",
+      "Tread softly. Old kingdoms sleep lightly beneath the mountain.",
+    ],
+    lonely_mountain: [
+      "There are victories that must be survived before they can be celebrated.",
+      "The Mountain has waited long; it will not easily surrender its secrets.",
+    ],
+  };
+
+  const ELROND_AMBIENT_LINES = [
+    "These halls were made for song and counsel, not for hurried hearts.",
+    "Often the small hand sets in motion what the great could never compel.",
+    "In Rivendell, old things yield their meaning slowly, yet seldom in vain.",
+  ];
+
+  const BEORN_AMBIENT_LINES = [
+    "Eat while food is before you, and speak plainly while peace still lasts.",
+    "I like roads best when goblins are far from them and wargs farther still.",
+    "The wild tells its tidings to those who have ears enough to heed them.",
+  ];
+
+  const GOLLUM_RIDDLES = [
+    {
+      question: "Gollum whispers 'Alive without breath, as cold as death; never thirsty, ever drinking. What is it, my precious?'",
+      answers: ["fish", "a fish", "fishes"],
+    },
+    {
+      question: "Gollum hisses 'It comes first on little cat feet, and swallows torchlight, stars, and moon. What is it, eh?'",
+      answers: ["dark", "darkness", "the dark"],
+    },
+  ];
+
   class CommandSplitter {
     constructor(data) {
       this.verbs = [...new Set([...(data.parser.verbs || []), ...NATURAL_VERBS])];
@@ -251,6 +345,413 @@
     }
   }
 
+  class UnexpectedPartyController {
+    constructor(game) {
+      this.game = game;
+      this.partyRooms = new Set(["hobbit_hole", "bilbos_garden"]);
+      this.roster = [
+        { id: "unexpected_party_dwalin", name: "Dwalin" },
+        { id: "unexpected_party_balin", name: "Balin" },
+        { id: "unexpected_party_fili", name: "Fili" },
+        { id: "unexpected_party_kili", name: "Kili" },
+        { id: "unexpected_party_dori", name: "Dori" },
+        { id: "unexpected_party_nori", name: "Nori" },
+        { id: "unexpected_party_ori", name: "Ori" },
+        { id: "unexpected_party_oin", name: "Oin" },
+        { id: "unexpected_party_gloin", name: "Gloin" },
+        { id: "unexpected_party_bifur", name: "Bifur" },
+        { id: "unexpected_party_bofur", name: "Bofur" },
+        { id: "unexpected_party_bombur", name: "Bombur" },
+      ];
+      this.reset();
+    }
+
+    reset(savedState = null) {
+      this.ensureCharacters();
+      const currentArrival = savedState?.currentArrival;
+      const validArrival = currentArrival && this.roster.some((entry) => entry.id === currentArrival.dwarfId)
+        ? {
+          dwarfId: currentArrival.dwarfId,
+          stage: Math.max(0, Math.min(3, Number(currentArrival.stage) || 0)),
+        }
+        : null;
+      const arrived = Array.isArray(savedState?.arrived)
+        ? savedState.arrived.filter((id) => this.roster.some((entry) => entry.id === id))
+        : [];
+      this.state = {
+        enabled: savedState?.enabled !== false,
+        turnCounter: Number(savedState?.turnCounter) || 0,
+        cooldown: Number.isFinite(savedState?.cooldown) ? Math.max(0, savedState.cooldown) : 2,
+        arrivalIndex: Number.isFinite(savedState?.arrivalIndex) ? Math.max(0, Math.min(this.roster.length, savedState.arrivalIndex)) : arrived.length,
+        currentArrival: validArrival,
+        arrived,
+        fullHouseAnnounced: Boolean(savedState?.fullHouseAnnounced),
+      };
+      if (this.state.arrivalIndex < this.state.arrived.length) this.state.arrivalIndex = this.state.arrived.length;
+      this.reconcileCharacters();
+    }
+
+    serialize() {
+      return clone(this.state);
+    }
+
+    load(savedState = null) {
+      this.reset(savedState);
+    }
+
+    ensureCharacters() {
+      for (const dwarf of this.roster) {
+        if (this.game.characters[dwarf.id]) continue;
+        this.game.characters[dwarf.id] = {
+          id: dwarf.id,
+          name: dwarf.name,
+          friendly: true,
+          strength: 7,
+          position: null,
+          movementMode: "never",
+          visible: true,
+          inventory: [],
+          worn: [],
+          attackFlag: 0,
+          hasMetPlayer: false,
+          justEntered: false,
+          noticeable: true,
+          wearingRing: false,
+          ringTimer: 0,
+          insideContainer: null,
+          carriedBy: null,
+          ambientOnly: true,
+          partyBound: true,
+        };
+      }
+    }
+
+    reconcileCharacters() {
+      for (const dwarf of this.roster) {
+        const character = this.game.characters[dwarf.id];
+        if (!character) continue;
+        character.ambientOnly = true;
+        character.partyBound = true;
+        character.friendly = true;
+        character.visible = true;
+        character.movementMode = "never";
+        character.followingPlayer = false;
+        character.justEntered = false;
+        character.carriedBy = null;
+        const currentStage = this.state.currentArrival?.dwarfId === dwarf.id ? this.state.currentArrival.stage : -1;
+        if (this.state.arrived.includes(dwarf.id)) {
+          if (!this.partyRooms.has(character.position)) character.position = "hobbit_hole";
+        } else if (currentStage === 1) {
+          character.position = "bilbos_garden";
+        } else if (currentStage >= 2) {
+          character.position = "hobbit_hole";
+        } else {
+          character.position = null;
+        }
+      }
+    }
+
+    isPartyRoom(roomId = this.game.currentRoom) {
+      return this.partyRooms.has(roomId);
+    }
+
+    isAmbientDwarf(characterOrId) {
+      const id = typeof characterOrId === "string" ? characterOrId : characterOrId?.id;
+      return this.roster.some((entry) => entry.id === id);
+    }
+
+    blocksGreetingResponse(character) {
+      return this.isAmbientDwarf(character);
+    }
+
+    blocksDirectInteraction(character, type = "talk") {
+      if (!this.isAmbientDwarf(character)) return false;
+      const messages = {
+        talk: [
+          `${character.name} gives you a polite nod, but keeps one ear on the gathering.`,
+          `${character.name} seems more interested in settling in than in conversation just now.`,
+          `${character.name} offers a brief smile and turns back to the bustle of Bag End.`,
+        ],
+        order: [
+          `${character.name} is busy with the gathering and does not take up your instruction.`,
+          `${character.name} seems intent on the party rather than on following orders.`,
+          `${character.name} has clearly come for the gathering, not for errands.`,
+        ],
+        ask: [
+          `${character.name} is in no mood for a long answer just now.`,
+          `${character.name} only murmurs something about the gathering and leaves it there.`,
+          `${character.name} appears too occupied to explain much.`,
+        ],
+        item: [
+          `${character.name} keeps his travelling things close for now.`,
+          `${character.name} gives his pack a protective pat and declines.`,
+          `${character.name} looks as though he would rather keep hold of his belongings.`,
+        ],
+        gift: [
+          `${character.name} waves the offer away and keeps his attention on the gathering.`,
+          `${character.name} is too occupied to bother with gifts just now.`,
+          `${character.name} gives the item only a passing glance.`,
+        ],
+      };
+      const pool = messages[type] || messages.talk;
+      this.game.print(this.pick(pool, hashString(`${character.id}:${type}:${this.state.turnCounter}`)));
+      return true;
+    }
+
+    canAdvance() {
+      return this.state.enabled && this.isPartyRoom(this.game.currentRoom);
+    }
+
+    advanceTurn() {
+      if (!this.canAdvance()) return false;
+      this.ensureCharacters();
+      this.reconcileCharacters();
+      this.state.turnCounter += 1;
+      if (this.state.cooldown > 0) {
+        this.state.cooldown -= 1;
+        if (this.state.cooldown > 0) return false;
+      }
+
+      const event = this.nextEvent();
+      if (!event) {
+        this.state.cooldown = this.pickCooldown(4, 6);
+        return false;
+      }
+
+      if (event.apply) event.apply();
+      this.game.print(event.message);
+      this.state.cooldown = event.cooldown ?? this.pickCooldown(3, 5);
+      return true;
+    }
+
+    nextEvent() {
+      if (this.state.arrivalIndex >= this.roster.length && !this.state.currentArrival && !this.state.fullHouseAnnounced) {
+        return {
+          message: "The house is now crowded with dwarves. Cloaks hang from nearly every peg. The smell of food fills the room.",
+          cooldown: 5,
+          apply: () => {
+            this.state.fullHouseAnnounced = true;
+          },
+        };
+      }
+
+      const preferAmbient = this.state.arrived.length > 0 && (this.state.turnCounter + this.state.arrived.length) % 4 === 0;
+      if (preferAmbient) {
+        const ambientFirst = this.nextAmbientEvent();
+        if (ambientFirst) return ambientFirst;
+      }
+
+      const arrival = this.nextArrivalEvent();
+      if (arrival) return arrival;
+      return this.nextAmbientEvent();
+    }
+
+    nextArrivalEvent() {
+      if (this.state.arrivalIndex >= this.roster.length && !this.state.currentArrival) return null;
+      if (!this.state.currentArrival) {
+        this.state.currentArrival = {
+          dwarfId: this.roster[this.state.arrivalIndex].id,
+          stage: 0,
+        };
+      }
+
+      const dwarf = this.game.characters[this.state.currentArrival.dwarfId];
+      if (!dwarf) return null;
+
+      if (this.state.currentArrival.stage === 0) {
+        return {
+          message: this.game.currentRoom === "bilbos_garden"
+            ? "From inside Bag End comes the sound of a knock at the round green door."
+            : "There is a knock at the round green door.",
+          cooldown: this.pickCooldown(2, 3),
+          apply: () => {
+            this.state.currentArrival.stage = 1;
+          },
+        };
+      }
+
+      if (this.state.currentArrival.stage === 1) {
+        return {
+          message: this.game.currentRoom === "bilbos_garden"
+            ? `${dwarf.name} comes through the garden gate and makes for the round green door.`
+            : `The round green door opens, and ${dwarf.name} can be glimpsed outside.`,
+          cooldown: this.pickCooldown(2, 3),
+          apply: () => {
+            this.setPartyDoorOpen(true);
+            dwarf.position = "bilbos_garden";
+            this.state.currentArrival.stage = 2;
+          },
+        };
+      }
+
+      if (this.state.currentArrival.stage === 2) {
+        return {
+          message: this.game.currentRoom === "bilbos_garden"
+            ? `${dwarf.name} ducks through the round green door and disappears inside.`
+            : `${dwarf.name} steps inside, brushing road dust from his cloak.`,
+          cooldown: this.pickCooldown(1, 2),
+          apply: () => {
+            this.setPartyDoorOpen(true);
+            dwarf.position = "hobbit_hole";
+            this.state.currentArrival.stage = 3;
+          },
+        };
+      }
+
+      const settleLines = [
+        `${dwarf.name} hangs up his cloak and settles near the fire.`,
+        `${dwarf.name} sets down his travelling gear and takes a comfortable place by the hearth.`,
+        `${dwarf.name} eases himself in, warming his hands and looking round with approval.`,
+      ];
+      return {
+        message: this.pick(settleLines, hashString(`${dwarf.id}:settle:${this.state.turnCounter}`)),
+        cooldown: this.pickCooldown(3, 5),
+        apply: () => {
+          dwarf.position = "hobbit_hole";
+          if (!this.state.arrived.includes(dwarf.id)) this.state.arrived.push(dwarf.id);
+          this.state.arrivalIndex = Math.min(this.roster.length, this.state.arrivalIndex + 1);
+          this.state.currentArrival = null;
+        },
+      };
+    }
+
+    nextAmbientEvent() {
+      const roomId = this.game.currentRoom;
+      const visibleDwarves = this.arrivedDwarves().filter((character) => character.position === roomId);
+      const options = [];
+
+      if (roomId === "hobbit_hole" && visibleDwarves.length >= 3) {
+        options.push({
+          message: this.pick([
+            "Several dwarves are discussing food.",
+            "Somebody asks whether there is any beer.",
+            "The room grows steadily more crowded.",
+            "A discussion about travelling routes breaks out.",
+          ], hashString(`group:${this.state.turnCounter}:${visibleDwarves.length}`)),
+          cooldown: this.pickCooldown(4, 6),
+        });
+      }
+
+      if (visibleDwarves.length) {
+        const dwarf = visibleDwarves[Math.abs(hashString(`room:${this.state.turnCounter}`)) % visibleDwarves.length];
+        const roomActions = roomId === "bilbos_garden"
+          ? [
+            `${dwarf.name} pauses among the flowers and breathes in the garden air.`,
+            `${dwarf.name} looks over the garden with mild approval.`,
+            `${dwarf.name} lingers a moment in the garden before turning back toward the house.`,
+          ]
+          : [
+            `${dwarf.name} settles more comfortably into his seat.`,
+            `${dwarf.name} rises, stretches his legs, and looks about the room.`,
+            `${dwarf.name} studies the comfortable furniture with interest.`,
+            `${dwarf.name} glances toward the kitchen hopefully.`,
+            `${dwarf.name} sniffs the air and seems encouraged by what he smells.`,
+          ];
+        options.push({
+          message: this.pick(roomActions, hashString(`${dwarf.id}:room:${this.state.turnCounter}`)),
+          cooldown: this.pickCooldown(4, 6),
+        });
+
+        const speechLines = [
+          "A little beer would suit me.",
+          "Seed-cake would be most welcome.",
+          "I am starving.",
+          "The smell from the kitchen is encouraging.",
+          "Someone should help our host.",
+          "Interesting house.",
+          "A hot drink would be welcome.",
+          "I hope there is enough food for everyone.",
+          "Apple tart would do nicely.",
+          "One should never rush a meal.",
+        ];
+        if ((this.state.turnCounter + visibleDwarves.length) % 5 === 0) {
+          options.push({
+            message: `${dwarf.name} says '${this.pick(speechLines, hashString(`${dwarf.id}:speech:${this.state.turnCounter}`))}'`,
+            cooldown: this.pickCooldown(5, 7),
+          });
+        }
+      }
+
+      const movable = this.arrivedDwarves().filter((character) => character.id !== this.state.currentArrival?.dwarfId && this.partyRooms.has(character.position));
+      if (movable.length) {
+        const dwarf = movable[Math.abs(hashString(`move:${this.state.turnCounter}`)) % movable.length];
+        const toRoom = dwarf.position === "hobbit_hole" ? "bilbos_garden" : "hobbit_hole";
+        options.push({
+          message: this.movementMessage(dwarf, dwarf.position, toRoom),
+          cooldown: this.pickCooldown(3, 5),
+          apply: () => {
+            this.setPartyDoorOpen(true);
+            dwarf.position = toRoom;
+          },
+        });
+      }
+
+      if (this.game.characters.gandalf?.position === roomId && this.state.arrivalIndex < this.roster.length && this.state.turnCounter % 6 === 0) {
+        options.push({
+          message: `Gandalf says '${this.pick([
+            "We are expecting company.",
+            "You had better prepare for guests.",
+            "Patience, Bilbo.",
+            "The road will soon be calling.",
+          ], hashString(`gandalf:${this.state.turnCounter}:${this.state.arrivalIndex}`))}'`,
+          cooldown: this.pickCooldown(5, 7),
+        });
+      }
+
+      if (roomId === "hobbit_hole" && this.state.arrived.length >= 8 && this.state.turnCounter % 7 === 0) {
+        options.push({
+          message: this.pick([
+            "We should not keep our leader waiting.",
+            "The meeting place is not far from here.",
+            "Best not arrive late.",
+            "Someone will be expecting us.",
+            "Our chief values punctuality.",
+          ], hashString(`hint:${this.state.turnCounter}:${this.state.arrived.length}`)),
+          cooldown: this.pickCooldown(5, 7),
+        });
+      }
+
+      const available = options.filter((option) => option && option.message);
+      if (!available.length) return null;
+      return available[Math.abs(hashString(`ambient:${this.state.turnCounter}:${available.length}`)) % available.length];
+    }
+
+    movementMessage(dwarf, fromRoom, toRoom) {
+      if (fromRoom === "hobbit_hole" && toRoom === "bilbos_garden") {
+        return this.game.currentRoom === "hobbit_hole"
+          ? `${dwarf.name} slips out into the garden for a moment.`
+          : `${dwarf.name} comes out into the garden.`;
+      }
+      return this.game.currentRoom === "bilbos_garden"
+        ? `${dwarf.name} goes back inside.`
+        : `${dwarf.name} comes in again from the garden.`;
+    }
+
+    arrivedDwarves() {
+      return this.state.arrived.map((id) => this.game.characters[id]).filter(Boolean);
+    }
+
+    partyDoor() {
+      return this.game.doors?.porta_hobbit_hole_bilbos_garden || null;
+    }
+
+    setPartyDoorOpen(open) {
+      const door = this.partyDoor();
+      if (!door) return;
+      door.open = Boolean(open);
+    }
+
+    pick(list, seed) {
+      if (!list.length) return "";
+      return list[Math.abs(seed) % list.length];
+    }
+
+    pickCooldown(min, max) {
+      const span = Math.max(0, max - min);
+      return min + (span ? Math.abs(hashString(`cooldown:${this.state.turnCounter}:${this.state.arrivalIndex}:${this.state.arrived.length}`)) % (span + 1) : 0);
+    }
+  }
+
   class HobbitGame {
     constructor(data) {
       this.data = data;
@@ -293,12 +794,15 @@
       this.endgameRestartArmed = false;
       this.arrivalNoticeTimers = [];
       this.spiderEyesState = null;
+      this.gollumState = null;
+      this.turnCount = 0;
       this.imageRevealTimer = null;
       this.lastRevealedImage = "";
       this.audio = musicPlayer;
       this.audio.loop = true;
       this.audio.preload = "auto";
       this.audio.volume = 0.75;
+      this.unexpectedParty = new UnexpectedPartyController(this);
       this.initState();
       this.bind();
       this.describeRoom(true);
@@ -324,6 +828,7 @@
         character.insideContainer = character.insideContainer || null;
         character.carriedBy = null;
       }
+      this.normalizeCharacterMovementModes();
       for (const placement of this.data.placements) {
         if (this.items[placement.item]) this.items[placement.item].location = { type: "room", id: placement.room };
       }
@@ -342,11 +847,36 @@
           this.characters[inv.character].inventory.push(inv.item);
         }
       }
+      if (this.items.golden_ring?.location?.type === "room" && this.items.golden_ring.location.id === "deep_dark_lake") {
+        this.items.golden_ring.visible = false;
+      }
       this.player = this.characters[this.data.player] || Object.values(this.characters).find((c) => c.name === "You");
       this.currentRoom = this.player.position || this.data.startRoom;
       this.visitedRooms.add(this.currentRoom);
       this.spiderEyesState = null;
+      this.gollumState = this.createGollumState();
+      this.turnCount = 0;
       this.addZXFinaleState();
+      this.unexpectedParty?.reset();
+    }
+
+    normalizeCharacterMovementModes() {
+      const gandalf = this.characters?.gandalf;
+      if (!gandalf) return;
+      if (!gandalf.movementMode || gandalf.movementMode === "always") gandalf.movementMode = "follow";
+    }
+
+    createGollumState() {
+      return {
+        met: false,
+        contestStarted: false,
+        awaitingAnswer: false,
+        currentRiddleIndex: 0,
+        awaitingPlayerRiddle: false,
+        pocketQuestionAsked: false,
+        enraged: false,
+        escaped: false,
+      };
     }
 
     addZXFinaleState() {
@@ -707,6 +1237,7 @@
       for (const character of people) {
         const name = normalize(character.name);
         if (command === name) {
+          if (this.unexpectedParty?.blocksDirectInteraction(character, "talk")) return true;
           this.print(`${character.name} listens intently, expecting your words.`);
           return true;
         }
@@ -717,6 +1248,7 @@
           this.respondToTalk(character);
           return true;
         }
+        if (this.unexpectedParty?.blocksDirectInteraction(character, "order")) return true;
         this.delegateCharacterOrder(character, order);
         return true;
       }
@@ -1768,13 +2300,13 @@
     hello() {
       if (this.player.name === "You" && this.player.wearingRing && this.player.noticeable === false) {
         const replies = this.peopleInRoom()
-          .filter((p) => p.name !== "You" && p.friendly === true)
+          .filter((p) => p.name !== "You" && p.friendly === true && !this.unexpectedParty?.blocksGreetingResponse(p))
           .map((p) => `${p.name} says 'who's talking?'`);
         return this.print(replies.length ? replies.join("\n") : "No one responds to your greeting.");
       }
       const greeter = this.player.name === "You" ? "you" : this.player.name;
       const replies = this.peopleInRoom()
-        .filter((p) => p.name !== "You" && p.friendly === true)
+        .filter((p) => p.name !== "You" && p.friendly === true && !this.unexpectedParty?.blocksGreetingResponse(p))
         .map((p) => `${p.name} says hello to ${greeter}.`);
       this.print(replies.length ? replies.join("\n") : (this.player.name === "You" ? "No one responds to your greeting." : `No one responds to ${this.player.name}'s greeting.`));
     }
@@ -1825,7 +2357,10 @@
         trollsTransformed: this.trollsTransformed,
         trollsDefeated: this.trollsDefeated,
         spiderEyesState: this.spiderEyesState,
+        gollumState: this.gollumState,
+        turnCount: this.turnCount,
         endgame: this.endgame,
+        unexpectedParty: this.unexpectedParty?.serialize(),
       }));
       this.print(`Game saved as "${name}".`);
     }
@@ -1848,10 +2383,14 @@
       this.trollsTransformed = Boolean(save.trollsTransformed);
       this.trollsDefeated = Boolean(save.trollsDefeated);
       this.spiderEyesState = save.spiderEyesState || null;
+      this.gollumState = save.gollumState || this.createGollumState();
+      this.turnCount = Number(save.turnCount) || 0;
       this.endgame = Boolean(save.endgame);
       this.player = this.characters[this.data.player];
+      this.normalizeCharacterMovementModes();
       this.normalizeLanternState();
       this.addZXFinaleState();
+      this.unexpectedParty?.load(save.unexpectedParty || null);
       this.print(`Game "${name}" loaded.`);
       this.describeRoom({ full: true });
     }
@@ -2062,6 +2601,20 @@
         return "take rope";
       }
 
+      if (beforeDragonDefeat && this.currentRoom === "deep_dark_lake" && !this.gollumState?.pocketQuestionAsked) {
+        if (!this.gollumState?.met) return "look";
+        if (this.gollumState?.awaitingAnswer) {
+          return this.gollumState.currentRiddleIndex === 0 ? "answer fish" : "answer darkness";
+        }
+        if (this.gollumState?.awaitingPlayerRiddle) return "say to gollum \"what have i got in my pocket\"";
+        return "ask gollum a riddle";
+      }
+
+      if (beforeDragonDefeat && this.currentRoom === "deep_dark_lake" && this.gollumState?.pocketQuestionAsked) {
+        if (this.player.noticeable !== false) return "wear ring";
+        return "north";
+      }
+
       const hostile = this.peopleInRoom().find((character) => {
         return character.visible && character.friendly === false && !matches(character.name, "dragon");
       });
@@ -2070,12 +2623,17 @@
       if (beforeDragonDefeat && this.visitedTrollsClearing && this.autoplayHas("large key") && !this.trollsTransformed && this.currentRoom !== "trolls_clearing") return "wait";
 
       if (beforeDragonDefeat && !this.autoplayHas("golden ring")) {
-        if (this.currentRoom === "dark_stuffy_passage_9") {
-          const prepRingLoad = this.autoplayRequiredPickupPrepCommand("golden ring");
-          if (prepRingLoad) return prepRingLoad;
-          return "take ring";
+        if (this.currentRoom === "deep_dark_lake") {
+          if (!this.gollumState?.met) return "look";
+          if (this.gollumState?.awaitingAnswer) {
+            return this.gollumState.currentRiddleIndex === 0 ? "answer fish" : "answer darkness";
+          }
+          if (this.gollumState?.awaitingPlayerRiddle) return "say to gollum \"what have i got in my pocket\"";
+          if (this.gollumState?.pocketQuestionAsked && this.player.noticeable !== false) return "wear ring";
+          if (this.gollumState?.pocketQuestionAsked && this.player.noticeable === false) return "north";
+          return "ask gollum a riddle";
         }
-        return this.autoplayRouteCommandTo("dark_stuffy_passage_9");
+        return this.autoplayRouteCommandTo("deep_dark_lake");
       }
 
       if (beforeDragonDefeat && (this.player.strength || 1) < 6) {
@@ -2339,6 +2897,7 @@
       const target = this.resolveCharacterTarget(parsed.targetName);
       if (!item) return this.print(this.heldItemMessage(parsed.itemName) || `${this.player.name} does not have the ${parsed.itemName}.`);
       if (!target) return this.print(`There is no one named ${parsed.targetName} here.`);
+      if (this.unexpectedParty?.blocksDirectInteraction(target, "gift")) return;
       if (target.id === this.player.id) return this.print(`${this.player.name} already has the ${item.name}.`);
       this.detachItem(item.id);
       item.location = { type: "character", id: target.id };
@@ -2354,6 +2913,7 @@
       const target = this.resolveCharacterTarget(parsed.targetName);
       if (!item) return this.print(this.heldItemMessage(parsed.itemName) || `${this.player.name} does not have the ${parsed.itemName}.`);
       if (!target) return this.print(`There is no one named ${parsed.targetName} here.`);
+      if (this.unexpectedParty?.blocksDirectInteraction(target, "gift")) return;
       this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "show")} the ${item.name} to ${target.name}.`);
       this.reactToShownItem(target, item);
     }
@@ -2366,10 +2926,10 @@
     }
 
     askFor(command) {
-      const delegated = this.parseAskToCommand(command);
-      const conversation = delegated || this.parseAskConversationCommand(command);
-      const parsed = conversation || this.parseAskForCommand(command);
-      const resolved = parsed || conversation || delegated;
+      const conversation = this.parseAskConversationCommand(command);
+      const delegated = conversation ? null : this.parseAskToCommand(command);
+      const parsed = this.parseAskForCommand(command);
+      const resolved = conversation || delegated || parsed;
       if (!resolved) return this.print("Use: ask [character] for [item], or ask [character] to [command].");
       if (resolved.topic) return this.askCharacterAbout(resolved.characterName, resolved.topic);
       if (resolved.order) return this.askCharacterTo(resolved.characterName, resolved.order);
@@ -2379,6 +2939,9 @@
     askCharacterForItem(characterName, itemName) {
       const character = this.resolveAskForCharacterTarget(characterName, itemName);
       if (!character) return this.print(`There is no one named ${characterName} here.`);
+      if (this.unexpectedParty?.blocksDirectInteraction(character, "item")) return;
+      const special = this.specialAskForResponse(character, itemName);
+      if (special) return this.print(special);
       const requestedCharacter = this.findKnownCharacter(itemName);
       if (requestedCharacter) {
         this.rememberConversationCharacter(character);
@@ -2386,6 +2949,17 @@
         return this.askCharacterAbout(character.name, `where ${requestedCharacter.name} is`);
       }
       return this.receiveItemFromCharacter(character, itemName);
+    }
+
+    specialAskForResponse(character, itemName) {
+      const text = normalize(itemName);
+      if (matches(character.name, "beorn") && matchesAny(text, ["food", "meal", "supper", "breakfast", "shelter", "rest"])) {
+        return "Beorn says 'There is food and a roof for honest guests. Help yourself, but do not mistake hospitality for weakness.'";
+      }
+      if (matches(character.name, "elrond") && matchesAny(text, ["advice", "help", "counsel", "map"])) {
+        return "Elrond says 'What aid I may offer is best received in thought, and not in haste.'";
+      }
+      return "";
     }
 
     resolveAskForCharacterTarget(characterName, itemName) {
@@ -2432,6 +3006,7 @@
       if (!character) return this.print(`There is no one named ${characterName} here.`);
       if (character.friendly === false) return this.respondToTalk(character);
       if (this.player.name === "You" && this.player.noticeable === false) return this.print(`${character.name} says 'who's talking?'`);
+      if (this.unexpectedParty?.blocksDirectInteraction(character, "order")) return;
       this.rememberConversationCharacter(character);
       this.rememberReferencedCharacter(order);
       if (this.handleBardDragonCommand(character, order)) return;
@@ -2559,8 +3134,11 @@
       if (!character) return this.print(`There is no one named ${characterName} here.`);
       if (character.friendly === false) return this.respondToTalk(character);
       if (this.player.name === "You" && this.player.noticeable === false) return this.print(`${character.name} says 'who's talking?'`);
+      if (this.unexpectedParty?.blocksDirectInteraction(character, "ask")) return;
       this.rememberConversationCharacter(character);
       this.rememberReferencedCharacter(topic);
+      const special = this.specialConversationResponse(character, topic);
+      if (special) return this.print(special);
       this.print(`${character.name} considers ${this.formatConversationTopic(topic)}, but gives no clear answer.`);
     }
 
@@ -2627,6 +3205,156 @@
       if (!text) return "the matter";
       if (text.startsWith("if ")) return `whether ${text.slice(3)}`;
       return text;
+    }
+
+    specialTalkResponse(character) {
+      if (matches(character.name, "elrond") && this.currentRoom === "rivendell") {
+        return "Elrond folds his hands and says 'Speak without haste. In Rivendell, even quiet words may be worth the hearing.'";
+      }
+      if (matches(character.name, "beorn") && this.currentRoom === "beorns_house") {
+        return "Beorn studies you in silence for a moment and says 'Say what you mean, little one, and spare me needless words.'";
+      }
+      if (matches(character.name, "gollum")) {
+        if (!this.gollumState?.contestStarted) {
+          return "Gollum rocks softly on the black water and whispers 'Riddles, yes, riddles. Ask Gollum a riddle, and we shall see who goes and who is eaten.'";
+        }
+        if (this.gollumState.awaitingAnswer) return "Gollum hisses 'Answer first, precious.'";
+        if (this.gollumState.awaitingPlayerRiddle) return "Gollum licks his lips. 'Now Baggins asks, yes. Ask it, precious, ask it.'";
+        if (this.gollumState.pocketQuestionAsked) return "Gollum is past speech now. He hunts only for his precious.";
+      }
+      return "";
+    }
+
+    specialConversationResponse(character, topic) {
+      const text = normalize(topic);
+      if (matches(character.name, "gollum")) {
+        if (text === "a riddle" || text === "riddle") return this.beginGollumRiddleContest();
+        if (text.includes("pocket")) return this.resolveGollumPocketQuestion();
+        if (text.includes("exit") || text.includes("way out")) {
+          return this.gollumState?.pocketQuestionAsked
+            ? "Gollum rasps from the dark 'North, yes. But not for thieves. Not for Baggins, no.'"
+            : "Gollum bares his teeth. 'Win first, then ask of ways out, precious.'";
+        }
+      }
+      if (matches(character.name, "elrond")) {
+        if (matchesAny(text, ["map", "moon letters", "moon-letters", "markings"])) {
+          return "Elrond says 'Such maps do not speak plainly to hasty eyes. Patience, and the right light, reveal more than force ever could.'";
+        }
+        if (matchesAny(text, ["secret door", "door", "key"])) {
+          return "Elrond says 'Many doors in the elder tales were meant to be found at their proper hour, and not before.'";
+        }
+      }
+      if (matches(character.name, "beorn")) {
+        if (matchesAny(text, ["mirkwood", "forest", "wood"])) {
+          return "Beorn says 'The forest ahead is black with old hunger. Keep to the path, and trust no feast that waits for you in silence.'";
+        }
+        if (matchesAny(text, ["goblins", "wargs", "wolves"])) {
+          return "Beorn snorts. 'Goblins breed mischief as marshes breed flies, and wargs are seldom far behind them.'";
+        }
+        if (matchesAny(text, ["food", "meal", "shelter", "night", "rest"])) {
+          return "Beorn says 'There is food and a roof here for decent guests. Take both with thanks, and do not abuse either.'";
+        }
+      }
+      return "";
+    }
+
+    currentGollum() {
+      return this.characters.gollum || Object.values(this.characters).find((character) => matches(character.name, "gollum")) || null;
+    }
+
+    ensureLakeRingInPocket() {
+      const ring = this.items.golden_ring;
+      if (!ring) return false;
+      if (this.player.inventory.includes(ring.id) || this.player.worn.includes(ring.id)) return false;
+      this.detachItem(ring.id);
+      ring.visible = true;
+      ring.location = { type: "character", id: this.player.id };
+      this.player.inventory.push(ring.id);
+      return true;
+    }
+
+    beginGollumRiddleContest() {
+      const gollum = this.currentGollum();
+      if (!gollum || gollum.position !== this.currentRoom) return "";
+      this.ensureLakeRingInPocket();
+      if (!this.gollumState) this.gollumState = this.createGollumState();
+      if (this.gollumState.pocketQuestionAsked) return "Gollum is done with riddles. He wants only his precious now, yes.";
+      if (this.gollumState.awaitingAnswer) return "Gollum hisses 'Answer first, precious.'";
+      if (this.gollumState.awaitingPlayerRiddle) return "Gollum curls his fingers over the boat's edge. 'Baggins asks now. Speak the riddle, then.'";
+      this.gollumState.contestStarted = true;
+      this.gollumState.awaitingAnswer = true;
+      gollum.friendly = "neutral";
+      const opener = this.gollumState.met
+        ? "Gollum paddles nearer and whispers 'If Baggins answers true, then Baggins may ask. If not, we eats him, yes.'"
+        : "Gollum glides over the black water and whispers 'If Baggins answers true, then Baggins may ask. If not, we eats him, yes.'";
+      return `${opener} ${GOLLUM_RIDDLES[this.gollumState.currentRiddleIndex].question}`;
+    }
+
+    gollumAnswerMatches(input, answers) {
+      const normalized = normalize(input).replace(/^(?:it is|it's|its|the answer is)\s+/, "").trim();
+      if (!normalized) return false;
+      return answers.some((answer) => {
+        const expected = normalize(answer);
+        return normalized === expected || normalized.endsWith(` ${expected}`);
+      });
+    }
+
+    handleGollumAnswer(answerText = "") {
+      if (!this.gollumState?.awaitingAnswer || this.currentRoom !== "deep_dark_lake") return false;
+      const riddle = GOLLUM_RIDDLES[this.gollumState.currentRiddleIndex];
+      if (!this.gollumAnswerMatches(answerText, riddle.answers)) {
+        this.print("Gollum's pale eyes flare with hunger. 'Wrong, precious. Wrong!' He springs from the boat and falls on you in the dark.", "danger");
+        this.endGame("Gollum catches you in the dark.");
+        return true;
+      }
+
+      if (this.gollumState.currentRiddleIndex < GOLLUM_RIDDLES.length - 1) {
+        this.gollumState.currentRiddleIndex += 1;
+        this.print(`Gollum nods reluctantly. 'Right, precious. Right.' ${GOLLUM_RIDDLES[this.gollumState.currentRiddleIndex].question}`);
+        return true;
+      }
+
+      this.gollumState.awaitingAnswer = false;
+      this.gollumState.awaitingPlayerRiddle = true;
+      this.print("Gollum narrows his pale eyes. 'Baggins has answered. Now Baggins asks, yes. Ask it, precious, ask it.'");
+      return true;
+    }
+
+    resolveGollumPocketQuestion() {
+      if (this.currentRoom !== "deep_dark_lake") return "";
+      if (!this.gollumState?.awaitingPlayerRiddle) {
+        return this.gollumState?.awaitingAnswer
+          ? "Gollum taps the side of the boat impatiently. 'First Baggins answers. Then Baggins asks.'"
+          : "Gollum blinks in the dark, waiting for a proper riddle-game to begin.";
+      }
+      this.ensureLakeRingInPocket();
+      const gollum = this.currentGollum();
+      if (gollum) {
+        gollum.friendly = false;
+        gollum.attackFlag = 0;
+      }
+      this.gollumState.awaitingPlayerRiddle = false;
+      this.gollumState.pocketQuestionAsked = true;
+      this.gollumState.enraged = true;
+      return "You ask 'What have I got in my pocket?' Gollum freezes, then hisses wild guesses: 'Knife? String? Handses?' At last he slips away to fetch what he meant to give you, only to discover that his ring is gone. He returns shrieking for his precious, and the little ring in your pocket suddenly feels heavier than gold.";
+    }
+
+    handleGollumSpeech(text) {
+      const normalized = normalize(text);
+      if (!normalized) return false;
+      if (normalized.includes("pocket")) {
+        this.print(this.resolveGollumPocketQuestion());
+        return true;
+      }
+      if (normalized.includes("riddle")) {
+        this.print(this.beginGollumRiddleContest());
+        return true;
+      }
+      if (this.gollumState?.awaitingPlayerRiddle) {
+        this.print("Gollum scowls. 'That is no fair riddle. Ask properly, precious, ask properly.'");
+        return true;
+      }
+      return false;
     }
 
     findCharacterItem(character, itemName) {
@@ -3027,6 +3755,7 @@
 
     socialAction(verb, objectName = "") {
       const text = normalize(objectName);
+      if (verb === "answer" && this.handleGollumAnswer(text.replace(/^gollum'?s?\s+riddle\b/, "").trim())) return;
       const target = this.resolveCharacterTarget(text.replace(/^(?:from|to)\s+/, ""));
       if (target) {
         const messages = {
@@ -3212,6 +3941,11 @@
     }
 
     goDirectlyTo(roomId) {
+      const gollumBlock = this.currentRoom === "deep_dark_lake" && roomId !== this.currentRoom ? this.gollumBlocksDirection("north") : "";
+      if (gollumBlock) {
+        this.print(gollumBlock);
+        return false;
+      }
       const distance = this.findTravelDistance(this.currentRoom, roomId);
       const name = this.rooms[roomId].name.replace(/_/g, " ");
       if (distance >= 99) {
@@ -3270,10 +4004,25 @@
       return Boolean(this.flags[requiredFlag]);
     }
 
+    gollumBlocksDirection(direction) {
+      if (this.currentRoom !== "deep_dark_lake" || direction !== "north") return "";
+      if (!this.gollumState?.met) return "";
+      if (!this.gollumState.pocketQuestionAsked) {
+        return "Gollum crouches between you and the northern passage. You will have to get through the riddle-game first.";
+      }
+      if (this.player.noticeable === false) return "";
+      return "Gollum is waiting by the way north, clawing at the stones and hunting for his precious. You will need better concealment to slip past him.";
+    }
+
     move(direction) {
       const candidates = this.connectionsFrom(this.currentRoom).filter((connection) => connection.direction === direction);
       if (!candidates.length) {
         this.print('That direction is not recognized. Type "go <direction>" or "go through <door name>".');
+        return false;
+      }
+      const gollumBlock = this.gollumBlocksDirection(direction);
+      if (gollumBlock) {
+        this.print(gollumBlock);
         return false;
       }
       const connection = candidates.find((candidate) => this.canTravelConnection(candidate)) || candidates[0];
@@ -3298,6 +4047,10 @@
       const previousRoom = this.currentRoom;
       this.currentRoom = connection.to;
       this.player.position = connection.to;
+      if (previousRoom === "deep_dark_lake" && this.gollumState?.pocketQuestionAsked && this.player.noticeable === false && !this.gollumState.escaped) {
+        this.gollumState.escaped = true;
+        this.print("Invisible under the ring, you slip past Gollum as he claws wildly about for his precious.");
+      }
       this.moveFollowers(previousRoom, connection.to, direction);
       if (this.commandIssuer) {
         this.print(`${this.player.name} goes ${direction}.`);
@@ -3331,6 +4084,7 @@
         if (character.id === this.player.id) continue;
         if (character.carriedBy) continue;
         if (character.movementMode !== "follow") continue;
+        if (this.isLooseFollower(character)) continue;
         if (!character.visible || character.position !== fromRoom) continue;
         if (this.characterCannotFollowVertical(character, direction)) continue;
         if (this.shouldHoldBardNearDale(character, toRoom)) continue;
@@ -3363,8 +4117,50 @@
       return true;
     }
 
+    isLooseFollower(character) {
+      return character?.id === "gandalf";
+    }
+
+    decideLooseFollowerMovement(character, options = {}) {
+      const { forceMove = false } = options;
+      if (!character.position) return;
+      if (this.player.noticeable === false) {
+        if (!forceMove && Math.random() >= 0.08) return;
+        const exits = shuffled(this.connectionsFrom(character.position));
+        for (const connection of exits) {
+          if (!this.canTravelConnection(connection)) continue;
+          this.moveCharacter(character, connection.to, connection.direction);
+          return;
+        }
+        return;
+      }
+      if (character.position === this.currentRoom) return;
+
+      const currentDistance = this.findTravelDistance(character.position, this.currentRoom);
+      if (currentDistance >= 99) return;
+      const moveChance = forceMove ? 1 : currentDistance <= 1 ? 0.35 : currentDistance === 2 ? 0.55 : 0.8;
+      if (Math.random() >= moveChance) return;
+
+      const exits = shuffled(this.connectionsFrom(character.position)).filter((connection) => this.canTravelConnection(connection));
+      let bestDistance = currentDistance;
+      let candidates = [];
+      for (const connection of exits) {
+        const distance = this.findTravelDistance(connection.to, this.currentRoom);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          candidates = [connection];
+        } else if (distance === bestDistance) {
+          candidates.push(connection);
+        }
+      }
+      const choice = (candidates.length ? candidates : exits)[0];
+      if (!choice) return;
+      this.moveCharacter(character, choice.to, choice.direction);
+    }
+
     advanceCharacterTurn(options = {}) {
       const { forceMove = false } = options;
+      this.turnCount += 1;
       this.updateRingTimers();
       this.updateLanternTimer();
       for (const character of this.peopleInRoom()) {
@@ -3374,8 +4170,10 @@
         if (character.id === this.player.id) continue;
         if (this.maybeAutoAttack(character)) continue;
         if (this.maybeCharacterInitiative(character)) continue;
+        if (this.maybeAmbientCharacterSpeech(character)) continue;
         this.decideCharacterMovement(character, { forceMove });
       }
+      this.unexpectedParty?.advanceTurn();
     }
 
     maybeCharacterInitiative(character) {
@@ -3400,6 +4198,7 @@
       if (matches(character.name, "gandalf")) return this.gandalfInitiative(character);
       if (matches(character.name, "thorin")) return this.thorinInitiative(character);
       if (matches(character.name, "elrond")) return this.elrondInitiative(character);
+      if (matches(character.name, "beorn")) return this.beornInitiative(character);
       if (matches(character.name, "bard")) return this.bardInitiative(character);
       if (matches(character.name, "wood elf")) {
         return {
@@ -3414,6 +4213,81 @@
         };
       }
       return null;
+    }
+
+    maybeAmbientCharacterSpeech(character) {
+      if (!character.visible || character.carriedBy || character.position !== this.currentRoom) return false;
+      if (character.id === this.player.id || this.player.noticeable === false) return false;
+
+      let lines = null;
+      if (matches(character.name, "elrond") && this.currentRoom === "rivendell") lines = ELROND_AMBIENT_LINES;
+      if (matches(character.name, "beorn") && this.currentRoom === "beorns_house") lines = BEORN_AMBIENT_LINES;
+      if (!lines?.length) return false;
+
+      const cooldownKey = `ambientcooldown_${character.id}`;
+      if ((this.flags[cooldownKey] || 0) > this.turnCount) return false;
+
+      const seed = hashString(`${character.id}:${this.turnCount}:${this.currentRoom}`);
+      const line = lines[Math.abs(seed) % lines.length];
+      this.flags[cooldownKey] = this.turnCount + 4 + (Math.abs(seed) % 3);
+      this.print(`${character.name} says '${line}'`);
+      return true;
+    }
+
+    gandalfAmbientKeyForRoom(roomId) {
+      if (!roomId) return null;
+      if (["hobbit_hole", "bilbos_garden"].includes(roomId)) return "bag_end";
+      if (["green_dragon_inn", "green_dragon_inn_outside"].includes(roomId)) return "green_dragon";
+      if (["trolls_clearing", "hidden_path", "trolls_cave"].includes(roomId)) return "trolls";
+      if (roomId === "rivendell") return "rivendell";
+      if (
+        ["misty_mountain", "narrow_place", "large_dry_cave"].includes(roomId)
+        || /^narrow_path_\d+$/.test(roomId)
+        || /^steep_path_\d+$/.test(roomId)
+        || /^deep_misty_valley_\d+$/.test(roomId)
+      ) return "mountains";
+      if (
+        ["goblins_dungeon", "dark_winding_passage", "big_cavern", "inside_goblins_gate", "outside_goblins_gate", "narrow_dangerous_path"].includes(roomId)
+        || /^dark_stuffy_passage_\d+$/.test(roomId)
+      ) return "goblins";
+      if (roomId === "deep_dark_lake") return "deep_lake";
+      if (roomId === "beorns_house") return "beorn";
+      if (roomId === "gate_to_mirkwood") return "mirkwood_gate";
+      if (["place_of_black_spiders", "forest_of_tangled_smothering_trees"].includes(roomId)) return "spiders";
+      if (["elvish_clearing", "elvenkings_halls", "dark_dungeon", "cellar"].includes(roomId)) return "elves";
+      if (["long_lake", "wooden_town", "strong_river"].includes(roomId)) return "laketown";
+      if (["bleak_barren_land", "ruins_of_the_town_of_dale", "stoe_of_ravenhill"].includes(roomId)) return "dale";
+      if (["front_gate", "little_steep_bay"].includes(roomId)) return "front_gate";
+      if (["lower_halls", "smooth_straight_passage", "empty_place"].includes(roomId)) return "mountain_halls";
+      if (roomId === "lonely_mountain") return "lonely_mountain";
+      if ([
+        "forest_river",
+        "forest_road",
+        "forest_road_2",
+        "forest",
+        "waterfall",
+        "running_river",
+        "bewitched_gloomy_place",
+        "west_bank",
+        "east_bank",
+        "green_forest",
+        "deep_bog",
+        "treeless_opening",
+        "great_river",
+        "mountains",
+      ].includes(roomId)) return "mirkwood";
+      return null;
+    }
+
+    gandalfAmbientInitiative() {
+      const key = this.gandalfAmbientKeyForRoom(this.currentRoom);
+      const lines = key && GANDALF_AMBIENT_LINES[key];
+      if (!key || !lines?.length) return null;
+      const seed = hashString(`gandalf-ambient:${key}:${this.currentRoom}`);
+      return {
+        flag: `initiative_gandalf_ambient_${key}`,
+        message: `Gandalf says '${lines[Math.abs(seed) % lines.length]}'`,
+      };
     }
 
     gandalfInitiative(character) {
@@ -3435,7 +4309,7 @@
           message: "Gandalf eyes the pipe and says 'A wizard never objects to a good pipe, though the road needs your courage more.'",
         };
       }
-      return null;
+      return this.gandalfAmbientInitiative();
     }
 
     thorinInitiative(character) {
@@ -3489,6 +4363,23 @@
         return {
           flag: "initiative_elrond_lunch",
           message: "Elrond says 'Road-worn minds hear counsel better after rest and food.'",
+        };
+      }
+      return null;
+    }
+
+    beornInitiative(character) {
+      if (this.currentRoom !== "beorns_house") return null;
+      if (!this.flags.initiative_beorn_warning) {
+        return {
+          flag: "initiative_beorn_warning",
+          message: "Beorn says 'Keep to the path in Mirkwood. The wood is black-hearted, and an old hunger walks beneath its boughs.'",
+        };
+      }
+      if ((this.player.strength || 0) < 6 && !this.flags.initiative_beorn_food) {
+        return {
+          flag: "initiative_beorn_food",
+          message: "Beorn eyes your weariness and says 'A hungry traveler thinks poorly. There is food in this house, if you have the sense to look for it.'",
         };
       }
       return null;
@@ -3551,6 +4442,7 @@
 
     maybeAutoAttack(character) {
       if (!character.visible || character.position !== this.currentRoom) return false;
+      if (matches(character.name, "gollum") && this.currentRoom === "deep_dark_lake" && !this.gollumState?.enraged) return false;
       if (character.friendly !== false || (character.attackFlag || 0) < 2) return false;
       const target = this.peopleInRoom().find((candidate) => {
         if (candidate.id === character.id || !candidate.visible || candidate.noticeable === false) return false;
@@ -3565,6 +4457,7 @@
     decideCharacterMovement(character, options = {}) {
       const { forceMove = false } = options;
       if (!character.visible || character.carriedBy || character.movementMode === "never") return;
+      if (this.isLooseFollower(character)) return this.decideLooseFollowerMovement(character, { forceMove });
       if (character.movementMode === "on_first_meet" && !character.hasMetPlayer) {
         if (character.position !== this.currentRoom) return;
         character.hasMetPlayer = true;
@@ -3808,8 +4701,32 @@
     }
 
     checkSpecialSituations() {
+      this.checkGollumEncounter();
       this.checkKidnapping();
       this.checkTrollsClearing();
+    }
+
+    checkGollumEncounter() {
+      if (this.currentRoom !== "deep_dark_lake") return;
+      if (!this.gollumState) this.gollumState = this.createGollumState();
+      const gollum = this.currentGollum();
+      if (!gollum || !gollum.visible) return;
+
+      if (!this.gollumState.met) {
+        this.gollumState.met = true;
+        gollum.friendly = "neutral";
+        if (this.ensureLakeRingInPocket()) {
+          this.print("Groping beside the water in the dark, your fingers close around a small cold ring. Almost without thinking, you slip it into your pocket.");
+        }
+        this.print("A small boat glides out across the black water. In it crouches Gollum, pale eyes shining in the dark.");
+        this.print("Gollum whispers 'What is it, my precious? Lost, is it? Hungry, is it?'");
+        this.print("For the moment he seems more curious than murderous. Riddles may yet buy you time.");
+        return;
+      }
+
+      if (this.gollumState.pocketQuestionAsked && this.player.noticeable !== false) {
+        this.print("Gollum prowls between you and the northern passage, sniffing for the ring.");
+      }
     }
 
     checkTrollsClearing() {
@@ -3890,6 +4807,8 @@
       if (!character) return this.print("You speak, but only silence meets your words.");
       if (character.friendly === false) return this.respondToTalk(character);
       if (this.player.name === "You" && this.player.noticeable === false) return this.print(`${character.name} says 'who's talking?'`);
+      if (this.unexpectedParty?.blocksDirectInteraction(character, parsed.order ? "order" : "talk")) return;
+      if (matches(character.name, "gollum") && parsed.order && this.handleGollumSpeech(parsed.order)) return;
       if (parsed.order) {
         this.rememberConversationCharacter(character);
         this.rememberReferencedCharacter(parsed.order);
@@ -3898,6 +4817,8 @@
         return;
       }
       this.rememberConversationCharacter(character);
+      const special = this.specialTalkResponse(character);
+      if (special) return this.print(special);
       this.print(`${character.name} listens intently, expecting your words.`);
     }
 
@@ -3919,6 +4840,11 @@
     }
 
     respondToTalk(character) {
+      if (matches(character.name, "gollum") && this.currentRoom === "deep_dark_lake") {
+        if (this.gollumState?.pocketQuestionAsked) return this.print("Gollum is no longer listening. He is hunting for his precious.");
+        const line = this.beginGollumRiddleContest() || "Gollum watches you in silence from the dark water.";
+        return this.print(line);
+      }
       this.print(`${character.name} glares at you, unimpressed.`);
     }
 

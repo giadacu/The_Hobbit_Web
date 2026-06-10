@@ -717,7 +717,7 @@ window.HOBBIT_DATA = {
     "top_drawer": {
       "id": "top_drawer",
       "name": "top drawer",
-      "description": "top drawer",
+      "description": "the top drawer",
       "container": true,
       "keyFor": null,
       "portable": false,
@@ -857,7 +857,7 @@ window.HOBBIT_DATA = {
     "middle_drawer": {
       "id": "middle_drawer",
       "name": "middle drawer",
-      "description": "middle drawer",
+      "description": "the middle drawer",
       "container": true,
       "keyFor": null,
       "portable": false,
@@ -917,7 +917,7 @@ window.HOBBIT_DATA = {
     "bottom_drawer": {
       "id": "bottom_drawer",
       "name": "bottom drawer",
-      "description": "bottom drawer",
+      "description": "the bottom drawer",
       "container": true,
       "keyFor": null,
       "portable": false,
@@ -2327,7 +2327,7 @@ window.HOBBIT_DATA = {
       "friendly": true,
       "strength": 10,
       "position": null,
-      "movementMode": "always",
+      "movementMode": "follow",
       "visible": true
     },
     "thorin": {
@@ -2353,6 +2353,15 @@ window.HOBBIT_DATA = {
       "name": "Elrond",
       "friendly": "neutral",
       "strength": 9,
+      "position": null,
+      "movementMode": "never",
+      "visible": true
+    },
+    "beorn": {
+      "id": "beorn",
+      "name": "Beorn",
+      "friendly": "neutral",
+      "strength": 12,
       "position": null,
       "movementMode": "never",
       "visible": true
@@ -4078,7 +4087,7 @@ window.HOBBIT_DATA = {
       "item": "curtain"
     },
     {
-      "room": "dark_stuffy_passage_9",
+      "room": "deep_dark_lake",
       "item": "golden_ring"
     },
     {
@@ -4356,6 +4365,10 @@ window.HOBBIT_DATA = {
       "character": "elrond"
     },
     {
+      "room": "beorns_house",
+      "character": "beorn"
+    },
+    {
       "room": "cellar",
       "character": "butler"
     },
@@ -4368,7 +4381,7 @@ window.HOBBIT_DATA = {
       "character": "gollum"
     },
     {
-      "room": "deep_dark_lake",
+      "room": "dark_stuffy_passage_15",
       "character": "hideous_goblin"
     },
     {
@@ -4808,6 +4821,18 @@ window.HOBBIT_DATA = {
       "Dark dungeon": [
         "It's dark in here. Maybe you need a light source.",
         "Look for hidden passages or objects that can help you escape."
+      ],
+      "Rivendell": [
+        "Elrond may have useful thoughts about old maps, secret doors, and moon-letters.",
+        "If Elrond is here, try talking to him or asking about the map."
+      ],
+      "Beorns House": [
+        "Beorn is no courtier, but he respects plain speech.",
+        "Rest, food, and warnings about Mirkwood may all be found here."
+      ],
+      "Deep Dark Lake": [
+        "Gollum values riddles more than courtesy.",
+        "Try 'ask gollum a riddle', then answer carefully. If things turn ill, the ring may help you slip away."
       ]
     }
   },
