@@ -167,6 +167,56 @@ const cases = [
     expected: ["bring me glass of water"],
   },
   {
+    name: "have person do action",
+    input: "Have Bard shoot the dragon.",
+    expected: ["ask bard to shoot dragon"],
+  },
+  {
+    name: "say to person to act",
+    input: "Say to Bard to shoot the dragon.",
+    expected: ["ask bard to shoot dragon"],
+  },
+  {
+    name: "vocative modal delegated action",
+    input: "Bard, can you shoot the dragon?",
+    expected: ["ask bard to shoot dragon"],
+  },
+  {
+    name: "vocative modal with filler phrase",
+    input: "Gandalf, could you take a look at the map?",
+    expected: ["ask gandalf to look at map"],
+  },
+  {
+    name: "vocative have a look phrase",
+    input: "Gandalf, have a look at the map.",
+    expected: ["ask gandalf to look at map"],
+  },
+  {
+    name: "vocative would you mind phrase",
+    input: "Gandalf, would you mind following me?",
+    expected: ["ask gandalf to follow me"],
+  },
+  {
+    name: "show person item natural order",
+    input: "Could you show Gandalf the map?",
+    expected: ["show map to gandalf"],
+  },
+  {
+    name: "give me item back natural order",
+    input: "Gandalf, can you give me the map back?",
+    expected: ["ask gandalf to give map to me"],
+  },
+  {
+    name: "delegated trailing for me is dropped",
+    input: "Gandalf, could you open the round green door for me?",
+    expected: ["ask gandalf to open round green door"],
+  },
+  {
+    name: "bard loose the arrow phrasing",
+    input: "Bard, loose the arrow!",
+    expected: ["ask bard to take shot"],
+  },
+  {
     name: "ask about topic",
     input: "Ask Thorin about the treasure.",
     expected: ["ask thorin about treasure"],
@@ -247,6 +297,36 @@ const cases = [
     expected: ["follow gandalf into tunnel", "light lantern"],
   },
   {
+    name: "take a look filler phrase",
+    input: "Take a look at the chest.",
+    expected: ["look at chest"],
+  },
+  {
+    name: "take a look through filler phrase",
+    input: "Tell Thorin to take a look through the window.",
+    expected: ["ask thorin to look through window"],
+  },
+  {
+    name: "open up filler phrase",
+    input: "Open up the chest.",
+    expected: ["open chest"],
+  },
+  {
+    name: "head direction alias",
+    input: "Head north.",
+    expected: ["north"],
+  },
+  {
+    name: "head back inside alias",
+    input: "Head back inside.",
+    expected: ["back inside"],
+  },
+  {
+    name: "pick back up filler phrase",
+    input: "Pick the key back up.",
+    expected: ["take key"],
+  },
+  {
     name: "steal from and return",
     input: "Steal the cup from Smaug and return to the dwarves.",
     expected: ["steal cup from smaug", "return to dwarves"],
@@ -257,9 +337,19 @@ const cases = [
     expected: ["ask bard about secret door", "follow bard"],
   },
   {
+    name: "give back to person",
+    input: "Give the map back to Gandalf.",
+    expected: ["give map to gandalf"],
+  },
+  {
     name: "give then tell pronoun",
     input: "Give the Arkenstone to Bard and tell him to negotiate with Thorin.",
     expected: ["give arkenstone to bard", "ask bard to negotiate with thorin"],
+  },
+  {
+    name: "give pronouns keep object and recipient",
+    inputs: ["Give the key to Thorin.", "Hand it to him."],
+    expected: ["give key to thorin", "hand key to thorin"],
   },
   {
     name: "mend object",
@@ -442,9 +532,9 @@ const originalListCases = [
   ["Ask Bard for help.", ["ask bard for help"]],
   ["Follow Bard.", ["follow bard"]],
   ["Tell Bard about Smaug.", ["ask bard about smaug"]],
-  ["Show Bard the secret map.", ["show bard secret map"]],
+  ["Show Bard the secret map.", ["show secret map to bard"]],
   ["Ask Bard to negotiate with Thorin.", ["ask bard to negotiate with thorin"]],
-  ["Give Bard the treasure.", ["give bard treasure"]],
+  ["Give Bard the treasure.", ["give treasure to bard"]],
   ["Thank Bard.", ["thank bard"]],
   ["Ask Bard about Lake-town.", ["ask bard about lake-town"]],
   ["Ask Gandalf to tell Thorin to follow me.", ["ask gandalf to tell thorin to follow me"]],
@@ -725,6 +815,101 @@ const gameCases = [
     notExpectedIncluded: ["You are in a beautiful garden, amidst verdant foliage and blossoms bright."],
   },
   {
+    name: "vocative modal order to thorin works naturally",
+    setup(game) {
+      game.currentRoom = "green_dragon_inn";
+      game.player.position = "green_dragon_inn";
+      placeCharacterWithPlayer(game, "thorin");
+    },
+    inputs: ["Thorin, could you take a look through the window?"],
+    expectedIncluded: [
+      "Thorin stretches to reach the window.",
+      "He peers through the window, his eyes narrowing, but it's too dark to see anything.",
+    ],
+    notExpectedIncluded: ["I don't see that here."],
+  },
+  {
+    name: "vocative trailing for me still performs delegated action",
+    inputs: ["Gandalf, could you open the round green door for me?"],
+    expectedIncluded: ["Gandalf opens the round green door."],
+    notExpectedIncluded: ["I don't see that here."],
+  },
+  {
+    name: "vocative modal order to bard can slay dragon",
+    setup(game) {
+      game.currentRoom = "lower_halls";
+      game.player.position = "lower_halls";
+      placeCharacterWithPlayer(game, "bard");
+      game.characters.bard.movementMode = "follow";
+      game.flags.bardreadiedarrow = true;
+      game.flags.dragondefeated = false;
+      game.characters.red_golden_dragon.position = "lower_halls";
+      game.characters.red_golden_dragon.visible = true;
+    },
+    inputs: ["Bard, can you shoot the dragon?"],
+    expectedIncluded: ["Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky."],
+    notExpectedIncluded: ["I'm not sure how to do that.", "The red golden dragon attacks you."],
+  },
+  {
+    name: "bard understands take the shot phrasing",
+    setup(game) {
+      game.currentRoom = "lower_halls";
+      game.player.position = "lower_halls";
+      placeCharacterWithPlayer(game, "bard");
+      game.characters.bard.movementMode = "follow";
+      game.flags.bardreadiedarrow = true;
+      game.flags.dragondefeated = false;
+      game.characters.red_golden_dragon.position = "lower_halls";
+      game.characters.red_golden_dragon.visible = true;
+    },
+    inputs: ["Bard, can you take the shot?"],
+    expectedIncluded: ["Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky."],
+    notExpectedIncluded: ["I'm not sure how to do that.", "I don't see that here."],
+  },
+  {
+    name: "bard understands loose the arrow phrasing",
+    setup(game) {
+      game.currentRoom = "lower_halls";
+      game.player.position = "lower_halls";
+      placeCharacterWithPlayer(game, "bard");
+      game.characters.bard.movementMode = "follow";
+      game.flags.bardreadiedarrow = true;
+      game.flags.dragondefeated = false;
+      game.characters.red_golden_dragon.position = "lower_halls";
+      game.characters.red_golden_dragon.visible = true;
+    },
+    inputs: ["Bard, loose the arrow!"],
+    expectedIncluded: ["Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky."],
+    notExpectedIncluded: ["I'm not sure how to do that.", "I don't see that here."],
+  },
+  {
+    name: "bard understands fire at dragon phrasing",
+    setup(game) {
+      game.currentRoom = "lower_halls";
+      game.player.position = "lower_halls";
+      placeCharacterWithPlayer(game, "bard");
+      game.characters.bard.movementMode = "follow";
+      game.flags.bardreadiedarrow = true;
+      game.flags.dragondefeated = false;
+      game.characters.red_golden_dragon.position = "lower_halls";
+      game.characters.red_golden_dragon.visible = true;
+    },
+    inputs: ["Ask Bard to fire at the dragon."],
+    expectedIncluded: ["Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky."],
+    notExpectedIncluded: ["I'm not sure how to do that."],
+  },
+  {
+    name: "delegated modal grammar stays natural",
+    setup(game) {
+      game.currentRoom = "bilbos_garden";
+      game.player.position = "bilbos_garden";
+      placeCharacterWithPlayer(game, "gandalf");
+    },
+    inputs: ["Gandalf, can you trim the rose bush with the pruner?"],
+    expectedIncluded: ["Gandalf would need something sharp to trim the rose bush."],
+    notExpectedIncluded: ["Gandalf woulds need something sharp to trim the rose bush."],
+  },
+  {
     name: "following npc stays with player across rooms",
     inputs: ["tell gandalf to follow me", "open the door", "go outside"],
     expectedIncluded: [
@@ -800,6 +985,114 @@ const gameCases = [
       "You light the elegant lamp. Its engraved metal catches the warm glow.",
       "You unstopper the dark glass inkwell.",
       "You stopper the dark glass inkwell.",
+    ],
+  },
+  {
+    name: "delegated container transfers work for npc",
+    setup(game) {
+      placeCharacterWithPlayer(game, "gandalf");
+      game.items.ornate_box.location = { type: "room", id: game.player.position };
+      game.items.ornate_box.visible = true;
+      game.items.ornate_box.open = true;
+      game.items.heavy_wooden_chest.location = { type: "room", id: game.player.position };
+      game.items.heavy_wooden_chest.visible = true;
+      game.items.heavy_wooden_chest.open = true;
+      game.items.heavy_wooden_chest.locked = false;
+      giveItemToCharacter(game, "small_key", "gandalf");
+    },
+    inputs: [
+      "Gandalf, put the small key in the ornate box",
+      "Gandalf, take the small key out of the ornate box",
+      "Gandalf, put it in the chest",
+      "Gandalf, take it out of the chest",
+    ],
+    expectedIncluded: [
+      "Gandalf puts the small key in the ornate box.",
+      "Gandalf takes the small key from the ornate box.",
+      "Gandalf puts the small key in the heavy wooden chest.",
+      "Gandalf takes the small key from the heavy wooden chest.",
+    ],
+    notExpectedIncluded: [
+      "I don't see that here.",
+      "Gandalf dons't have the it.",
+    ],
+  },
+  {
+    name: "delegated held item grammar stays correct when player has object",
+    setup(game) {
+      placeCharacterWithPlayer(game, "gandalf");
+      game.items.small_key.location = { type: "character", id: game.player.id };
+      if (!game.player.inventory.includes("small_key")) game.player.inventory.push("small_key");
+    },
+    inputs: ["Gandalf, drop the small key"],
+    expectedIncluded: ["You are carrying the small key."],
+    notExpectedIncluded: ["You is carrying the small key."],
+  },
+  {
+    name: "delegated missing item grammar keeps contractions correct",
+    setup(game) {
+      placeCharacterWithPlayer(game, "gandalf");
+    },
+    inputs: ["Gandalf, drop the small key"],
+    expectedIncluded: ["Gandalf doesn't have the small key."],
+    notExpectedIncluded: ["Gandalf dons't have the small key."],
+  },
+  {
+    name: "delegated npc can give item to another npc",
+    setup(game) {
+      placeCharacterWithPlayer(game, "gandalf");
+      placeCharacterWithPlayer(game, "thorin");
+      giveItemToCharacter(game, "small_key", "gandalf");
+    },
+    inputs: ["Gandalf, give the small key to Thorin", "Thorin, give it to me"],
+    expectedIncluded: [
+      "Gandalf gives the small key to Thorin.",
+      "Thorin gives the small key to You.",
+    ],
+    notExpectedIncluded: [
+      "There is no one named thorin here.",
+      "Gandalf does not have the small key.",
+    ],
+  },
+  {
+    name: "delegated npc transfer pronouns keep recipient character",
+    setup(game) {
+      placeCharacterWithPlayer(game, "gandalf");
+      placeCharacterWithPlayer(game, "thorin");
+      giveItemToCharacter(game, "small_key", "gandalf");
+    },
+    inputs: [
+      "Gandalf, give the small key to Thorin",
+      "Gandalf, take the small key from Thorin",
+      "Gandalf, hand it to him",
+    ],
+    expectedIncluded: [
+      "Gandalf gives the small key to Thorin.",
+      "Gandalf takes the small key from Thorin.",
+      "Gandalf gives the small key to Thorin.",
+    ],
+    notExpectedIncluded: [
+      "There is no one named key here.",
+      "Thorin gives you the small key.",
+    ],
+  },
+  {
+    name: "delegated npc transfer chain can move item between companions",
+    setup(game) {
+      placeCharacterWithPlayer(game, "gandalf");
+      placeCharacterWithPlayer(game, "thorin");
+      placeCharacterWithPlayer(game, "bard");
+      giveItemToCharacter(game, "small_key", "thorin");
+    },
+    inputs: ["Gandalf, take the small key from Thorin and give it to Bard"],
+    expectedIncluded: [
+      "Gandalf takes the small key from Thorin.",
+      "Gandalf gives the small key to Bard.",
+    ],
+    notExpectedIncluded: [
+      "Thorin gives you the small key.",
+      "There is no one named key here.",
+      "Gandalf does not have the small key.",
     ],
   },
   {

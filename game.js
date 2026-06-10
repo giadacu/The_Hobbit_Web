@@ -130,6 +130,10 @@
         tell: "ask",
       };
       this.adverbs = (data.parser.adverbs || []).filter((adverb) => adverb !== "next");
+      this.knownCharacterNames = Object.values(data.characters || {})
+        .map((character) => normalize(character?.name))
+        .filter((name) => name && name !== "you")
+        .sort((a, b) => b.length - a.length);
       this.lastAdverb = null;
       this.lastObject = null;
       this.lastDirectObject = null;
@@ -141,6 +145,7 @@
       command = normalizeNaturalCommand(command);
       command = normalizeVocativeCommand(command, this.verbs);
       command = normalizeDelegatedTellCommand(command, this.verbs);
+      command = this.normalizeCharacterObjectOrder(command);
       command = command.replace(/\bthe\b\s*/gi, "").replace(/\ba\b\s*/gi, "");
       this.lastAdverb = null;
       for (const adverb of this.adverbs) {
@@ -168,7 +173,10 @@
         const askToIndex = currentVerb === "ask" ? words.indexOf("to") : -1;
         words = words.map((word, wordIndex) => {
           if (askToIndex >= 0 && wordIndex > askToIndex) return word;
-          if (["it", "him", "her", "one"].includes(word) && (this.lastDirectObject || this.lastTargetObject)) {
+          if (["him", "her"].includes(word) && (this.lastTargetObject || this.lastDirectObject)) {
+            return this.lastTargetObject || this.lastDirectObject;
+          }
+          if (["it", "one"].includes(word) && (this.lastDirectObject || this.lastTargetObject)) {
             const directVerbs = new Set(["take", "get", "retrieve", "wear", "remove", "eat", "drink", "catch", "borrow", "give", "show", "hand", "pass", "bring", "send", "return", "deliver", "put", "drop", "leave", "place", "set", "store", "hide", "open", "close", "throw", "combine"]);
             if (word === "one" || directVerbs.has(currentVerb)) return this.lastDirectObject || this.lastTargetObject;
             return this.lastTargetObject || this.lastDirectObject;
@@ -199,9 +207,24 @@
       return result.length ? result : [command];
     }
 
+    normalizeCharacterObjectOrder(command) {
+      const match = String(command || "").match(/^(show|give|hand|pass|bring|send|return|deliver)\s+(.+)$/);
+      if (!match) return command;
+      const verb = match[1];
+      const rest = match[2].trim();
+      if (!rest || /^(?:to|at|into|me\b|you\b)/.test(rest)) return command;
+      for (const name of this.knownCharacterNames) {
+        if (!rest.startsWith(`${name} `)) continue;
+        const item = rest.slice(name.length).trim();
+        if (!item) continue;
+        return `${verb} ${item} to ${name}`;
+      }
+      return command;
+    }
+
     rememberObjects(verb, object) {
       const words = object.split(/\s+/).filter(Boolean);
-      const prepositions = new Set(["in", "on", "at", "to", "with", "for", "from", "into", "inside", "under", "behind", "beside", "near", "about", "where", "whether", "if", "that", "past"]);
+      const prepositions = new Set(["in", "on", "at", "to", "with", "for", "from", "into", "inside", "under", "behind", "beside", "near", "about", "where", "whether", "if", "that", "past", "out", "off"]);
       let direct = [];
       let target = [];
       for (let index = 0; index < words.length; index += 1) {
@@ -252,6 +275,8 @@
       this.commandIssuer = null;
       this.lastConversationCharacterId = null;
       this.lastReferencedCharacterId = null;
+      this.delegatedSplitters = new Map();
+      this.sharedDelegatedContext = { lastObject: null, lastDirectObject: null, lastTargetObject: null };
       this.autoplayRunning = false;
       this.autoplayTimer = null;
       this.autoplayTypingTimer = null;
@@ -738,6 +763,10 @@
       return this.connectionsFromVisible(this.currentRoom);
     }
 
+    visiblePeopleInRoom() {
+      return this.peopleInRoom().filter((character) => !character.carriedBy);
+    }
+
     connectionsFromVisible(roomId) {
       const seen = new Set();
       return this.connectionsFrom(roomId).filter((connection) => {
@@ -769,7 +798,7 @@
         .join(" ");
       const objects = this.itemsInRoom(this.currentRoom).filter((item) => item.visible);
       const objectText = objects.length ? `You see: ${objects.map((item) => this.describeItemShort(item)).join(", ")}.` : "";
-      const people = this.peopleInRoom().filter((p) => p.name !== "You" && p.visible);
+      const people = this.visiblePeopleInRoom().filter((p) => p.name !== "You" && p.visible);
       const arrivingPeople = people.filter((p) => p.justEntered);
       const peopleText = people.filter((p) => !p.justEntered).map((p) => this.characterPresence(p)).join(" ");
       const detailsText = showFullDetails
@@ -827,11 +856,10 @@
         if (!currentSrc) this.revealRoomImage(src);
         roomImage.alt = room.name;
       }
-      const carriedCharacters = Object.values(this.characters).filter((character) => character.carriedBy === this.player.id).map((character) => character.name);
-      fillList(inventoryList, [...this.player.inventory.map((id) => this.inventorySidebarLabel(this.items[id])).filter(Boolean), ...carriedCharacters], "nothing");
+      fillList(inventoryList, this.player.inventory.map((id) => this.inventorySidebarLabel(this.items[id])).filter(Boolean), "nothing");
       if (inventoryStatus) inventoryStatus.textContent = `Weight ${this.currentCarryWeight()}/${this.carryCapacity()}`;
       fillList(exitsList, this.roomConnections().map((c) => c.direction), "none");
-      fillList(peopleList, this.peopleInRoom().filter((p) => p.name !== "You" && p.visible).map((p) => p.name), "none");
+      fillList(peopleList, this.visiblePeopleInRoom().filter((p) => p.name !== "You" && p.visible).map((p) => p.name), "none");
     }
 
     revealRoomImage(src) {
@@ -964,7 +992,26 @@
       const held = this.findVisibleCharacterHolding(objectName);
       if (!held) return "";
       const verb = held.worn ? "wearing" : "carrying";
+      if (held.character.name === "You") return `You are ${verb} the ${held.item.name}.`;
       return `${held.character.name} is ${verb} the ${held.item.name}.`;
+    }
+
+    findItemInsideContainer(container, itemName) {
+      if (!container?.container) return null;
+      const name = normalize(itemName);
+      const scan = (itemIds, parent) => {
+        for (const id of itemIds || []) {
+          const item = this.items[id];
+          if (!item) continue;
+          if (matches(item.name, name)) return { item, parent };
+          if (item.container && (item.open || item.noLid)) {
+            const nested = scan(item.contents, item);
+            if (nested) return nested;
+          }
+        }
+        return null;
+      };
+      return scan(container.contents, container);
     }
 
     findDoor(name) {
@@ -1077,13 +1124,44 @@
     take(objectName) {
       if (!objectName) return this.print("What would you like to take?");
       if (objectName.includes("door")) return this.print(`You cannot take the ${objectName}.`);
+      const outOfMatch = normalize(objectName).match(/^(.+?)\s+out\s+of\s+(.+)$/);
+      if (outOfMatch) {
+        const itemName = outOfMatch[1].trim();
+        const container = this.visibleSearch(outOfMatch[2].trim(), { closedContainers: true })?.item;
+        if (!container || !container.container) return this.print("I don't see that here.");
+        if (!container.open && !container.noLid) return this.print(`The ${container.name} is closed.`);
+        const nested = this.findItemInsideContainer(container, itemName);
+        if (!nested) return this.print("I don't see that here.");
+        const item = nested.item;
+        if (item.weight > this.player.strength * 5) return this.print(`The ${item.name} is too heavy to take.`);
+        if (!this.canCarryAdditionalWeight(item.weight || 0)) return this.print(this.carryTooMuchMessage(item));
+        this.detachItem(item.id);
+        item.location = { type: "character", id: this.player.id };
+        this.player.inventory.push(item.id);
+        if (matches(item.name, "treasure")) this.flags.treasuretaken = true;
+        return this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "take")} the ${item.name} from the ${container.name}.`);
+      }
       const fromMatch = objectName.split(" from ");
       const request = parseAllTarget(fromMatch[0]);
       const targetName = normalize(request.target);
       if (request.all) return this.takeAll(targetName);
       if (fromMatch.length === 2) {
         const character = this.resolveCharacterTarget(fromMatch[1]);
-        if (character) return this.receiveItemFromCharacter(character, targetName);
+        if (character) return this.takeItemFromCharacter(character, targetName);
+        const container = this.visibleSearch(fromMatch[1], { closedContainers: true })?.item;
+        if (container?.container) {
+          if (!container.open && !container.noLid) return this.print(`The ${container.name} is closed.`);
+          const nested = this.findItemInsideContainer(container, targetName);
+          if (!nested) return this.print("I don't see that here.");
+          const item = nested.item;
+          if (item.weight > this.player.strength * 5) return this.print(`The ${item.name} is too heavy to take.`);
+          if (!this.canCarryAdditionalWeight(item.weight || 0)) return this.print(this.carryTooMuchMessage(item));
+          this.detachItem(item.id);
+          item.location = { type: "character", id: this.player.id };
+          this.player.inventory.push(item.id);
+          if (matches(item.name, "treasure")) this.flags.treasuretaken = true;
+          return this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "take")} the ${item.name} from the ${container.name}.`);
+        }
       }
       const found = this.visibleSearch(targetName);
       if (!found) {
@@ -1123,6 +1201,22 @@
       character.followingPlayer = false;
       character.justEntered = false;
       this.print(actorizeSecondPerson(this.player, `You pick up ${character.name}.`));
+    }
+
+    characterCannotFollowVertical(character, direction) {
+      return matches(character?.name, "bard") && ["up", "down"].includes(normalize(direction));
+    }
+
+    releaseCarriedCharacter(character, { follow = false, message = "" } = {}) {
+      if (!character) return;
+      character.carriedBy = null;
+      character.position = this.currentRoom;
+      character.justEntered = false;
+      if (follow) {
+        character.movementMode = "follow";
+        character.followingPlayer = true;
+      }
+      if (message) this.print(message);
     }
 
     takeAll(objectName) {
@@ -1198,10 +1292,9 @@
     }
 
     dropCharacter(character) {
-      character.carriedBy = null;
-      character.position = this.currentRoom;
-      character.justEntered = false;
-      this.print(actorizeSecondPerson(this.player, `You put ${character.name} down.`));
+      this.releaseCarriedCharacter(character, {
+        message: actorizeSecondPerson(this.player, `You put ${character.name} down.`),
+      });
     }
 
     checkVictory(item, container) {
@@ -1642,9 +1735,9 @@
       const weightText = ` Carry weight: ${this.currentCarryWeight()}/${this.carryCapacity()}.`;
       if (!this.player.inventory.length && !carriedCharacters.length) return this.print(actorizeSecondPerson(this.player, `You are carrying: nothing.${weightText}`));
       const items = this.player.inventory.map((id) => this.inventoryItemLabel(this.items[id]));
-      items.push(...carriedCharacters.map((character) => character.name));
+      const companionsText = carriedCharacters.length ? ` With you: ${carriedCharacters.map((character) => character.name).join(", ")}.` : "";
       const worn = this.player.worn?.length ? ` You are wearing: ${this.player.worn.map((id) => this.inventoryItemLabel(this.items[id])).join(", ")}.` : "";
-      this.print(actorizeSecondPerson(this.player, `You are carrying: ${items.join(", ")}.${worn}${weightText}`));
+      this.print(actorizeSecondPerson(this.player, `You are carrying: ${items.join(", ")}.${companionsText}${worn}${weightText}`));
     }
 
     wait() {
@@ -2011,22 +2104,25 @@
       }
 
       const bard = Object.values(this.characters).find((character) => matches(character.name, "bard"));
-      const carryingBard = bard?.carriedBy === this.player.id;
-      if (!carryingBard) {
-        if (bard?.position === this.currentRoom && bard.visible) return "pick up bard";
-        const bardCorridor = {
-          elvish_clearing: "north east",
-          elvenkings_halls: "south",
-          cellar: this.doors.porta_cellar_long_lake?.open ? "down" : "open trap door",
-          long_lake: "east",
-        };
-        if (bardCorridor[this.currentRoom]) return bardCorridor[this.currentRoom];
-        const commandToBard = this.autoplayRouteCommandTo(bard?.position || "wooden_town");
-        if (commandToBard) return commandToBard;
-        return this.autoplayRouteCommandTo("west_bank");
-      }
+      if (!this.flags.dragondefeated) {
+        const bardWithPlayer = bard?.carriedBy === this.player.id
+          || (bard?.movementMode === "follow" && bard?.position === this.currentRoom && bard.visible);
+        if (!bardWithPlayer) {
+          if (bard?.position === this.currentRoom && bard.visible) return "pick up bard";
+          const bardCorridor = {
+            elvish_clearing: "north east",
+            elvenkings_halls: "south",
+            cellar: this.doors.porta_cellar_long_lake?.open ? "down" : "open trap door",
+            long_lake: "east",
+          };
+          if (bardCorridor[this.currentRoom]) return bardCorridor[this.currentRoom];
+          const commandToBard = this.autoplayRouteCommandTo(bard?.position || "wooden_town");
+          if (commandToBard) return commandToBard;
+          return this.autoplayRouteCommandTo("west_bank");
+        }
 
-      if (!this.flags.bardreadiedarrow) return "say to bard \"get strong arrow from quiver\"";
+        if (!this.flags.bardreadiedarrow) return "say to bard \"get strong arrow from quiver\"";
+      }
 
       if (this.currentRoom === "lower_halls" && !this.autoplayHas("treasure")) {
         if (this.liveDragon()) {
@@ -2300,18 +2396,34 @@
       this.print(`${character.name} gives you the ${held.item.name}.`);
     }
 
+    takeItemFromCharacter(character, itemName) {
+      if (character.friendly === false) return this.respondToTalk(character);
+      const held = this.findCharacterItem(character, itemName);
+      if (!held) return this.print(`${character.name} does not have the ${itemName}.`);
+      if (held.worn) return this.print(`${character.name} is wearing the ${held.item.name}.`);
+      if (!this.canCarryAdditionalWeight(held.item.weight || 0)) return this.print(this.carryTooMuchMessage(held.item));
+      this.detachItem(held.item.id);
+      held.item.location = { type: "character", id: this.player.id };
+      this.player.inventory.push(held.item.id);
+      this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "take")} the ${held.item.name} from ${character.name}.`);
+    }
+
     askCharacterTo(characterName, order) {
       const character = this.resolveCharacterTarget(characterName);
       if (!character) return this.print(`There is no one named ${characterName} here.`);
       if (character.friendly === false) return this.respondToTalk(character);
       if (this.player.name === "You" && this.player.noticeable === false) return this.print(`${character.name} says 'who's talking?'`);
+      this.rememberConversationCharacter(character);
+      this.rememberReferencedCharacter(order);
+      if (this.handleBardDragonCommand(character, order)) return;
       this.delegateCharacterOrder(character, order);
     }
 
     delegateCharacterOrder(character, order) {
       this.rememberConversationCharacter(character);
       this.rememberReferencedCharacter(order);
-      const delegatedSplitter = new CommandSplitter(this.data);
+      const delegatedSplitter = this.delegatedSplitterFor(character);
+      this.seedDelegatedSplitter(delegatedSplitter);
       for (const action of delegatedSplitter.split(order)) {
         const interpreted = this.interpretFriendlyOrder(character, action);
         if (interpreted.message) this.print(interpreted.message);
@@ -2319,6 +2431,31 @@
         const moved = this.processCommand(interpreted.action, character);
         if (moved) break;
       }
+      this.rememberDelegatedSplitter(delegatedSplitter);
+    }
+
+    delegatedSplitterFor(character) {
+      if (!character?.id) return new CommandSplitter(this.data);
+      if (!this.delegatedSplitters.has(character.id)) {
+        this.delegatedSplitters.set(character.id, new CommandSplitter(this.data));
+      }
+      return this.delegatedSplitters.get(character.id);
+    }
+
+    seedDelegatedSplitter(splitter) {
+      if (!splitter) return;
+      splitter.lastObject ||= this.sharedDelegatedContext.lastObject;
+      splitter.lastDirectObject ||= this.sharedDelegatedContext.lastDirectObject;
+      splitter.lastTargetObject ||= this.sharedDelegatedContext.lastTargetObject;
+    }
+
+    rememberDelegatedSplitter(splitter) {
+      if (!splitter) return;
+      this.sharedDelegatedContext = {
+        lastObject: splitter.lastObject || this.sharedDelegatedContext.lastObject,
+        lastDirectObject: splitter.lastDirectObject || this.sharedDelegatedContext.lastDirectObject,
+        lastTargetObject: splitter.lastTargetObject || this.sharedDelegatedContext.lastTargetObject,
+      };
     }
 
     interpretFriendlyOrder(character, action) {
@@ -3141,6 +3278,12 @@
       for (const character of Object.values(this.characters)) {
         if (character.carriedBy !== this.player.id) continue;
         this.moveCharacter(character, toRoom, direction, { silent: true });
+        if (this.characterCannotFollowVertical(character, direction)) {
+          this.releaseCarriedCharacter(character, {
+            follow: true,
+            message: `${character.name} climbs down from your shoulders and follows you.`,
+          });
+        }
       }
       if (this.player.noticeable === false) return;
       for (const character of Object.values(this.characters)) {
@@ -3148,6 +3291,7 @@
         if (character.carriedBy) continue;
         if (character.movementMode !== "follow") continue;
         if (!character.visible || character.position !== fromRoom) continue;
+        if (this.characterCannotFollowVertical(character, direction)) continue;
         if (this.shouldHoldBardNearDale(character, toRoom)) continue;
         this.moveCharacter(character, toRoom, direction, { silent: true });
         character.justEntered = false;
@@ -3527,6 +3671,8 @@
       this.lastConversationCharacterId = null;
       this.lastReferencedCharacterId = null;
       this.splitter = new CommandSplitter(this.data);
+      this.delegatedSplitters = new Map();
+      this.sharedDelegatedContext = { lastObject: null, lastDirectObject: null, lastTargetObject: null };
       output.replaceChildren();
       output.classList.remove("end-screen");
       this.initState();
@@ -3744,8 +3890,12 @@
         this.print(hasArrow ? "Bard readies the strong arrow from his quiver." : "Bard searches his quiver, but finds no arrow.");
         return true;
       }
-      const asksToAttack = /\b(kill|attack|shoot|slay)\b/.test(text);
-      const targetsDragon = /\bdragon\b/.test(text);
+      const dragon = Object.values(this.characters).find((candidate) => matches(candidate.name, "dragon"));
+      const liveDragonVisible = Boolean(dragon && dragon.visible !== false);
+      const asksToAttack = /\b(kill|attack|shoot|slay|fire)\b/.test(text)
+        || /\btake\b.*\bshot\b/.test(text)
+        || (/\bloose\b/.test(text) && /\barrow\b/.test(text));
+      const targetsDragon = /\bdragon\b/.test(text) || (liveDragonVisible && (/\btake\b.*\bshot\b/.test(text) || /\bloose\b/.test(text)));
       if (!asksToAttack || !targetsDragon) return false;
 
       const hasBow = character.inventory.some((itemId) => matches(this.items[itemId]?.name, "bow"));
@@ -3755,7 +3905,6 @@
         return true;
       }
 
-      const dragon = Object.values(this.characters).find((candidate) => matches(candidate.name, "dragon"));
       if (!dragon || dragon.visible === false) {
         this.print("Bard says the dragon has already been slain.");
         return true;
@@ -4229,6 +4378,17 @@
       .replace(/^(?:please\s+)?(?:can|could|would|will)\s+/, "")
       .replace(/^please\s+/, "")
       .replace(/\s+please$/g, "")
+      .replace(/^have\s+([a-z][a-z ]+?)\s+([a-z].+)$/i, "tell $1 to $2")
+      .replace(/^say\s+to\s+([a-z][a-z ]+?)\s+to\s+(.+)$/i, "tell $1 to $2")
+      .replace(/^head\s+(?=(?:back\s+(?:inside|outside)|north|south|east|west|north east|north west|south east|south west|up|down|n|s|e|w|ne|nw|se|sw|u|d)\b)/i, "")
+      .replace(/\btake\s+a\s+look\b/g, "look")
+      .replace(/\bhave\s+a\s+look\b/g, "look")
+      .replace(/\bopen\s+up\b/g, "open")
+      .replace(/\bpick\s+(.+?)\s+back\s+up\b/g, "take $1")
+      .replace(/\bgive\s+(.+?)\s+back\s+to\b/g, "give $1 to")
+      .replace(/\bgive\s+me\s+(.+?)\s+back\b/g, "give $1 to me")
+      .replace(/\bloose\s+(?:the\s+)?arrow\b/g, "take shot")
+      .replace(/\s+for\s+(?:me|us)\s*$/g, "")
       .replace(/\bturn\s+off\b/g, "close")
       .replace(/\bturn\s+on\b/g, "open")
       .replace(/\bpick\s+up\b/g, "take")
@@ -4324,12 +4484,51 @@
     if (!match) return command;
     const firstWord = match[1].split(/\s+/)[0];
     if (verbs.includes(firstWord)) return command;
-    const restVerb = match[2].split(/\s+/)[0];
+    const rest = match[2].trim();
+    const withoutModal = rest.replace(/^(?:please\s+)?(?:can|could|would|will)\s+you\s+/, "").trim();
+    const softenedRest = withoutModal.startsWith("mind ")
+      ? normalizeLeadingGerund(withoutModal.slice(5).trim())
+      : withoutModal;
+    const normalizedRest = normalizeNaturalCommand(rest).trim();
+    const normalizedSoftenedRest = normalizeNaturalCommand(softenedRest).trim();
+    const restVerb = normalizedRest.split(/\s+/)[0];
+    const softenedVerb = normalizedSoftenedRest.split(/\s+/)[0];
+    if (normalizedSoftenedRest !== normalizedRest && verbs.includes(softenedVerb)) {
+      return `ask ${match[1].trim()} to ${normalizedSoftenedRest}`;
+    }
     if (["who", "where", "what", "why", "how", "whether", "if"].includes(restVerb)) {
-      return `ask ${match[1].trim()} ${match[2].trim()}`;
+      return `ask ${match[1].trim()} ${normalizedRest}`;
     }
     if (!verbs.includes(restVerb)) return command;
-    return `ask ${match[1].trim()} to ${match[2].trim()}`;
+    return `ask ${match[1].trim()} to ${normalizedRest}`;
+  }
+
+  function normalizeLeadingGerund(phrase) {
+    const text = String(phrase || "").trim();
+    if (!text) return text;
+    const [first, ...rest] = text.split(/\s+/);
+    const irregular = {
+      following: "follow",
+      reading: "read",
+      opening: "open",
+      looking: "look",
+      shooting: "shoot",
+      giving: "give",
+      taking: "take",
+      waiting: "wait",
+      helping: "help",
+      trimming: "trim",
+      watering: "water",
+      digging: "dig",
+      planting: "plant",
+      raking: "rake",
+      unlocking: "unlock",
+      locking: "lock",
+      wearing: "wear",
+      removing: "remove",
+    };
+    if (!irregular[first]) return text;
+    return [irregular[first], ...rest].join(" ");
   }
 
   function isBoundary(char) {
@@ -4366,7 +4565,29 @@
 
   function actorVerb(character, verb) {
     if (character.name === "You") return verb;
-    const irregular = { are: "is", do: "does", have: "has" };
+    const irregular = {
+      are: "is",
+      do: "does",
+      "don't": "doesn't",
+      have: "has",
+      "haven't": "hasn't",
+      can: "can",
+      "can't": "can't",
+      could: "could",
+      may: "may",
+      might: "might",
+      must: "must",
+      "mustn't": "mustn't",
+      shall: "shall",
+      should: "should",
+      "shouldn't": "shouldn't",
+      will: "will",
+      "won't": "won't",
+      would: "would",
+      "wouldn't": "wouldn't",
+      "aren't": "isn't",
+      "weren't": "weren't",
+    };
     if (irregular[verb]) return irregular[verb];
     if (verb.endsWith("y")) return `${verb.slice(0, -1)}ies`;
     if (verb.endsWith("s") || verb.endsWith("sh") || verb.endsWith("ch") || verb.endsWith("x")) return `${verb}es`;
@@ -4385,7 +4606,7 @@
     if (!value || character.name === "You") return value;
     const sentences = value.split(/(?<=[.!?])\s+/).filter(Boolean);
     return sentences.map((sentence) => {
-      const match = sentence.match(/^You\s+([a-z]+)(\b.*)$/i);
+      const match = sentence.match(/^You\s+([a-z']+)(\b.*)$/i);
       if (!match) return sentence.replace(/^You\b/, actorSubject(character, true));
       return `${actorSubject(character, true)} ${actorVerb(character, match[1].toLowerCase())}${match[2]}`;
     }).join(" ");
