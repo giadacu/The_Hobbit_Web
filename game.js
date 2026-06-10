@@ -3262,6 +3262,11 @@
       return this.characters.gollum || Object.values(this.characters).find((character) => matches(character.name, "gollum")) || null;
     }
 
+    isGollumPresentInLake() {
+      const gollum = this.currentGollum();
+      return Boolean(gollum && gollum.visible !== false && gollum.position === "deep_dark_lake");
+    }
+
     ensureLakeRingInPocket() {
       const ring = this.items.golden_ring;
       if (!ring) return false;
@@ -4007,6 +4012,7 @@
     gollumBlocksDirection(direction) {
       if (this.currentRoom !== "deep_dark_lake" || direction !== "north") return "";
       if (!this.gollumState?.met) return "";
+      if (!this.isGollumPresentInLake()) return "";
       if (!this.gollumState.pocketQuestionAsked) {
         return "Gollum crouches between you and the northern passage. You will have to get through the riddle-game first.";
       }
@@ -4047,7 +4053,7 @@
       const previousRoom = this.currentRoom;
       this.currentRoom = connection.to;
       this.player.position = connection.to;
-      if (previousRoom === "deep_dark_lake" && this.gollumState?.pocketQuestionAsked && this.player.noticeable === false && !this.gollumState.escaped) {
+      if (previousRoom === "deep_dark_lake" && this.gollumState?.pocketQuestionAsked && this.player.noticeable === false && !this.gollumState.escaped && this.isGollumPresentInLake()) {
         this.gollumState.escaped = true;
         this.print("Invisible under the ring, you slip past Gollum as he claws wildly about for his precious.");
       }
@@ -4442,7 +4448,10 @@
 
     maybeAutoAttack(character) {
       if (!character.visible || character.position !== this.currentRoom) return false;
-      if (matches(character.name, "gollum") && this.currentRoom === "deep_dark_lake" && !this.gollumState?.enraged) return false;
+      if (matches(character.name, "gollum") && this.currentRoom === "deep_dark_lake") {
+        if (!this.gollumState?.enraged) return false;
+        if (this.player.noticeable === false) return false;
+      }
       if (character.friendly !== false || (character.attackFlag || 0) < 2) return false;
       const target = this.peopleInRoom().find((candidate) => {
         if (candidate.id === character.id || !candidate.visible || candidate.noticeable === false) return false;

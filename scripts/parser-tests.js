@@ -1510,6 +1510,39 @@ const gameCases = [
       "Invisible under the ring, you slip past Gollum as he claws wildly about for his precious.",
     ],
   },
+  {
+    name: "gollum does not attack gandalf while player is invisible",
+    setup(game) {
+      game.currentRoom = "deep_dark_lake";
+      game.player.position = "deep_dark_lake";
+      placeCharacterWithPlayer(game, "gandalf");
+      game.checkSpecialSituations();
+      game.gollumState.pocketQuestionAsked = true;
+      game.gollumState.enraged = true;
+      game.player.noticeable = false;
+      game.player.wearingRing = true;
+      game.characters.gollum.attackFlag = 2;
+    },
+    inputs: ["wait"],
+    expectedIncluded: [],
+    notExpectedIncluded: ["Gollum attacks Gandalf."],
+  },
+  {
+    name: "dead gollum no longer blocks or narrates slip past",
+    setup(game) {
+      game.currentRoom = "deep_dark_lake";
+      game.player.position = "deep_dark_lake";
+      game.checkSpecialSituations();
+      game.gollumState.pocketQuestionAsked = true;
+      game.gollumState.enraged = true;
+      game.player.noticeable = false;
+      game.player.wearingRing = true;
+      game.characters.gollum.visible = false;
+    },
+    inputs: ["north"],
+    expectedIncluded: [],
+    notExpectedIncluded: ["Invisible under the ring, you slip past Gollum as he claws wildly about for his precious."],
+  },
 ];
 
 const Splitter = bootGame();
