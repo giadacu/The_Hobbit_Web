@@ -188,7 +188,7 @@
     "The wild tells its tidings to those who have ears enough to heed them.",
   ];
 
-  const GOLLUM_RIDDLES = [
+  const GOLLUM_RIDDLE_POOL = [
     {
       question: "Gollum whispers 'Alive without breath, as cold as death; never thirsty, ever drinking. What is it, my precious?'",
       answers: ["fish", "a fish", "fishes"],
@@ -196,6 +196,18 @@
     {
       question: "Gollum hisses 'It comes first on little cat feet, and swallows torchlight, stars, and moon. What is it, eh?'",
       answers: ["dark", "darkness", "the dark"],
+    },
+    {
+      question: "Gollum murmurs 'Thirty white horses on a red hill. First they champ, then they stamp, then they stand still. What are they, precious?'",
+      answers: ["teeth", "white teeth", "horses", "the teeth"],
+    },
+    {
+      question: "Gollum croons 'A box without hinges, key, or lid, yet golden treasure inside is hid. What is it, eh?'",
+      answers: ["egg", "an egg", "a egg"],
+    },
+    {
+      question: "Gollum whispers 'Voiceless it cries, wingless flutters, toothless bites, mouthless mutters. What is it, my precious?'",
+      answers: ["wind", "the wind"],
     },
   ];
 
@@ -527,7 +539,11 @@
     nextEvent() {
       if (this.state.arrivalIndex >= this.roster.length && !this.state.currentArrival && !this.state.fullHouseAnnounced) {
         return {
-          message: "The house is now crowded with dwarves. Cloaks hang from nearly every peg. The smell of food fills the room.",
+          message: this.pick([
+            "The house is now crowded with dwarves. Cloaks hang from nearly every peg. The smell of food fills the room.",
+            "Bag End is full at last: dwarf cloaks line the pegs, voices fill the rooms, and supper scents drift everywhere.",
+            "At last every seat seems taken. Bag End hums with dwarf voices, dangling cloaks, and the promise of supper.",
+          ], this.seededHash(`full-house:${this.state.turnCounter}`)),
           cooldown: 5,
           apply: () => {
             this.state.fullHouseAnnounced = true;
@@ -557,13 +573,14 @@
 
       const dwarf = this.game.characters[this.state.currentArrival.dwarfId];
       if (!dwarf) return null;
+      const profile = this.arrivalProfile(dwarf.id);
 
       if (this.state.currentArrival.stage === 0) {
         return {
           message: this.game.currentRoom === "bilbos_garden"
-            ? "From inside Bag End comes the sound of a knock at the round green door."
-            : "There is a knock at the round green door.",
-          cooldown: this.pickCooldown(2, 3),
+            ? this.pick(profile.knockGarden, this.seededHash(`${dwarf.id}:knock:garden:${this.state.turnCounter}`))
+            : this.pick(profile.knockHall, this.seededHash(`${dwarf.id}:knock:hall:${this.state.turnCounter}`)),
+          cooldown: this.pickCooldown(profile.knockCooldown[0], profile.knockCooldown[1]),
           apply: () => {
             this.state.currentArrival.stage = 1;
           },
@@ -573,9 +590,9 @@
       if (this.state.currentArrival.stage === 1) {
         return {
           message: this.game.currentRoom === "bilbos_garden"
-            ? `${dwarf.name} comes through the garden gate and makes for the round green door.`
-            : `The round green door opens, and ${dwarf.name} can be glimpsed outside.`,
-          cooldown: this.pickCooldown(2, 3),
+            ? this.pick(profile.approachGarden.map((line) => line.replaceAll("{name}", dwarf.name)), this.seededHash(`${dwarf.id}:approach:garden:${this.state.turnCounter}`))
+            : this.pick(profile.approachHall.map((line) => line.replaceAll("{name}", dwarf.name)), this.seededHash(`${dwarf.id}:approach:hall:${this.state.turnCounter}`)),
+          cooldown: this.pickCooldown(profile.approachCooldown[0], profile.approachCooldown[1]),
           apply: () => {
             this.setPartyDoorOpen(true);
             dwarf.position = "bilbos_garden";
@@ -587,9 +604,9 @@
       if (this.state.currentArrival.stage === 2) {
         return {
           message: this.game.currentRoom === "bilbos_garden"
-            ? `${dwarf.name} ducks through the round green door and disappears inside.`
-            : `${dwarf.name} steps inside, brushing road dust from his cloak.`,
-          cooldown: this.pickCooldown(1, 2),
+            ? this.pick(profile.entryGarden.map((line) => line.replaceAll("{name}", dwarf.name)), this.seededHash(`${dwarf.id}:entry:garden:${this.state.turnCounter}`))
+            : this.pick(profile.entryHall.map((line) => line.replaceAll("{name}", dwarf.name)), this.seededHash(`${dwarf.id}:entry:hall:${this.state.turnCounter}`)),
+          cooldown: this.pickCooldown(profile.entryCooldown[0], profile.entryCooldown[1]),
           apply: () => {
             this.setPartyDoorOpen(true);
             dwarf.position = "hobbit_hole";
@@ -598,14 +615,9 @@
         };
       }
 
-      const settleLines = [
-        `${dwarf.name} hangs up his cloak and settles near the fire.`,
-        `${dwarf.name} sets down his travelling gear and takes a comfortable place by the hearth.`,
-        `${dwarf.name} eases himself in, warming his hands and looking round with approval.`,
-      ];
       return {
-        message: this.pick(settleLines, hashString(`${dwarf.id}:settle:${this.state.turnCounter}`)),
-        cooldown: this.pickCooldown(3, 5),
+        message: this.pick(profile.settle.map((line) => line.replaceAll("{name}", dwarf.name)), this.seededHash(`${dwarf.id}:settle:${this.state.turnCounter}`)),
+        cooldown: this.pickCooldown(profile.settleCooldown[0], profile.settleCooldown[1]),
         apply: () => {
           dwarf.position = "hobbit_hole";
           if (!this.state.arrived.includes(dwarf.id)) this.state.arrived.push(dwarf.id);
@@ -627,18 +639,20 @@
             "Somebody asks whether there is any beer.",
             "The room grows steadily more crowded.",
             "A discussion about travelling routes breaks out.",
-          ], hashString(`group:${this.state.turnCounter}:${visibleDwarves.length}`)),
+            "A clutter of cloaks, boots, and low voices spreads through the room.",
+          ], this.seededHash(`group:${this.state.turnCounter}:${visibleDwarves.length}`)),
           cooldown: this.pickCooldown(4, 6),
         });
       }
 
       if (visibleDwarves.length) {
-        const dwarf = visibleDwarves[Math.abs(hashString(`room:${this.state.turnCounter}`)) % visibleDwarves.length];
+        const dwarf = visibleDwarves[Math.abs(this.seededHash(`room:${this.state.turnCounter}`)) % visibleDwarves.length];
         const roomActions = roomId === "bilbos_garden"
           ? [
             `${dwarf.name} pauses among the flowers and breathes in the garden air.`,
             `${dwarf.name} looks over the garden with mild approval.`,
             `${dwarf.name} lingers a moment in the garden before turning back toward the house.`,
+            `${dwarf.name} studies the vegetables with the gravity of a traveller judging a campsite.`,
           ]
           : [
             `${dwarf.name} settles more comfortably into his seat.`,
@@ -646,9 +660,10 @@
             `${dwarf.name} studies the comfortable furniture with interest.`,
             `${dwarf.name} glances toward the kitchen hopefully.`,
             `${dwarf.name} sniffs the air and seems encouraged by what he smells.`,
+            `${dwarf.name} adjusts his cloak and claims a little more room by the hearth.`,
           ];
         options.push({
-          message: this.pick(roomActions, hashString(`${dwarf.id}:room:${this.state.turnCounter}`)),
+          message: this.pick(roomActions, this.seededHash(`${dwarf.id}:room:${this.state.turnCounter}`)),
           cooldown: this.pickCooldown(4, 6),
         });
 
@@ -666,7 +681,7 @@
         ];
         if ((this.state.turnCounter + visibleDwarves.length) % 5 === 0) {
           options.push({
-            message: `${dwarf.name} says '${this.pick(speechLines, hashString(`${dwarf.id}:speech:${this.state.turnCounter}`))}'`,
+            message: `${dwarf.name} says '${this.pick(speechLines, this.seededHash(`${dwarf.id}:speech:${this.state.turnCounter}`))}'`,
             cooldown: this.pickCooldown(5, 7),
           });
         }
@@ -674,7 +689,7 @@
 
       const movable = this.arrivedDwarves().filter((character) => character.id !== this.state.currentArrival?.dwarfId && this.partyRooms.has(character.position));
       if (movable.length) {
-        const dwarf = movable[Math.abs(hashString(`move:${this.state.turnCounter}`)) % movable.length];
+        const dwarf = movable[Math.abs(this.seededHash(`move:${this.state.turnCounter}`)) % movable.length];
         const toRoom = dwarf.position === "hobbit_hole" ? "bilbos_garden" : "hobbit_hole";
         options.push({
           message: this.movementMessage(dwarf, dwarf.position, toRoom),
@@ -693,7 +708,8 @@
             "You had better prepare for guests.",
             "Patience, Bilbo.",
             "The road will soon be calling.",
-          ], hashString(`gandalf:${this.state.turnCounter}:${this.state.arrivalIndex}`))}'`,
+            "Best keep the kettle near at hand.",
+          ], this.seededHash(`gandalf:${this.state.turnCounter}:${this.state.arrivalIndex}`))}'`,
           cooldown: this.pickCooldown(5, 7),
         });
       }
@@ -706,14 +722,15 @@
             "Best not arrive late.",
             "Someone will be expecting us.",
             "Our chief values punctuality.",
-          ], hashString(`hint:${this.state.turnCounter}:${this.state.arrived.length}`)),
+            "There is business ahead once this hospitality is done.",
+          ], this.seededHash(`hint:${this.state.turnCounter}:${this.state.arrived.length}`)),
           cooldown: this.pickCooldown(5, 7),
         });
       }
 
       const available = options.filter((option) => option && option.message);
       if (!available.length) return null;
-      return available[Math.abs(hashString(`ambient:${this.state.turnCounter}:${available.length}`)) % available.length];
+      return available[Math.abs(this.seededHash(`ambient:${this.state.turnCounter}:${available.length}`)) % available.length];
     }
 
     movementMessage(dwarf, fromRoom, toRoom) {
@@ -741,6 +758,121 @@
       door.open = Boolean(open);
     }
 
+    arrivalProfile(dwarfId) {
+      const profiles = [
+        {
+          knockHall: [
+            "There is a knock at the round green door.",
+            "A firm knock sounds at the round green door.",
+          ],
+          knockGarden: [
+            "From inside Bag End comes the sound of a knock at the round green door.",
+            "You hear a solid knock from the round green door behind you.",
+          ],
+          approachHall: [
+            "The round green door opens, and {name} can be glimpsed outside.",
+            "The round green door opens just enough to reveal {name} waiting on the step.",
+          ],
+          approachGarden: [
+            "{name} comes through the garden gate and makes for the round green door.",
+            "{name} crosses the garden path with steady, purposeful steps.",
+          ],
+          entryHall: [
+            "{name} steps inside, brushing road dust from his cloak.",
+            "{name} steps in from the step outside and looks round Bag End approvingly.",
+          ],
+          entryGarden: [
+            "{name} ducks through the round green door and disappears inside.",
+            "{name} stoops beneath the round green door and vanishes into Bag End.",
+          ],
+          settle: [
+            "{name} hangs up his cloak and settles near the fire.",
+            "{name} sets down his travelling gear and takes a comfortable place by the hearth.",
+            "{name} eases himself in, warming his hands and looking round with approval.",
+          ],
+          knockCooldown: [2, 3],
+          approachCooldown: [2, 3],
+          entryCooldown: [1, 2],
+          settleCooldown: [3, 5],
+        },
+        {
+          knockHall: [
+            "A brisk rat-tat sounds at the round green door.",
+            "There comes a quick, businesslike knock at the round green door.",
+          ],
+          knockGarden: [
+            "From the house comes a brisk rat-tat at the round green door.",
+            "A quick knock rattles the round green door behind you.",
+          ],
+          approachHall: [
+            "The round green door swings open, and {name} is already on the step as if impatient to be admitted.",
+            "The round green door opens wide enough for a glimpse of {name}, boots planted squarely outside.",
+          ],
+          approachGarden: [
+            "{name} strides through the gate and heads straight for the round green door.",
+            "{name} enters the garden without hesitation and comes directly to the door.",
+          ],
+          entryHall: [
+            "{name} comes in briskly, as though he has half-expected to find the room waiting for him.",
+            "{name} steps smartly inside and gives the room one measuring glance.",
+          ],
+          entryGarden: [
+            "{name} slips through the round green door with practised ease.",
+            "{name} is through the door in a moment, cloak swinging behind him.",
+          ],
+          settle: [
+            "{name} claims a place near the hearth and begins to look thoroughly at home.",
+            "{name} sets down his pack, warms his hands, and seems satisfied with the arrangement.",
+            "{name} makes himself comfortable with the air of a guest expecting many more to follow.",
+          ],
+          knockCooldown: [1, 2],
+          approachCooldown: [1, 2],
+          entryCooldown: [1, 2],
+          settleCooldown: [2, 4],
+        },
+        {
+          knockHall: [
+            "A measured knock sounds at the round green door, followed by the faint scrape of boots on the step.",
+            "There is a patient knock at the round green door.",
+          ],
+          knockGarden: [
+            "From within comes a measured knock at the round green door, followed by the sound of someone waiting outside.",
+            "You hear a patient knock from the round green door and the soft scrape of boots beyond it.",
+          ],
+          approachHall: [
+            "The round green door opens, and {name} can be seen outside, looking in with calm interest.",
+            "The round green door opens, framing {name} on the doorstep with travel-stained cloak and all.",
+          ],
+          approachGarden: [
+            "{name} enters by the garden gate, taking a moment to glance round before approaching the door.",
+            "{name} walks up the garden path at an unhurried pace toward the round green door.",
+          ],
+          entryHall: [
+            "{name} enters with a courteous nod, bringing the smell of road and weather indoors.",
+            "{name} steps inside carefully, as though unwilling to disturb the comfort of the place too suddenly.",
+          ],
+          entryGarden: [
+            "{name} bows his head under the round door and passes inside.",
+            "{name} disappears through the round green door after one last glance at the garden.",
+          ],
+          settle: [
+            "{name} removes his travelling things, then settles with quiet appreciation near the fire.",
+            "{name} finds himself a place by the hearth and looks as though he means to enjoy it properly.",
+            "{name} stands warming himself for a moment before taking a comfortable seat.",
+          ],
+          knockCooldown: [2, 4],
+          approachCooldown: [2, 3],
+          entryCooldown: [1, 3],
+          settleCooldown: [3, 5],
+        },
+      ];
+      return profiles[Math.abs(this.seededHash(`arrival-profile:${dwarfId}`)) % profiles.length];
+    }
+
+    seededHash(key) {
+      return hashString(`${this.game.storySeed || 0}:${key}`);
+    }
+
     pick(list, seed) {
       if (!list.length) return "";
       return list[Math.abs(seed) % list.length];
@@ -748,7 +880,7 @@
 
     pickCooldown(min, max) {
       const span = Math.max(0, max - min);
-      return min + (span ? Math.abs(hashString(`cooldown:${this.state.turnCounter}:${this.state.arrivalIndex}:${this.state.arrived.length}`)) % (span + 1) : 0);
+      return min + (span ? Math.abs(this.seededHash(`cooldown:${this.state.turnCounter}:${this.state.arrivalIndex}:${this.state.arrived.length}`)) % (span + 1) : 0);
     }
   }
 
@@ -792,10 +924,16 @@
       this.autoplayCapturedText = "";
       this.autoplayCapturingOutput = false;
       this.endgameRestartArmed = false;
+      this.pendingEndgameChoice = null;
       this.arrivalNoticeTimers = [];
       this.spiderEyesState = null;
       this.gollumState = null;
       this.turnCount = 0;
+      this.storyRunCount = 0;
+      this.storySeed = 0;
+      this.autosaveSnapshot = null;
+      this.autosaveMeta = null;
+      this.autosaveCounter = 0;
       this.imageRevealTimer = null;
       this.lastRevealedImage = "";
       this.audio = musicPlayer;
@@ -809,6 +947,7 @@
     }
 
     initState() {
+      this.storySeed = this.nextStorySeed();
       for (const item of Object.values(this.items)) {
         item.location = null;
         item.contents = [];
@@ -860,6 +999,12 @@
       this.unexpectedParty?.reset();
     }
 
+    nextStorySeed() {
+      this.storyRunCount = (Number(this.storyRunCount) || 0) + 1;
+      const randomPart = Math.floor(Math.random() * 0x7fffffff);
+      return hashString(`${Date.now()}:${this.storyRunCount}:${randomPart}`);
+    }
+
     normalizeCharacterMovementModes() {
       const gandalf = this.characters?.gandalf;
       if (!gandalf) return;
@@ -867,16 +1012,124 @@
     }
 
     createGollumState() {
+      const riddleIds = this.selectGollumRiddleIds();
       return {
         met: false,
         contestStarted: false,
         awaitingAnswer: false,
         currentRiddleIndex: 0,
+        riddleIds,
         awaitingPlayerRiddle: false,
         pocketQuestionAsked: false,
         enraged: false,
         escaped: false,
+        revealStyle: Math.abs(hashString(`${this.storySeed}:gollum-reveal`)) % 4,
+        deathStyle: Math.abs(hashString(`${this.storySeed}:gollum-death`)) % 4,
       };
+    }
+
+    restoreGollumState(savedState = null) {
+      if (!savedState) return this.createGollumState();
+      const base = this.createGollumState();
+      const restored = { ...base, ...savedState };
+      restored.currentRiddleIndex = Math.max(0, Number(restored.currentRiddleIndex) || 0);
+      if (!Array.isArray(restored.riddleIds) || !restored.riddleIds.length) restored.riddleIds = base.riddleIds;
+      restored.riddleIds = restored.riddleIds
+        .map((value) => Number(value))
+        .filter((value) => Number.isInteger(value) && value >= 0 && value < GOLLUM_RIDDLE_POOL.length)
+        .slice(0, 2);
+      if (!restored.riddleIds.length) restored.riddleIds = base.riddleIds;
+      if (restored.currentRiddleIndex >= restored.riddleIds.length) restored.currentRiddleIndex = restored.riddleIds.length - 1;
+      restored.revealStyle = Number.isInteger(restored.revealStyle) ? restored.revealStyle : base.revealStyle;
+      restored.deathStyle = Number.isInteger(restored.deathStyle) ? restored.deathStyle : base.deathStyle;
+      return restored;
+    }
+
+    selectGollumRiddleIds() {
+      const pool = GOLLUM_RIDDLE_POOL.map((_entry, index) => index);
+      const chosen = [];
+      while (pool.length && chosen.length < 2) {
+        const pickIndex = Math.abs(hashString(`${this.storySeed}:gollum-riddle:${chosen.length}:${pool.length}`)) % pool.length;
+        chosen.push(pool.splice(pickIndex, 1)[0]);
+      }
+      return chosen;
+    }
+
+    activeGollumRiddles(state = this.gollumState) {
+      const ids = Array.isArray(state?.riddleIds) && state.riddleIds.length ? state.riddleIds : this.selectGollumRiddleIds();
+      return ids.map((id) => GOLLUM_RIDDLE_POOL[id]).filter(Boolean);
+    }
+
+    currentGollumRiddle(state = this.gollumState) {
+      const riddles = this.activeGollumRiddles(state);
+      return riddles[state?.currentRiddleIndex || 0] || riddles[0] || null;
+    }
+
+    gollumRevealLines() {
+      const styles = [
+        [
+          "A small boat glides out across the black water. In it crouches Gollum, pale eyes shining in the dark.",
+          "Gollum whispers 'What is it, my precious? Lost, is it? Hungry, is it?'",
+          "For the moment he seems more curious than murderous. Riddles may yet buy you time.",
+        ],
+        [
+          "A wet scraping reaches you from the stones, and then Gollum unfolds himself from the darkness at the water's edge.",
+          "His pale eyes blink once. 'Lost, is it? Lost and found by us, perhapses?' he whispers.",
+          "He seems intent on studying you before deciding whether you are guest, game, or thief.",
+        ],
+        [
+          "Something disturbs the black water. A narrow boat noses silently from the dark, and Gollum is suddenly there, peering at you over its side.",
+          "Gollum rocks gently and murmurs 'A nasty little Baggins in the dark. Shall we talk, precious?'",
+          "His hunger is plain, but so is his fascination. A riddle-game might hold him for a while.",
+        ],
+        [
+          "You catch a flash of pale eyes before the rest of him emerges from shadow, one hand on a boat, the other on the slick stones.",
+          "Gollum gives a thin smile. 'We knows a stranger when we smells one, yes. We talks first, perhaps.'",
+          "He has not attacked yet. There is room, for the moment, for words and riddles.",
+        ],
+      ];
+      return styles[this.gollumState?.revealStyle || 0] || styles[0];
+    }
+
+    gollumContestOpener() {
+      const openers = [
+        {
+          first: "Gollum glides over the black water and whispers 'If Baggins answers true, then Baggins may ask. If not, we eats him, yes.'",
+          repeat: "Gollum paddles nearer and whispers 'If Baggins answers true, then Baggins may ask. If not, we eats him, yes.'",
+        },
+        {
+          first: "Gollum tilts his head and rasps 'Answer true, little Baggins, and then you may ask. Answer false, and we keeps you forever.'",
+          repeat: "Gollum taps the boat with one claw. 'Again, yes. Answer true and ask. Answer false and feed us.'",
+        },
+        {
+          first: "Gollum folds himself low in the boat. 'Riddles first, precious. True answers earn a question. False answers earn the dark.'",
+          repeat: "Gollum circles closer. 'More riddles, yes. Truth buys time. Mistakes buy death.'",
+        },
+      ];
+      const variant = openers[Math.abs(hashString(`${this.storySeed}:gollum-opener`)) % openers.length];
+      return this.gollumState?.met ? variant.repeat : variant.first;
+    }
+
+    gollumWrongAnswerOutcome() {
+      const outcomes = [
+        {
+          attack: "Gollum's pale eyes flare with hunger. 'Wrong, precious. Wrong!' He springs from the boat and falls on you in the dark.",
+          ending: "Gollum catches you in the dark.",
+        },
+        {
+          attack: "Gollum lets out a shrill cry of delight. 'Wrong! Wrong!' He darts low, knife-quick, and drags you down among the wet stones.",
+          ending: "Gollum tears you down beside the black water.",
+        },
+        {
+          attack: "With a hiss like tearing cloth, Gollum launches himself at your throat. The dark water splashes, cold hands close, and the cave spins.",
+          ending: "Gollum strangles you in the dark.",
+        },
+        {
+          attack: "Gollum shrieks 'False!' and comes at you in a frenzy of claws and teeth, driving you backward into the black water.",
+          ending: "Gollum drags you under the dark lake.",
+        },
+      ];
+      return outcomes[this.gollumState?.deathStyle || 0] || outcomes[0];
     }
 
     addZXFinaleState() {
@@ -964,10 +1217,23 @@
       document.addEventListener("keydown", (event) => {
         if (!this.endgameRestartArmed) return;
         event.preventDefault();
+        if (this.pendingEndgameChoice) {
+          const key = normalize(event.key);
+          if (["1", "a", "autosave", "resume", "continue"].includes(key)) {
+            this.resumeFromAutosave();
+            return;
+          }
+          if (["2", "r", "restart"].includes(key)) {
+            this.restartGame();
+            return;
+          }
+          return;
+        }
         this.restartGame();
       });
       document.addEventListener("click", () => {
         if (!this.endgameRestartArmed) return;
+        if (this.pendingEndgameChoice) return;
         this.restartGame();
       });
       roomImage.addEventListener("error", () => {
@@ -987,7 +1253,22 @@
     execute(rawCommand) {
       const lower = rawCommand.toLowerCase();
       if (this.endgame) {
-        if (normalize(lower) === "restart") {
+        const normalizedEndgame = normalize(lower);
+        if (this.pendingEndgameChoice) {
+          if (["autosave", "resume", "continue", "checkpoint", "load autosave"].includes(normalizedEndgame)) {
+            this.resumeFromAutosave();
+            return;
+          }
+          if (["restart", "start again", "from beginning", "beginning"].includes(normalizedEndgame)) {
+            this.restartGame();
+            return;
+          }
+          this.print(this.autosaveSnapshot
+            ? "Type 'autosave' to resume from the last checkpoint or 'restart' to begin again."
+            : "There is no autosave available. Type 'restart' to begin again.", "system");
+          return;
+        }
+        if (normalizedEndgame === "restart") {
           this.restartGame();
           return;
         }
@@ -1296,11 +1577,47 @@
       return this.rooms[this.currentRoom];
     }
 
+    roomLightMode(roomId = this.currentRoom) {
+      if (!roomId) return "normal";
+      if (roomId === "trolls_cave") return "dim";
+      if (roomId === "dark_winding_passage" || roomId === "deep_dark_lake" || /^dark_stuffy_passage_\d+$/.test(roomId)) return "dark";
+      return "normal";
+    }
+
+    roomNeedsLantern(roomId = this.currentRoom) {
+      return this.roomLightMode(roomId) !== "normal";
+    }
+
+    hasActiveLantern() {
+      return Boolean(this.flags.lanternon && this.lanternTurnsRemaining() > 0);
+    }
+
+    roomIsDim(roomId = this.currentRoom) {
+      return this.roomLightMode(roomId) === "dim" && !this.hasActiveLantern();
+    }
+
+    roomIsDark(roomId = this.currentRoom) {
+      return this.roomLightMode(roomId) === "dark" && !this.hasActiveLantern();
+    }
+
+    revealLanternDiscoveries(options = {}) {
+      if (this.currentRoom !== "trolls_cave" || !this.hasActiveLantern()) return false;
+      const chest = this.items.arcane_chest;
+      if (!chest || chest.visible) return false;
+      chest.visible = true;
+      this.flags.swordchest = true;
+      if (!options.silent) {
+        this.print("In the lantern glow, something runed glints beneath the discarded armor: an arcane chest.");
+      }
+      return true;
+    }
+
     roomConnections() {
       return this.connectionsFromVisible(this.currentRoom);
     }
 
     visiblePeopleInRoom() {
+      if (this.roomIsDark()) return [];
       return this.peopleInRoom().filter((character) => !character.carriedBy);
     }
 
@@ -1327,8 +1644,19 @@
       if (!room) return;
       const wasVisited = this.visitedRooms.has(this.currentRoom);
       this.visitedRooms.add(this.currentRoom);
+      this.revealLanternDiscoveries({ silent: true });
+      if (this.roomIsDark()) {
+        this.print("It is pitch dark here. You cannot see the room, its exits, or anything else. You can only feel your way and move by guesswork.");
+        if (config.initial) {
+          this.print('Type "tips" for a hint, "commands" or "verbs" for recognized words, "save name" to save.', "system");
+        }
+        this.render();
+        return;
+      }
       const showFullDetails = config.full || !wasVisited;
-      const roomText = showFullDetails ? room.description : this.firstSentence(room.description);
+      const baseRoomText = showFullDetails ? room.description : this.firstSentence(room.description);
+      const dimPrefix = this.roomIsDim() ? "The cave lies in a murky penumbra. You can make out the larger shapes, but fine details are easily missed." : "";
+      const roomText = [dimPrefix, baseRoomText].filter(Boolean).join(" ");
       const doorText = this.roomConnections()
         .filter((c) => c.door && this.doors[c.door])
         .map((c) => `${this.directionLead(c.direction)} there is the ${this.doors[c.door].name}. The ${this.doors[c.door].name} is ${this.doors[c.door].open ? "open" : "closed"}.`)
@@ -1385,7 +1713,10 @@
 
     render() {
       const room = this.room();
-      if (room?.image) {
+      if (this.roomIsDark()) {
+        roomImage.removeAttribute("src");
+        roomImage.alt = "Darkness";
+      } else if (room?.image) {
         const src = assetUrl(IMAGE_ROOT, room.image);
         const currentSrc = roomImage.getAttribute("src");
         if (currentSrc !== src) this.revealRoomImage(src);
@@ -1493,7 +1824,7 @@
           if (item.container && (item.open || item.noLid || options.closedContainers)) scan(item.contents, item);
         }
       };
-      scan(this.itemsInRoom(this.currentRoom).map((item) => item.id));
+      if (!this.roomIsDark()) scan(this.itemsInRoom(this.currentRoom).map((item) => item.id));
       if (options.includeInventory !== false) scan(this.player.inventory, { inventory: true });
       return candidates;
     }
@@ -1514,6 +1845,7 @@
     }
 
     findVisibleCharacterHolding(objectName) {
+      if (this.roomIsDark()) return null;
       const name = normalize(objectName);
       for (const character of this.peopleInRoom()) {
         if (character.id === this.player.id || !character.visible) continue;
@@ -2344,11 +2676,37 @@
 
     save(name) {
       if (!name) return this.print("Error: You must specify a filename to save.");
-      localStorage.setItem(SAVE_PREFIX + name, JSON.stringify({
+      localStorage.setItem(SAVE_PREFIX + name, JSON.stringify(this.createSnapshot()));
+      this.print(`Game saved as "${name}".`);
+    }
+
+    load(name) {
+      if (!name) return this.print("Error: You must specify a filename to load.");
+      const raw = localStorage.getItem(SAVE_PREFIX + name);
+      if (!raw) return this.print(`No saved game named "${name}" was found.`);
+      const save = JSON.parse(raw);
+      this.restoreSnapshot(save);
+      this.print(`Game "${name}" loaded.`);
+      this.describeRoom({ full: true });
+    }
+
+    listSaves() {
+      const saves = Object.keys(localStorage).filter((key) => key.startsWith(SAVE_PREFIX)).map((key) => key.slice(SAVE_PREFIX.length));
+      this.print(saves.length ? `Saved games:\n${saves.join("\n")}` : "No saved games found.");
+    }
+
+    quit() {
+      this.endGame(this.player.name === "You" ? "You quit" : `${this.player.name} quits`);
+    }
+
+    createSnapshot() {
+      return clone({
         items: this.items,
         doors: this.doors,
         characters: this.characters,
         currentRoom: this.currentRoom,
+        storySeed: this.storySeed,
+        storyRunCount: this.storyRunCount,
         flags: this.flags,
         visitedRooms: [...this.visitedRooms],
         visitedTrollsClearing: this.visitedTrollsClearing,
@@ -2361,20 +2719,18 @@
         turnCount: this.turnCount,
         endgame: this.endgame,
         unexpectedParty: this.unexpectedParty?.serialize(),
-      }));
-      this.print(`Game saved as "${name}".`);
+      });
     }
 
-    load(name) {
-      if (!name) return this.print("Error: You must specify a filename to load.");
-      const raw = localStorage.getItem(SAVE_PREFIX + name);
-      if (!raw) return this.print(`No saved game named "${name}" was found.`);
-      const save = JSON.parse(raw);
+    restoreSnapshot(save) {
       this.clearArrivalNoticeTimers();
+      this.stopAutoplay();
       this.items = save.items;
       this.doors = save.doors;
       this.characters = save.characters;
       this.currentRoom = save.currentRoom;
+      this.storySeed = Number(save.storySeed) || this.nextStorySeed();
+      this.storyRunCount = Number(save.storyRunCount) || this.storyRunCount;
       this.flags = save.flags || {};
       this.visitedRooms = new Set(save.visitedRooms || [this.currentRoom]);
       this.visitedTrollsClearing = Boolean(save.visitedTrollsClearing);
@@ -2383,25 +2739,52 @@
       this.trollsTransformed = Boolean(save.trollsTransformed);
       this.trollsDefeated = Boolean(save.trollsDefeated);
       this.spiderEyesState = save.spiderEyesState || null;
-      this.gollumState = save.gollumState || this.createGollumState();
+      this.gollumState = this.restoreGollumState(save.gollumState);
       this.turnCount = Number(save.turnCount) || 0;
-      this.endgame = Boolean(save.endgame);
+      this.endgame = false;
+      this.endgameRestartArmed = false;
+      this.pendingEndgameChoice = null;
       this.player = this.characters[this.data.player];
       this.normalizeCharacterMovementModes();
       this.normalizeLanternState();
       this.addZXFinaleState();
       this.unexpectedParty?.load(save.unexpectedParty || null);
-      this.print(`Game "${name}" loaded.`);
+      output.replaceChildren();
+      output.classList.remove("end-screen");
+      input.value = "";
+      input.focus();
+      this.render();
+    }
+
+    recordAutosave(label, options = {}) {
+      if (this.endgame) return false;
+      const key = options.key || `${this.currentRoom}:${label}`;
+      const turnCount = Number(this.turnCount) || 0;
+      const previous = this.autosaveMeta;
+      if (!options.force && previous?.key === key && previous?.turnCount === turnCount) return false;
+      this.autosaveSnapshot = this.createSnapshot();
+      this.autosaveCounter += 1;
+      this.autosaveMeta = {
+        id: this.autosaveCounter,
+        key,
+        label,
+        roomId: this.currentRoom,
+        roomName: this.room()?.name || this.currentRoom,
+        turnCount,
+      };
+      this.print(`Autosave: ${label}.`, "system");
+      return true;
+    }
+
+    resumeFromAutosave() {
+      if (!this.autosaveSnapshot) {
+        this.print("There is no autosave available.", "system");
+        return false;
+      }
+      this.restoreSnapshot(clone(this.autosaveSnapshot));
+      this.print(`Resumed from autosave${this.autosaveMeta?.label ? `: ${this.autosaveMeta.label}` : ""}.`, "system");
       this.describeRoom({ full: true });
-    }
-
-    listSaves() {
-      const saves = Object.keys(localStorage).filter((key) => key.startsWith(SAVE_PREFIX)).map((key) => key.slice(SAVE_PREFIX.length));
-      this.print(saves.length ? `Saved games:\n${saves.join("\n")}` : "No saved games found.");
-    }
-
-    quit() {
-      this.endGame(this.player.name === "You" ? "You quit" : `${this.player.name} quits`);
+      return true;
     }
 
     showMap() {
@@ -2514,6 +2897,14 @@
       return Math.max(this.autoplayDelay, Math.min(readingDelay, 16500));
     }
 
+    autoplayShouldLightLantern() {
+      if (this.hasActiveLantern()) return false;
+      if (this.currentRoom === "deep_dark_lake" && this.gollumState?.pocketQuestionAsked && this.player.noticeable !== false) return false;
+      if (this.roomNeedsLantern(this.currentRoom)) return true;
+      if (this.currentRoom === "green_dragon_inn" && !this.flags.seenpony) return true;
+      return false;
+    }
+
     nextAutoplayCommand() {
       const beforeDragonDefeat = !this.flags.dragondefeated;
 
@@ -2561,7 +2952,7 @@
         return "take lantern";
       }
 
-      if (beforeDragonDefeat && !this.flags.lanternon) return "light lantern";
+      if (beforeDragonDefeat && this.autoplayShouldLightLantern()) return "light lantern";
 
       if (beforeDragonDefeat && !this.flags.seenpony) {
         const thorin = Object.values(this.characters).find((character) => matches(character.name, "thorin"));
@@ -2586,7 +2977,7 @@
       if (beforeDragonDefeat && !this.autoplayHas("majestic sword")) {
         if (this.currentRoom !== "trolls_cave") return this.autoplayRouteCommandTo("trolls_cave");
         const chest = this.items.arcane_chest;
-        if (!chest.visible) return "carefully examine discarded armor";
+        if (!chest.visible) return this.hasActiveLantern() ? "examine discarded armor" : "carefully examine discarded armor";
         if (!chest.open) return "open arcane chest";
         if (!this.flags.autoplayexaminedarcanechest) return this.autoplayOnce("autoplayexaminedarcanechest", "examine arcane chest");
         const prepSwordLoad = this.autoplayRequiredPickupPrepCommand("majestic sword");
@@ -2604,7 +2995,9 @@
       if (beforeDragonDefeat && this.currentRoom === "deep_dark_lake" && !this.gollumState?.pocketQuestionAsked) {
         if (!this.gollumState?.met) return "look";
         if (this.gollumState?.awaitingAnswer) {
-          return this.gollumState.currentRiddleIndex === 0 ? "answer fish" : "answer darkness";
+          const riddle = this.currentGollumRiddle();
+          if (riddle?.answers?.[0]) return `answer ${riddle.answers[0]}`;
+          return "ask gollum a riddle";
         }
         if (this.gollumState?.awaitingPlayerRiddle) return "say to gollum \"what have i got in my pocket\"";
         return "ask gollum a riddle";
@@ -2626,7 +3019,9 @@
         if (this.currentRoom === "deep_dark_lake") {
           if (!this.gollumState?.met) return "look";
           if (this.gollumState?.awaitingAnswer) {
-            return this.gollumState.currentRiddleIndex === 0 ? "answer fish" : "answer darkness";
+            const riddle = this.currentGollumRiddle();
+            if (riddle?.answers?.[0]) return `answer ${riddle.answers[0]}`;
+            return "ask gollum a riddle";
           }
           if (this.gollumState?.awaitingPlayerRiddle) return "say to gollum \"what have i got in my pocket\"";
           if (this.gollumState?.pocketQuestionAsked && this.player.noticeable !== false) return "wear ring";
@@ -2774,6 +3169,9 @@
         if (door.locked && this.keyFor(door)) return `unlock ${door.name}`;
         if (door.locked && this.autoplayHas("majestic sword")) return `break ${door.name} with sword`;
         return `open ${door.name}`;
+      }
+      if (!this.hasActiveLantern() && this.autoplayHas("brass lantern") && this.roomNeedsLantern(connection.to)) {
+        return "light lantern";
       }
       return connection.direction;
     }
@@ -3216,7 +3614,11 @@
       }
       if (matches(character.name, "gollum")) {
         if (!this.gollumState?.contestStarted) {
-          return "Gollum rocks softly on the black water and whispers 'Riddles, yes, riddles. Ask Gollum a riddle, and we shall see who goes and who is eaten.'";
+          return this.pick([
+            "Gollum rocks softly on the black water and whispers 'Riddles, yes, riddles. Ask Gollum a riddle, and we shall see who goes and who is eaten.'",
+            "Gollum tilts his head and rasps 'Riddles first, yes. Ask Gollum a riddle, and then we shall see what becomes of Baggins.'",
+            "Gollum grins in the dark. 'A riddle-game, precious. That will tell whether Baggins goes free or feeds us.'",
+          ], hashString(`${this.storySeed}:gollum-talk-intro`));
         }
         if (this.gollumState.awaitingAnswer) return "Gollum hisses 'Answer first, precious.'";
         if (this.gollumState.awaitingPlayerRiddle) return "Gollum licks his lips. 'Now Baggins asks, yes. Ask it, precious, ask it.'";
@@ -3289,10 +3691,9 @@
       this.gollumState.contestStarted = true;
       this.gollumState.awaitingAnswer = true;
       gollum.friendly = "neutral";
-      const opener = this.gollumState.met
-        ? "Gollum paddles nearer and whispers 'If Baggins answers true, then Baggins may ask. If not, we eats him, yes.'"
-        : "Gollum glides over the black water and whispers 'If Baggins answers true, then Baggins may ask. If not, we eats him, yes.'";
-      return `${opener} ${GOLLUM_RIDDLES[this.gollumState.currentRiddleIndex].question}`;
+      const riddle = this.currentGollumRiddle();
+      if (!riddle) return "Gollum watches you in tense silence from the dark water.";
+      return `${this.gollumContestOpener()} ${riddle.question}`;
     }
 
     gollumAnswerMatches(input, answers) {
@@ -3306,16 +3707,20 @@
 
     handleGollumAnswer(answerText = "") {
       if (!this.gollumState?.awaitingAnswer || this.currentRoom !== "deep_dark_lake") return false;
-      const riddle = GOLLUM_RIDDLES[this.gollumState.currentRiddleIndex];
+      const riddles = this.activeGollumRiddles();
+      const riddle = riddles[this.gollumState.currentRiddleIndex];
+      if (!riddle) return false;
       if (!this.gollumAnswerMatches(answerText, riddle.answers)) {
-        this.print("Gollum's pale eyes flare with hunger. 'Wrong, precious. Wrong!' He springs from the boat and falls on you in the dark.", "danger");
-        this.endGame("Gollum catches you in the dark.");
+        const outcome = this.gollumWrongAnswerOutcome();
+        this.print(outcome.attack, "danger");
+        this.endGame(outcome.ending, { fatal: true });
         return true;
       }
 
-      if (this.gollumState.currentRiddleIndex < GOLLUM_RIDDLES.length - 1) {
+      if (this.gollumState.currentRiddleIndex < riddles.length - 1) {
         this.gollumState.currentRiddleIndex += 1;
-        this.print(`Gollum nods reluctantly. 'Right, precious. Right.' ${GOLLUM_RIDDLES[this.gollumState.currentRiddleIndex].question}`);
+        const nextRiddle = riddles[this.gollumState.currentRiddleIndex];
+        this.print(`Gollum nods reluctantly. 'Right, precious. Right.' ${nextRiddle.question}`);
         return true;
       }
 
@@ -3972,6 +4377,7 @@
         return true;
       }
       this.describeRoom();
+      this.maybeAutosaveForRoom(roomId);
       this.checkSpecialSituations();
       return true;
     }
@@ -4004,6 +4410,7 @@
     }
 
     canSeeConnection(connection) {
+      if (connection?.from === this.currentRoom && this.roomIsDark(connection.from)) return false;
       const requiredFlag = connection?.requiredFlag;
       if (!requiredFlag) return true;
       return Boolean(this.flags[requiredFlag]);
@@ -4051,12 +4458,14 @@
         return false;
       }
       const previousRoom = this.currentRoom;
+      const movedInTotalDarkness = this.roomIsDark(previousRoom);
       this.currentRoom = connection.to;
       this.player.position = connection.to;
       if (previousRoom === "deep_dark_lake" && this.gollumState?.pocketQuestionAsked && this.player.noticeable === false && !this.gollumState.escaped && this.isGollumPresentInLake()) {
         this.gollumState.escaped = true;
         this.print("Invisible under the ring, you slip past Gollum as he claws wildly about for his precious.");
       }
+      if (movedInTotalDarkness && this.applyDarkMovementHazard(previousRoom, direction, connection.to)) return true;
       this.moveFollowers(previousRoom, connection.to, direction);
       if (this.commandIssuer) {
         this.print(`${this.player.name} goes ${direction}.`);
@@ -4064,8 +4473,37 @@
       }
       this.describeRoom();
       this.triggerSpiderEyesEncounter(previousRoom, connection.to, direction);
+      this.maybeAutosaveForRoom(connection.to);
       this.checkSpecialSituations();
       return true;
+    }
+
+    applyDarkMovementHazard(fromRoom, direction, toRoom) {
+      const roll = Math.abs(hashString(`${this.storySeed}:${this.turnCount}:${fromRoom}:${direction}:${toRoom}`)) % 8;
+      if (roll > 2) return false;
+
+      const outcomes = [
+        {
+          damage: 3,
+          message: "Feeling your way in the dark, you misjudge the floor and plunge into a shallow cavity before hauling yourself out again.",
+        },
+        {
+          damage: 2,
+          message: "You blunder into a jagged wall in the darkness and feel the breath go out of you.",
+        },
+        {
+          damage: 1,
+          message: "You stumble blindly over loose stone and bang yourself painfully in the dark.",
+        },
+      ];
+      const outcome = outcomes[roll] || outcomes.at(-1);
+      this.player.strength = Math.max(0, (this.player.strength || 0) - outcome.damage);
+      this.print(`${outcome.message} Strength: ${this.player.strength}.`, "danger");
+      if (this.player.strength <= 0) {
+        this.endGame("Your strength fails you in the dark.", { fatal: true });
+        return true;
+      }
+      return false;
     }
 
     blockingWebFor(connection) {
@@ -4533,7 +4971,7 @@
       fallen.visible = false;
       attacker.attackFlag = 0;
       if (fallen.id === this.data.player) {
-        this.endGame(message);
+        this.endGame(message, { fatal: true });
         return "";
       }
       return message;
@@ -4554,18 +4992,26 @@
       character.noticeable = true;
     }
 
-    endGame(message) {
+    endGame(message, options = {}) {
       this.stopAutoplay();
       this.clearArrivalNoticeTimers();
       output.replaceChildren();
       output.classList.add("end-screen");
       this.endgame = true;
       this.endgameRestartArmed = true;
+      this.pendingEndgameChoice = options.fatal ? "death" : null;
       const totalRooms = Math.max(Object.keys(this.rooms).length, 1);
       const percentage = (this.visitedRooms.size / totalRooms) * 100;
       const endMessage = message ? `${message.replace(/[.!?]*$/, "")}. ` : "";
       this.print(`${endMessage}You have mastered ${percentage.toFixed(2)}% of this adventure.`, "danger");
-      this.print("Press any key or click to restart.", "system");
+      if (options.fatal && this.autosaveSnapshot) {
+        const roomText = this.autosaveMeta?.roomName ? ` at ${this.autosaveMeta.roomName.replace(/_/g, " ")}` : "";
+        this.print(`Type 'autosave' to continue from the last checkpoint${roomText}, or 'restart' to begin again.`, "system");
+      } else if (options.fatal) {
+        this.print("Type 'restart' to begin again.", "system");
+      } else {
+        this.print("Press any key or click to restart.", "system");
+      }
     }
 
     winGame(message) {
@@ -4575,6 +5021,7 @@
       output.classList.add("end-screen");
       this.endgame = true;
       this.endgameRestartArmed = true;
+      this.pendingEndgameChoice = null;
       const totalRooms = Math.max(Object.keys(this.rooms).length, 1);
       const percentage = (this.visitedRooms.size / totalRooms) * 100;
       const endMessage = message ? `${message.replace(/[.!?]*$/, "")}. ` : "";
@@ -4594,6 +5041,7 @@
       this.flags = {};
       this.endgame = false;
       this.endgameRestartArmed = false;
+      this.pendingEndgameChoice = null;
       this.visitedTrollsClearing = false;
       this.waitCounter = 0;
       this.secretDoorWaitCounter = 0;
@@ -4652,6 +5100,9 @@
       const trigger = this.spiderEyesTriggerFor(previousRoom, currentRoom, direction);
       if (!trigger) return;
       if (this.flags[this.spiderEyesResolvedFlag(currentRoom)]) return;
+      this.recordAutosave(`before the spider ambush near ${this.rooms[currentRoom]?.name?.replace(/_/g, " ") || currentRoom}`, {
+        key: `hazard:spider-eyes:${currentRoom}`,
+      });
       this.spiderEyesState = {
         active: true,
         room: currentRoom,
@@ -4706,7 +5157,7 @@
     }
 
     killBySpiderEyes() {
-      this.endGame("Something stings. You are dead.");
+      this.endGame("Something stings. You are dead.", { fatal: true });
     }
 
     checkSpecialSituations() {
@@ -4722,14 +5173,13 @@
       if (!gollum || !gollum.visible) return;
 
       if (!this.gollumState.met) {
+        this.recordAutosave("before meeting Gollum", { key: "hazard:gollum:room" });
         this.gollumState.met = true;
         gollum.friendly = "neutral";
         if (this.ensureLakeRingInPocket()) {
           this.print("Groping beside the water in the dark, your fingers close around a small cold ring. Almost without thinking, you slip it into your pocket.");
         }
-        this.print("A small boat glides out across the black water. In it crouches Gollum, pale eyes shining in the dark.");
-        this.print("Gollum whispers 'What is it, my precious? Lost, is it? Hungry, is it?'");
-        this.print("For the moment he seems more curious than murderous. Riddles may yet buy you time.");
+        for (const line of this.gollumRevealLines()) this.print(line);
         return;
       }
 
@@ -4741,6 +5191,7 @@
     checkTrollsClearing() {
       if (this.currentRoom !== "trolls_clearing") return;
       if (!this.visitedTrollsClearing) {
+        this.recordAutosave("before facing the trolls", { key: "hazard:trolls:room" });
         this.visitedTrollsClearing = true;
         this.waitCounter = 0;
         this.print("You crouch low behind a mossy boulder, heart pounding, as the trolls argue by the flickering campfire in the moonlit clearing.");
@@ -4758,8 +5209,22 @@
       const liveTroll = this.peopleInRoom().find((p) => ["hideous troll", "vicious troll"].includes(normalize(p.name)) && p.visible);
       if (liveTroll && !this.trollsDefeated) {
         this.print("The hideous troll eats you. You are dead.", "danger");
-        this.endGame("You are dead.");
+        this.endGame("You are dead.", { fatal: true });
       }
+    }
+
+    maybeAutosaveForRoom(roomId = this.currentRoom) {
+      const hazardMap = {
+        deep_dark_lake: { label: "before meeting Gollum", key: "hazard:gollum:room" },
+        trolls_clearing: { label: "before facing the trolls", key: "hazard:trolls:room" },
+        west_bank: { label: "before testing the fast river", key: "hazard:river:west-bank" },
+        cellar: { label: "before the barrel escape", key: "hazard:river:cellar" },
+        forest_road_2: { label: "before crossing the spider-haunted road", key: "hazard:spiders:forest-road-2" },
+        forest_road: { label: "before the second spider-haunted crossing", key: "hazard:spiders:forest-road" },
+      };
+      const hazard = hazardMap[roomId];
+      if (!hazard) return false;
+      return this.recordAutosave(hazard.label, { key: hazard.key });
     }
 
     transformTrolls() {
@@ -4934,6 +5399,12 @@
         if (this.isLanternLightAction(action)) {
           return this.igniteLantern(actorActionSentence(this.player, action.desc1));
         }
+        if (String(action.destination || "").includes("endgame")) {
+          const roomLabel = this.room()?.name?.replace(/_/g, " ") || "this place";
+          this.recordAutosave(`before a dangerous action in ${roomLabel}`, {
+            key: `special:${this.currentRoom}:${action.verb}:${action.obj1 || ""}:${action.obj2 || ""}:${action.destination}`,
+          });
+        }
         if (action.desc1) this.print(actorActionSentence(this.player, action.desc1));
         if (action.desc2) this.print(action.desc2, action.destination?.includes("endgame") ? "danger" : "");
         this.performSpecialActionTransfer(action);
@@ -4946,11 +5417,12 @@
         }
         if (action.destination) {
           if (action.destination.includes("endgame")) {
-            this.endGame("The adventure ends.");
+            this.endGame("The adventure ends.", { fatal: true });
           } else if (this.roomByName(action.destination)) {
             this.currentRoom = this.roomByName(action.destination).id;
             this.player.position = this.currentRoom;
             this.describeRoom();
+            this.maybeAutosaveForRoom(this.currentRoom);
             this.checkSpecialSituations();
           }
         }
@@ -5008,6 +5480,12 @@
     matchesSpecialActionObjects(action, objectText, adverb) {
       const text = normalizeWords(objectText);
       const requiredAdverb = String(action.adverb || "").trim();
+      if (this.currentRoom === "trolls_cave" && action.reveals === "arcane chest") {
+        const obj1Matches = !action.obj1 || commandObjectMatches(text, action.obj1);
+        if (!obj1Matches) return false;
+        if (this.hasActiveLantern()) return true;
+        return requiredAdverb === adverb || wordInCommand(text, requiredAdverb);
+      }
       const adverbMatches = !requiredAdverb || requiredAdverb === adverb || wordInCommand(text, requiredAdverb);
       const obj1Matches = !action.obj1 || commandObjectMatches(text, action.obj1);
       let obj2Matches = !action.obj2 || commandObjectMatches(text, action.obj2);
@@ -5128,6 +5606,7 @@
       this.flags.lanternon = true;
       this.flags.lanternturns = LANTERN_BURN_TURNS;
       this.print(actorizeSecondPerson(this.player, message));
+      this.revealLanternDiscoveries();
       return true;
     }
 

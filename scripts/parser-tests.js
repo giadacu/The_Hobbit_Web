@@ -116,10 +116,15 @@ function runGameCase(testCase) {
     Math.random = originalRandom;
   }
   const actual = outputLines.slice();
-  const includesExpected = testCase.expectedIncluded.every((line) => actual.includes(line));
-  const excludesForbidden = (testCase.notExpectedIncluded || []).every((line) => !actual.includes(line));
+  const includesExpected = testCase.expectedIncluded.every((pattern) => actual.some((line) => lineMatches(line, pattern)));
+  const excludesForbidden = (testCase.notExpectedIncluded || []).every((pattern) => !actual.some((line) => lineMatches(line, pattern)));
   const ok = includesExpected && excludesForbidden;
   return { ...testCase, actual, expected: testCase.expectedIncluded, ok };
+}
+
+function lineMatches(line, pattern) {
+  if (pattern instanceof RegExp) return pattern.test(line);
+  return line.includes(pattern);
 }
 
 function placeCharacterWithPlayer(game, characterId) {
@@ -1029,9 +1034,9 @@ const gameCases = [
       }
     },
     expectedIncluded: [
-      "There is a knock at the round green door.",
-      "The round green door opens, and Dwalin can be glimpsed outside.",
-      "Dwalin steps inside, brushing road dust from his cloak.",
+      /(knock|rat-tat).*round green door/i,
+      /Dwalin.*(outside|step|doorstep|door)/,
+      /Dwalin.*(steps in|steps inside|comes in|enters|inside)/,
     ],
     notExpectedIncluded: ["Thorin"],
   },
@@ -1047,7 +1052,7 @@ const gameCases = [
       game.print(`Door traversal room: ${game.currentRoom}`);
     },
     expectedIncluded: [
-      "The round green door opens, and Dwalin can be glimpsed outside.",
+      /Dwalin.*(outside|step|doorstep|door)/,
       "Door traversal room: bilbos_garden",
     ],
     notExpectedIncluded: ["The round green door is closed."],
@@ -1070,7 +1075,7 @@ const gameCases = [
       game.print(escaped.length ? `Escaped dwarves: ${escaped.join(", ")}` : "Unexpected Party dwarves remain within Bag End.");
     },
     expectedIncluded: [
-      "The house is now crowded with dwarves. Cloaks hang from nearly every peg. The smell of food fills the room.",
+      /(crowded with dwarves|Bag End is full at last|every seat seems taken)/,
       "Unexpected Party dwarves remain within Bag End.",
     ],
     notExpectedIncluded: ["Escaped dwarves:"],
@@ -1309,6 +1314,8 @@ const gameCases = [
       game.player.strength = 5;
       game.currentRoom = "trolls_cave";
       game.player.position = "trolls_cave";
+      game.flags.lanternon = true;
+      game.flags.lanternturns = 6;
       game.items.majestic_sword.location = { type: "room", id: game.player.position };
       game.items.majestic_sword.visible = true;
       game.items.sturdy_rope.location = { type: "room", id: game.player.position };
@@ -1357,6 +1364,7 @@ const gameCases = [
       game.trollsTransformed = true;
       game.flags.dragondefeated = false;
       game.flags.lanternon = true;
+      game.flags.lanternturns = 6;
       game.flags.seenpony = true;
       game.player.inventory = ["small_key", "firestone", "sturdy_key", "brass_lantern", "the_large_key", "majestic_sword"];
       const command = game.nextAutoplayCommand();
@@ -1366,6 +1374,40 @@ const gameCases = [
       game.execute(command);
     },
     expectedIncluded: ["You take the sturdy rope."],
+  },
+  {
+    name: "autoplay does not relight lantern when not needed",
+    drive(game) {
+      game.player.inventory.push("brass_lantern");
+      game.flags.lanternon = false;
+      game.flags.lanternturns = 0;
+      const command = game.nextAutoplayCommand();
+      if (command === "light lantern") {
+        throw new Error("Autoplay should not relight the lantern in a safe bright room.");
+      }
+      game.print(`Autoplay bright-room command: ${command}`);
+    },
+    expectedIncluded: [/Autoplay bright-room command: .+/],
+    notExpectedIncluded: ["Autoplay bright-room command: light lantern"],
+  },
+  {
+    name: "autoplay relights lantern in trolls cave when needed",
+    drive(game) {
+      game.player.inventory = ["small_key", "firestone", "sturdy_key", "brass_lantern", "the_large_key"];
+      game.currentRoom = "trolls_cave";
+      game.player.position = "trolls_cave";
+      game.visitedTrollsClearing = true;
+      game.trollsTransformed = true;
+      game.flags.dragondefeated = false;
+      game.flags.lanternon = false;
+      game.flags.lanternturns = 0;
+      const command = game.nextAutoplayCommand();
+      if (command !== "light lantern") {
+        throw new Error(`Expected autoplay to relight the lantern in trolls cave, got: ${command}`);
+      }
+      game.print(`Autoplay dark-room command: ${command}`);
+    },
+    expectedIncluded: ["Autoplay dark-room command: light lantern"],
   },
   {
     name: "lamp can be lit and turned off",
@@ -1379,6 +1421,87 @@ const gameCases = [
     name: "turn on lamp is handled as lighting",
     inputs: ["turn on lamp"],
     expectedIncluded: ["You light the elegant lamp. Its engraved metal catches the warm glow."],
+  },
+  {
+    name: "trolls cave is dim without lantern",
+    setup(game) {
+      game.currentRoom = "trolls_cave";
+      game.player.position = "trolls_cave";
+      game.flags.lanternon = false;
+      game.flags.lanternturns = 0;
+    },
+    drive(game) {
+      game.execute("look");
+      game.print(`Dim exits: ${game.roomConnections().length}`);
+    },
+    expectedIncluded: [
+      "The cave lies in a murky penumbra. You can make out the larger shapes, but fine details are easily missed.",
+      /Dim exits: [1-9]/,
+    ],
+  },
+  {
+    name: "lantern reveals arcane chest in trolls cave without careful adverb",
+    setup(game) {
+      game.currentRoom = "trolls_cave";
+      game.player.position = "trolls_cave";
+      game.player.inventory.push("brass_lantern");
+      game.flags.lanternon = false;
+      game.flags.lanternturns = 0;
+      if (game.items.arcane_chest) game.items.arcane_chest.visible = false;
+      game.flags.swordchest = false;
+    },
+    drive(game) {
+      game.execute("light lantern");
+      game.execute("examine discarded armor");
+      game.print(`Arcane chest visible: ${game.items.arcane_chest.visible ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "In the lantern glow, something runed glints beneath the discarded armor: an arcane chest.",
+      "Arcane chest visible: yes",
+    ],
+  },
+  {
+    name: "lighting lantern restores visibility in dark tunnels",
+    setup(game) {
+      game.currentRoom = "dark_stuffy_passage_13";
+      game.player.position = "dark_stuffy_passage_13";
+      game.player.inventory.push("brass_lantern");
+      game.flags.lanternon = false;
+      game.flags.lanternturns = 0;
+    },
+    drive(game) {
+      game.execute("light lantern");
+      if (game.roomConnections().length === 0) {
+        throw new Error("Expected visible exits after lighting the lantern in a dark tunnel.");
+      }
+      game.print(`Lit tunnel exits: ${game.roomConnections().length}`);
+    },
+    expectedIncluded: [
+      "You light the brass lantern. It gives off a steady glow for a while.",
+      /Lit tunnel exits: [1-9]/,
+    ],
+  },
+  {
+    name: "moving in total darkness can reduce strength",
+    setup(game) {
+      game.currentRoom = "dark_stuffy_passage_13";
+      game.player.position = "dark_stuffy_passage_13";
+      game.player.strength = 6;
+      game.storySeed = 1;
+      game.flags.lanternon = false;
+      game.flags.lanternturns = 0;
+    },
+    drive(game) {
+      game.execute("south west");
+      game.execute("north east");
+      game.execute("south west");
+      game.execute("north east");
+      game.print(`Dark movement strength: ${game.player.strength}`);
+    },
+    expectedIncluded: [
+      /Strength: [0-9]+./,
+      /Dark movement strength: [0-5]/,
+    ],
   },
   {
     name: "inkwell can be opened and closed",
@@ -1494,15 +1617,17 @@ const gameCases = [
       game.currentRoom = "dark_stuffy_passage_13";
       game.player.position = "dark_stuffy_passage_13";
     },
-    inputs: [
-      "south",
-      "ask gollum a riddle",
-      "answer fish",
-      "answer darkness",
-      "say to gollum \"what have i got in my pocket\"",
-      "wear ring",
-      "north",
-    ],
+    drive(game) {
+      game.execute("south");
+      game.execute("ask gollum a riddle");
+      const firstRiddle = game.currentGollumRiddle();
+      game.execute(`answer ${firstRiddle.answers[0]}`);
+      const secondRiddle = game.currentGollumRiddle();
+      game.execute(`answer ${secondRiddle.answers[0]}`);
+      game.execute("say to gollum \"what have i got in my pocket\"");
+      game.execute("wear ring");
+      game.execute("north");
+    },
     expectedIncluded: [
       "Groping beside the water in the dark, your fingers close around a small cold ring. Almost without thinking, you slip it into your pocket.",
       "Gollum narrows his pale eyes. 'Baggins has answered. Now Baggins asks, yes. Ask it, precious, ask it.'",
@@ -1526,6 +1651,96 @@ const gameCases = [
     inputs: ["wait"],
     expectedIncluded: [],
     notExpectedIncluded: ["Gollum attacks Gandalf."],
+  },
+  {
+    name: "gollum wrong answers still kill through varied attack text",
+    setup(game) {
+      game.currentRoom = "deep_dark_lake";
+      game.player.position = "deep_dark_lake";
+      game.checkSpecialSituations();
+    },
+    drive(game) {
+      game.execute("ask gollum a riddle");
+      game.execute("answer toaster");
+      game.print(`Gollum death endgame: ${game.endgame ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      /Gollum .*?(dark|water|lake|stones)/,
+      "Gollum death endgame: yes",
+    ],
+  },
+  {
+    name: "fatal gollum death offers autosave choice",
+    setup(game) {
+      game.currentRoom = "dark_stuffy_passage_13";
+      game.player.position = "dark_stuffy_passage_13";
+    },
+    drive(game) {
+      game.execute("south");
+      game.execute("ask gollum a riddle");
+      game.execute("answer toaster");
+      game.print(`Death choice: ${game.pendingEndgameChoice || "none"}`);
+      game.print(`Autosave room: ${game.autosaveMeta?.roomId || "none"}`);
+    },
+    expectedIncluded: [
+      "Death choice: death",
+      "Autosave room: deep_dark_lake",
+    ],
+  },
+  {
+    name: "autosave command resumes from fatal checkpoint",
+    setup(game) {
+      game.currentRoom = "dark_stuffy_passage_13";
+      game.player.position = "dark_stuffy_passage_13";
+    },
+    drive(game) {
+      game.execute("south");
+      game.execute("ask gollum a riddle");
+      game.execute("answer toaster");
+      game.execute("autosave");
+      game.print(`Resume room: ${game.currentRoom}`);
+      game.print(`Resume endgame: ${game.endgame ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Resumed from autosave: before meeting Gollum.",
+      "Resume room: deep_dark_lake",
+      "Resume endgame: no",
+    ],
+  },
+  {
+    name: "restart command after death returns to the beginning",
+    setup(game) {
+      game.currentRoom = "dark_stuffy_passage_13";
+      game.player.position = "dark_stuffy_passage_13";
+    },
+    drive(game) {
+      game.execute("south");
+      game.execute("ask gollum a riddle");
+      game.execute("answer toaster");
+      game.execute("restart");
+      game.print(`Restart room: ${game.currentRoom}`);
+      game.print(`Restart endgame: ${game.endgame ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Restart room: hobbit_hole",
+      "Restart endgame: no",
+    ],
+  },
+  {
+    name: "fatal river action creates an autosave on the west bank",
+    setup(game) {
+      game.currentRoom = "west_bank";
+      game.player.position = "west_bank";
+    },
+    drive(game) {
+      game.execute("jump into river");
+      game.print(`River autosave room: ${game.autosaveMeta?.roomId || "none"}`);
+      game.print(`River death choice: ${game.pendingEndgameChoice || "none"}`);
+    },
+    expectedIncluded: [
+      "River autosave room: west_bank",
+      "River death choice: death",
+    ],
   },
   {
     name: "dead gollum no longer blocks or narrates slip past",
