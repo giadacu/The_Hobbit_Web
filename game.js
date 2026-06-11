@@ -4,11 +4,13 @@
   const MUSIC_ROOT = "assets/local-music/";
   const ASSET_VERSION = "20260607-1630";
   const SAVE_PREFIX = "hobbit-web-save:";
+  const LAYOUT_PREF_KEY = "hobbit-web-layout-mode";
 
   const $ = (id) => document.getElementById(id);
   const output = $("output");
   const input = $("command-input");
   const form = $("command-form");
+  const gameShell = $("game-shell");
   const roomImage = $("room-image");
   const imageReveal = $("image-reveal");
   const imageRevealOutline = $("image-reveal-outline");
@@ -18,10 +20,18 @@
   const inventoryStatus = $("inventory-status");
   const exitsList = $("exits-list");
   const peopleList = $("people-list");
+  const layoutSwitch = $("layout-switch");
+  const layoutDivider = $("layout-divider");
+  const layoutMode1Button = $("layout-mode-1");
+  const layoutMode2Button = $("layout-mode-2");
   const BASE_CARRY_CAPACITY = 5;
   const CARRY_CAPACITY_PER_STRENGTH = 3;
   const PLAYER_CARRY_BONUS = 32;
   const LANTERN_BURN_TURNS = 10;
+  const LAYOUT_SWITCH_IDLE_MS = 1600;
+  const LAYOUT_MOUSE_ACTIVITY_THRESHOLD = 28;
+  const LAYOUT_SPLIT_PREF_KEY = "hobbit-web-layout-2-scene-width";
+  const DEFAULT_LAYOUT_2_SCENE_WIDTH = 54;
 
   const commandsWithoutObject = new Set([
     "look", "wait", "inventory", "i", "save", "load", "quit", "verbs",
@@ -941,6 +951,16 @@
       this.audio.preload = "auto";
       this.audio.volume = 0.75;
       this.unexpectedParty = new UnexpectedPartyController(this);
+      this.layoutSwitchHideTimer = null;
+      this.layoutSwitchAutoHide = this.shouldAutoHideLayoutSwitch();
+      this.layoutResizeCleanup = null;
+      this.layoutMouseAnchor = null;
+      this.layoutMode = this.loadLayoutModePreference();
+      this.layout2SceneWidth = this.loadLayout2SceneWidthPreference();
+      this.applyLayout2SceneWidth(this.layout2SceneWidth, { persist: false });
+      this.applyLayoutMode(this.layoutMode);
+      this.initializeLayoutSwitchVisibility();
+      this.initializeLayoutDivider();
       this.initState();
       this.bind();
       this.describeRoom(true);
@@ -1248,6 +1268,35 @@
           this.print(`Music file could not be loaded: ${this.audio.currentSrc || this.audio.src || this.currentTrack || "unknown track"}.`, "system");
         }
       });
+      const bindLayoutButton = (button, mode) => {
+        if (!button) return;
+        button.addEventListener("click", () => this.setLayoutMode(mode));
+      };
+      bindLayoutButton(layoutMode1Button, "1");
+      bindLayoutButton(layoutMode2Button, "2");
+      if (this.layoutSwitchAutoHide && layoutSwitch) {
+        document.addEventListener("mousemove", (event) => this.handleLayoutMouseActivity(event), { passive: true });
+        document.addEventListener("mousedown", (event) => this.handleLayoutMouseDown(event), { passive: true });
+        layoutSwitch.addEventListener("mouseenter", () => this.cancelLayoutSwitchHide());
+        layoutSwitch.addEventListener("mouseleave", () => this.scheduleLayoutSwitchHide(900));
+        layoutSwitch.addEventListener("focusin", () => {
+          this.showLayoutSwitch();
+          this.cancelLayoutSwitchHide();
+        });
+        layoutSwitch.addEventListener("focusout", () => this.scheduleLayoutSwitchHide(900));
+        input?.addEventListener("focus", () => this.hideLayoutSwitch());
+        input?.addEventListener("input", () => this.hideLayoutSwitch());
+        document.addEventListener("keydown", () => {
+          if (document.activeElement === input) this.hideLayoutSwitch();
+        });
+      }
+      if (this.layoutSwitchAutoHide && layoutDivider) {
+        layoutDivider.addEventListener("mouseenter", () => this.cancelLayoutSwitchHide());
+        layoutDivider.addEventListener("mouseleave", () => this.scheduleLayoutSwitchHide(900));
+      }
+      if (typeof window.addEventListener === "function") {
+        window.addEventListener("resize", () => this.applyLayout2SceneWidth(this.layout2SceneWidth, { persist: false }));
+      }
     }
 
     execute(rawCommand) {
@@ -1713,16 +1762,26 @@
 
     render() {
       const room = this.room();
+      const scene = roomImage.closest(".scene");
       if (this.roomIsDark()) {
+        scene?.classList.remove("is-revealing");
+        clearTimeout(this.imageRevealTimer);
+        this.imageRevealTimer = null;
+        roomImage.setAttribute("hidden", "hidden");
         roomImage.removeAttribute("src");
-        roomImage.alt = "Darkness";
+        roomImage.alt = "";
       } else if (room?.image) {
+        roomImage.removeAttribute("hidden");
         const src = assetUrl(IMAGE_ROOT, room.image);
         const currentSrc = roomImage.getAttribute("src");
         if (currentSrc !== src) this.revealRoomImage(src);
         if (currentSrc !== src) roomImage.src = src;
         if (!currentSrc) this.revealRoomImage(src);
         roomImage.alt = room.name;
+      } else {
+        roomImage.setAttribute("hidden", "hidden");
+        roomImage.removeAttribute("src");
+        roomImage.alt = "";
       }
       fillList(inventoryList, this.player.inventory.map((id) => this.inventorySidebarLabel(this.items[id])).filter(Boolean), "nothing");
       if (inventoryStatus) inventoryStatus.textContent = `Weight ${this.currentCarryWeight()}/${this.carryCapacity()}`;
@@ -1753,6 +1812,183 @@
       clearTimeout(this.imageRevealTimer);
       this.imageRevealTimer = null;
       scene?.classList.remove("is-revealing");
+    }
+
+    loadLayoutModePreference() {
+      const saved = String(localStorage.getItem(LAYOUT_PREF_KEY) || "").trim();
+      return ["1", "2"].includes(saved) ? saved : "1";
+    }
+
+    loadLayout2SceneWidthPreference() {
+      const saved = Number.parseFloat(localStorage.getItem(LAYOUT_SPLIT_PREF_KEY) || "");
+      return Number.isFinite(saved) ? saved : DEFAULT_LAYOUT_2_SCENE_WIDTH;
+    }
+
+    shouldAutoHideLayoutSwitch() {
+      if (!layoutSwitch || typeof window.matchMedia !== "function") return false;
+      return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+    }
+
+    initializeLayoutSwitchVisibility() {
+      if (!layoutSwitch) return;
+      if (!this.layoutSwitchAutoHide) {
+        layoutSwitch.classList.remove("layout-switch--auto-hide");
+        layoutSwitch.classList.remove("is-visible");
+        layoutDivider?.classList?.remove("layout-divider--auto-hide");
+        layoutDivider?.classList?.remove("is-visible");
+        return;
+      }
+      layoutSwitch.classList.add("layout-switch--auto-hide");
+      layoutSwitch.classList.remove("is-visible");
+      layoutDivider?.classList?.add("layout-divider--auto-hide");
+      layoutDivider?.classList?.remove("is-visible");
+    }
+
+    showLayoutSwitch() {
+      if (!this.layoutSwitchAutoHide) return;
+      layoutSwitch?.classList?.add("is-visible");
+      if (this.layoutMode === "2") layoutDivider?.classList?.add("is-visible");
+    }
+
+    hideLayoutSwitch() {
+      if (!this.layoutSwitchAutoHide) return;
+      this.cancelLayoutSwitchHide();
+      layoutSwitch?.classList?.remove("is-visible");
+      layoutDivider?.classList?.remove("is-visible");
+    }
+
+    cancelLayoutSwitchHide() {
+      clearTimeout(this.layoutSwitchHideTimer);
+      this.layoutSwitchHideTimer = null;
+    }
+
+    scheduleLayoutSwitchHide(delay = LAYOUT_SWITCH_IDLE_MS) {
+      if (!this.layoutSwitchAutoHide || !layoutSwitch) return;
+      this.cancelLayoutSwitchHide();
+      this.layoutSwitchHideTimer = setTimeout(() => {
+        if (document.activeElement === layoutSwitch || layoutSwitch.contains?.(document.activeElement)) return;
+        this.hideLayoutSwitch();
+      }, delay);
+    }
+
+    revealLayoutSwitch() {
+      if (!this.layoutSwitchAutoHide || !layoutSwitch) return;
+      this.showLayoutSwitch();
+      this.scheduleLayoutSwitchHide();
+    }
+
+    handleLayoutMouseDown(event) {
+      this.layoutMouseAnchor = { x: event?.clientX ?? 0, y: event?.clientY ?? 0 };
+      this.revealLayoutSwitch();
+    }
+
+    handleLayoutMouseActivity(event) {
+      if (!this.layoutSwitchAutoHide) return;
+      const x = event?.clientX;
+      const y = event?.clientY;
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        this.revealLayoutSwitch();
+        return;
+      }
+      if (!this.layoutMouseAnchor) {
+        this.layoutMouseAnchor = { x, y };
+        return;
+      }
+      const dx = x - this.layoutMouseAnchor.x;
+      const dy = y - this.layoutMouseAnchor.y;
+      if (Math.hypot(dx, dy) < LAYOUT_MOUSE_ACTIVITY_THRESHOLD) return;
+      this.layoutMouseAnchor = { x, y };
+      this.revealLayoutSwitch();
+    }
+
+    layout2SceneBounds() {
+      const shellWidth = gameShell?.getBoundingClientRect?.().width || window.innerWidth || 1280;
+      const dividerWidth = layoutDivider?.getBoundingClientRect?.().width || 14;
+      const minPanelWidth = shellWidth <= 860 ? 240 : 320;
+      if (!shellWidth) {
+        return { min: 36, max: 72 };
+      }
+      const min = Math.max(24, (minPanelWidth / shellWidth) * 100);
+      const max = Math.min(76, 100 - (((minPanelWidth + dividerWidth) / shellWidth) * 100));
+      if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) {
+        return { min: 36, max: 72 };
+      }
+      return { min, max };
+    }
+
+    normalizeLayout2SceneWidth(value) {
+      const numeric = Number.parseFloat(value);
+      const { min, max } = this.layout2SceneBounds();
+      const candidate = Number.isFinite(numeric) ? numeric : DEFAULT_LAYOUT_2_SCENE_WIDTH;
+      return Math.min(max, Math.max(min, candidate));
+    }
+
+    applyLayout2SceneWidth(value, options = {}) {
+      const normalized = this.normalizeLayout2SceneWidth(value);
+      this.layout2SceneWidth = normalized;
+      document.body?.style?.setProperty?.("--layout-2-scene-width", `${normalized}%`);
+      document.documentElement?.style?.setProperty?.("--layout-2-scene-width", `${normalized}%`);
+      if (options.persist !== false) localStorage.setItem(LAYOUT_SPLIT_PREF_KEY, String(normalized));
+      return normalized;
+    }
+
+    updateLayout2SceneWidthFromPointer(clientX) {
+      if (!gameShell?.getBoundingClientRect) return;
+      const rect = gameShell.getBoundingClientRect();
+      if (!rect.width) return;
+      const percent = ((clientX - rect.left) / rect.width) * 100;
+      this.applyLayout2SceneWidth(percent);
+    }
+
+    stopLayoutResize() {
+      document.body?.classList?.remove("is-resizing-layout");
+      if (typeof this.layoutResizeCleanup === "function") this.layoutResizeCleanup();
+      this.layoutResizeCleanup = null;
+      if (this.layoutSwitchAutoHide) this.scheduleLayoutSwitchHide(700);
+    }
+
+    initializeLayoutDivider() {
+      if (!layoutDivider) return;
+      layoutDivider.addEventListener("pointerdown", (event) => {
+        if (this.layoutMode !== "2" || event.button !== 0) return;
+        if (!gameShell?.getBoundingClientRect) return;
+        event.preventDefault();
+        this.stopLayoutResize();
+        this.showLayoutSwitch();
+        this.cancelLayoutSwitchHide();
+        document.body?.classList?.add("is-resizing-layout");
+        this.updateLayout2SceneWidthFromPointer(event.clientX);
+        const move = (moveEvent) => this.updateLayout2SceneWidthFromPointer(moveEvent.clientX);
+        const finish = () => this.stopLayoutResize();
+        document.addEventListener("pointermove", move);
+        document.addEventListener("pointerup", finish, { once: true });
+        document.addEventListener("pointercancel", finish, { once: true });
+        this.layoutResizeCleanup = () => {
+          document.removeEventListener("pointermove", move);
+          document.removeEventListener("pointerup", finish);
+          document.removeEventListener("pointercancel", finish);
+        };
+      });
+    }
+
+    applyLayoutMode(mode) {
+      const normalized = ["1", "2"].includes(String(mode)) ? String(mode) : "1";
+      this.layoutMode = normalized;
+      document.body?.setAttribute("data-layout", normalized);
+      document.documentElement?.setAttribute?.("data-layout", normalized);
+      if (normalized === "2") this.applyLayout2SceneWidth(this.layout2SceneWidth, { persist: false });
+      const syncPressed = (button, value) => {
+        if (!button) return;
+        button.setAttribute("aria-pressed", normalized === value ? "true" : "false");
+      };
+      syncPressed(layoutMode1Button, "1");
+      syncPressed(layoutMode2Button, "2");
+      if (normalized !== "2") this.stopLayoutResize();
+    }
+
+    setLayoutMode(mode) {
+      this.applyLayoutMode(mode);
+      localStorage.setItem(LAYOUT_PREF_KEY, this.layoutMode);
     }
 
     print(text, kind = "") {

@@ -23,7 +23,7 @@
       }
 
     </style>
-    <link rel="stylesheet" href="style.css?v=20260607-2235">
+    <link rel="stylesheet" href="style.css?v=20260611-2015">
   </head>
   <body class="booting notranslate" translate="no">
     <svg class="visual-filters" width="0" height="0" aria-hidden="true" focusable="false">
@@ -42,7 +42,14 @@
         </feComponentTransfer>
       </filter>
     </svg>
-    <main class="game-shell">
+    <div id="layout-switch" class="layout-switch" aria-label="Layout">
+      <span class="layout-switch__label">Layout</span>
+      <div class="layout-switch__buttons" role="group" aria-label="Choose layout">
+        <button id="layout-mode-1" type="button">1</button>
+        <button id="layout-mode-2" type="button">2</button>
+      </div>
+    </div>
+    <main id="game-shell" class="game-shell">
       <section class="scene" aria-label="Current location">
         <img id="room-image" src="assets/local-images/hobbit_hole.jpeg?v=20260607-1855" alt="Hobbit_hole">
         <div id="image-reveal" class="image-reveal" aria-hidden="true">
@@ -51,6 +58,8 @@
         </div>
         <audio id="music-player" preload="none"></audio>
       </section>
+
+      <div id="layout-divider" class="layout-divider" role="separator" aria-orientation="vertical" aria-label="Resize layout"></div>
 
       <section class="console" aria-label="Game console">
         <div id="output" class="output" aria-live="polite"></div>
@@ -78,6 +87,6 @@
     </main>
 
     <script src="assets/game-data.js?v=20260607-1630"></script>
-    <script src="game.js?v=20260609-1820"></script>
+    <script src="game.js?v=20260611-2015"></script>
   </body>
 </html>

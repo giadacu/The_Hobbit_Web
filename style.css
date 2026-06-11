@@ -27,6 +27,12 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: Georgia, "Times New Roman", serif;
+  --layout-2-scene-width: 54%;
+  --layout-2-divider-width: 14px;
+}
+
+[hidden] {
+  display: none !important;
 }
 
 button,
@@ -59,6 +65,79 @@ input {
   overflow: hidden;
 }
 
+.layout-switch {
+  position: fixed;
+  bottom: 14px;
+  right: 14px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(10, 11, 8, 0.84);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(8px);
+}
+
+.layout-switch--auto-hide {
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.layout-switch--auto-hide.is-visible,
+.layout-switch--auto-hide:hover,
+.layout-switch--auto-hide:focus-within {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.layout-switch__label {
+  color: var(--muted);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.layout-switch__buttons {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.layout-switch button {
+  min-width: 38px;
+  min-height: 34px;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.layout-switch button[aria-pressed="true"] {
+  color: #111109;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .layout-switch--auto-hide {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+    transition: none;
+  }
+
+  body[data-layout="2"] .layout-divider.layout-divider--auto-hide {
+    opacity: 1;
+    pointer-events: auto;
+    transition: none;
+  }
+}
+
 .scene {
   position: relative;
   grid-column: 1 / 2;
@@ -72,6 +151,53 @@ input {
   border-bottom: 1px solid var(--line);
 }
 
+.layout-divider {
+  display: none;
+}
+
+body[data-layout="2"] .layout-divider {
+  position: relative;
+  display: block;
+  grid-column: 2 / 3;
+  grid-row: 1 / 2;
+  background:
+    linear-gradient(to right, rgba(0, 0, 0, 0), rgba(63, 61, 42, 0.92), rgba(0, 0, 0, 0));
+  cursor: col-resize;
+  touch-action: none;
+}
+
+body[data-layout="2"] .layout-divider.layout-divider--auto-hide {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+body[data-layout="2"] .layout-divider.layout-divider--auto-hide.is-visible,
+body[data-layout="2"] .layout-divider.layout-divider--auto-hide:hover,
+body.is-resizing-layout[data-layout="2"] .layout-divider.layout-divider--auto-hide {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+body[data-layout="2"] .layout-divider::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: min(96px, 18vh);
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(to bottom, var(--muted), var(--accent));
+  box-shadow: 0 0 0 1px rgba(10, 11, 8, 0.55);
+}
+
+body.is-resizing-layout,
+body.is-resizing-layout * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
 .scene img {
   position: absolute;
   inset: 0;
@@ -83,6 +209,10 @@ input {
   display: block;
   object-fit: cover;
   object-position: center 42%;
+}
+
+.scene img[hidden] {
+  display: none;
 }
 
 .image-reveal {
@@ -380,5 +510,52 @@ li.empty {
   .output {
     padding: 16px;
     font-size: 16px;
+  }
+
+  .layout-switch {
+    bottom: 10px;
+    right: 10px;
+    left: auto;
+    justify-content: flex-start;
+  }
+}
+
+body[data-layout="2"] .game-shell {
+  --layout-2-scene-clamped: clamp(36%, var(--layout-2-scene-width), 72%);
+  grid-template-columns:
+    minmax(320px, var(--layout-2-scene-clamped))
+    var(--layout-2-divider-width)
+    minmax(320px, calc(100% - var(--layout-2-scene-clamped) - var(--layout-2-divider-width)));
+  grid-template-rows: minmax(0, 1fr);
+}
+
+body[data-layout="2"] .scene {
+  grid-column: 1 / 2;
+  grid-row: 1 / 2;
+  border-bottom: 0;
+}
+
+body[data-layout="2"] .console {
+  grid-column: 3 / 4;
+  grid-row: 1 / 2;
+  border-bottom: 0;
+}
+
+body[data-layout="2"] .sidebar {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  body[data-layout="2"] .game-shell {
+    grid-template-columns:
+      minmax(240px, var(--layout-2-scene-clamped))
+      10px
+      minmax(240px, calc(100% - var(--layout-2-scene-clamped) - 10px));
+    grid-template-rows: minmax(220px, 40dvh);
+  }
+
+  body[data-layout="2"] .scene,
+  body[data-layout="2"] .console {
+    border-right: 0;
   }
 }

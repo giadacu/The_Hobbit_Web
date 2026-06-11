@@ -10,7 +10,11 @@ function makeElement(id = "") {
     textContent: "",
     className: "",
     children: [],
-    style: {},
+    style: {
+      setProperty() {},
+      removeProperty() {},
+      getPropertyValue() { return ""; },
+    },
     attributes: {},
     classList: { add() {}, remove() {}, contains() { return false; } },
     append(child) {
@@ -22,11 +26,13 @@ function makeElement(id = "") {
       if (this.id === "output") outputLines.length = 0;
     },
     addEventListener() {},
+    removeEventListener() {},
     removeAttribute(name) { delete this.attributes[name]; },
     getAttribute(name) { return this.attributes[name] || ""; },
     setAttribute(name, value) { this.attributes[name] = value; },
     focus() {},
     closest() { return makeElement("scene"); },
+    contains() { return false; },
     getBoundingClientRect() { return { width: 800, height: 500 }; },
     play() { return Promise.resolve(); },
     pause() {},
@@ -43,6 +49,7 @@ function bootGame() {
     "output",
     "command-input",
     "command-form",
+    "game-shell",
     "room-image",
     "image-reveal",
     "image-reveal-outline",
@@ -51,6 +58,10 @@ function bootGame() {
     "inventory-list",
     "exits-list",
     "people-list",
+    "layout-switch",
+    "layout-divider",
+    "layout-mode-1",
+    "layout-mode-2",
   ]) {
     elements.set(id, makeElement(id));
   }
@@ -60,7 +71,9 @@ function bootGame() {
     getElementById: (id) => elements.get(id) || makeElement(id),
     createElement: () => makeElement(),
     addEventListener() {},
+    removeEventListener() {},
     body: makeElement("body"),
+    documentElement: makeElement("html"),
     fonts: { ready: Promise.resolve() },
   };
   global.localStorage = {
