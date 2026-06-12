@@ -1066,10 +1066,177 @@ const gameCases = [
     },
     expectedIncluded: [
       /(knock|rat-tat).*round green door/i,
-      /Dwalin.*(outside|step|doorstep|door)/,
-      /Dwalin.*(steps in|steps inside|comes in|enters|inside)/,
+      /(blue-hooded dwarf|Dwalin).*(step|door|path|gate)/i,
+      /Dwalin.*(ducks inside|enters|inside|introduce)/i,
     ],
     notExpectedIncluded: ["Thorin"],
+  },
+  {
+    name: "garden arrival messages stay outside-facing",
+    drive(game) {
+      const controller = game.unexpectedParty;
+      game.currentRoom = "bilbos_garden";
+      game.player.position = "bilbos_garden";
+      controller.state.cooldown = 0;
+      controller.advanceTurn();
+    },
+    expectedIncluded: [/round green door/],
+    notExpectedIncluded: ["behind you", "From inside Bag End comes the sound of a knock"],
+  },
+  {
+    name: "balin garden entry stays outside-facing",
+    drive(game) {
+      const controller = game.unexpectedParty;
+      game.currentRoom = "bilbos_garden";
+      game.player.position = "bilbos_garden";
+      controller.ensureCharacters();
+      controller.state.arrivalIndex = 1;
+      controller.state.arrived = ["unexpected_party_dwalin"];
+      controller.state.currentArrival = { dwarfId: "unexpected_party_balin", stage: 2 };
+      controller.state.cooldown = 0;
+      controller.advanceTurn();
+    },
+    expectedIncluded: ["Balin bows his head beneath the round green door and passes inside with easy courtesy."],
+    notExpectedIncluded: ["Balin enters with an easy bow, polite in manner and quietly observant of the whole room at once."],
+  },
+  {
+    name: "remaining dwarves can arrive in pairs",
+    drive(game) {
+      const controller = game.unexpectedParty;
+      controller.ensureCharacters();
+      controller.state.arrivalIndex = 2;
+      controller.state.arrived = ["unexpected_party_dwalin", "unexpected_party_balin"];
+      controller.state.currentArrival = null;
+      controller.state.cooldown = 0;
+      controller.advanceTurn();
+      controller.state.cooldown = 0;
+      controller.advanceTurn();
+    },
+    expectedIncluded: [
+      /Fili and Kili/,
+      /(arrives together|come in together|duck through the round green door together)/i,
+    ],
+    notExpectedIncluded: ["Thorin"],
+  },
+  {
+    name: "paired dwarf arrivals are not interrupted by ambient beats",
+    drive(game) {
+      const controller = game.unexpectedParty;
+      let guard = 0;
+      while (controller.state.arrivalIndex < controller.roster.length && guard < 20) {
+        controller.state.cooldown = 0;
+        controller.advanceTurn();
+        guard += 1;
+      }
+    },
+    expectedIncluded: [
+      "Another pair arrives together: Fili and Kili stand at the round green door almost shoulder to shoulder.",
+      "Fili and Kili come in together, shedding travel-cloaks and adding at once to the cheerful disorder of Bag End.",
+      "Another pair arrives together: Dori and Nori stand at the round green door almost shoulder to shoulder.",
+      "Dori and Nori come in together, shedding travel-cloaks and adding at once to the cheerful disorder of Bag End.",
+    ],
+    notExpectedIncluded: [
+      "Plates disappear almost as soon as they are set down, and the pantry is beginning to look heroically overmatched.",
+      "Ori wanders off toward the study.",
+    ],
+  },
+  {
+    name: "thorin arrives last and turns supper into a quest",
+    drive(game) {
+      const controller = game.unexpectedParty;
+      let guard = 0;
+      let thorinTurn = null;
+      while (!controller.state.questBriefingDone && guard < 80) {
+        controller.state.cooldown = 0;
+        controller.advanceTurn();
+        guard += 1;
+        if (thorinTurn === null && controller.state.thorinArrived) thorinTurn = guard;
+      }
+      game.print(`Thorin pacing ok: ${thorinTurn !== null && thorinTurn <= 30 ? "yes" : "no"}`);
+      game.print(`Quest briefing done: ${controller.state.questBriefingDone ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      /Thorin Oakenshield|Thorin says/,
+      /Erebor/,
+      /Smaug/,
+      /burglar/,
+      "Thorin pacing ok: yes",
+      "Quest briefing done: yes",
+    ],
+  },
+  {
+    name: "the road east stays closed until thorins briefing is done",
+    drive(game) {
+      game.currentRoom = "bilbos_garden";
+      game.player.position = "bilbos_garden";
+      game.execute("east");
+    },
+    expectedIncluded: ['Gandalf lifts a hand. "Not yet, Bilbo. There is more company yet to come."'],
+    notExpectedIncluded: ["You are outside the Green Dragon Inn"],
+  },
+  {
+    name: "repeated attempt to leave before briefing feels socially awkward",
+    drive(game) {
+      game.currentRoom = "bilbos_garden";
+      game.player.position = "bilbos_garden";
+      game.execute("east");
+      game.execute("east");
+    },
+    expectedIncluded: ["You make as if to slip away, but Gandalf's look makes it plain that he expects you to stay."],
+  },
+  {
+    name: "trying to leave after thorin arrives points back to the briefing",
+    drive(game) {
+      const controller = game.unexpectedParty;
+      let guard = 0;
+      while (!controller.state.thorinArrived && guard < 80) {
+        controller.state.cooldown = 0;
+        controller.advanceTurn();
+        guard += 1;
+      }
+      game.currentRoom = "bilbos_garden";
+      game.player.position = "bilbos_garden";
+      game.execute("east");
+      game.execute("east");
+    },
+    expectedIncluded: ["You reach toward the way out, then stop. Leaving now would look very like fleeing the room."],
+  },
+  {
+    name: "the road east opens after thorins briefing",
+    drive(game) {
+      const controller = game.unexpectedParty;
+      let guard = 0;
+      while (!controller.state.questBriefingDone && guard < 80) {
+        controller.state.cooldown = 0;
+        controller.advanceTurn();
+        guard += 1;
+      }
+      game.currentRoom = "bilbos_garden";
+      game.player.position = "bilbos_garden";
+      game.execute("east");
+      game.execute("location");
+    },
+    expectedIncluded: ["You are currently in Green Dragon Inn Outside."],
+    notExpectedIncluded: ['Gandalf lifts a hand. "Not yet, Bilbo. There is more company yet to come."'],
+  },
+  {
+    name: "bag end house atmosphere does not imply dwarves before arrival",
+    drive(game) {
+      game.currentRoom = "hobbit_hole";
+      game.player.position = "hobbit_hole";
+      for (let turn = 0; turn < 40; turn += 1) {
+        game.turnCount = turn;
+        delete game.flags.atmosphere_bag_end_house_cooldown;
+        const before = outputLines.length;
+        game.maybeAtmosphericEvent();
+        if (outputLines.length > before) break;
+      }
+    },
+    expectedIncluded: ["From the kitchen comes the warm homely sound of cutlery, cupboard doors, and something sizzling in butter."],
+    notExpectedIncluded: [
+      "A fragment of dwarven song rolls along the round passages before fading into murmured conversation.",
+      "Somewhere deeper in Bag End, crockery rattles, a kettle begins to sing, and dwarf laughter answers it.",
+    ],
   },
   {
     name: "unexpected party opening the door updates traversal state",
@@ -1083,7 +1250,7 @@ const gameCases = [
       game.print(`Door traversal room: ${game.currentRoom}`);
     },
     expectedIncluded: [
-      /Dwalin.*(outside|step|doorstep|door)/,
+      /(blue-hooded dwarf|Dwalin).*(step|door|path|gate)/i,
       "Door traversal room: bilbos_garden",
     ],
     notExpectedIncluded: ["The round green door is closed."],
@@ -1104,7 +1271,6 @@ const gameCases = [
         .filter((character) => character.position && ![
           "hobbit_hole",
           "bilbos_garden",
-          "bag_end_entrance_hall",
           "bag_end_parlour",
           "bag_end_study",
           "bag_end_dining_room",
@@ -1393,7 +1559,7 @@ const gameCases = [
       const issued = [];
       Math.random = () => 0.99;
       try {
-        for (let step = 0; step < 250 && !game.endgame; step += 1) {
+        for (let step = 0; step < 500 && !game.endgame; step += 1) {
           const command = game.nextAutoplayCommand();
           if (!command) throw new Error(`Autoplay stopped unexpectedly at step ${step} in ${game.currentRoom}.`);
           issued.push(command);
@@ -1851,9 +2017,19 @@ const gameCases = [
     notExpectedIncluded: ["Invisible under the ring, you slip past Gollum as he claws wildly about for his precious."],
   },
   {
+    name: "missing exit reports no visible exit rather than unrecognized direction",
+    setup(game) {
+      game.currentRoom = "hobbit_hole";
+      game.player.position = "hobbit_hole";
+    },
+    inputs: ["north"],
+    expectedIncluded: ["You see no exit in that direction."],
+    notExpectedIncluded: ['That direction is not recognized. Type "go <direction>" or "go through <door name>".'],
+  },
+  {
     name: "bag end expansion rooms are reachable",
     drive(game) {
-      game.execute("north");
+      game.execute("west");
       game.execute("location");
       game.currentRoom = "hobbit_hole";
       game.player.position = "hobbit_hole";
@@ -1862,7 +2038,7 @@ const gameCases = [
       game.execute("examine seed cakes");
     },
     expectedIncluded: [
-      "You are currently in Entrance Hall.",
+      "You are currently in Parlour.",
       "You see a plate of fragrant seed-cakes, cut small enough to vanish at a dwarf's convenience.",
     ],
   },

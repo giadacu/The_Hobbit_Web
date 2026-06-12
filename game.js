@@ -2,7 +2,7 @@
   const DATA = applyImmersionExpansion(window.HOBBIT_DATA);
   const IMAGE_ROOT = "assets/local-images/";
   const MUSIC_ROOT = "assets/local-music/";
-  const ASSET_VERSION = "20260612-1244";
+  const ASSET_VERSION = "20260612-1338";
   const SAVE_PREFIX = "hobbit-web-save:";
   const LAYOUT_PREF_KEY = "hobbit-web-layout-mode";
 
@@ -224,7 +224,6 @@
   const IMMERSION_BAG_END_ROOMS = new Set([
     "hobbit_hole",
     "bilbos_garden",
-    "bag_end_entrance_hall",
     "bag_end_parlour",
     "bag_end_study",
     "bag_end_dining_room",
@@ -367,7 +366,7 @@
       "From the kitchen comes the warm homely sound of cutlery, cupboard doors, and something sizzling in butter.",
     ],
     bag_end_garden: [
-      "Bees move lazily among the flowers, and from inside Bag End comes only the faintest murmur of domestic bustle.",
+      "Bees move lazily among the flowers, and the Hill feels hushed but homely in the mild evening air.",
       "A light breeze stirs the herbs and clipped borders, carrying soil, roses, and the quiet comfort of the Hill.",
       "The garden path lies peaceful beneath the round door, while birds and distant village sounds make the world seem kindly for a moment.",
     ],
@@ -557,7 +556,6 @@
     data.rooms.lower_halls.description = "You enter the lower halls of Erebor, a mighty chamber of pillars, carvings, and treasure under the Mountain's ancient stone. The air is warm, close, and faintly tainted by dragon-smoke, while every footfall seems an impertinence in a kingdom too old to forget itself.";
 
     [
-      ["bag_end_entrance_hall", "Entrance Hall", "A broad, circular passage opens here with umbrella stands, polished pegs, and a tiled floor kept absurdly clean for a place about to receive thirteen dwarves and a wizard. The green door is not far off, and every sound in the smial seems to pass through this generous little chamber.", "hobbit_hole.jpeg", "relaxed"],
       ["bag_end_parlour", "Parlour", "This snug parlour is arranged for conversation rather than grandeur: deep chairs, a hearth laid ready, and several low tables already burdened with plates, cups, and evidence of hobbit forethought. It would be a perfect room for quiet company if Bag End still believed in quiet company.", "bag_end_parlour.jpeg", "relaxed"],
       ["bag_end_study", "Study", "Bilbo's study smells of paper, pipe-weed, and old leather. Shelves rise almost to the curve of the ceiling, a writing desk stands ready with maps and pens, and the whole room feels like the private stronghold of a hobbit who likes his adventures safely bound between covers.", "bag_end_study.jpeg", "relaxed"],
       ["bag_end_dining_room", "Dining Room", "A long table dominates the dining room, though it was plainly built for family comfort rather than a troop of hungry dwarves. Good silver, folded linen, and polished sideboards suggest that Bag End knows very well how hospitality ought to be done.", "bag_end_dining_room.jpeg", "relaxed"],
@@ -605,7 +603,7 @@
       ["erebor_treasure_approach", "Treasure Approach", "Gold-dust glitters in the cracks ahead, and the air grows warmer with every step. The silence here is not empty; it is the held breath of a house occupied by something too mighty to disturb lightly.", "Dragon.jpeg", "suspence"],
     ].forEach(([id, name, description, image, sound]) => ensureRoom(id, { name, description, image, sound }));
 
-    ensureTwoWay("hobbit_hole", "north", "bag_end_entrance_hall");
+    ensureTwoWay("hobbit_hole", "east", "bilbos_garden", "west");
     ensureTwoWay("hobbit_hole", "west", "bag_end_parlour");
     ensureTwoWay("hobbit_hole", "south", "bag_end_dining_room");
     ensureTwoWay("hobbit_hole", "north east", "bag_end_study", "south west");
@@ -613,7 +611,6 @@
     ensureTwoWay("bag_end_pantry", "east", "bag_end_kitchen");
     ensureTwoWay("bag_end_parlour", "south", "bag_end_guest_room");
     ensureTwoWay("bag_end_dining_room", "down", "bag_end_cellar_room", "up");
-    ensureTwoWay("bag_end_entrance_hall", "north", "bilbos_garden", "south");
     ensureTwoWay("rivendell", "north", "rivendell_courtyard");
     ensureTwoWay("rivendell", "north east", "rivendell_library", "south west", 1);
     ensureTwoWay("rivendell", "south", "rivendell_hall_of_fire", "north");
@@ -757,10 +754,10 @@
       ["bag_end_study", "study_maps"],
       ["bag_end_study", "pipe_rack"],
       ["bag_end_pantry", "pantry_shelves"],
-      ["bag_end_entrance_hall", "hall_coat_pegs"],
-      ["bag_end_entrance_hall", "hall_umbrella_stand"],
-      ["bag_end_entrance_hall", "hall_console_table"],
-      ["bag_end_entrance_hall", "hall_letter_tray"],
+      ["hobbit_hole", "hall_coat_pegs"],
+      ["hobbit_hole", "hall_umbrella_stand"],
+      ["hobbit_hole", "hall_console_table"],
+      ["hobbit_hole", "hall_letter_tray"],
       ["bag_end_parlour", "parlour_hearth"],
       ["bag_end_parlour", "parlour_sideboard"],
       ["bag_end_parlour", "parlour_biscuit_tin"],
@@ -1038,6 +1035,9 @@
       const validArrival = currentArrival && this.roster.some((entry) => entry.id === currentArrival.dwarfId)
         ? {
           dwarfId: currentArrival.dwarfId,
+          companionIds: Array.isArray(currentArrival.companionIds)
+            ? currentArrival.companionIds.filter((id) => id !== currentArrival.dwarfId && this.roster.some((entry) => entry.id === id))
+            : [],
           stage: Math.max(0, Math.min(3, Number(currentArrival.stage) || 0)),
         }
         : null;
@@ -1052,6 +1052,9 @@
         currentArrival: validArrival,
         arrived,
         fullHouseAnnounced: Boolean(savedState?.fullHouseAnnounced),
+        thorinStage: Number.isFinite(savedState?.thorinStage) ? Math.max(0, Math.min(6, savedState.thorinStage)) : 0,
+        thorinArrived: Boolean(savedState?.thorinArrived),
+        questBriefingDone: Boolean(savedState?.questBriefingDone),
       };
       if (this.state.arrivalIndex < this.state.arrived.length) this.state.arrivalIndex = this.state.arrived.length;
       this.reconcileCharacters();
@@ -1104,13 +1107,13 @@
         character.followingPlayer = false;
         character.justEntered = false;
         character.carriedBy = null;
-        const currentStage = this.state.currentArrival?.dwarfId === dwarf.id ? this.state.currentArrival.stage : -1;
+        const currentStage = this.currentArrivalIds().includes(dwarf.id) ? this.state.currentArrival.stage : -1;
         if (this.state.arrived.includes(dwarf.id)) {
           if (!this.partyRooms.has(character.position)) character.position = this.homeRoomFor(dwarf.id);
         } else if (currentStage === 1) {
           character.position = "bilbos_garden";
         } else if (currentStage >= 2) {
-          character.position = "bag_end_entrance_hall";
+          character.position = "hobbit_hole";
         } else {
           character.position = null;
         }
@@ -1162,7 +1165,7 @@
 
     homeRoomFor(dwarfId) {
       const distribution = {
-        unexpected_party_dwalin: "bag_end_entrance_hall",
+        unexpected_party_dwalin: "hobbit_hole",
         unexpected_party_balin: "bag_end_parlour",
         unexpected_party_fili: "bag_end_guest_room",
         unexpected_party_kili: "bilbos_garden",
@@ -1172,7 +1175,7 @@
         unexpected_party_oin: "bag_end_kitchen",
         unexpected_party_gloin: "bag_end_cellar_room",
         unexpected_party_bifur: "bag_end_parlour",
-        unexpected_party_bofur: "bag_end_entrance_hall",
+        unexpected_party_bofur: "hobbit_hole",
         unexpected_party_bombur: "bag_end_pantry",
       };
       return distribution[dwarfId] || "hobbit_hole";
@@ -1219,6 +1222,14 @@
     }
 
     nextEvent() {
+      if (this.state.arrivalIndex >= this.roster.length && !this.state.currentArrival && !this.state.thorinArrived) {
+        return this.nextThorinEvent();
+      }
+
+      if (this.state.arrivalIndex >= this.roster.length && !this.state.currentArrival && !this.state.questBriefingDone) {
+        return this.nextQuestBriefingEvent();
+      }
+
       if (this.state.arrivalIndex >= this.roster.length && !this.state.currentArrival && !this.state.fullHouseAnnounced) {
         return {
           message: this.pick([
@@ -1233,7 +1244,10 @@
         };
       }
 
-      const preferAmbient = this.state.arrived.length > 0 && (this.state.turnCounter + this.state.arrived.length) % 4 === 0;
+      const arrivalsStillInProgress = this.state.arrivalIndex < this.roster.length || Boolean(this.state.currentArrival);
+      const preferAmbient = this.state.thorinArrived
+        ? this.state.arrived.length > 0 && (this.state.turnCounter + this.state.arrived.length) % 4 === 0
+        : !arrivalsStillInProgress && this.state.arrived.length >= 4;
       if (preferAmbient) {
         const ambientFirst = this.nextAmbientEvent();
         if (ambientFirst) return ambientFirst;
@@ -1247,14 +1261,21 @@
     nextArrivalEvent() {
       if (this.state.arrivalIndex >= this.roster.length && !this.state.currentArrival) return null;
       if (!this.state.currentArrival) {
+        const dwarfId = this.roster[this.state.arrivalIndex].id;
+        const shouldPair = this.state.arrivalIndex >= 2 && this.state.arrivalIndex + 1 < this.roster.length;
         this.state.currentArrival = {
-          dwarfId: this.roster[this.state.arrivalIndex].id,
+          dwarfId,
+          companionIds: shouldPair ? [this.roster[this.state.arrivalIndex + 1].id] : [],
           stage: 0,
         };
       }
 
-      const dwarf = this.game.characters[this.state.currentArrival.dwarfId];
+      const dwarves = this.currentArrivalCharacters();
+      const dwarf = dwarves[0];
       if (!dwarf) return null;
+      const scripted = this.scriptedArrivalEvent(dwarf);
+      if (scripted) return scripted;
+      if (dwarves.length > 1) return this.groupedArrivalEvent(dwarves);
       const profile = this.arrivalProfile(dwarf.id);
 
       if (this.state.currentArrival.stage === 0) {
@@ -1292,21 +1313,255 @@
           apply: () => {
             this.setPartyDoorOpen(true);
             dwarf.position = "hobbit_hole";
-            this.state.currentArrival.stage = 3;
+            if (!this.state.arrived.includes(dwarf.id)) this.state.arrived.push(dwarf.id);
+            this.state.arrivalIndex = Math.min(this.roster.length, this.state.arrivalIndex + 1);
+            this.state.currentArrival = null;
           },
         };
       }
 
-      return {
-        message: this.pick(profile.settle.map((line) => line.replaceAll("{name}", dwarf.name)), this.seededHash(`${dwarf.id}:settle:${this.state.turnCounter}`)),
-        cooldown: this.pickCooldown(profile.settleCooldown[0], profile.settleCooldown[1]),
-        apply: () => {
-          dwarf.position = "hobbit_hole";
-          if (!this.state.arrived.includes(dwarf.id)) this.state.arrived.push(dwarf.id);
-          this.state.arrivalIndex = Math.min(this.roster.length, this.state.arrivalIndex + 1);
-          this.state.currentArrival = null;
-        },
-      };
+      return null;
+    }
+
+    currentArrivalIds() {
+      if (!this.state.currentArrival) return [];
+      return [this.state.currentArrival.dwarfId, ...(this.state.currentArrival.companionIds || [])];
+    }
+
+    currentArrivalCharacters() {
+      return this.currentArrivalIds().map((id) => this.game.characters[id]).filter(Boolean);
+    }
+
+    groupedArrivalEvent(dwarves) {
+      const names = dwarves.map((character) => character.name);
+      const pairLabel = names.join(" and ");
+      const ids = dwarves.map((character) => character.id);
+      const stage = this.state.currentArrival?.stage || 0;
+
+      if (stage === 0) {
+        return {
+          message: this.game.currentRoom === "bilbos_garden"
+            ? `${pairLabel} come through the garden gate together and make straight for the round green door.`
+            : `Another pair arrives together: ${pairLabel} stand at the round green door almost shoulder to shoulder.`,
+          cooldown: 1,
+          apply: () => {
+            this.setPartyDoorOpen(true);
+            for (const dwarf of dwarves) dwarf.position = "bilbos_garden";
+            this.state.currentArrival.stage = 1;
+          },
+        };
+      }
+
+      if (stage === 1) {
+        return {
+          message: this.game.currentRoom === "bilbos_garden"
+            ? `${pairLabel} duck through the round green door together and vanish inside in a bustle of cloaks, packs, and cheerful appetite.`
+            : `${pairLabel} come in together, shedding travel-cloaks and adding at once to the cheerful disorder of Bag End.`,
+          cooldown: 1,
+          apply: () => {
+            this.setPartyDoorOpen(true);
+            for (const dwarf of dwarves) {
+              dwarf.position = "hobbit_hole";
+              if (!this.state.arrived.includes(dwarf.id)) this.state.arrived.push(dwarf.id);
+            }
+            this.state.arrivalIndex = Math.min(this.roster.length, this.state.arrivalIndex + ids.length);
+            this.state.currentArrival = null;
+          },
+        };
+      }
+
+      return null;
+    }
+
+    scriptedArrivalEvent(dwarf) {
+      const stage = this.state.currentArrival?.stage;
+      if ((this.state.currentArrival?.companionIds || []).length) return null;
+      if (dwarf.id === "unexpected_party_dwalin") {
+        if (stage === 0) {
+          return {
+            message: this.game.currentRoom === "bilbos_garden"
+              ? "Heavy boots sound upon the garden path, followed by a solid knock at the round green door."
+              : "Heavy boots sound upon the path outside, and a solid knock follows at the round green door.",
+            cooldown: 1,
+            apply: () => {
+              this.state.currentArrival.stage = 1;
+            },
+          };
+        }
+        if (stage === 1) {
+          return {
+            message: this.game.currentRoom === "bilbos_garden"
+              ? "A blue-hooded dwarf comes through the gate and makes directly for the round green door."
+              : "The round green door opens to reveal a blue-hooded dwarf standing broad and patient upon the step.",
+            cooldown: 1,
+            apply: () => {
+              this.setPartyDoorOpen(true);
+              dwarf.position = "bilbos_garden";
+              this.state.currentArrival.stage = 2;
+            },
+          };
+        }
+        if (stage === 2) {
+          return {
+            message: this.game.currentRoom === "bilbos_garden"
+              ? "Dwalin ducks through the round green door, and almost at once his voice can be heard within asking for food before introductions."
+              : "Dwalin ducks inside and says that food would be welcome before he troubles to introduce himself.",
+            cooldown: 1,
+            apply: () => {
+              this.setPartyDoorOpen(true);
+              dwarf.position = "hobbit_hole";
+              this.state.currentArrival.stage = 3;
+            },
+          };
+        }
+        if (stage === 3) {
+          return {
+            message: "Only after warming himself a little does Dwalin give his name, eyeing the room with practical approval.",
+            cooldown: 1,
+            apply: () => {
+              dwarf.position = "hobbit_hole";
+              if (!this.state.arrived.includes(dwarf.id)) this.state.arrived.push(dwarf.id);
+              this.state.arrivalIndex = Math.min(this.roster.length, this.state.arrivalIndex + 1);
+              this.state.currentArrival = null;
+            },
+          };
+        }
+      }
+
+      if (dwarf.id === "unexpected_party_balin") {
+        if (stage === 0) {
+          return {
+            message: this.game.currentRoom === "bilbos_garden"
+              ? "Before the last surprise has settled, another knock comes at the round green door, gentler but no less certain."
+              : "A second knock comes at the round green door, gentler than the first yet somehow more assured.",
+            cooldown: 1,
+            apply: () => {
+              this.state.currentArrival.stage = 1;
+            },
+          };
+        }
+        if (stage === 1) {
+          return {
+            message: this.game.currentRoom === "bilbos_garden"
+              ? "A white-bearded dwarf passes through the gate with courteous calm, observing everything as he comes."
+              : "The round green door opens upon a white-bearded dwarf whose bright eyes seem to miss nothing.",
+            cooldown: 1,
+            apply: () => {
+              this.setPartyDoorOpen(true);
+              dwarf.position = "bilbos_garden";
+              this.state.currentArrival.stage = 2;
+            },
+          };
+        }
+        if (stage === 2) {
+          return {
+            message: this.game.currentRoom === "bilbos_garden"
+              ? "Balin bows his head beneath the round green door and passes inside with easy courtesy."
+              : "Balin enters with an easy bow, polite in manner and quietly observant of the whole room at once.",
+            cooldown: 1,
+            apply: () => {
+              this.setPartyDoorOpen(true);
+              dwarf.position = "hobbit_hole";
+              this.state.currentArrival.stage = 3;
+            },
+          };
+        }
+        if (stage === 3) {
+          return {
+            message: "Balin settles near the hearth, smiling as though he has already decided that Bag End is worth remembering.",
+            cooldown: 1,
+            apply: () => {
+              dwarf.position = "bag_end_parlour";
+              if (!this.state.arrived.includes(dwarf.id)) this.state.arrived.push(dwarf.id);
+              this.state.arrivalIndex = Math.min(this.roster.length, this.state.arrivalIndex + 1);
+              this.state.currentArrival = null;
+            },
+          };
+        }
+      }
+
+      return null;
+    }
+
+    nextThorinEvent() {
+      const thorin = this.game.characters.thorin;
+      if (!thorin) return null;
+      if (this.state.thorinStage === 0) {
+        return {
+          message: this.game.currentRoom === "bilbos_garden"
+            ? "At last a measured tread comes up the path outside, slower and graver than the rest."
+            : "At last a measured tread sounds beyond the round green door, slower and graver than any that came before.",
+          cooldown: 1,
+          apply: () => {
+            this.state.thorinStage = 1;
+          },
+        };
+      }
+      if (this.state.thorinStage === 1) {
+        return {
+          message: this.game.currentRoom === "bilbos_garden"
+            ? "A dwarf wrapped in a dark cloak comes through the gate: taller than the others, proud, and imposing even before he speaks."
+            : "The round green door opens, and there stands Thorin Oakenshield, dark-cloaked, proud, and unmistakably the leader of those already gathered within.",
+          cooldown: 1,
+          apply: () => {
+            this.setPartyDoorOpen(true);
+            thorin.position = "bilbos_garden";
+            this.state.thorinStage = 2;
+          },
+        };
+      }
+      if (this.state.thorinStage === 2) {
+        return {
+          message: this.game.currentRoom === "bilbos_garden"
+            ? "Thorin stoops beneath the round green door and passes inside. The voices within falter almost at once, as though the whole gathering has changed shape."
+            : "Thorin stoops beneath the round green door and enters Bag End. The talk falters almost at once; what had been a merry dinner begins to feel like the threshold of a grave business.",
+          cooldown: 1,
+          apply: () => {
+            this.setPartyDoorOpen(true);
+            thorin.position = "hobbit_hole";
+            this.state.thorinStage = 3;
+            this.state.thorinArrived = true;
+          },
+        };
+      }
+      return null;
+    }
+
+    nextQuestBriefingEvent() {
+      const thorin = this.game.characters.thorin;
+      if (!thorin) return null;
+      if (this.state.thorinStage === 3) {
+        return {
+          message: "Thorin says 'Erebor was my people's kingdom under the Mountain, and it has long been lost to us.'",
+          cooldown: 2,
+          apply: () => {
+            thorin.position = "hobbit_hole";
+            this.state.thorinStage = 4;
+          },
+        };
+      }
+      if (this.state.thorinStage === 4) {
+        return {
+          message: "Thorin says 'Smaug the dragon lies there now upon halls and treasure beyond counting, and all of it was won from us by fire and death.'",
+          cooldown: 2,
+          apply: () => {
+            thorin.position = "hobbit_hole";
+            this.state.thorinStage = 5;
+          },
+        };
+      }
+      if (this.state.thorinStage === 5) {
+        return {
+          message: "Thorin's gaze settles on you. 'And you, Master Baggins, are meant to be our burglar.' Gandalf adds softly, 'The world is wider than your garden gate, Master Baggins.'",
+          cooldown: 3,
+          apply: () => {
+            thorin.position = "bag_end_parlour";
+            this.state.thorinStage = 6;
+            this.state.questBriefingDone = true;
+          },
+        };
+      }
+      return null;
     }
 
     nextAmbientEvent() {
@@ -1314,7 +1569,7 @@
       const visibleDwarves = this.arrivedDwarves().filter((character) => character.position === roomId);
       const options = [];
 
-      if (["hobbit_hole", "bag_end_parlour", "bag_end_dining_room", "bag_end_entrance_hall"].includes(roomId) && visibleDwarves.length >= 2) {
+      if (["hobbit_hole", "bag_end_parlour", "bag_end_dining_room"].includes(roomId) && visibleDwarves.length >= 2) {
         options.push({
           message: this.pick([
             "Several dwarves are comparing roads, weather, and provisions in the rapid shorthand of practiced travelers.",
@@ -1387,7 +1642,19 @@
         }
       }
 
-      const movable = this.arrivedDwarves().filter((character) => character.id !== this.state.currentArrival?.dwarfId && this.partyRooms.has(character.position));
+      if (this.state.arrived.length >= 4 && ["hobbit_hole", "bag_end_dining_room", "bag_end_pantry", "bag_end_kitchen"].includes(roomId)) {
+        options.push({
+          message: this.pick([
+            "Snatches of dwarf-song roll from room to room, and the chorus grows louder with every fresh plate that vanishes.",
+            "Plates disappear almost as soon as they are set down, and the pantry is beginning to look heroically overmatched.",
+            "The house fills with laughter, song, and the steady domestic calamity of dwarves discovering how well Bilbo keeps his pantry.",
+          ], this.seededHash(`party-feast:${this.state.turnCounter}:${this.state.arrived.length}`)),
+          cooldown: this.pickCooldown(4, 6),
+        });
+      }
+
+      const arrivingIds = new Set(this.currentArrivalIds());
+      const movable = this.arrivedDwarves().filter((character) => !arrivingIds.has(character.id) && this.partyRooms.has(character.position));
       if (movable.length) {
         const dwarf = movable[Math.abs(this.seededHash(`move:${this.state.turnCounter}`)) % movable.length];
         const toRoom = this.nextBagEndRoomFor(dwarf.position, dwarf.id);
@@ -1401,20 +1668,20 @@
         });
       }
 
-      if (this.game.characters.gandalf?.position === roomId && this.state.arrivalIndex < this.roster.length && this.state.turnCounter % 6 === 0) {
+      if (this.game.characters.gandalf?.position === roomId && !this.state.questBriefingDone && this.state.turnCounter % 6 === 0) {
         options.push({
           message: `Gandalf says '${this.pick([
             "We are expecting company.",
             "You had better prepare for guests.",
             "Patience, Bilbo.",
-            "The road will soon be calling.",
+            "The world is wider than your garden gate, Master Baggins.",
             "Best keep the kettle near at hand.",
           ], this.seededHash(`gandalf:${this.state.turnCounter}:${this.state.arrivalIndex}`))}'`,
           cooldown: this.pickCooldown(5, 7),
         });
       }
 
-      if (roomId === "hobbit_hole" && this.state.arrived.length >= 8 && this.state.turnCounter % 7 === 0) {
+      if (roomId === "hobbit_hole" && this.state.questBriefingDone && this.state.arrived.length >= 8 && this.state.turnCounter % 7 === 0) {
         options.push({
           message: this.pick([
             "We should not keep our leader waiting.",
@@ -1455,10 +1722,9 @@
 
     nextBagEndRoomFor(fromRoom, dwarfId) {
       const routes = {
-        hobbit_hole: ["bilbos_garden", "bag_end_entrance_hall", "bag_end_parlour", "bag_end_study", "bag_end_dining_room"],
-        bilbos_garden: ["bag_end_entrance_hall", "hobbit_hole"],
-        bag_end_entrance_hall: ["hobbit_hole", "bilbos_garden", "bag_end_parlour"],
-        bag_end_parlour: ["hobbit_hole", "bag_end_guest_room", "bag_end_entrance_hall"],
+        hobbit_hole: ["bilbos_garden", "bag_end_parlour", "bag_end_study", "bag_end_dining_room"],
+        bilbos_garden: ["hobbit_hole"],
+        bag_end_parlour: ["hobbit_hole", "bag_end_guest_room"],
         bag_end_study: ["hobbit_hole", "bag_end_parlour"],
         bag_end_dining_room: ["hobbit_hole", "bag_end_pantry", "bag_end_cellar_room"],
         bag_end_pantry: ["bag_end_dining_room", "bag_end_kitchen"],
@@ -1492,8 +1758,8 @@
             "A firm knock sounds at the round green door.",
           ],
           knockGarden: [
-            "From inside Bag End comes the sound of a knock at the round green door.",
-            "You hear a solid knock from the round green door behind you.",
+            "A knock sounds at the round green door ahead of you.",
+            "A solid knock carries across the garden to the round green door.",
           ],
           approachHall: [
             "The round green door opens, and {name} can be glimpsed outside.",
@@ -1516,10 +1782,10 @@
             "{name} sets down his travelling gear and takes a comfortable place by the hearth.",
             "{name} eases himself in, warming his hands and looking round with approval.",
           ],
-          knockCooldown: [2, 3],
-          approachCooldown: [2, 3],
-          entryCooldown: [1, 2],
-          settleCooldown: [3, 5],
+          knockCooldown: [1, 1],
+          approachCooldown: [1, 1],
+          entryCooldown: [1, 1],
+          settleCooldown: [1, 2],
         },
         {
           knockHall: [
@@ -1527,8 +1793,8 @@
             "There comes a quick, businesslike knock at the round green door.",
           ],
           knockGarden: [
-            "From the house comes a brisk rat-tat at the round green door.",
-            "A quick knock rattles the round green door behind you.",
+            "A brisk rat-tat sounds at the round green door ahead.",
+            "A quick knock rattles the round green door before you.",
           ],
           approachHall: [
             "The round green door swings open, and {name} is already on the step as if impatient to be admitted.",
@@ -1551,10 +1817,10 @@
             "{name} sets down his pack, warms his hands, and seems satisfied with the arrangement.",
             "{name} makes himself comfortable with the air of a guest expecting many more to follow.",
           ],
-          knockCooldown: [1, 2],
-          approachCooldown: [1, 2],
-          entryCooldown: [1, 2],
-          settleCooldown: [2, 4],
+          knockCooldown: [1, 1],
+          approachCooldown: [1, 1],
+          entryCooldown: [1, 1],
+          settleCooldown: [1, 2],
         },
         {
           knockHall: [
@@ -1562,8 +1828,8 @@
             "There is a patient knock at the round green door.",
           ],
           knockGarden: [
-            "From within comes a measured knock at the round green door, followed by the sound of someone waiting outside.",
-            "You hear a patient knock from the round green door and the soft scrape of boots beyond it.",
+            "A measured knock sounds at the round green door, followed by the soft scrape of boots on the path.",
+            "Someone knocks patiently at the round green door while the garden gate clicks shut behind them.",
           ],
           approachHall: [
             "The round green door opens, and {name} can be seen outside, looking in with calm interest.",
@@ -1586,10 +1852,10 @@
             "{name} finds himself a place by the hearth and looks as though he means to enjoy it properly.",
             "{name} stands warming himself for a moment before taking a comfortable seat.",
           ],
-          knockCooldown: [2, 4],
-          approachCooldown: [2, 3],
-          entryCooldown: [1, 3],
-          settleCooldown: [3, 5],
+          knockCooldown: [1, 1],
+          approachCooldown: [1, 1],
+          entryCooldown: [1, 1],
+          settleCooldown: [1, 2],
         },
       ];
       return profiles[Math.abs(this.seededHash(`arrival-profile:${dwarfId}`)) % profiles.length];
@@ -1643,10 +1909,13 @@
       if (["bag_end", "green_dragon"].includes(this.chapterForRoom())) return;
       const party = this.game.unexpectedParty;
       if (!party) return;
-      if (party.state.arrivalIndex >= party.roster.length && party.state.arrived.length >= party.roster.length) return;
+      if (party.state.arrivalIndex >= party.roster.length && party.state.arrived.length >= party.roster.length && party.state.questBriefingDone) return;
       party.state.arrived = party.roster.map((entry) => entry.id);
       party.state.arrivalIndex = party.roster.length;
       party.state.currentArrival = null;
+      party.state.thorinStage = 6;
+      party.state.thorinArrived = true;
+      party.state.questBriefingDone = true;
       party.state.fullHouseAnnounced = true;
       party.reconcileCharacters();
     }
@@ -1689,9 +1958,16 @@
       if (gandalf && !["green_dragon_inn", "green_dragon_inn_outside"].includes(this.game.currentRoom)) {
         if (!gandalf.position || !IMMERSION_BAG_END_ROOMS.has(gandalf.position)) gandalf.position = "hobbit_hole";
       }
+      const party = this.game.unexpectedParty;
       const thorin = this.game.characters.thorin;
       if (thorin && IMMERSION_BAG_END_ROOMS.has(this.game.currentRoom)) {
-        if (!thorin.position || !IMMERSION_BAG_END_ROOMS.has(thorin.position)) thorin.position = "bag_end_parlour";
+        if (!party?.state?.thorinArrived && (party?.state?.thorinStage || 0) === 0) {
+          if (!thorin.position || !IMMERSION_BAG_END_ROOMS.has(thorin.position)) thorin.position = null;
+          return;
+        }
+        if (!thorin.position || !IMMERSION_BAG_END_ROOMS.has(thorin.position)) {
+          thorin.position = party?.state?.questBriefingDone ? "bag_end_parlour" : "hobbit_hole";
+        }
       }
     }
 
@@ -1923,8 +2199,9 @@
       this.autosaveSnapshot = null;
       this.autosaveMeta = null;
       this.autosaveCounter = 0;
-      this.imageRevealTimer = null;
-      this.lastRevealedImage = "";
+      this.imageTransitionTimer = null;
+      this.currentImageSrc = roomImage.getAttribute("src") || "";
+      this.imageTransitionCycle = 0;
       this.audio = musicPlayer;
       this.audio.loop = true;
       this.audio.preload = "auto";
@@ -2755,28 +3032,19 @@
       const room = this.room();
       const scene = roomImage.closest(".scene");
       if (this.roomIsDark()) {
-        scene?.classList.remove("is-revealing");
-        clearTimeout(this.imageRevealTimer);
-        this.imageRevealTimer = null;
-        this.lastRevealedImage = "";
+        this.finishImageTransition(scene);
+        this.currentImageSrc = "";
         roomImage.setAttribute("hidden", "hidden");
         roomImage.removeAttribute("src");
         roomImage.alt = "";
       } else if (room?.image) {
         roomImage.removeAttribute("hidden");
         const src = assetUrl(IMAGE_ROOT, room.image);
-        const currentSrc = roomImage.getAttribute("src");
-        if (currentSrc !== src) roomImage.src = src;
-        scene?.classList.remove("is-revealing");
-        clearTimeout(this.imageRevealTimer);
-        this.imageRevealTimer = null;
-        this.lastRevealedImage = "";
+        this.swapRoomImage(scene, src);
         roomImage.alt = room.name;
       } else {
-        scene?.classList.remove("is-revealing");
-        clearTimeout(this.imageRevealTimer);
-        this.imageRevealTimer = null;
-        this.lastRevealedImage = "";
+        this.finishImageTransition(scene);
+        this.currentImageSrc = "";
         roomImage.setAttribute("hidden", "hidden");
         roomImage.removeAttribute("src");
         roomImage.alt = "";
@@ -2787,15 +3055,50 @@
       fillList(peopleList, this.visiblePeopleInRoom().filter((p) => p.name !== "You" && p.visible).map((p) => p.name), "none");
     }
 
-    revealRoomImage(src) {
-      this.lastRevealedImage = src || "";
-      this.finishImageReveal(roomImage.closest(".scene"));
+    swapRoomImage(scene, nextSrc) {
+      const previousSrc = this.currentImageSrc || roomImage.getAttribute("src") || "";
+      if (previousSrc === nextSrc) {
+        if (roomImage.getAttribute("src") !== nextSrc) roomImage.src = nextSrc;
+        this.currentImageSrc = nextSrc;
+        return;
+      }
+
+      roomImage.src = nextSrc;
+      this.currentImageSrc = nextSrc;
+
+      if (!previousSrc || !imageReveal || !imageRevealFill || !imageRevealOutline) {
+        this.finishImageTransition(scene);
+        return;
+      }
+
+      this.finishImageTransition(scene);
+      imageRevealFill.src = previousSrc;
+      imageRevealOutline.src = nextSrc;
+      imageRevealFill.alt = "";
+      imageRevealOutline.alt = "";
+      imageReveal.removeAttribute("hidden");
+
+      scene?.classList.remove("is-transitioning");
+      void scene?.offsetWidth;
+      scene?.classList.add("is-transitioning");
+
+      const cycle = ++this.imageTransitionCycle;
+      this.imageTransitionTimer = setTimeout(() => {
+        if (cycle !== this.imageTransitionCycle) return;
+        this.finishImageTransition(scene);
+      }, 920);
     }
 
-    finishImageReveal(scene) {
-      clearTimeout(this.imageRevealTimer);
-      this.imageRevealTimer = null;
-      scene?.classList.remove("is-revealing");
+    finishImageTransition(scene) {
+      clearTimeout(this.imageTransitionTimer);
+      this.imageTransitionTimer = null;
+      this.imageTransitionCycle += 1;
+      scene?.classList.remove("is-transitioning");
+      imageReveal?.setAttribute("hidden", "hidden");
+      imageRevealFill?.removeAttribute("src");
+      imageRevealOutline?.removeAttribute("src");
+      if (imageRevealFill) imageRevealFill.alt = "";
+      if (imageRevealOutline) imageRevealOutline.alt = "";
     }
 
     loadLayoutModePreference() {
@@ -3868,9 +4171,53 @@
       return "";
     }
 
+    bagEndPartyHasEnteredHouse() {
+      const party = this.unexpectedParty;
+      if (!party) return false;
+      if ((party.state?.arrived?.length || 0) > 0) return true;
+      return (party.state?.currentArrival?.stage || 0) >= 2;
+    }
+
+    bagEndQuestHasBegun() {
+      return Boolean(this.unexpectedParty?.state?.questBriefingDone);
+    }
+
+    narrativeTravelBlock(connection) {
+      if (!connection) return false;
+      return (
+        connection.from === "bilbos_garden"
+        && connection.direction === "east"
+        && connection.to === "green_dragon_inn_outside"
+        && !this.bagEndQuestHasBegun()
+      );
+    }
+
+    narrativeTravelBlockMessage(connection) {
+      if (!connection) return "";
+      if (!this.narrativeTravelBlock(connection)) return "";
+      const attempts = Number(this.flags.bagendexitattempts || 0);
+      const thorinPresent = Boolean(this.unexpectedParty?.state?.thorinArrived);
+      if (!thorinPresent) {
+        if (attempts <= 0) return 'Gandalf lifts a hand. "Not yet, Bilbo. There is more company yet to come."';
+        if (attempts === 1) return "You make as if to slip away, but Gandalf's look makes it plain that he expects you to stay.";
+        return "With knocks still expected at the door and the evening gathering momentum, this is no graceful moment to disappear.";
+      }
+      if (attempts <= 0) return 'Gandalf lifts a hand. "Not yet, Bilbo. Hear Thorin out first."';
+      if (attempts === 1) return "You reach toward the way out, then stop. Leaving now would look very like fleeing the room.";
+      return "With Thorin speaking and every eye turned inward, slipping away now would be too awkward to attempt.";
+    }
+
+    registerNarrativeTravelBlock(connection) {
+      if (!this.narrativeTravelBlock(connection)) return;
+      this.flags.bagendexitattempts = Number(this.flags.bagendexitattempts || 0) + 1;
+    }
+
     maybeAtmosphericEvent() {
       const region = this.atmosphereRegionKey();
-      const pool = region && ATMOSPHERIC_EVENT_POOLS[region];
+      let pool = region && ATMOSPHERIC_EVENT_POOLS[region];
+      if (region === "bag_end_house" && !this.bagEndPartyHasEnteredHouse()) {
+        pool = pool.filter((line) => !/\bdwarf\b|song|conversation|laughter/i.test(line));
+      }
       if (!pool?.length) return false;
       const cooldownKey = `atmosphere_${region}_cooldown`;
       if ((this.flags[cooldownKey] || 0) > this.turnCount) return false;
@@ -4296,6 +4643,7 @@
       if (beforeDragonDefeat && this.autoplayShouldLightLantern()) return "light lantern";
 
       if (beforeDragonDefeat && !this.flags.seenpony) {
+        if (!this.bagEndQuestHasBegun()) return "wait";
         const thorin = Object.values(this.characters).find((character) => matches(character.name, "thorin"));
         if (this.currentRoom !== "green_dragon_inn") return this.autoplayRouteCommandTo("green_dragon_inn");
         if (thorin?.position !== this.currentRoom) thorin.position = this.currentRoom;
@@ -4535,6 +4883,7 @@
     }
 
     autoplayCanPlanConnection(connection) {
+      if (this.narrativeTravelBlock(connection)) return false;
       const door = connection.door && this.doors[connection.door];
       if (!door || door.broken) return true;
       if (matches(door.name, "secret door") && !this.flags.secretdoorsun) return false;
@@ -5779,6 +6128,7 @@
 
     canTravelConnection(connection) {
       if (!this.canSeeConnection(connection)) return false;
+      if (this.narrativeTravelBlock(connection)) return false;
       const web = this.blockingWebFor(connection);
       if (web && !web.broken) return false;
       const door = connection.door && this.doors[connection.door];
@@ -5808,7 +6158,9 @@
     move(direction) {
       const candidates = this.connectionsFrom(this.currentRoom).filter((connection) => connection.direction === direction);
       if (!candidates.length) {
-        this.print('That direction is not recognized. Type "go <direction>" or "go through <door name>".');
+        this.print(this.isDirection(direction)
+          ? "You see no exit in that direction."
+          : 'That direction is not recognized. Type "go <direction>" or "go through <door name>".');
         return false;
       }
       const gollumBlock = this.gollumBlocksDirection(direction);
@@ -5817,6 +6169,12 @@
         return false;
       }
       const connection = candidates.find((candidate) => this.canTravelConnection(candidate)) || candidates[0];
+      if (this.narrativeTravelBlock(connection)) {
+        const narrativeBlock = this.narrativeTravelBlockMessage(connection);
+        this.registerNarrativeTravelBlock(connection);
+        this.print(narrativeBlock);
+        return false;
+      }
       const web = this.blockingWebFor(connection);
       if (web && !web.broken) {
         this.print("A thick spider web blocks your path.");

@@ -24,25 +24,9 @@
       }
 
     </style>
-    <link rel="stylesheet" href="style.css?v=20260612-1241">
+    <link rel="stylesheet" href="style.css?v=20260612-1338">
   </head>
   <body class="booting notranslate" translate="no">
-    <svg class="visual-filters" width="0" height="0" aria-hidden="true" focusable="false">
-      <filter id="retro-edge-filter" color-interpolation-filters="sRGB">
-        <feColorMatrix in="SourceGraphic" type="matrix" values="
-          0.333 0.333 0.333 0 0
-          0.333 0.333 0.333 0 0
-          0.333 0.333 0.333 0 0
-          0     0     0     1 0
-        " />
-        <feConvolveMatrix order="3" kernelMatrix="-1 -1 -1 -1 8 -1 -1 -1 -1" preserveAlpha="true" />
-        <feComponentTransfer>
-          <feFuncR type="linear" slope="3.8" intercept="-0.18" />
-          <feFuncG type="linear" slope="3.8" intercept="-0.18" />
-          <feFuncB type="linear" slope="3.8" intercept="-0.18" />
-        </feComponentTransfer>
-      </filter>
-    </svg>
     <div id="layout-switch" class="layout-switch" aria-label="Layout">
       <span class="layout-switch__label">Layout</span>
       <div class="layout-switch__buttons" role="group" aria-label="Choose layout">
@@ -52,8 +36,8 @@
     </div>
     <main id="game-shell" class="game-shell">
       <section class="scene" aria-label="Current location">
-        <img id="room-image" src="assets/local-images/hobbit_hole.jpeg?v=20260612-1244" alt="Hobbit_hole">
-        <div id="image-reveal" class="image-reveal" aria-hidden="true">
+        <img id="room-image" src="assets/local-images/hobbit_hole.jpeg?v=20260612-1338" alt="Hobbit_hole">
+        <div id="image-reveal" class="image-reveal" aria-hidden="true" hidden>
           <img id="image-reveal-outline" class="image-reveal-outline" alt="">
           <img id="image-reveal-fill" class="image-reveal-fill" alt="">
         </div>
@@ -87,7 +71,7 @@
       </aside>
     </main>
 
-    <script src="assets/game-data.js?v=20260612-1244"></script>
-    <script src="game.js?v=20260612-1244"></script>
+    <script src="assets/game-data.js?v=20260612-1338"></script>
+    <script src="game.js?v=20260612-1338"></script>
   </body>
 </html>
