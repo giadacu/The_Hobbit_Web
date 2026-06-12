@@ -1,5 +1,5 @@
 (() => {
-  const DATA = window.HOBBIT_DATA;
+  const DATA = applyImmersionExpansion(window.HOBBIT_DATA);
   const IMAGE_ROOT = "assets/local-images/";
   const MUSIC_ROOT = "assets/local-music/";
   const ASSET_VERSION = "20260607-1630";
@@ -221,6 +221,535 @@
     },
   ];
 
+  const IMMERSION_BAG_END_ROOMS = new Set([
+    "hobbit_hole",
+    "bilbos_garden",
+    "bag_end_entrance_hall",
+    "bag_end_parlour",
+    "bag_end_study",
+    "bag_end_dining_room",
+    "bag_end_pantry",
+    "bag_end_kitchen",
+    "bag_end_guest_room",
+    "bag_end_cellar_room",
+  ]);
+
+  const IMMERSION_RIVENDELL_ROOMS = new Set([
+    "rivendell",
+    "rivendell_courtyard",
+    "rivendell_library",
+    "rivendell_hall_of_fire",
+    "rivendell_guest_chambers",
+    "rivendell_terrace",
+    "rivendell_bridge",
+  ]);
+
+  const IMMERSION_BEORN_ROOMS = new Set([
+    "beorns_house",
+    "beorn_great_hall",
+    "beorn_stable",
+    "beorn_garden",
+    "beorn_animal_yard",
+  ]);
+
+  const IMMERSION_MIRKWOOD_ROOMS = new Set([
+    "gate_to_mirkwood",
+    "bewitched_gloomy_place",
+    "west_bank",
+    "east_bank",
+    "green_forest",
+    "place_of_black_spiders",
+    "forest_of_tangled_smothering_trees",
+    "deep_bog",
+    "mirkwood_forest_path",
+    "mirkwood_spider_grove",
+    "mirkwood_dark_glade",
+    "mirkwood_enchanted_stream",
+    "mirkwood_deer_trail",
+    "mirkwood_fallen_tree_crossing",
+    "mirkwood_ruined_clearing",
+  ]);
+
+  const IMMERSION_ELVEN_HALLS_ROOMS = new Set([
+    "elvenkings_halls",
+    "dark_dungeon",
+    "cellar",
+    "elven_prison_cells",
+    "elven_guard_post",
+    "elven_feast_hall",
+    "elven_underground_river",
+    "elven_storage_rooms",
+  ]);
+
+  const IMMERSION_LAKETOWN_ROOMS = new Set([
+    "wooden_town",
+    "long_lake",
+    "strong_river",
+    "laketown_docks",
+    "laketown_marketplace",
+    "laketown_town_square",
+    "laketown_warehouses",
+    "laketown_bridges",
+    "laketown_tavern",
+  ]);
+
+  const IMMERSION_EREBOR_OUTER_ROOMS = new Set([
+    "front_gate",
+    "erebor_hidden_door",
+    "erebor_watch_chamber",
+    "erebor_upper_tunnels",
+    "erebor_ancient_armoury",
+    "erebor_abandoned_workshop",
+    "erebor_great_hall",
+    "erebor_treasure_approach",
+  ]);
+
+  const IMMERSION_EREBOR_INNER_ROOMS = new Set([
+    "lower_halls",
+    "smooth_straight_passage",
+    "empty_place",
+    "lonely_mountain",
+  ]);
+
+  const IMMERSION_GOBLIN_ROOMS = new Set([
+    "goblins_dungeon",
+    "dark_winding_passage",
+    "big_cavern",
+    "inside_goblins_gate",
+    "outside_goblins_gate",
+    "narrow_dangerous_path",
+    "deep_dark_lake",
+    "dark_stuffy_passage_1",
+    "dark_stuffy_passage_2",
+    "dark_stuffy_passage_3",
+    "dark_stuffy_passage_4",
+    "dark_stuffy_passage_5",
+    "dark_stuffy_passage_6",
+    "dark_stuffy_passage_7",
+    "dark_stuffy_passage_8",
+    "dark_stuffy_passage_9",
+    "dark_stuffy_passage_10",
+    "dark_stuffy_passage_11",
+    "dark_stuffy_passage_12",
+    "dark_stuffy_passage_13",
+    "dark_stuffy_passage_14",
+    "dark_stuffy_passage_15",
+  ]);
+
+  const IMMERSION_MOUNTAIN_ROOMS = new Set([
+    "misty_mountain",
+    "narrow_place",
+    "large_dry_cave",
+    "narrow_ledge",
+    "mountain_lookout",
+    "storm_shelter",
+    "narrow_path_1",
+    "narrow_path_2",
+    "narrow_path_3",
+    "narrow_path_4",
+    "narrow_path_5",
+    "narrow_path_6",
+    "narrow_path_7",
+    "narrow_path_8",
+    "narrow_path_9",
+    "narrow_path_10",
+    "steep_path_6",
+    "steep_path_7",
+    "steep_path_8",
+    "deep_misty_valley_1",
+    "deep_misty_valley_2",
+  ]);
+
+  const ATMOSPHERIC_EVENT_POOLS = {
+    bag_end: [
+      "Somewhere deeper in Bag End, crockery rattles, a kettle begins to sing, and dwarf laughter answers it.",
+      "A fragment of dwarven song rolls along the round passages before fading into murmured conversation.",
+      "From the kitchen comes the warm homely sound of cutlery, cupboard doors, and something sizzling in butter.",
+    ],
+    rivendell: [
+      "A brief strain of elven song rises from elsewhere in the valley, then is gone like a bird on the wind.",
+      "Clear water and harp-music mingle faintly in the air, making the burden of the road seem farther away.",
+      "Somewhere in Rivendell a soft voice recites old lore, the words carrying only as music and not as sense.",
+    ],
+    mountains: [
+      "Wind races over the heights with a hollow cry, and even the stones seem to draw themselves in against it.",
+      "Far above, loose scree rattles down some unseen slope, reminding you how small all travelers are here.",
+      "Cloud-shadow runs over the ridges and is gone before you can tell whether it hid anything watching.",
+    ],
+    gollum: [
+      "A drip falls somewhere beyond sight, then another, and the dark seems to listen to the sound of its own water.",
+      "Something paddles once upon the black lake and then is still again.",
+      "A faint wet muttering reaches you from the darkness and dies before the words can be made out.",
+    ],
+    beorn: [
+      "From the yard comes the measured sound of hooves and the uncanny quiet of beasts that know their work.",
+      "A dog gives one short bark outside and is silent at once, as if obeying a command too soft for you to hear.",
+      "The scent of warm bread, honey, and clean straw drifts through Beorn's stead like a promise of shelter honestly won.",
+    ],
+    mirkwood: [
+      "Far off among the trunks there comes a laugh that may be water, birds, or something less wholesome.",
+      "For a moment a pale shape like a white deer slips between the trees, and then only bark and shadow remain.",
+      "A wandering light glimmers deeper in the wood, wavering as if to invite pursuit, then disappears.",
+    ],
+    elves: [
+      "Bootsteps pass lightly somewhere in the halls, disciplined enough to suggest a watch that seldom sleeps.",
+      "Laughter from a distant feast brushes the stone and fades into the flowing dark of the underground ways.",
+      "Water murmurs under the halls, and above it comes the clink of cups and the music of a people at ease in secrecy.",
+    ],
+    laketown: [
+      "Voices carry over the planks in snatches of prices, weather, fish, and rumors from the Mountain.",
+      "A bell rings somewhere on the water, and the town answers with footsteps, hammering, and boat-hooks on timber.",
+      "The smell of tar, fish, wet rope, and cookfires hangs over the walkways in a busy human cloud.",
+    ],
+    erebor: [
+      "From somewhere in the old stone comes a dull settling sound, as though the Mountain remembered its own vast weight.",
+      "Dust stirs over ancient carvings, and for an instant the air seems warmer, touched by the memory of dragon-fire.",
+      "A thin metallic whisper travels through the halls as treasure shifts against treasure in the deep.",
+    ],
+  };
+
+  const GOLLUM_ACTIVITY_LINES = [
+    "Gollum crouches low in his little boat, paddling a slow circle just beyond the edge of sight.",
+    "Gollum slips away into the darkness for a breathless moment before his pale eyes show again over the water.",
+    "Gollum worries at a limp fish with quick fingers, muttering to himself between tiny bites.",
+    "Gollum drifts close enough for the water to knock softly at the stones, then backs away into the black.",
+  ];
+
+  const SMAUG_STATE_DESCRIPTIONS = {
+    sleeping: "Smaug lies upon the treasure like a fallen hill of red-gold scale and coiled ruin, his breath moving the nearest coins in slow glittering tides.",
+    curious: "Smaug's great head has lifted from the treasure. One lid is half open, and the dragon seems to taste the air for news of an unseen visitor.",
+    suspicious: "Smaug moves among the heaps with terrible care, speaking softly into the chamber as if to coax a thief into betraying himself.",
+    searching: "Smaug prowls restlessly across the treasure, scattering coin and cup with every measured step while his eyes search every shadow.",
+    enraged: "Smaug's wrath burns through the halls. He lashes the treasure with tail and claw, and every word from him comes edged with fire.",
+  };
+
+  const COMPANION_PERSONALITIES = {
+    unexpected_party_balin: {
+      summary: "Balin's bright eyes miss little, and his courtesy never feels forced.",
+      talk: "Balin smiles and says 'A warm welcome counts for much on the road, Master Baggins.'",
+      ask: "Balin says 'I have seen many roads, but this house may yet prove the most memorable halt of all.'",
+      gift: "Balin accepts it with a little bow. 'Very thoughtful, and very welcome.'",
+    },
+    unexpected_party_dwalin: {
+      summary: "Dwalin is blunt as a hammer-head and twice as solid.",
+      talk: "Dwalin grunts approvingly. 'Comfortable place. Solid hinges. Useful food. I've seen worse starts to a journey.'",
+      ask: "Dwalin says 'Best speak plainly and keep moving when the time comes. That is counsel enough from me.'",
+      gift: "Dwalin nods once. 'Practical. Good.'",
+    },
+    unexpected_party_bombur: {
+      summary: "Bombur's interest in comfort and food is heroic in its own right.",
+      talk: "Bombur sniffs hopefully and says 'There is nothing wrong with courage, provided supper keeps pace with it.'",
+      ask: "Bombur says 'If there is a pantry in this smial, I shall come to think very highly of it indeed.'",
+      gift: "Bombur receives it with shining gratitude. 'Now that is true hospitality.'",
+    },
+    unexpected_party_bofur: {
+      summary: "Bofur wears hardship lightly and seems determined that others should do the same.",
+      talk: "Bofur grins. 'A song, a fire, and a full plate can put heart back into almost anyone.'",
+      ask: "Bofur says 'If the road turns grim, that is only more reason to keep cheerful while we may.'",
+      gift: "Bofur laughs warmly. 'You'll spoil a travelling dwarf at this rate.'",
+    },
+    thorin: {
+      summary: "Thorin carries pride like a cloak, yet every glance westward betrays the pull of his lost home.",
+      talk: "Thorin says 'Pleasant rooms are well enough, but my thoughts are on the road and what waits at its end.'",
+      ask: "Thorin says 'We have delayed long enough in comfort. There is a kingdom yet to win back.'",
+      gift: "Thorin takes it gravely. 'You have my thanks. Such things matter on a hard journey.'",
+    },
+  };
+
+  function applyImmersionExpansion(data) {
+    if (!data || data.__immersionExpansionApplied) return data;
+    data.__immersionExpansionApplied = true;
+
+    const ensureRoom = (id, config) => {
+      if (data.rooms[id]) return data.rooms[id];
+      data.rooms[id] = {
+        id,
+        name: config.name,
+        description: config.description,
+        image: null,
+        transformedImage: null,
+        sound: config.sound || "relaxed",
+      };
+      if (!data.roomOrder.includes(id)) data.roomOrder.push(id);
+      return data.rooms[id];
+    };
+
+    const ensureConnection = (from, direction, to, distance = 1) => {
+      if (data.connections.some((connection) => connection.from === from && connection.direction === direction && connection.to === to)) return;
+      data.connections.push({ from, direction, to, door: null, distance });
+    };
+
+    const ensureTwoWay = (a, dirA, b, dirB = oppositeDirection(dirA), distance = 1) => {
+      ensureConnection(a, dirA, b, distance);
+      ensureConnection(b, dirB, a, distance);
+    };
+
+    const ensureItem = (id, config) => {
+      if (data.items[id]) return data.items[id];
+      data.items[id] = {
+        id,
+        name: config.name,
+        description: config.description,
+        container: Boolean(config.container),
+        keyFor: null,
+        portable: Boolean(config.portable),
+        weight: config.weight ?? (config.portable ? 1 : 100),
+        strength: config.strength ?? (config.portable ? 1 : 20),
+        visible: config.visible !== false,
+        open: Boolean(config.open),
+        locked: Boolean(config.locked),
+        requiredKey: config.requiredKey || null,
+        weapon: Boolean(config.weapon),
+        noLid: Boolean(config.noLid),
+        wearable: Boolean(config.wearable),
+        worn: false,
+        reveals: null,
+        specialChar: null,
+      };
+      return data.items[id];
+    };
+
+    const placeItem = (room, item) => {
+      if (data.placements.some((placement) => placement.room === room && placement.item === item)) return;
+      data.placements.push({ room, item });
+    };
+
+    const ensureCharacter = (id, config) => {
+      if (data.characters[id]) return data.characters[id];
+      data.characters[id] = {
+        id,
+        name: config.name,
+        friendly: config.friendly ?? "neutral",
+        strength: config.strength ?? 5,
+        position: null,
+        movementMode: config.movementMode || "never",
+        visible: config.visible !== false,
+      };
+      return data.characters[id];
+    };
+
+    const placeCharacter = (room, character) => {
+      if (data.characterPlacements.some((placement) => placement.room === room && placement.character === character)) return;
+      data.characterPlacements.push({ room, character });
+    };
+
+    data.rooms.hobbit_hole.description = "You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions.";
+    data.rooms.bilbos_garden.description = "You are in the front garden before Bag End, where clipped borders, herbs, and bright flowers soften the green slope. A neat path leads to the famous round door, and the air smells of soil, roses, and well-watered earth in the Hill.";
+    data.rooms.rivendell.description = "You are in the heart of Rivendell, where carved stone, running water, and old trees are woven together so gently that no hand seems to dominate the place. Light falls softly through leaves and arches alike, and song lingers even when no singer is near.";
+    data.rooms.deep_dark_lake.description = "You are beside the black underground lake. The air is cold, wet, and close; drops fall from unseen heights, whispers echo where no one should be standing, and the darkness feels alive with hidden movement beyond the reach of your hands.";
+    data.rooms.beorns_house.description = "You are in Beorn's great house, built broad and strong of timber, with a central fire, long tables, and the scent of bread, honey, and clean straw. Everything is orderly, sturdy, and touched by the curious discipline of a household in which beasts and men alike keep good manners.";
+    data.rooms.wooden_town.description = "You are in Lake-town, a forest of timber halls, jetties, and plank bridges raised above the dark water. Merchants call, boats creak at their moorings, and the talk of trade, weather, and the Mountain moves continually through the town.";
+    data.rooms.front_gate.description = "You stand before the Front Gate of Erebor, where vast stonework, weathered carvings, and old dwarf-craft still command awe despite ruin and neglect. Dust lies thick in the seams, yet the place feels wakeful, as though memory itself keeps guard here.";
+    data.rooms.lower_halls.description = "You enter the lower halls of Erebor, a mighty chamber of pillars, carvings, and treasure under the Mountain's ancient stone. The air is warm, close, and faintly tainted by dragon-smoke, while every footfall seems an impertinence in a kingdom too old to forget itself.";
+
+    [
+      ["bag_end_entrance_hall", "Entrance Hall", "A broad, circular passage opens here with umbrella stands, polished pegs, and a tiled floor kept absurdly clean for a place about to receive thirteen dwarves and a wizard. The green door is not far off, and every sound in the smial seems to pass through this generous little chamber.", "hobbit_hole.jpeg", "relaxed"],
+      ["bag_end_parlour", "Parlour", "This snug parlour is arranged for conversation rather than grandeur: deep chairs, a hearth laid ready, and several low tables already burdened with plates, cups, and evidence of hobbit forethought. It would be a perfect room for quiet company if Bag End still believed in quiet company.", "hobbit_hole1.jpeg", "relaxed"],
+      ["bag_end_study", "Study", "Bilbo's study smells of paper, pipe-weed, and old leather. Shelves rise almost to the curve of the ceiling, a writing desk stands ready with maps and pens, and the whole room feels like the private stronghold of a hobbit who likes his adventures safely bound between covers.", "map.jpeg", "relaxed"],
+      ["bag_end_dining_room", "Dining Room", "A long table dominates the dining room, though it was plainly built for family comfort rather than a troop of hungry dwarves. Good silver, folded linen, and polished sideboards suggest that Bag End knows very well how hospitality ought to be done.", "hobbit_hole1.jpeg", "relaxed"],
+      ["bag_end_pantry", "Pantry", "Cool shelves line the pantry from floor to ceiling, and every shelf seems intent on proving that a respectable hobbit should never be surprised by appetite. Jars, cheeses, seed-cakes, cold chicken, and bottled pickles stand in ranks like edible household troops.", "Cellar.jpeg", "relaxed"],
+      ["bag_end_kitchen", "Kitchen", "The kitchen is warm, bright, and busily practical: copper pans hang in order, a kettle mutters on the hob, and the table is marked by generations of competent chopping, kneading, and tea-making. If Bag End has a heart, it beats here.", "hobbit_hole.jpeg", "relaxed"],
+      ["bag_end_guest_room", "Guest Room", "A carefully prepared guest room waits here with a turned-down bed, a wash-stand, and curtains that give the place a surprising air of ceremony. It was not furnished with dwarves in mind, yet it is doing its quiet best.", "hobbit_hole1.jpeg", "relaxed"],
+      ["bag_end_cellar_room", "Cellar", "The cellar is cool, dry, and heavily provisioned. Barrels rest in shadow, preserves gleam in neat rows, and a prudent abundance of ale, potatoes, and stored comforts makes plain that Bag End expected hard winters long before it expected adventures.", "Cellar.jpeg", "relaxed"],
+      ["rivendell_courtyard", "Courtyard", "White stone and living ivy share this quiet courtyard, where the sound of falling water softens every footstep. Benches stand in sun and shade alike, inviting weary travelers to believe that peace may yet be a practical thing.", "Rivendell.jpeg", "relaxed"],
+      ["rivendell_library", "Library", "Tall shelves and carved ladders fill the library with the hush of well-kept wisdom. Scrolls, red-bound volumes, maps, and forgotten songs wait here with the patience of things certain they will outlast haste.", "map.jpeg", "relaxed"],
+      ["rivendell_hall_of_fire", "Hall of Fire", "Firelight and song belong equally to this hall. Cushioned seats ring the hearth, the rafters hold echoes of ancient music, and any tale told here seems at once older and truer than it did outside.", "Rivendell.jpeg", "relaxed"],
+      ["rivendell_guest_chambers", "Guest Chambers", "These guest chambers are simple by elvish standards and magnificent by most others. Fresh water, clean linen, and open windows overlooking the valley make them feel more like healing than lodging.", "Rivendell.jpeg", "relaxed"],
+      ["rivendell_terrace", "Terrace", "The terrace looks over pine-clad slopes and silver water. Evening light lingers here lovingly, and the valley below seems less a refuge built by hands than a blessing laid upon the land.", "Rivendell.jpeg", "relaxed"],
+      ["rivendell_bridge", "Bridge", "A graceful bridge crosses the rushing water at the edge of Rivendell, its carved rails cool beneath the hand. From here the valley feels defended not by walls but by beauty, depth, and old wisdom.", "Rivendell.jpeg", "relaxed"],
+      ["narrow_ledge", "Narrow Ledge", "This ledge is little wider than a cart-plank, with mountain emptiness falling away beneath one shoulder and a raw wall of stone pressing the other. Even the wind seems to pass here single-file.", "narrow_path_7.jpeg", "adventure"],
+      ["mountain_lookout", "Mountain Lookout", "A rare shelf of level stone offers a view of broken ridges, cloud-shadow, and far valleys already half lost in haze. For a moment the world opens wide enough to remind you how long the road still is.", "mountains.jpeg", "adventure"],
+      ["storm_shelter", "Storm Shelter", "A shallow overhang in the mountain gives some shelter from rain and ice-driven wind. Travelers have camped here before; the soot on the rock and the circle of old stones show it plainly.", "large_dry_cave.jpeg", "adventure"],
+      ["beorn_great_hall", "Great Hall", "Beorn's great hall rises high and timbered, with carved beams, a long hearth, and a table built for appetites that do not trouble over refinement. Honey, bread, and strength seem native to the room.", "Beorns.jpeg", "relaxed"],
+      ["beorn_stable", "Stable", "The stable is large, clean, and astonishingly orderly. The horses stand like intelligent servants rather than beasts, and the straw is so neatly laid that you begin to suspect discipline deeper than training.", "Beorns1.jpeg", "relaxed"],
+      ["beorn_garden", "Garden", "A practical garden stretches here in straight, well-kept beds of herbs, beans, roots, and bee-loving flowers. Nothing is ornamental without also being useful, though usefulness in this place has a beauty of its own.", "Bilbosgarden.jpeg", "relaxed"],
+      ["beorn_animal_yard", "Animal Yard", "The animal yard is quiet in a way that should feel impossible. Dogs, sheep, and great shaggy creatures keep their places with solemn attention, as though the household runs on law rather than habit.", "Beorns1.jpeg", "relaxed"],
+      ["mirkwood_forest_path", "Forest Path", "A black forest path runs under close-packed boughs where little light survives to touch the roots. The air is dry, stale, and old, and every turn seems just a little too like the last.", "Mirkwood.jpeg", "suspence"],
+      ["mirkwood_spider_grove", "Spider Grove", "The trees here are curtained with webbing from branch to branch, so that the grove looks wrapped in old frost though the air is warm and foul. Cocoon-shapes hang among the trunks where no fruit should grow.", "spider_place.jpeg", "suspence"],
+      ["mirkwood_dark_glade", "Dark Glade", "A dim glade opens unexpectedly beneath the trees, though it offers no comfort. The silence is wrong, the moss is too soft, and even the shafts of light that reach the ground seem unwilling to stay.", "dark_stuffy_14.jpeg", "suspence"],
+      ["mirkwood_enchanted_stream", "Enchanted Stream", "A narrow dark stream winds through the wood, clear enough to tempt the thirsty and strange enough to warn the wise. It runs without song, as though afraid of being overheard.", "forest_river.jpeg", "suspence"],
+      ["mirkwood_deer_trail", "Deer Trail", "A pale trail, hardly more than bent grass and delicate prints, slips among the trees here. It feels like the work of swift clean creatures from a brighter wood than this one.", "green_forest.jpeg", "suspence"],
+      ["mirkwood_fallen_tree_crossing", "Fallen Tree Crossing", "A mighty trunk has fallen across a murky runnel, making a crossing too narrow for comfort and too useful to ignore. Bark peels from it in long strips like weathered skin.", "forest_road_2.jpeg", "suspence"],
+      ["mirkwood_ruined_clearing", "Ruined Clearing", "Broken stones and choked foundations lie in this clearing, half swallowed by root and fern. Whatever stood here belonged to another age, and the wood has taken it back with ill grace.", "elvish_clearing.jpeg", "suspence"],
+      ["elven_prison_cells", "Prison Cells", "Rows of stout wooden cells stand here under lantern-light, each built more for dignity than cruelty but still secure enough to smother hope. The smell of damp wood and river-water clings to the place.", "elvenkings.jpeg", "suspence"],
+      ["elven_guard_post", "Guard Post", "A narrow post looks out over a junction of ways through the halls. Spears, lanterns, and a small gaming board suggest long watches kept by folk who dislike being surprised.", "elvenkings.jpeg", "suspence"],
+      ["elven_feast_hall", "Feast Hall", "Long tables, carved pillars, and hanging lamps give the feast hall a secret splendor. Even empty, it feels one song away from laughter, wine, and a company entirely too alert to be called careless.", "elvenkings.jpeg", "relaxed"],
+      ["elven_underground_river", "Underground River", "Black water glides past beneath the halls in a channel of echoing stone. Lantern-light glitters upon it in shifting bars, and every small sound seems to float farther than it ought.", "dark_deep_lake.jpeg", "suspence"],
+      ["elven_storage_rooms", "Storage Rooms", "Crates, casks, spare rope, and neatly stacked goods fill these cool storage rooms. Nothing is neglected here; even hidden wealth is catalogued by an orderly hand.", "Cellar.jpeg", "suspence"],
+      ["laketown_docks", "Docks", "Timbered docks thrust out over the dark lake, crowded with nets, ropes, casks, and boats bumping softly at their moorings. Men shout, gulls complain, and the water smells of work.", "Wooden_town.jpeg", "relaxed"],
+      ["laketown_marketplace", "Marketplace", "Here the boards of Lake-town are busiest, lined with stalls, baskets of fish, bolts of cloth, and traders eager to turn rumor into profit. News moves nearly as fast as money.", "Wooden_town.jpeg", "relaxed"],
+      ["laketown_town_square", "Town Square", "A widened platform serves as Lake-town's square, ringed by posts, notices, and the practical little ceremonies of a town held together by timber and mutual dependence.", "Wooden_town.jpeg", "relaxed"],
+      ["laketown_warehouses", "Warehouses", "Heavy doors and tarred beams guard the warehouse district, where grain, salted fish, rope, and trade-goods lie stacked in the dim. It smells of river-water, labor, and careful counting.", "Wooden_town.jpeg", "relaxed"],
+      ["laketown_bridges", "Bridges", "A web of bridges links the town's neighborhoods above the water. Looking down through the planks, you see the black lake moving quietly under all this human bustle.", "long_lake.jpeg", "relaxed"],
+      ["laketown_tavern", "Tavern", "The tavern is loud with cups, weather-talk, and brave opinions formed at safe distances from dragons. Even so, the people here watch the Mountain between jokes.", "Green_dragon.jpeg", "relaxed"],
+      ["erebor_hidden_door", "Hidden Door", "A narrow door cunningly wrought into the mountain-face lies here, so artfully fitted that even knowing it exists does not lessen the marvel. Moonlight and memory seem equally required of it.", "Gate_Lonely_Mountain.jpeg", "adventure"],
+      ["erebor_watch_chamber", "Watch Chamber", "This small chamber above the approach was plainly meant for quiet eyes and patient watches. Slits in the stone command the way below, and the dust has not quite smothered the old discipline of the place.", "front_gate.jpeg", "adventure"],
+      ["erebor_upper_tunnels", "Upper Tunnels", "The upper tunnels run on in exact dwarf-work, their walls scored with tool-marks, way-runes, and faint traces of old soot. Each turning feels deliberate, as though planned by minds that despised waste.", "smooth_straight.jpeg", "adventure"],
+      ["erebor_ancient_armoury", "Ancient Armoury", "Racks and wall-hooks fill the old armoury, though many stand empty now. Broken helms, split shields, and a few surviving pieces of craft tell of a people who expected both war and ceremony.", "lower_halls.jpeg", "adventure"],
+      ["erebor_abandoned_workshop", "Abandoned Workshop", "Benches, tools, and half-finished work remain in the abandoned workshop as though the hands that used them expected to return at once. Dragon-fire and long neglect have only sharpened the sense of interruption.", "lower_halls.jpeg", "adventure"],
+      ["erebor_great_hall", "Great Hall", "The great hall of Erebor opens wide and stately, its pillars carved with kings, hammers, and mountains under stars. Even emptied of life, it possesses a grandeur that seems to challenge ruin itself.", "lower_halls.jpeg", "adventure"],
+      ["erebor_treasure_approach", "Treasure Approach", "Gold-dust glitters in the cracks ahead, and the air grows warmer with every step. The silence here is not empty; it is the held breath of a house occupied by something too mighty to disturb lightly.", "Dragon.jpeg", "suspence"],
+    ].forEach(([id, name, description, image, sound]) => ensureRoom(id, { name, description, image, sound }));
+
+    ensureTwoWay("hobbit_hole", "north", "bag_end_entrance_hall");
+    ensureTwoWay("hobbit_hole", "west", "bag_end_parlour");
+    ensureTwoWay("hobbit_hole", "south", "bag_end_dining_room");
+    ensureTwoWay("hobbit_hole", "north east", "bag_end_study", "south west");
+    ensureTwoWay("bag_end_dining_room", "east", "bag_end_pantry");
+    ensureTwoWay("bag_end_pantry", "east", "bag_end_kitchen");
+    ensureTwoWay("bag_end_parlour", "south", "bag_end_guest_room");
+    ensureTwoWay("bag_end_dining_room", "down", "bag_end_cellar_room", "up");
+    ensureTwoWay("bag_end_entrance_hall", "north", "bilbos_garden", "south");
+    ensureTwoWay("rivendell", "north", "rivendell_courtyard");
+    ensureTwoWay("rivendell", "north east", "rivendell_library", "south west", 1);
+    ensureTwoWay("rivendell", "south", "rivendell_hall_of_fire", "north");
+    ensureTwoWay("rivendell", "north west", "rivendell_guest_chambers", "south east");
+    ensureTwoWay("rivendell_courtyard", "east", "rivendell_terrace", "west");
+    ensureTwoWay("rivendell_terrace", "north", "rivendell_bridge", "south");
+    ensureTwoWay("misty_mountain", "north west", "narrow_ledge", "south east");
+    ensureTwoWay("narrow_ledge", "up", "mountain_lookout", "down");
+    ensureTwoWay("narrow_ledge", "west", "storm_shelter", "east");
+    ensureTwoWay("beorns_house", "east", "beorn_great_hall", "west");
+    ensureTwoWay("beorn_great_hall", "south", "beorn_stable", "north");
+    ensureTwoWay("beorn_great_hall", "north", "beorn_garden", "south");
+    ensureTwoWay("beorn_garden", "east", "beorn_animal_yard", "west");
+    ensureTwoWay("forest_road", "south east", "mirkwood_forest_path", "north west");
+    ensureTwoWay("mirkwood_forest_path", "east", "mirkwood_dark_glade", "west");
+    ensureTwoWay("mirkwood_dark_glade", "north", "mirkwood_deer_trail", "south");
+    ensureTwoWay("mirkwood_dark_glade", "east", "mirkwood_enchanted_stream", "west");
+    ensureTwoWay("mirkwood_enchanted_stream", "north", "mirkwood_fallen_tree_crossing", "south");
+    ensureTwoWay("mirkwood_fallen_tree_crossing", "east", "mirkwood_spider_grove", "west");
+    ensureTwoWay("mirkwood_spider_grove", "north", "mirkwood_ruined_clearing", "south");
+    ensureTwoWay("mirkwood_ruined_clearing", "east", "place_of_black_spiders", "west");
+    ensureTwoWay("elvenkings_halls", "north", "elven_guard_post", "south");
+    ensureTwoWay("elvenkings_halls", "north east", "elven_feast_hall", "south west");
+    ensureTwoWay("dark_dungeon", "north", "elven_prison_cells", "south");
+    ensureTwoWay("cellar", "east", "elven_storage_rooms", "west");
+    ensureTwoWay("cellar", "south east", "elven_underground_river", "north west");
+    ensureTwoWay("wooden_town", "north east", "laketown_marketplace", "south west");
+    ensureTwoWay("wooden_town", "south east", "laketown_docks", "north west");
+    ensureTwoWay("wooden_town", "north west", "laketown_town_square", "south east");
+    ensureTwoWay("wooden_town", "south west", "laketown_bridges", "north east");
+    ensureTwoWay("laketown_marketplace", "south", "laketown_warehouses", "north");
+    ensureTwoWay("laketown_bridges", "south", "laketown_tavern", "north");
+    ensureTwoWay("front_gate", "north east", "erebor_hidden_door", "south west");
+    ensureTwoWay("front_gate", "east", "erebor_watch_chamber", "west");
+    ensureTwoWay("erebor_watch_chamber", "east", "erebor_upper_tunnels", "west");
+    ensureTwoWay("erebor_upper_tunnels", "south", "erebor_ancient_armoury", "north");
+    ensureTwoWay("erebor_upper_tunnels", "east", "erebor_abandoned_workshop", "west");
+    ensureTwoWay("erebor_abandoned_workshop", "north", "erebor_great_hall", "south");
+    ensureTwoWay("erebor_great_hall", "east", "erebor_treasure_approach", "west");
+    ensureTwoWay("erebor_treasure_approach", "east", "lower_halls", "west");
+
+    [
+      ["seed_cakes", "seed cakes", "a plate of fragrant seed-cakes, cut small enough to vanish at a dwarf's convenience"],
+      ["bag_end_cheese", "cheese", "a round of good yellow cheese wrapped in cloth"],
+      ["bag_end_ale", "ale", "a brown bottle of good ale, cool from the cellar", { portable: true }],
+      ["cold_chicken", "cold chicken", "a dish of cold chicken laid out with sensible generosity"],
+      ["pickles_jar", "pickles", "a stone jar packed with tart little pickles"],
+      ["kitchen_kettle", "kettle", "a bright kettle humming quietly above the fire"],
+      ["kitchen_oven", "oven", "a well-made oven still warm from recent use"],
+      ["teapot_bag_end", "teapot", "a stout brown teapot that looks equal to any social emergency"],
+      ["cooking_utensils", "cooking utensils", "a neat arrangement of spoons, knives, ladles, and pans polished by frequent use"],
+      ["study_writing_desk", "writing desk", "a tidy writing desk scattered with letters, sealing wax, and a nib recently cleaned"],
+      ["study_maps", "maps", "several folded maps, mostly of respectable places and one or two of less prudent interest"],
+      ["pipe_rack", "pipe rack", "a pipe rack holding a variety fit for every mood from contemplative to celebratory"],
+      ["pantry_shelves", "pantry shelves", "sturdy shelves bowed under the honorable weight of preserved comforts"],
+      ["hall_coat_pegs", "coat pegs", "a regiment of polished pegs now threatened by an oncoming invasion of dwarf-cloaks"],
+      ["hall_umbrella_stand", "umbrella stand", "a ceramic stand painted with little green leaves"],
+      ["parlour_hearth", "parlour hearth", "a welcoming hearth laid to cheer guests who know how to appreciate one"],
+      ["guest_washstand", "wash-stand", "a small wash-stand prepared with basin, towel, and hobbit neatness"],
+      ["cellar_ale_rack", "ale rack", "rows of bottled ale resting in cool shadow"],
+      ["rivendell_map_table", "map table", "a carved table laid with maps weighted by smooth river-stones"],
+      ["rivendell_songbook", "songbook", "a slim book of songs written in an elegant flowing hand"],
+      ["rivendell_star_globe", "star globe", "a delicate globe showing the constellations in silver points"],
+      ["beorn_honey_crock", "honey crock", "a heavy crock of dark golden honey"],
+      ["beorn_harness", "harness", "clean harness hung in exact order upon pegs"],
+      ["mirkwood_web_cocoons", "cocoons", "web-wrapped shapes hanging disturbingly from the branches"],
+      ["mirkwood_white_antlers", "white antlers", "a glimpse of white antlers caught for a moment among the deeper trees"],
+      ["elf_wine_cups", "wine cups", "slender cups left from a feast not long concluded"],
+      ["elf_lanterns", "lanterns", "green-gold lanterns whose light flatters the stone"],
+      ["laketown_nets", "nets", "bundled nets smelling strongly of fish and honest labor"],
+      ["laketown_stalls", "market stalls", "crowded stalls hung with baskets, bolts of cloth, and river trade"],
+      ["erebor_carvings", "dwarf carvings", "weathered carvings of kings, hammers, ravens, and mountain stars"],
+      ["erebor_broken_tools", "broken tools", "old tools left where labor ended suddenly and too long ago"],
+      ["erebor_inscriptions", "dwarf inscriptions", "deep runes cut in the stone by hands that expected their work to be remembered"],
+    ].forEach(([id, name, description, options = {}]) => ensureItem(id, {
+      name,
+      description,
+      portable: false,
+      visible: true,
+      ...options,
+    }));
+
+    [
+      ["bag_end_pantry", "seed_cakes"],
+      ["bag_end_pantry", "bag_end_cheese"],
+      ["bag_end_pantry", "cold_chicken"],
+      ["bag_end_pantry", "pickles_jar"],
+      ["bag_end_cellar_room", "bag_end_ale"],
+      ["bag_end_kitchen", "kitchen_kettle"],
+      ["bag_end_kitchen", "kitchen_oven"],
+      ["bag_end_kitchen", "teapot_bag_end"],
+      ["bag_end_kitchen", "cooking_utensils"],
+      ["bag_end_study", "study_writing_desk"],
+      ["bag_end_study", "study_maps"],
+      ["bag_end_study", "pipe_rack"],
+      ["bag_end_pantry", "pantry_shelves"],
+      ["bag_end_entrance_hall", "hall_coat_pegs"],
+      ["bag_end_entrance_hall", "hall_umbrella_stand"],
+      ["bag_end_parlour", "parlour_hearth"],
+      ["bag_end_guest_room", "guest_washstand"],
+      ["bag_end_cellar_room", "cellar_ale_rack"],
+      ["rivendell_library", "rivendell_songbook"],
+      ["rivendell_library", "rivendell_star_globe"],
+      ["rivendell_hall_of_fire", "rivendell_map_table"],
+      ["beorn_great_hall", "beorn_honey_crock"],
+      ["beorn_stable", "beorn_harness"],
+      ["mirkwood_spider_grove", "mirkwood_web_cocoons"],
+      ["mirkwood_deer_trail", "mirkwood_white_antlers"],
+      ["elven_feast_hall", "elf_wine_cups"],
+      ["elven_guard_post", "elf_lanterns"],
+      ["laketown_docks", "laketown_nets"],
+      ["laketown_marketplace", "laketown_stalls"],
+      ["erebor_watch_chamber", "erebor_carvings"],
+      ["erebor_abandoned_workshop", "erebor_broken_tools"],
+      ["erebor_great_hall", "erebor_inscriptions"],
+    ].forEach(([room, item]) => placeItem(room, item));
+
+    [
+      ["rivendell_singer", "elf singer", { friendly: true, strength: 4 }],
+      ["rivendell_lorekeeper", "elf lorekeeper", { friendly: true, strength: 5 }],
+      ["beorn_horse", "great horse", { friendly: true, strength: 8 }],
+      ["beorn_hound", "sheepdog", { friendly: true, strength: 5 }],
+      ["beorn_sheep", "woolly sheep", { friendly: true, strength: 2 }],
+      ["elf_guard_one", "woodland guard", { friendly: "neutral", strength: 6 }],
+      ["elf_guard_two", "woodland guard", { friendly: "neutral", strength: 6 }],
+      ["laketown_merchant", "merchant", { friendly: "neutral", strength: 4 }],
+      ["laketown_fisherman", "fisherman", { friendly: "neutral", strength: 4 }],
+      ["laketown_guard", "town guard", { friendly: "neutral", strength: 6 }],
+      ["mirkwood_spider_scout", "great spider", { friendly: false, strength: 8 }],
+      ["mirkwood_spider_brood", "web-spinner", { friendly: false, strength: 7 }],
+    ].forEach(([id, name, options]) => ensureCharacter(id, { name, movementMode: "never", visible: true, ...options }));
+
+    [
+      ["rivendell_hall_of_fire", "rivendell_singer"],
+      ["rivendell_library", "rivendell_lorekeeper"],
+      ["beorn_stable", "beorn_horse"],
+      ["beorn_animal_yard", "beorn_hound"],
+      ["beorn_animal_yard", "beorn_sheep"],
+      ["elven_guard_post", "elf_guard_one"],
+      ["elven_feast_hall", "elf_guard_two"],
+      ["laketown_marketplace", "laketown_merchant"],
+      ["laketown_docks", "laketown_fisherman"],
+      ["laketown_town_square", "laketown_guard"],
+      ["mirkwood_spider_grove", "mirkwood_spider_scout"],
+      ["mirkwood_ruined_clearing", "mirkwood_spider_brood"],
+    ].forEach(([room, character]) => placeCharacter(room, character));
+
+    return data;
+  }
+
   class CommandSplitter {
     constructor(data) {
       this.verbs = [...new Set([...(data.parser.verbs || []), ...NATURAL_VERBS])];
@@ -370,7 +899,7 @@
   class UnexpectedPartyController {
     constructor(game) {
       this.game = game;
-      this.partyRooms = new Set(["hobbit_hole", "bilbos_garden"]);
+      this.partyRooms = new Set([...IMMERSION_BAG_END_ROOMS]);
       this.roster = [
         { id: "unexpected_party_dwalin", name: "Dwalin" },
         { id: "unexpected_party_balin", name: "Balin" },
@@ -462,11 +991,11 @@
         character.carriedBy = null;
         const currentStage = this.state.currentArrival?.dwarfId === dwarf.id ? this.state.currentArrival.stage : -1;
         if (this.state.arrived.includes(dwarf.id)) {
-          if (!this.partyRooms.has(character.position)) character.position = "hobbit_hole";
+          if (!this.partyRooms.has(character.position)) character.position = this.homeRoomFor(dwarf.id);
         } else if (currentStage === 1) {
           character.position = "bilbos_garden";
         } else if (currentStage >= 2) {
-          character.position = "hobbit_hole";
+          character.position = "bag_end_entrance_hall";
         } else {
           character.position = null;
         }
@@ -483,17 +1012,13 @@
     }
 
     blocksGreetingResponse(character) {
-      return this.isAmbientDwarf(character);
+      return false;
     }
 
     blocksDirectInteraction(character, type = "talk") {
       if (!this.isAmbientDwarf(character)) return false;
+      if (["talk", "ask", "gift"].includes(type)) return false;
       const messages = {
-        talk: [
-          `${character.name} gives you a polite nod, but keeps one ear on the gathering.`,
-          `${character.name} seems more interested in settling in than in conversation just now.`,
-          `${character.name} offers a brief smile and turns back to the bustle of Bag End.`,
-        ],
         order: [
           `${character.name} is busy with the gathering and does not take up your instruction.`,
           `${character.name} seems intent on the party rather than on following orders.`,
@@ -518,6 +1043,38 @@
       const pool = messages[type] || messages.talk;
       this.game.print(this.pick(pool, hashString(`${character.id}:${type}:${this.state.turnCounter}`)));
       return true;
+    }
+
+    homeRoomFor(dwarfId) {
+      const distribution = {
+        unexpected_party_dwalin: "bag_end_entrance_hall",
+        unexpected_party_balin: "bag_end_parlour",
+        unexpected_party_fili: "bag_end_guest_room",
+        unexpected_party_kili: "bilbos_garden",
+        unexpected_party_dori: "bag_end_dining_room",
+        unexpected_party_nori: "bag_end_study",
+        unexpected_party_ori: "bag_end_study",
+        unexpected_party_oin: "bag_end_kitchen",
+        unexpected_party_gloin: "bag_end_cellar_room",
+        unexpected_party_bifur: "bag_end_parlour",
+        unexpected_party_bofur: "bag_end_entrance_hall",
+        unexpected_party_bombur: "bag_end_pantry",
+      };
+      return distribution[dwarfId] || "hobbit_hole";
+    }
+
+    dwarfProfile(character) {
+      return COMPANION_PERSONALITIES[character?.id] || COMPANION_PERSONALITIES[normalize(character?.name)] || {
+        summary: `${character?.name || "The dwarf"} looks road-worn, capable, and entirely equal to a long supper.`,
+        talk: `${character?.name || "The dwarf"} says 'A bright fire and a full table improve any beginning.'`,
+        ask: `${character?.name || "The dwarf"} says 'There will be time enough for stories once the road is under us.'`,
+        gift: `${character?.name || "The dwarf"} accepts it with a nod of gratitude.`,
+      };
+    }
+
+    describeCharacter(character) {
+      const profile = this.dwarfProfile(character);
+      return profile.summary;
     }
 
     canAdvance() {
@@ -642,14 +1199,14 @@
       const visibleDwarves = this.arrivedDwarves().filter((character) => character.position === roomId);
       const options = [];
 
-      if (roomId === "hobbit_hole" && visibleDwarves.length >= 3) {
+      if (["hobbit_hole", "bag_end_parlour", "bag_end_dining_room", "bag_end_entrance_hall"].includes(roomId) && visibleDwarves.length >= 2) {
         options.push({
           message: this.pick([
-            "Several dwarves are discussing food.",
-            "Somebody asks whether there is any beer.",
-            "The room grows steadily more crowded.",
-            "A discussion about travelling routes breaks out.",
-            "A clutter of cloaks, boots, and low voices spreads through the room.",
+            "Several dwarves are comparing roads, weather, and provisions in the rapid shorthand of practiced travelers.",
+            "Someone asks whether there is any beer, and someone else answers as if the very question were an article of faith.",
+            "The room feels steadily smaller as cloaks, packs, boots, and opinions accumulate in it.",
+            "A low argument breaks out about routes east and the merits of various inns west of the mountains.",
+            "Bag End hums with dwarf voices, chair-scrapes, and the soft domestic protest of a smial being thoroughly occupied.",
           ], this.seededHash(`group:${this.state.turnCounter}:${visibleDwarves.length}`)),
           cooldown: this.pickCooldown(4, 6),
         });
@@ -664,6 +1221,24 @@
             `${dwarf.name} lingers a moment in the garden before turning back toward the house.`,
             `${dwarf.name} studies the vegetables with the gravity of a traveller judging a campsite.`,
           ]
+          : roomId === "bag_end_pantry"
+            ? [
+              `${dwarf.name} inspects the shelves with a seriousness usually reserved for treasure-vaults.`,
+              `${dwarf.name} looks deeply encouraged by the condition of the pantry.`,
+              `${dwarf.name} discovers yet another shelf of provisions and brightens at once.`,
+            ]
+            : roomId === "bag_end_study"
+              ? [
+                `${dwarf.name} turns over a map with respectful curiosity.`,
+                `${dwarf.name} squints at the books as though half-expecting them to contain practical advice.`,
+                `${dwarf.name} studies the writing desk and nods to himself.`,
+              ]
+              : roomId === "bag_end_kitchen"
+                ? [
+                  `${dwarf.name} hovers near the kitchen fire with unmistakable hope.`,
+                  `${dwarf.name} lifts the kettle lid a fraction and seems satisfied by what he learns.`,
+                  `${dwarf.name} inhales deeply and looks toward the table as if called by destiny.`,
+                ]
           : [
             `${dwarf.name} settles more comfortably into his seat.`,
             `${dwarf.name} rises, stretches his legs, and looks about the room.`,
@@ -700,7 +1275,7 @@
       const movable = this.arrivedDwarves().filter((character) => character.id !== this.state.currentArrival?.dwarfId && this.partyRooms.has(character.position));
       if (movable.length) {
         const dwarf = movable[Math.abs(this.seededHash(`move:${this.state.turnCounter}`)) % movable.length];
-        const toRoom = dwarf.position === "hobbit_hole" ? "bilbos_garden" : "hobbit_hole";
+        const toRoom = this.nextBagEndRoomFor(dwarf.position, dwarf.id);
         options.push({
           message: this.movementMessage(dwarf, dwarf.position, toRoom),
           cooldown: this.pickCooldown(3, 5),
@@ -749,9 +1324,35 @@
           ? `${dwarf.name} slips out into the garden for a moment.`
           : `${dwarf.name} comes out into the garden.`;
       }
-      return this.game.currentRoom === "bilbos_garden"
-        ? `${dwarf.name} goes back inside.`
-        : `${dwarf.name} comes in again from the garden.`;
+      if (toRoom === "hobbit_hole") {
+        return this.game.currentRoom === "bilbos_garden"
+          ? `${dwarf.name} goes back inside.`
+          : `${dwarf.name} comes in again from the garden.`;
+      }
+      const targetRoom = this.game.rooms[toRoom]?.name || toRoom.replaceAll("_", " ");
+      const travel = [
+        `${dwarf.name} wanders off toward the ${targetRoom.toLowerCase()}.`,
+        `${dwarf.name} slips away in search of room, food, or both.`,
+        `${dwarf.name} heads off through the round passages toward the ${targetRoom.toLowerCase()}.`,
+      ];
+      return this.pick(travel, this.seededHash(`${dwarf.id}:move-msg:${fromRoom}:${toRoom}:${this.state.turnCounter}`));
+    }
+
+    nextBagEndRoomFor(fromRoom, dwarfId) {
+      const routes = {
+        hobbit_hole: ["bilbos_garden", "bag_end_entrance_hall", "bag_end_parlour", "bag_end_study", "bag_end_dining_room"],
+        bilbos_garden: ["bag_end_entrance_hall", "hobbit_hole"],
+        bag_end_entrance_hall: ["hobbit_hole", "bilbos_garden", "bag_end_parlour"],
+        bag_end_parlour: ["hobbit_hole", "bag_end_guest_room", "bag_end_entrance_hall"],
+        bag_end_study: ["hobbit_hole", "bag_end_parlour"],
+        bag_end_dining_room: ["hobbit_hole", "bag_end_pantry", "bag_end_cellar_room"],
+        bag_end_pantry: ["bag_end_dining_room", "bag_end_kitchen"],
+        bag_end_kitchen: ["bag_end_pantry", "bag_end_dining_room"],
+        bag_end_guest_room: ["bag_end_parlour", "hobbit_hole"],
+        bag_end_cellar_room: ["bag_end_dining_room"],
+      };
+      const options = routes[fromRoom] || ["hobbit_hole"];
+      return options[Math.abs(this.seededHash(`${dwarfId}:route:${fromRoom}:${this.state.turnCounter}`)) % options.length];
     }
 
     arrivedDwarves() {
@@ -894,6 +1495,228 @@
     }
   }
 
+  class CompanionDirector {
+    constructor(game) {
+      this.game = game;
+    }
+
+    ambientDwarfIds() {
+      return this.game.unexpectedParty?.roster?.map((entry) => entry.id) || [];
+    }
+
+    questDwarfIds() {
+      return ["thorin", ...this.ambientDwarfIds()];
+    }
+
+    chapterForRoom(roomId = this.game.currentRoom) {
+      if (IMMERSION_BAG_END_ROOMS.has(roomId) || ["green_dragon_inn", "green_dragon_inn_outside"].includes(roomId)) return "bag_end";
+      if (roomId === "deep_dark_lake") return "isolation";
+      if (IMMERSION_GOBLIN_ROOMS.has(roomId)) return "goblins";
+      if (IMMERSION_RIVENDELL_ROOMS.has(roomId)) return "rivendell";
+      if (IMMERSION_BEORN_ROOMS.has(roomId) || ["treeless_opening", "great_river"].includes(roomId)) return "beorn";
+      if (IMMERSION_MIRKWOOD_ROOMS.has(roomId) || ["forest_road", "forest_road_2", "forest", "waterfall", "running_river"].includes(roomId)) return "mirkwood";
+      if (IMMERSION_ELVEN_HALLS_ROOMS.has(roomId) || roomId === "elvish_clearing") return "elves";
+      if (IMMERSION_LAKETOWN_ROOMS.has(roomId) || ["bleak_barren_land", "ruins_of_the_town_of_dale", "stoe_of_ravenhill"].includes(roomId)) return "laketown";
+      if (IMMERSION_EREBOR_OUTER_ROOMS.has(roomId)) return "erebor_outer";
+      if (IMMERSION_EREBOR_INNER_ROOMS.has(roomId)) return "erebor_inner";
+      if (IMMERSION_MOUNTAIN_ROOMS.has(roomId) || ["trolls_clearing", "hidden_path", "trolls_cave"].includes(roomId)) return "journey";
+      return "journey";
+    }
+
+    ensureQuestPartyReady() {
+      if (this.chapterForRoom() === "bag_end") return;
+      const party = this.game.unexpectedParty;
+      if (!party) return;
+      if (party.state.arrivalIndex >= party.roster.length && party.state.arrived.length >= party.roster.length) return;
+      party.state.arrived = party.roster.map((entry) => entry.id);
+      party.state.arrivalIndex = party.roster.length;
+      party.state.currentArrival = null;
+      party.state.fullHouseAnnounced = true;
+      party.reconcileCharacters();
+    }
+
+    sync() {
+      this.ensureQuestPartyReady();
+      const chapter = this.chapterForRoom();
+      if (chapter === "bag_end") {
+        this.syncBagEndLeaders();
+        return;
+      }
+
+      const focusRoom = this.game.currentRoom;
+      const dwarfIds = this.ambientDwarfIds();
+      const candidateRooms = this.chapterRooms(chapter, focusRoom);
+      for (let index = 0; index < dwarfIds.length; index += 1) {
+        const character = this.game.characters[dwarfIds[index]];
+        if (!character) continue;
+        character.movementMode = "never";
+        character.visible = true;
+        character.partyBound = true;
+        if (chapter === "isolation") {
+          character.position = null;
+          continue;
+        }
+        const room = this.pickCompanionRoom(candidateRooms, focusRoom, chapter, index, character.id);
+        character.position = room;
+      }
+
+      this.syncGandalf(chapter, focusRoom);
+      this.syncThorin(chapter, focusRoom);
+    }
+
+    syncBagEndLeaders() {
+      const gandalf = this.game.characters.gandalf;
+      if (gandalf && !["green_dragon_inn", "green_dragon_inn_outside"].includes(this.game.currentRoom)) {
+        if (!gandalf.position || !IMMERSION_BAG_END_ROOMS.has(gandalf.position)) gandalf.position = "hobbit_hole";
+      }
+      const thorin = this.game.characters.thorin;
+      if (thorin && IMMERSION_BAG_END_ROOMS.has(this.game.currentRoom)) {
+        if (!thorin.position || !IMMERSION_BAG_END_ROOMS.has(thorin.position)) thorin.position = "bag_end_parlour";
+      }
+    }
+
+    chapterRooms(chapter, focusRoom) {
+      const nearby = [focusRoom, ...this.game.connectionsFrom(focusRoom).map((connection) => connection.to)];
+      const uniqueNearby = [...new Set(nearby)];
+      if (chapter === "journey") return uniqueNearby;
+      if (chapter === "goblins") return uniqueNearby.filter((room) => IMMERSION_GOBLIN_ROOMS.has(room) && room !== "deep_dark_lake");
+      if (chapter === "rivendell") return uniqueNearby.filter((room) => IMMERSION_RIVENDELL_ROOMS.has(room));
+      if (chapter === "beorn") return uniqueNearby.filter((room) => IMMERSION_BEORN_ROOMS.has(room) || ["treeless_opening", "great_river"].includes(room));
+      if (chapter === "mirkwood") {
+        const regionRooms = [...new Set([
+          ...uniqueNearby.filter((room) => IMMERSION_MIRKWOOD_ROOMS.has(room) || ["forest_road", "forest_road_2", "forest", "waterfall", "running_river"].includes(room)),
+          "mirkwood_forest_path",
+          "mirkwood_dark_glade",
+          "mirkwood_deer_trail",
+          "mirkwood_fallen_tree_crossing",
+          "mirkwood_ruined_clearing",
+          "place_of_black_spiders",
+        ])];
+        return regionRooms;
+      }
+      if (chapter === "elves") return uniqueNearby.filter((room) => IMMERSION_ELVEN_HALLS_ROOMS.has(room) || room === "elvish_clearing");
+      if (chapter === "laketown") return uniqueNearby.filter((room) => IMMERSION_LAKETOWN_ROOMS.has(room) || ["bleak_barren_land", "ruins_of_the_town_of_dale", "stoe_of_ravenhill"].includes(room));
+      if (chapter === "erebor_outer") return uniqueNearby.filter((room) => IMMERSION_EREBOR_OUTER_ROOMS.has(room) || room === "front_gate");
+      if (chapter === "erebor_inner") return ["front_gate", "erebor_hidden_door", "erebor_watch_chamber", "erebor_great_hall", "erebor_treasure_approach"];
+      return uniqueNearby;
+    }
+
+    pickCompanionRoom(candidateRooms, focusRoom, chapter, index, companionId) {
+      const rooms = candidateRooms.length ? candidateRooms : [focusRoom];
+      const focusBias = {
+        journey: 4,
+        rivendell: 3,
+        beorn: 3,
+        goblins: 1,
+        mirkwood: 1,
+        elves: 2,
+        laketown: 2,
+        erebor_outer: 2,
+        erebor_inner: 0,
+      }[chapter] ?? 2;
+      const weighted = [
+        ...Array.from({ length: focusBias }, () => focusRoom),
+        ...rooms.filter((room) => room !== focusRoom),
+      ];
+      const seed = hashString(`${this.game.storySeed}:${chapter}:${companionId}:${this.game.turnCount}:${index}`);
+      return weighted[Math.abs(seed) % weighted.length] || focusRoom;
+    }
+
+    syncGandalf(chapter, focusRoom) {
+      const gandalf = this.game.characters.gandalf;
+      if (!gandalf) return;
+      if (["mirkwood", "elves", "laketown", "erebor_outer", "erebor_inner", "isolation"].includes(chapter)) {
+        gandalf.position = null;
+        return;
+      }
+      if (chapter === "goblins") {
+        gandalf.position = focusRoom === "deep_dark_lake" ? null : focusRoom;
+        return;
+      }
+      gandalf.position = focusRoom;
+    }
+
+    syncThorin(chapter, focusRoom) {
+      const thorin = this.game.characters.thorin;
+      if (!thorin) return;
+      if (chapter === "isolation") {
+        thorin.position = null;
+        return;
+      }
+      if (chapter === "erebor_inner" && this.game.liveDragon()) {
+        thorin.position = "erebor_treasure_approach";
+        return;
+      }
+      thorin.position = chapter === "goblins" && focusRoom === "deep_dark_lake" ? null : focusRoom;
+    }
+
+    visibleCompanions(roomId = this.game.currentRoom) {
+      return [...this.questDwarfIds(), "gandalf", "bard"]
+        .map((id) => this.game.characters[id])
+        .filter((character) => character && character.visible !== false && character.position === roomId);
+    }
+
+    companionPose(character, roomId, index = 0) {
+      const posesByRegion = {
+        bag_end: ["stands near the hearth", "has claimed a chair and half the available table-space", "keeps one eye on the kitchen"],
+        journey: ["studies the road ahead", "rests with pack still within arm's reach", "keeps a wary eye on the country round about"],
+        rivendell: ["looks more rested here than on the open road", "studies the elvish work with open respect", "listens in spite of himself for distant song"],
+        beorn: ["glances often toward the yard and its disciplined beasts", "seems impressed by the strength of the house", "watches the door with road-bred caution"],
+        goblins: ["waits tensely in the dark", "listens for any stir ahead", "keeps close to the wall, breathing carefully"],
+        mirkwood: ["looks worn by hunger and bad light", "watches the branches overhead with undisguised mistrust", "moves like someone afraid the trees may be listening"],
+        elves: ["keeps quiet under the eyes of the Elvenking's folk", "studies the halls as though measuring chances of escape", "waits with dwarf patience and dwarf resentment"],
+        laketown: ["watches the water and the people with equal suspicion", "seems steadier for the sound of human trade and labor", "keeps his cloak close in the lake-wind"],
+        erebor_outer: ["stares toward the Mountain's depths with a hunger older than the journey", "has little attention left for anything but the halls ahead", "runs a hand absently over old stone as if greeting kin"],
+        erebor_inner: ["remains outside the treasure halls, unwilling to risk the whole company at once", "waits beyond the deeper passages, watching and listening", "holds himself near the threshold, torn between caution and longing"],
+      };
+      const region = this.chapterForRoom(roomId);
+      const poses = posesByRegion[region] || posesByRegion.journey;
+      const seed = hashString(`${this.game.storySeed}:${character.id}:${roomId}:${index}`);
+      return poses[Math.abs(seed) % poses.length];
+    }
+
+    roomCompanionNarrative(roomId = this.game.currentRoom) {
+      const companions = this.visibleCompanions(roomId);
+      if (!companions.length) {
+        if (this.chapterForRoom(roomId) === "isolation") {
+          return "You are utterly alone here, cut off from the company by black water, blind passages, and a darkness that seems glad of the separation.";
+        }
+        return "";
+      }
+      const highlights = companions.slice(0, 3).map((character, index) => `${character.name} ${this.companionPose(character, roomId, index)}`);
+      const overflow = companions.length > highlights.length ? ` Others of the company are nearby as well.` : "";
+      return `${highlights.join(". ")}.${overflow}`;
+    }
+
+    maybeComment() {
+      const companions = this.visibleCompanions().filter((character) => character.id !== "thorin");
+      if (!companions.length || this.game.player.noticeable === false) return false;
+      const cooldownKey = "companion_comment_cooldown";
+      if ((this.game.flags[cooldownKey] || 0) > this.game.turnCount) return false;
+
+      const comments = [];
+      if (!this.game.flags.stingremarked && this.game.player.inventory.some((itemId) => matches(this.game.items[itemId]?.name, "short strong dagger"))) {
+        comments.push("Balin glances at your elvish blade and says 'A better knife than any pantry would usually require, Master Baggins.'");
+        this.game.flags.stingremarked = true;
+      }
+      if (this.chapterForRoom() === "mirkwood") {
+        comments.push("Bofur says 'This wood could make a hungry dwarf long for plain honest rain and an open sky.'");
+      }
+      if (this.chapterForRoom() === "journey" && this.game.turnCount > 10) {
+        comments.push("Dwalin says 'We keep moving, or the road will begin to think us ornamental.'");
+      }
+      if (this.chapterForRoom() === "laketown" && this.game.flags.dragondefeated) {
+        comments.push("Balin says 'Better the sound of hammers and market-calls than dragon-fire over a town.'");
+      }
+      if (!comments.length) return false;
+
+      const seed = hashString(`${this.game.storySeed}:companion-comment:${this.game.turnCount}:${comments.length}`);
+      this.game.flags[cooldownKey] = this.game.turnCount + 6 + (Math.abs(seed) % 4);
+      this.game.print(comments[Math.abs(seed) % comments.length]);
+      return true;
+    }
+  }
+
   class HobbitGame {
     constructor(data) {
       this.data = data;
@@ -951,6 +1774,7 @@
       this.audio.preload = "auto";
       this.audio.volume = 0.75;
       this.unexpectedParty = new UnexpectedPartyController(this);
+      this.companionDirector = new CompanionDirector(this);
       this.layoutSwitchHideTimer = null;
       this.layoutSwitchAutoHide = this.shouldAutoHideLayoutSwitch();
       this.layoutResizeCleanup = null;
@@ -1017,6 +1841,7 @@
       this.turnCount = 0;
       this.addZXFinaleState();
       this.unexpectedParty?.reset();
+      this.companionDirector?.sync();
     }
 
     nextStorySeed() {
@@ -1043,6 +1868,8 @@
         pocketQuestionAsked: false,
         enraged: false,
         escaped: false,
+        activityIndex: 0,
+        activityCooldown: 0,
         revealStyle: Math.abs(hashString(`${this.storySeed}:gollum-reveal`)) % 4,
         deathStyle: Math.abs(hashString(`${this.storySeed}:gollum-death`)) % 4,
       };
@@ -1060,6 +1887,8 @@
         .slice(0, 2);
       if (!restored.riddleIds.length) restored.riddleIds = base.riddleIds;
       if (restored.currentRiddleIndex >= restored.riddleIds.length) restored.currentRiddleIndex = restored.riddleIds.length - 1;
+      restored.activityIndex = Number.isInteger(restored.activityIndex) ? restored.activityIndex : base.activityIndex;
+      restored.activityCooldown = Number.isFinite(restored.activityCooldown) ? restored.activityCooldown : base.activityCooldown;
       restored.revealStyle = Number.isInteger(restored.revealStyle) ? restored.revealStyle : base.revealStyle;
       restored.deathStyle = Number.isInteger(restored.deathStyle) ? restored.deathStyle : base.deathStyle;
       return restored;
@@ -1689,6 +2518,7 @@
       const config = typeof options === "boolean"
         ? { initial: options, full: options }
         : { initial: false, full: false, ...options };
+      this.companionDirector?.sync();
       const room = this.room();
       if (!room) return;
       const wasVisited = this.visitedRooms.has(this.currentRoom);
@@ -1715,9 +2545,11 @@
       const people = this.visiblePeopleInRoom().filter((p) => p.name !== "You" && p.visible);
       const arrivingPeople = people.filter((p) => p.justEntered);
       const peopleText = people.filter((p) => !p.justEntered).map((p) => this.characterPresence(p)).join(" ");
+      const companionNarrative = this.companionDirector?.roomCompanionNarrative(this.currentRoom) || "";
+      const atmosphericNarrative = this.roomAtmosphericNarrative();
       const detailsText = showFullDetails
-        ? [doorText, objectText, peopleText].filter(Boolean).join(" ")
-        : peopleText;
+        ? [doorText, objectText, companionNarrative, atmosphericNarrative, peopleText].filter(Boolean).join(" ")
+        : [companionNarrative, atmosphericNarrative, peopleText].filter(Boolean).join(" ");
       this.print([roomText, detailsText].filter(Boolean).join(" "));
       for (const person of arrivingPeople) {
         this.scheduleCharacterArrivalNotice(person);
@@ -1767,6 +2599,7 @@
         scene?.classList.remove("is-revealing");
         clearTimeout(this.imageRevealTimer);
         this.imageRevealTimer = null;
+        this.lastRevealedImage = "";
         roomImage.setAttribute("hidden", "hidden");
         roomImage.removeAttribute("src");
         roomImage.alt = "";
@@ -1779,6 +2612,10 @@
         if (!currentSrc) this.revealRoomImage(src);
         roomImage.alt = room.name;
       } else {
+        scene?.classList.remove("is-revealing");
+        clearTimeout(this.imageRevealTimer);
+        this.imageRevealTimer = null;
+        this.lastRevealedImage = "";
         roomImage.setAttribute("hidden", "hidden");
         roomImage.removeAttribute("src");
         roomImage.alt = "";
@@ -1930,6 +2767,15 @@
       document.documentElement?.style?.setProperty?.("--layout-2-scene-width", `${normalized}%`);
       if (options.persist !== false) localStorage.setItem(LAYOUT_SPLIT_PREF_KEY, String(normalized));
       return normalized;
+    }
+
+    refreshLayout() {
+      if (!gameShell?.style) return;
+      if (this.layoutMode === "2") this.applyLayout2SceneWidth(this.layout2SceneWidth, { persist: false });
+      // Nudge a fresh grid calculation after boot so layout 1 does not wait for user input to settle.
+      gameShell.style.setProperty("--layout-refresh-token", String(Date.now()));
+      gameShell.getBoundingClientRect?.();
+      requestAnimationFrame(() => gameShell.style.removeProperty("--layout-refresh-token"));
     }
 
     updateLayout2SceneWidthFromPointer(clientX) {
@@ -2694,7 +3540,10 @@
     examineCharacter(character) {
       const loadout = this.characterLoadoutText(character, { includeEmpty: true });
       const temperament = character.friendly === false ? "They look dangerous." : "";
-      this.print([actorizeSecondPerson(this.player, `You examine ${character.name}.`), loadout, temperament].filter(Boolean).join(" "));
+      const companionSummary = this.unexpectedParty?.isAmbientDwarf(character) ? this.unexpectedParty.describeCharacter(character) : "";
+      const gollumSummary = matches(character.name, "gollum") ? this.gollumRoomNarrative() : "";
+      const smaugSummary = matches(character.name, "dragon") ? this.smaugRoomNarrative() : "";
+      this.print([actorizeSecondPerson(this.player, `You examine ${character.name}.`), companionSummary, gollumSummary, smaugSummary, loadout, temperament].filter(Boolean).join(" "));
     }
 
     sense(verb, objectName = "") {
@@ -2833,6 +3682,113 @@
       if (description.includes("food") || description.includes("meal") || description.includes("wine")) return "There is a homely smell of food and drink.";
       if (description.includes("dragon") || description.includes("smaug")) return "The air smells hot, dry, and dangerous.";
       return `${actorSubject(this.player, true)} ${actorVerb(this.player, "smell")} the air, but notice${this.player.name === "You" ? "" : "s"} nothing useful.`;
+    }
+
+    roomAtmosphericNarrative() {
+      const details = [];
+      if (this.currentRoom === "deep_dark_lake") details.push(this.gollumRoomNarrative());
+      if ((IMMERSION_EREBOR_OUTER_ROOMS.has(this.currentRoom) || IMMERSION_EREBOR_INNER_ROOMS.has(this.currentRoom) || this.currentRoom === "front_gate") && this.liveDragon()) {
+        details.push(this.smaugRoomNarrative());
+      }
+      if (IMMERSION_MIRKWOOD_ROOMS.has(this.currentRoom) && this.currentRoom !== "place_of_black_spiders") {
+        details.push("Hunger, weariness, and the sameness of the trees make it hard to believe in straight roads.");
+      }
+      return details.filter(Boolean).join(" ");
+    }
+
+    gollumRoomNarrative() {
+      const gollum = this.currentGollum();
+      if (!gollum || gollum.position !== "deep_dark_lake" || gollum.visible === false) return "";
+      if (!this.gollumState?.met) return "The black water gives back no light, and some patient thing beyond it seems to be listening.";
+      return GOLLUM_ACTIVITY_LINES[this.gollumState?.activityIndex || 0] || GOLLUM_ACTIVITY_LINES[0];
+    }
+
+    smaugRoomNarrative() {
+      return SMAUG_STATE_DESCRIPTIONS[this.currentSmaugState()] || SMAUG_STATE_DESCRIPTIONS.sleeping;
+    }
+
+    atmosphereRegionKey(roomId = this.currentRoom) {
+      if (IMMERSION_BAG_END_ROOMS.has(roomId)) return "bag_end";
+      if (IMMERSION_RIVENDELL_ROOMS.has(roomId)) return "rivendell";
+      if (IMMERSION_MOUNTAIN_ROOMS.has(roomId)) return "mountains";
+      if (roomId === "deep_dark_lake") return "gollum";
+      if (IMMERSION_BEORN_ROOMS.has(roomId)) return "beorn";
+      if (IMMERSION_MIRKWOOD_ROOMS.has(roomId) || ["forest_road", "forest_road_2", "forest", "waterfall", "running_river"].includes(roomId)) return "mirkwood";
+      if (IMMERSION_ELVEN_HALLS_ROOMS.has(roomId) || roomId === "elvish_clearing") return "elves";
+      if (IMMERSION_LAKETOWN_ROOMS.has(roomId) || ["bleak_barren_land", "ruins_of_the_town_of_dale", "stoe_of_ravenhill"].includes(roomId)) return "laketown";
+      if (IMMERSION_EREBOR_OUTER_ROOMS.has(roomId) || IMMERSION_EREBOR_INNER_ROOMS.has(roomId) || roomId === "front_gate") return "erebor";
+      return "";
+    }
+
+    maybeAtmosphericEvent() {
+      const region = this.atmosphereRegionKey();
+      const pool = region && ATMOSPHERIC_EVENT_POOLS[region];
+      if (!pool?.length) return false;
+      const cooldownKey = `atmosphere_${region}_cooldown`;
+      if ((this.flags[cooldownKey] || 0) > this.turnCount) return false;
+      const seed = hashString(`${this.storySeed}:atmosphere:${region}:${this.turnCount}:${this.currentRoom}`);
+      if (Math.abs(seed) % 5 !== 0) return false;
+      this.flags[cooldownKey] = this.turnCount + 5 + (Math.abs(seed) % 3);
+      this.print(pool[Math.abs(seed) % pool.length]);
+      return true;
+    }
+
+    advanceGollumActivity() {
+      if (this.currentRoom !== "deep_dark_lake" || !this.gollumState) return;
+      const gollum = this.currentGollum();
+      if (!gollum || gollum.visible === false) return;
+      this.gollumState.activityCooldown = Math.max(0, (this.gollumState.activityCooldown || 0) - 1);
+      if (this.gollumState.activityCooldown > 0) return;
+      const nextIndex = Math.abs(hashString(`${this.storySeed}:gollum-activity:${this.turnCount}`)) % GOLLUM_ACTIVITY_LINES.length;
+      this.gollumState.activityIndex = nextIndex;
+      this.gollumState.activityCooldown = 2 + (nextIndex % 2);
+      if (this.gollumState.met && !this.gollumState.awaitingAnswer && !this.gollumState.awaitingPlayerRiddle && !this.gollumState.pocketQuestionAsked && this.turnCount % 3 === 0) {
+        this.print(GOLLUM_ACTIVITY_LINES[nextIndex]);
+      }
+    }
+
+    currentSmaugState() {
+      return this.flags.smaugstate || "sleeping";
+    }
+
+    setSmaugState(state, announce = false) {
+      const normalized = SMAUG_STATE_DESCRIPTIONS[state] ? state : "sleeping";
+      const previous = this.currentSmaugState();
+      this.flags.smaugstate = normalized;
+      if (announce && previous !== normalized && IMMERSION_EREBOR_INNER_ROOMS.has(this.currentRoom)) {
+        const lines = {
+          curious: "Smaug stirs, one vast lid lifting over a watchful eye.",
+          suspicious: "Smaug's voice rolls through the hall, soft and terrible, as he begins to suspect an intruder.",
+          searching: "Smaug rises from the treasure and begins to search the hall in deadly earnest.",
+          enraged: "Smaug's patience breaks. Rage shakes the treasure as the dragon lashes the chamber with tail and voice.",
+          sleeping: "At last the dragon settles again upon the gold, though not peacefully.",
+        };
+        this.print(lines[normalized] || SMAUG_STATE_DESCRIPTIONS[normalized]);
+      }
+    }
+
+    advanceSmaugAwareness() {
+      const dragon = Object.values(this.characters).find((character) => matches(character.name, "dragon") && character.visible !== false);
+      if (!dragon) return;
+      if (!(IMMERSION_EREBOR_INNER_ROOMS.has(this.currentRoom) || IMMERSION_EREBOR_OUTER_ROOMS.has(this.currentRoom) || this.flags.treasuretaken)) {
+        this.setSmaugState("sleeping");
+        return;
+      }
+      let state = "sleeping";
+      if (this.flags.treasuretaken) state = "enraged";
+      else if (IMMERSION_EREBOR_INNER_ROOMS.has(this.currentRoom) && this.player.noticeable !== false) {
+        const tempo = (this.turnCount + (this.flags.smaugSuspicion || 0)) % 6;
+        state = tempo <= 1 ? "curious" : tempo <= 3 ? "suspicious" : "searching";
+      } else if (IMMERSION_EREBOR_INNER_ROOMS.has(this.currentRoom)) {
+        state = "suspicious";
+      } else if (IMMERSION_EREBOR_OUTER_ROOMS.has(this.currentRoom)) {
+        state = "curious";
+      }
+      if (state === "searching" && this.player.noticeable !== false && this.turnCount % 5 === 0) {
+        state = "enraged";
+      }
+      this.flags.smaugSuspicion = (this.flags.smaugSuspicion || 0) + (IMMERSION_EREBOR_INNER_ROOMS.has(this.currentRoom) ? 1 : 0);
+      this.setSmaugState(state, true);
     }
 
     inventory() {
@@ -2985,6 +3941,7 @@
       this.normalizeLanternState();
       this.addZXFinaleState();
       this.unexpectedParty?.load(save.unexpectedParty || null);
+      this.companionDirector?.sync();
       output.replaceChildren();
       output.classList.remove("end-screen");
       input.value = "";
@@ -3766,6 +4723,10 @@
     askCharacterAbout(characterName, topic) {
       const character = this.resolveCharacterTarget(characterName);
       if (!character) return this.print(`There is no one named ${characterName} here.`);
+      if (matches(character.name, "dragon")) {
+        const special = this.specialConversationResponse(character, topic) || this.specialTalkResponse(character);
+        return this.print(special);
+      }
       if (character.friendly === false) return this.respondToTalk(character);
       if (this.player.name === "You" && this.player.noticeable === false) return this.print(`${character.name} says 'who's talking?'`);
       if (this.unexpectedParty?.blocksDirectInteraction(character, "ask")) return;
@@ -3842,6 +4803,9 @@
     }
 
     specialTalkResponse(character) {
+      if (this.unexpectedParty?.isAmbientDwarf(character)) {
+        return this.unexpectedParty.dwarfProfile(character).talk;
+      }
       if (matches(character.name, "elrond") && this.currentRoom === "rivendell") {
         return "Elrond folds his hands and says 'Speak without haste. In Rivendell, even quiet words may be worth the hearing.'";
       }
@@ -3860,11 +4824,26 @@
         if (this.gollumState.awaitingPlayerRiddle) return "Gollum licks his lips. 'Now Baggins asks, yes. Ask it, precious, ask it.'";
         if (this.gollumState.pocketQuestionAsked) return "Gollum is past speech now. He hunts only for his precious.";
       }
+      if (matches(character.name, "dragon")) {
+        const lines = {
+          sleeping: "A deep rumble answers you. Whether it is speech or dreaming, it contains very little reassurance.",
+          curious: "Smaug says 'A courteous little voice in my halls? Come nearer, and let us see what sort of thief has learned manners.'",
+          suspicious: "Smaug says 'You smell of doorways, moonlight, and secrets. Tell me, little trespasser, who taught you to walk so softly?'",
+          searching: "Smaug says 'Come out, come out, thief in the dark. I know now that I am not alone.'",
+          enraged: "Smaug's answer is a furnace-breath growl: 'When I find you, I shall know your taste as well as your scent.'",
+        };
+        return lines[this.currentSmaugState()] || lines.sleeping;
+      }
       return "";
     }
 
     specialConversationResponse(character, topic) {
       const text = normalize(topic);
+      if (this.unexpectedParty?.isAmbientDwarf(character)) {
+        if (matchesAny(text, ["food", "supper", "tea", "ale", "beer", "pantry"])) return this.unexpectedParty.dwarfProfile(character).ask;
+        if (matchesAny(text, ["quest", "road", "journey", "mountain", "thorin"])) return `${character.name} says 'We have not come merely to enjoy your excellent housekeeping, though I mean to do my best with it while it lasts.'`;
+        return this.unexpectedParty.dwarfProfile(character).ask;
+      }
       if (matches(character.name, "gollum")) {
         if (text === "a riddle" || text === "riddle") return this.beginGollumRiddleContest();
         if (text.includes("pocket")) return this.resolveGollumPocketQuestion();
@@ -3892,6 +4871,11 @@
         if (matchesAny(text, ["food", "meal", "shelter", "night", "rest"])) {
           return "Beorn says 'There is food and a roof here for decent guests. Take both with thanks, and do not abuse either.'";
         }
+      }
+      if (matches(character.name, "dragon")) {
+        if (matchesAny(text, ["treasure", "gold", "cup", "hoard"])) return "Smaug says 'My armour is like tenfold shields, my teeth are swords, my claws are spears, and this wealth is mine by fire and fear.'";
+        if (matchesAny(text, ["thorin", "dwarves", "company"])) return "Smaug says 'Ah, the dwarves. Greed remembers old tunnels better than wisdom does.'";
+        if (matchesAny(text, ["door", "entrance", "way in", "secret"])) return "Smaug gives a low pleased rumble. 'You ask many careful questions for so small a guest. That interests me.'";
       }
       return "";
     }
@@ -4013,6 +4997,13 @@
     }
 
     reactToGift(character, item) {
+      if (this.unexpectedParty?.isAmbientDwarf(character)) {
+        const profile = this.unexpectedParty.dwarfProfile(character);
+        if (matchesAny(item.name, ["seed cakes", "cheese", "ale", "meal", "cold chicken", "pickles", "wine"])) {
+          return this.print(`${character.name} brightens at once. '${profile.gift}'`);
+        }
+        return this.print(`${character.name} accepts the ${item.name}. '${profile.gift}'`);
+      }
       if (matches(character.name, "gandalf")) {
         if (matches(item.name, "curious map")) {
           this.flags.gandalf_has_been_given_map = true;
@@ -4035,6 +5026,9 @@
       }
       if (matches(character.name, "bard")) {
         if (matches(item.name, "bow") || matches(item.name, "arrow")) return this.print("Bard checks the weapon carefully and says 'A clean shot asks for a steady hour.'");
+      }
+      if (matches(character.name, "dragon")) {
+        return this.print("Smaug laughs, a sound like furnace-doors shaken open. 'A gift? From a thief? Put it down and perhaps I shall only wonder why.'");
       }
     }
 
@@ -4768,9 +5762,35 @@
         if (!character.visible || character.position !== fromRoom) continue;
         if (this.characterCannotFollowVertical(character, direction)) continue;
         if (this.shouldHoldBardNearDale(character, toRoom)) continue;
+        if (this.shouldHoldFollowerByChapter(character, fromRoom, toRoom)) continue;
         this.moveCharacter(character, toRoom, direction, { silent: true });
         character.justEntered = false;
       }
+    }
+
+    shouldHoldFollowerByChapter(character, fromRoom, toRoom) {
+      if (matches(character.name, "gandalf")) {
+        if (IMMERSION_MIRKWOOD_ROOMS.has(toRoom) || IMMERSION_ELVEN_HALLS_ROOMS.has(toRoom) || IMMERSION_LAKETOWN_ROOMS.has(toRoom) || IMMERSION_EREBOR_OUTER_ROOMS.has(toRoom) || IMMERSION_EREBOR_INNER_ROOMS.has(toRoom)) {
+          character.movementMode = "never";
+          character.followingPlayer = false;
+          character.position = fromRoom;
+          if (!this.flags.gandalfpartedcompany) {
+            this.flags.gandalfpartedcompany = true;
+            this.print("Gandalf says 'From here your road goes where I cannot presently walk beside you. Remember what you have learned.'");
+          }
+          return true;
+        }
+      }
+      if (matches(character.name, "thorin") && IMMERSION_EREBOR_INNER_ROOMS.has(toRoom) && this.liveDragon()) {
+        character.followingPlayer = false;
+        character.position = "erebor_treasure_approach";
+        if (!this.flags.thorinheldfromsmaug) {
+          this.flags.thorinheldfromsmaug = true;
+          this.print("Thorin says 'I will not hazard the whole company in Smaug's very chamber. Go on, then, and be wary.'");
+        }
+        return true;
+      }
+      return false;
     }
 
     shouldHoldBardNearDale(character, toRoom) {
@@ -4854,6 +5874,11 @@
         this.decideCharacterMovement(character, { forceMove });
       }
       this.unexpectedParty?.advanceTurn();
+      this.companionDirector?.sync();
+      this.advanceGollumActivity();
+      this.advanceSmaugAwareness();
+      this.maybeAtmosphericEvent();
+      this.companionDirector?.maybeComment();
     }
 
     maybeCharacterInitiative(character) {
@@ -5124,6 +6149,11 @@
       if (!character.visible || character.position !== this.currentRoom) return false;
       if (matches(character.name, "gollum") && this.currentRoom === "deep_dark_lake") {
         if (!this.gollumState?.enraged) return false;
+        if (this.player.noticeable === false) return false;
+      }
+      if (matches(character.name, "dragon")) {
+        const state = this.currentSmaugState();
+        if (!["searching", "enraged"].includes(state)) return false;
         if (this.player.noticeable === false) return false;
       }
       if (character.friendly !== false || (character.attackFlag || 0) < 2) return false;
@@ -5555,6 +6585,10 @@
         const line = this.beginGollumRiddleContest() || "Gollum watches you in silence from the dark water.";
         return this.print(line);
       }
+      if (matches(character.name, "dragon")) {
+        const line = this.specialTalkResponse(character) || `${character.name} watches and waits.`;
+        return this.print(line);
+      }
       this.print(`${character.name} glares at you, unimpressed.`);
     }
 
@@ -5983,6 +7017,22 @@
 
   function matchesAny(text, choices) {
     return choices.some((choice) => matches(text, choice) || matches(choice, text));
+  }
+
+  function oppositeDirection(direction = "") {
+    const pairs = {
+      north: "south",
+      south: "north",
+      east: "west",
+      west: "east",
+      "north east": "south west",
+      "north west": "south east",
+      "south east": "north west",
+      "south west": "north east",
+      up: "down",
+      down: "up",
+    };
+    return pairs[normalize(direction)] || "back";
   }
 
   function commandObjectMatches(commandText, requiredName) {
@@ -6498,6 +7548,8 @@
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         document.body.classList.remove("booting");
+        window.hobbitGame?.refreshLayout?.();
+        requestAnimationFrame(() => window.hobbitGame?.refreshLayout?.());
       });
     });
   });

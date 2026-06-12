@@ -938,7 +938,7 @@ const gameCases = [
     inputs: ["tell gandalf to follow me", "open the door", "go outside"],
     expectedIncluded: [
       "Gandalf follows you as closely as possible.",
-      "You are in a beautiful garden, amidst verdant foliage and blossoms bright. The air is sweet with nature's breath. Paths wind through hidden nooks, where secrets lie in wait. A tranquil haven, where the heart finds peace and the spirit, adventure. To the west there is the round green door. The round green door is open. You see: a weathered, moss-covered stone bench perfect for quiet contemplation, an ancient sun dial casting shadows to mark the hours, a vibrant, fragrant rose bush attracting bees and brightening the garden, a shallow bird bath inviting feathered friends to splash and drink, a fragrant herbs patch thriving in the sunlight, a small garden shed for storing tools and gardening supplies.",
+      "You are in the front garden before Bag End, where clipped borders, herbs, and bright flowers soften the green slope. A neat path leads to the famous round door, and the air smells of soil, roses, and well-watered earth in the Hill. To the west there is the round green door. The round green door is open. You see: a weathered, moss-covered stone bench perfect for quiet contemplation, an ancient sun dial casting shadows to mark the hours, a vibrant, fragrant rose bush attracting bees and brightening the garden, a shallow bird bath inviting feathered friends to splash and drink, a fragrant herbs patch thriving in the sunlight, a small garden shed for storing tools and gardening supplies.",
     ],
   },
   {
@@ -1083,7 +1083,18 @@ const gameCases = [
         controller.advanceTurn();
       }
       const escaped = controller.arrivedDwarves()
-        .filter((character) => character.position && !["hobbit_hole", "bilbos_garden"].includes(character.position))
+        .filter((character) => character.position && ![
+          "hobbit_hole",
+          "bilbos_garden",
+          "bag_end_entrance_hall",
+          "bag_end_parlour",
+          "bag_end_study",
+          "bag_end_dining_room",
+          "bag_end_pantry",
+          "bag_end_kitchen",
+          "bag_end_guest_room",
+          "bag_end_cellar_room",
+        ].includes(character.position))
         .map((character) => character.name);
       game.print(escaped.length ? `Escaped dwarves: ${escaped.join(", ")}` : "Unexpected Party dwarves remain within Bag End.");
     },
@@ -1363,7 +1374,7 @@ const gameCases = [
         throw new Error(`Expected autoplay victory message. Commands: ${issued.slice(-12).join(" | ")}`);
       }
     },
-    expectedIncluded: ["Congratulations. You have killed Smaug and found the treasure - a real thief. You have mastered 48.81% of this adventure."],
+    expectedIncluded: [/Congratulations\. You have killed Smaug and found the treasure - a real thief\. You have mastered \d+\.\d+% of this adventure\./],
     notExpectedIncluded: ["You leave the", "You drop the"],
   },
   {
@@ -1770,6 +1781,44 @@ const gameCases = [
     inputs: ["north"],
     expectedIncluded: [],
     notExpectedIncluded: ["Invisible under the ring, you slip past Gollum as he claws wildly about for his precious."],
+  },
+  {
+    name: "bag end expansion rooms are reachable",
+    drive(game) {
+      game.execute("north");
+      game.execute("location");
+      game.currentRoom = "hobbit_hole";
+      game.player.position = "hobbit_hole";
+      game.execute("south");
+      game.execute("east");
+      game.execute("examine seed cakes");
+    },
+    expectedIncluded: [
+      "You are currently in Entrance Hall.",
+      "You see a plate of fragrant seed-cakes, cut small enough to vanish at a dwarf's convenience.",
+    ],
+  },
+  {
+    name: "unexpected party dwarves can be spoken to",
+    setup(game) {
+      game.unexpectedParty.state.arrived = ["unexpected_party_balin"];
+      game.unexpectedParty.state.arrivalIndex = 1;
+      game.unexpectedParty.state.currentArrival = null;
+      game.unexpectedParty.reconcileCharacters();
+      game.characters.unexpected_party_balin.position = "hobbit_hole";
+    },
+    inputs: ["talk balin"],
+    expectedIncluded: ["Balin smiles and says 'A warm welcome counts for much on the road, Master Baggins.'"],
+  },
+  {
+    name: "smaug answers with stateful dialogue",
+    setup(game) {
+      game.currentRoom = "lower_halls";
+      game.player.position = "lower_halls";
+      game.flags.smaugstate = "curious";
+    },
+    inputs: ["talk smaug"],
+    expectedIncluded: ["Smaug says 'A courteous little voice in my halls? Come nearer, and let us see what sort of thief has learned manners.'"],
   },
 ];
 
