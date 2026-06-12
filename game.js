@@ -2,7 +2,7 @@
   const DATA = applyImmersionExpansion(window.HOBBIT_DATA);
   const IMAGE_ROOT = "assets/local-images/";
   const MUSIC_ROOT = "assets/local-music/";
-  const ASSET_VERSION = "20260607-1630";
+  const ASSET_VERSION = "20260612-1244";
   const SAVE_PREFIX = "hobbit-web-save:";
   const LAYOUT_PREF_KEY = "hobbit-web-layout-mode";
 
@@ -361,10 +361,15 @@
   ]);
 
   const ATMOSPHERIC_EVENT_POOLS = {
-    bag_end: [
+    bag_end_house: [
       "Somewhere deeper in Bag End, crockery rattles, a kettle begins to sing, and dwarf laughter answers it.",
       "A fragment of dwarven song rolls along the round passages before fading into murmured conversation.",
       "From the kitchen comes the warm homely sound of cutlery, cupboard doors, and something sizzling in butter.",
+    ],
+    bag_end_garden: [
+      "Bees move lazily among the flowers, and from inside Bag End comes only the faintest murmur of domestic bustle.",
+      "A light breeze stirs the herbs and clipped borders, carrying soil, roses, and the quiet comfort of the Hill.",
+      "The garden path lies peaceful beneath the round door, while birds and distant village sounds make the world seem kindly for a moment.",
     ],
     rivendell: [
       "A brief strain of elven song rises from elsewhere in the valley, then is gone like a bird on the wind.",
@@ -466,8 +471,8 @@
         id,
         name: config.name,
         description: config.description,
-        image: null,
-        transformedImage: null,
+        image: config.image || null,
+        transformedImage: config.transformedImage || null,
         sound: config.sound || "relaxed",
       };
       if (!data.roomOrder.includes(id)) data.roomOrder.push(id);
@@ -533,6 +538,15 @@
       data.characterPlacements.push({ room, character });
     };
 
+    const placeItemInContainer = (container, item) => {
+      if (data.containerContents.some((link) => link.container === container && link.item === item)) return;
+      data.containerContents.push({ container, item });
+    };
+
+    const removeItemFromContainers = (item) => {
+      data.containerContents = data.containerContents.filter((link) => link.item !== item);
+    };
+
     data.rooms.hobbit_hole.description = "You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions.";
     data.rooms.bilbos_garden.description = "You are in the front garden before Bag End, where clipped borders, herbs, and bright flowers soften the green slope. A neat path leads to the famous round door, and the air smells of soil, roses, and well-watered earth in the Hill.";
     data.rooms.rivendell.description = "You are in the heart of Rivendell, where carved stone, running water, and old trees are woven together so gently that no hand seems to dominate the place. Light falls softly through leaves and arches alike, and song lingers even when no singer is near.";
@@ -544,13 +558,13 @@
 
     [
       ["bag_end_entrance_hall", "Entrance Hall", "A broad, circular passage opens here with umbrella stands, polished pegs, and a tiled floor kept absurdly clean for a place about to receive thirteen dwarves and a wizard. The green door is not far off, and every sound in the smial seems to pass through this generous little chamber.", "hobbit_hole.jpeg", "relaxed"],
-      ["bag_end_parlour", "Parlour", "This snug parlour is arranged for conversation rather than grandeur: deep chairs, a hearth laid ready, and several low tables already burdened with plates, cups, and evidence of hobbit forethought. It would be a perfect room for quiet company if Bag End still believed in quiet company.", "hobbit_hole1.jpeg", "relaxed"],
-      ["bag_end_study", "Study", "Bilbo's study smells of paper, pipe-weed, and old leather. Shelves rise almost to the curve of the ceiling, a writing desk stands ready with maps and pens, and the whole room feels like the private stronghold of a hobbit who likes his adventures safely bound between covers.", "map.jpeg", "relaxed"],
-      ["bag_end_dining_room", "Dining Room", "A long table dominates the dining room, though it was plainly built for family comfort rather than a troop of hungry dwarves. Good silver, folded linen, and polished sideboards suggest that Bag End knows very well how hospitality ought to be done.", "hobbit_hole1.jpeg", "relaxed"],
-      ["bag_end_pantry", "Pantry", "Cool shelves line the pantry from floor to ceiling, and every shelf seems intent on proving that a respectable hobbit should never be surprised by appetite. Jars, cheeses, seed-cakes, cold chicken, and bottled pickles stand in ranks like edible household troops.", "Cellar.jpeg", "relaxed"],
-      ["bag_end_kitchen", "Kitchen", "The kitchen is warm, bright, and busily practical: copper pans hang in order, a kettle mutters on the hob, and the table is marked by generations of competent chopping, kneading, and tea-making. If Bag End has a heart, it beats here.", "hobbit_hole.jpeg", "relaxed"],
-      ["bag_end_guest_room", "Guest Room", "A carefully prepared guest room waits here with a turned-down bed, a wash-stand, and curtains that give the place a surprising air of ceremony. It was not furnished with dwarves in mind, yet it is doing its quiet best.", "hobbit_hole1.jpeg", "relaxed"],
-      ["bag_end_cellar_room", "Cellar", "The cellar is cool, dry, and heavily provisioned. Barrels rest in shadow, preserves gleam in neat rows, and a prudent abundance of ale, potatoes, and stored comforts makes plain that Bag End expected hard winters long before it expected adventures.", "Cellar.jpeg", "relaxed"],
+      ["bag_end_parlour", "Parlour", "This snug parlour is arranged for conversation rather than grandeur: deep chairs, a hearth laid ready, and several low tables already burdened with plates, cups, and evidence of hobbit forethought. It would be a perfect room for quiet company if Bag End still believed in quiet company.", "bag_end_parlour.jpeg", "relaxed"],
+      ["bag_end_study", "Study", "Bilbo's study smells of paper, pipe-weed, and old leather. Shelves rise almost to the curve of the ceiling, a writing desk stands ready with maps and pens, and the whole room feels like the private stronghold of a hobbit who likes his adventures safely bound between covers.", "bag_end_study.jpeg", "relaxed"],
+      ["bag_end_dining_room", "Dining Room", "A long table dominates the dining room, though it was plainly built for family comfort rather than a troop of hungry dwarves. Good silver, folded linen, and polished sideboards suggest that Bag End knows very well how hospitality ought to be done.", "bag_end_dining_room.jpeg", "relaxed"],
+      ["bag_end_pantry", "Pantry", "Cool shelves line the pantry from floor to ceiling, and every shelf seems intent on proving that a respectable hobbit should never be surprised by appetite. Jars, cheeses, seed-cakes, cold chicken, and bottled pickles stand in ranks like edible household troops.", "bag_end_pantry.jpeg", "relaxed"],
+      ["bag_end_kitchen", "Kitchen", "The kitchen is warm, bright, and busily practical: copper pans hang in order, a kettle mutters on the hob, and the table is marked by generations of competent chopping, kneading, and tea-making. If Bag End has a heart, it beats here.", "bag_end_kitchen.jpeg", "relaxed"],
+      ["bag_end_guest_room", "Guest Room", "A carefully prepared guest room waits here with a turned-down bed, a wash-stand, and curtains that give the place a surprising air of ceremony. It was not furnished with dwarves in mind, yet it is doing its quiet best.", "bag_end_guest_room.jpeg", "relaxed"],
+      ["bag_end_cellar_room", "Cellar", "The cellar is cool, dry, and heavily provisioned. Barrels rest in shadow, preserves gleam in neat rows, and a prudent abundance of ale, potatoes, and stored comforts makes plain that Bag End expected hard winters long before it expected adventures.", "bag_end_cellar_room.jpeg", "relaxed"],
       ["rivendell_courtyard", "Courtyard", "White stone and living ivy share this quiet courtyard, where the sound of falling water softens every footstep. Benches stand in sun and shade alike, inviting weary travelers to believe that peace may yet be a practical thing.", "Rivendell.jpeg", "relaxed"],
       ["rivendell_library", "Library", "Tall shelves and carved ladders fill the library with the hush of well-kept wisdom. Scrolls, red-bound volumes, maps, and forgotten songs wait here with the patience of things certain they will outlast haste.", "map.jpeg", "relaxed"],
       ["rivendell_hall_of_fire", "Hall of Fire", "Firelight and song belong equally to this hall. Cushioned seats ring the hearth, the rafters hold echoes of ancient music, and any tale told here seems at once older and truer than it did outside.", "Rivendell.jpeg", "relaxed"],
@@ -657,23 +671,70 @@
       ["pantry_shelves", "pantry shelves", "sturdy shelves bowed under the honorable weight of preserved comforts"],
       ["hall_coat_pegs", "coat pegs", "a regiment of polished pegs now threatened by an oncoming invasion of dwarf-cloaks"],
       ["hall_umbrella_stand", "umbrella stand", "a ceramic stand painted with little green leaves"],
+      ["hall_console_table", "console table", "a narrow console table with a polished top and a discreet little drawer", { container: true }],
+      ["hall_letter_tray", "letter tray", "a brass tray meant for cards, notes, and other civilized arrivals"],
       ["parlour_hearth", "parlour hearth", "a welcoming hearth laid to cheer guests who know how to appreciate one"],
+      ["parlour_sideboard", "sideboard", "a handsome sideboard with cupboards for cups, plates, and comforting reserves", { container: true }],
+      ["parlour_biscuit_tin", "biscuit tin", "a painted biscuit tin that rattles with hospitable promise", { container: true, portable: true, weight: 4 }],
       ["guest_washstand", "wash-stand", "a small wash-stand prepared with basin, towel, and hobbit neatness"],
+      ["guest_room_trunk", "guest trunk", "a sturdy trunk placed at the foot of the guest bed", { container: true }],
+      ["guest_quilt", "guest quilt", "a folded quilt smelling faintly of lavender and cupboard freshness"],
       ["cellar_ale_rack", "ale rack", "rows of bottled ale resting in cool shadow"],
+      ["dining_sideboard", "dining sideboard", "a polished sideboard built for the honorable management of meals", { container: true }],
+      ["dining_candlesticks", "candlesticks", "a pair of polished candlesticks prepared for a more orderly supper than this house is likely to see tonight"],
+      ["cellar_potato_crate", "potato crate", "a low crate of carefully sorted potatoes and onions", { container: true }],
+      ["cellar_preserve_shelf", "preserve shelf", "shelves crowded with labeled jars of jam, chutney, and pickled reassurance"],
       ["rivendell_map_table", "map table", "a carved table laid with maps weighted by smooth river-stones"],
       ["rivendell_songbook", "songbook", "a slim book of songs written in an elegant flowing hand"],
       ["rivendell_star_globe", "star globe", "a delicate globe showing the constellations in silver points"],
+      ["courtyard_fountain", "fountain", "a white-stone fountain falling in quiet silver threads"],
+      ["library_scroll_cabinet", "scroll cabinet", "a carved cabinet full of narrow shelves and careful order", { container: true }],
+      ["hall_of_fire_harp", "harp", "a harp resting near the fire as though the next song has merely stepped away for a moment"],
+      ["guest_cedar_chest", "cedar chest", "a cedar chest sweet with resin and clean linen", { container: true }],
+      ["guest_linen_bundle", "linen bundle", "a folded bundle of fresh linen tied neatly with ribbon"],
+      ["terrace_sundial", "elven sundial", "a pale sundial whose markings seem too graceful to be practical, though they plainly are"],
+      ["bridge_lantern", "bridge lantern", "a silver lantern hung above the carved rail"],
+      ["lookout_cairn", "cairn", "a little cairn of guiding stones set by earlier mountain hands"],
+      ["storm_shelter_supply_niche", "supply niche", "a dry niche in the rock where travelers might leave small stores", { container: true }],
       ["beorn_honey_crock", "honey crock", "a heavy crock of dark golden honey"],
       ["beorn_harness", "harness", "clean harness hung in exact order upon pegs"],
+      ["beorn_bench", "oak bench", "a heavy oak bench made for broad backs and plain company"],
+      ["beorn_tack_chest", "tack chest", "a stout chest for harness, straps, and stable order", { container: true }],
+      ["beorn_seed_box", "seed box", "a practical wooden box filled with paper seed packets and twine", { container: true }],
+      ["beorn_feed_trough", "feed trough", "a clean trough laid ready for beasts that know better than to waste food"],
       ["mirkwood_web_cocoons", "cocoons", "web-wrapped shapes hanging disturbingly from the branches"],
       ["mirkwood_white_antlers", "white antlers", "a glimpse of white antlers caught for a moment among the deeper trees"],
+      ["spider_egg_sac", "egg sac", "a pale swollen sac wrapped in gray silk"],
+      ["dark_glade_stone", "standing stone", "a leaning stone mottled with black moss and older unease"],
+      ["stream_stepping_stones", "stepping stones", "slick stones half swallowed by the dark stream"],
+      ["deer_trail_tracks", "tracks", "light deer-tracks, neat as handwriting and just as fleeting"],
+      ["fallen_crossing_snag", "snag", "a broken snag jutting up beside the makeshift crossing"],
+      ["ruined_altar", "broken altar", "a broken altar or plinth of age-smoothed stone", { container: true }],
       ["elf_wine_cups", "wine cups", "slender cups left from a feast not long concluded"],
       ["elf_lanterns", "lanterns", "green-gold lanterns whose light flatters the stone"],
+      ["cell_bench", "cell bench", "a narrow bench too plain for comfort and too solid for optimism"],
+      ["guard_locker", "guard locker", "a tall locker for cloaks, spears, and dutiful routine", { container: true }],
+      ["feast_dais", "dais", "a shallow dais from which songs and toasts might lead the hall"],
+      ["river_mooring_ring", "mooring ring", "an iron ring set deep in the stone for casks, ropes, or boats"],
+      ["storage_cask_stack", "cask stack", "a tidy stack of iron-banded casks", { container: true }],
       ["laketown_nets", "nets", "bundled nets smelling strongly of fish and honest labor"],
       ["laketown_stalls", "market stalls", "crowded stalls hung with baskets, bolts of cloth, and river trade"],
+      ["dock_fish_crate", "fish crate", "a slatted crate damp with scales and lake-water", { container: true }],
+      ["market_handcart", "handcart", "a trader's handcart piled high with bundled goods", { container: true }],
+      ["square_notice_board", "notice board", "a weathered notice board thick with proclamations and requests"],
+      ["warehouse_pallet", "cargo pallet", "a broad timber pallet stacked with careful bundles", { container: true }],
+      ["bridge_rope_rail", "rope rail", "thick rope rails creaking gently over the black water"],
+      ["tavern_barrel", "ale barrel", "a serviceable ale barrel tapped hard and often", { container: true }],
       ["erebor_carvings", "dwarf carvings", "weathered carvings of kings, hammers, ravens, and mountain stars"],
       ["erebor_broken_tools", "broken tools", "old tools left where labor ended suddenly and too long ago"],
       ["erebor_inscriptions", "dwarf inscriptions", "deep runes cut in the stone by hands that expected their work to be remembered"],
+      ["hidden_door_runes", "moon-runes", "pale runes that seem to wait for the right light before consenting to be read"],
+      ["watch_chamber_chest", "watch chest", "a low chest for blankets, oil, and the supplies of a patient watch", { container: true }],
+      ["upper_tunnel_supply_cache", "supply cache", "a neatly recessed cache cut straight into the tunnel wall", { container: true }],
+      ["armoury_weapon_rack", "weapon rack", "a rack built for spears and axes, though few remain fit for use", { container: true }],
+      ["workshop_tool_cabinet", "tool cabinet", "a soot-dark cabinet of narrow drawers for a master's tools", { container: true }],
+      ["great_hall_dais", "throne dais", "a raised dais from which kings once judged, feasted, and were remembered"],
+      ["treasure_coin_drift", "coin drift", "a drift of coins washed together like metal sand"],
     ].forEach(([id, name, description, options = {}]) => ensureItem(id, {
       name,
       description,
@@ -698,24 +759,78 @@
       ["bag_end_pantry", "pantry_shelves"],
       ["bag_end_entrance_hall", "hall_coat_pegs"],
       ["bag_end_entrance_hall", "hall_umbrella_stand"],
+      ["bag_end_entrance_hall", "hall_console_table"],
+      ["bag_end_entrance_hall", "hall_letter_tray"],
       ["bag_end_parlour", "parlour_hearth"],
+      ["bag_end_parlour", "parlour_sideboard"],
+      ["bag_end_parlour", "parlour_biscuit_tin"],
+      ["bag_end_dining_room", "dining_sideboard"],
+      ["bag_end_dining_room", "dining_candlesticks"],
       ["bag_end_guest_room", "guest_washstand"],
+      ["bag_end_guest_room", "guest_room_trunk"],
+      ["bag_end_guest_room", "guest_quilt"],
       ["bag_end_cellar_room", "cellar_ale_rack"],
+      ["bag_end_cellar_room", "cellar_potato_crate"],
+      ["bag_end_cellar_room", "cellar_preserve_shelf"],
+      ["rivendell_courtyard", "courtyard_fountain"],
       ["rivendell_library", "rivendell_songbook"],
       ["rivendell_library", "rivendell_star_globe"],
+      ["rivendell_library", "library_scroll_cabinet"],
       ["rivendell_hall_of_fire", "rivendell_map_table"],
+      ["rivendell_hall_of_fire", "hall_of_fire_harp"],
+      ["rivendell_guest_chambers", "guest_cedar_chest"],
+      ["rivendell_terrace", "terrace_sundial"],
+      ["rivendell_bridge", "bridge_lantern"],
+      ["mountain_lookout", "lookout_cairn"],
+      ["storm_shelter", "storm_shelter_supply_niche"],
       ["beorn_great_hall", "beorn_honey_crock"],
+      ["beorn_great_hall", "beorn_bench"],
       ["beorn_stable", "beorn_harness"],
+      ["beorn_stable", "beorn_tack_chest"],
+      ["beorn_garden", "beorn_seed_box"],
+      ["beorn_animal_yard", "beorn_feed_trough"],
       ["mirkwood_spider_grove", "mirkwood_web_cocoons"],
+      ["mirkwood_spider_grove", "spider_egg_sac"],
+      ["mirkwood_dark_glade", "dark_glade_stone"],
+      ["mirkwood_enchanted_stream", "stream_stepping_stones"],
       ["mirkwood_deer_trail", "mirkwood_white_antlers"],
+      ["mirkwood_deer_trail", "deer_trail_tracks"],
+      ["mirkwood_fallen_tree_crossing", "fallen_crossing_snag"],
+      ["mirkwood_ruined_clearing", "ruined_altar"],
+      ["elven_prison_cells", "cell_bench"],
       ["elven_feast_hall", "elf_wine_cups"],
+      ["elven_feast_hall", "feast_dais"],
       ["elven_guard_post", "elf_lanterns"],
+      ["elven_guard_post", "guard_locker"],
+      ["elven_underground_river", "river_mooring_ring"],
+      ["elven_storage_rooms", "storage_cask_stack"],
       ["laketown_docks", "laketown_nets"],
+      ["laketown_docks", "dock_fish_crate"],
       ["laketown_marketplace", "laketown_stalls"],
+      ["laketown_marketplace", "market_handcart"],
+      ["laketown_town_square", "square_notice_board"],
+      ["laketown_warehouses", "warehouse_pallet"],
+      ["laketown_bridges", "bridge_rope_rail"],
+      ["laketown_tavern", "tavern_barrel"],
+      ["erebor_hidden_door", "hidden_door_runes"],
       ["erebor_watch_chamber", "erebor_carvings"],
+      ["erebor_watch_chamber", "watch_chamber_chest"],
+      ["erebor_upper_tunnels", "upper_tunnel_supply_cache"],
+      ["erebor_ancient_armoury", "armoury_weapon_rack"],
       ["erebor_abandoned_workshop", "erebor_broken_tools"],
+      ["erebor_abandoned_workshop", "workshop_tool_cabinet"],
       ["erebor_great_hall", "erebor_inscriptions"],
+      ["erebor_great_hall", "great_hall_dais"],
+      ["erebor_treasure_approach", "treasure_coin_drift"],
     ].forEach(([room, item]) => placeItem(room, item));
+
+    placeItemInContainer("hall_console_table", "hall_letter_tray");
+    placeItemInContainer("parlour_sideboard", "parlour_biscuit_tin");
+    placeItemInContainer("guest_room_trunk", "guest_quilt");
+    placeItemInContainer("guest_cedar_chest", "guest_linen_bundle");
+
+    removeItemFromContainers("ornate_box");
+    placeItemInContainer("guest_room_trunk", "ornate_box");
 
     [
       ["rivendell_singer", "elf singer", { friendly: true, strength: 4 }],
@@ -1509,7 +1624,8 @@
     }
 
     chapterForRoom(roomId = this.game.currentRoom) {
-      if (IMMERSION_BAG_END_ROOMS.has(roomId) || ["green_dragon_inn", "green_dragon_inn_outside"].includes(roomId)) return "bag_end";
+      if (["green_dragon_inn", "green_dragon_inn_outside"].includes(roomId)) return "green_dragon";
+      if (IMMERSION_BAG_END_ROOMS.has(roomId)) return "bag_end";
       if (roomId === "deep_dark_lake") return "isolation";
       if (IMMERSION_GOBLIN_ROOMS.has(roomId)) return "goblins";
       if (IMMERSION_RIVENDELL_ROOMS.has(roomId)) return "rivendell";
@@ -1524,7 +1640,7 @@
     }
 
     ensureQuestPartyReady() {
-      if (this.chapterForRoom() === "bag_end") return;
+      if (["bag_end", "green_dragon"].includes(this.chapterForRoom())) return;
       const party = this.game.unexpectedParty;
       if (!party) return;
       if (party.state.arrivalIndex >= party.roster.length && party.state.arrived.length >= party.roster.length) return;
@@ -1538,6 +1654,10 @@
     sync() {
       this.ensureQuestPartyReady();
       const chapter = this.chapterForRoom();
+      if (chapter === "green_dragon") {
+        this.syncGreenDragonLeaders();
+        return;
+      }
       if (chapter === "bag_end") {
         this.syncBagEndLeaders();
         return;
@@ -1575,6 +1695,19 @@
       }
     }
 
+    syncGreenDragonLeaders() {
+      const thorin = this.game.characters.thorin;
+      if (thorin) {
+        thorin.position = "green_dragon_inn";
+        thorin.followingPlayer = false;
+        thorin.movementMode = "never";
+      }
+      const gandalf = this.game.characters.gandalf;
+      if (gandalf && !gandalf.followingPlayer && ["green_dragon_inn", "green_dragon_inn_outside"].includes(gandalf.position)) {
+        gandalf.position = "hobbit_hole";
+      }
+    }
+
     chapterRooms(chapter, focusRoom) {
       const nearby = [focusRoom, ...this.game.connectionsFrom(focusRoom).map((connection) => connection.to)];
       const uniqueNearby = [...new Set(nearby)];
@@ -1604,6 +1737,7 @@
     pickCompanionRoom(candidateRooms, focusRoom, chapter, index, companionId) {
       const rooms = candidateRooms.length ? candidateRooms : [focusRoom];
       const focusBias = {
+        green_dragon: 2,
         journey: 4,
         rivendell: 3,
         beorn: 3,
@@ -1657,8 +1791,30 @@
     }
 
     companionPose(character, roomId, index = 0) {
+      const posesByRoom = {
+        bilbos_garden: [
+          "stands among the flowers with the air of a guest surprised by so much gardening",
+          "paces the garden path, glancing now and then toward the round green door",
+          "waits in the garden with road-worn patience, boots careful of the neat borders",
+        ],
+        green_dragon_inn: [
+          "stands near the window, watching the dark beyond the glass",
+          "waits in the lamplight with the wary stillness of someone measuring the road ahead",
+          "keeps his voice low in the inn, as if business matters more here than comfort",
+        ],
+        green_dragon_inn_outside: [
+          "keeps near the inn door, listening for movement within",
+          "watches the yard and the road with a traveller's caution",
+          "stands beneath the inn sign, looking as though he would rather be on the road than idle",
+        ],
+      };
+      if (posesByRoom[roomId]?.length) {
+        const roomSeed = hashString(`${this.game.storySeed}:${character.id}:${roomId}:${index}`);
+        return posesByRoom[roomId][Math.abs(roomSeed) % posesByRoom[roomId].length];
+      }
       const posesByRegion = {
         bag_end: ["stands near the hearth", "has claimed a chair and half the available table-space", "keeps one eye on the kitchen"],
+        green_dragon: ["waits like a traveller between one decision and the next", "keeps an eye on doors, windows, and whoever might be listening", "looks as though the inn is only a pause in a longer business"],
         journey: ["studies the road ahead", "rests with pack still within arm's reach", "keeps a wary eye on the country round about"],
         rivendell: ["looks more rested here than on the open road", "studies the elvish work with open respect", "listens in spite of himself for distant song"],
         beorn: ["glances often toward the yard and its disciplined beasts", "seems impressed by the strength of the house", "watches the door with road-bred caution"],
@@ -1852,8 +2008,11 @@
 
     normalizeCharacterMovementModes() {
       const gandalf = this.characters?.gandalf;
-      if (!gandalf) return;
-      if (!gandalf.movementMode || gandalf.movementMode === "always") gandalf.movementMode = "follow";
+      if (gandalf && (!gandalf.movementMode || gandalf.movementMode === "always")) gandalf.movementMode = "follow";
+      const thorin = this.characters?.thorin;
+      if (thorin && !thorin.followingPlayer && (!thorin.movementMode || thorin.movementMode === "follow" || thorin.movementMode === "always")) {
+        thorin.movementMode = "never";
+      }
     }
 
     createGollumState() {
@@ -2607,9 +2766,11 @@
         roomImage.removeAttribute("hidden");
         const src = assetUrl(IMAGE_ROOT, room.image);
         const currentSrc = roomImage.getAttribute("src");
-        if (currentSrc !== src) this.revealRoomImage(src);
         if (currentSrc !== src) roomImage.src = src;
-        if (!currentSrc) this.revealRoomImage(src);
+        scene?.classList.remove("is-revealing");
+        clearTimeout(this.imageRevealTimer);
+        this.imageRevealTimer = null;
+        this.lastRevealedImage = "";
         roomImage.alt = room.name;
       } else {
         scene?.classList.remove("is-revealing");
@@ -2627,22 +2788,8 @@
     }
 
     revealRoomImage(src) {
-      if (!imageReveal || !imageRevealOutline || !imageRevealFill || this.lastRevealedImage === src) return;
-      this.lastRevealedImage = src;
-      const scene = roomImage.closest(".scene");
-      clearTimeout(this.imageRevealTimer);
-      imageRevealOutline.src = src;
-      imageRevealFill.src = src;
-      scene.classList.remove("is-revealing");
-      imageReveal.style.animation = "none";
-      imageRevealOutline.style.animation = "none";
-      imageRevealFill.style.animation = "none";
-      imageReveal.offsetHeight;
-      imageReveal.style.animation = "";
-      imageRevealOutline.style.animation = "";
-      imageRevealFill.style.animation = "";
-      scene.classList.add("is-revealing");
-      this.imageRevealTimer = setTimeout(() => this.finishImageReveal(scene), 3650);
+      this.lastRevealedImage = src || "";
+      this.finishImageReveal(roomImage.closest(".scene"));
     }
 
     finishImageReveal(scene) {
@@ -3708,7 +3855,8 @@
     }
 
     atmosphereRegionKey(roomId = this.currentRoom) {
-      if (IMMERSION_BAG_END_ROOMS.has(roomId)) return "bag_end";
+      if (roomId === "bilbos_garden") return "bag_end_garden";
+      if (IMMERSION_BAG_END_ROOMS.has(roomId)) return "bag_end_house";
       if (IMMERSION_RIVENDELL_ROOMS.has(roomId)) return "rivendell";
       if (IMMERSION_MOUNTAIN_ROOMS.has(roomId)) return "mountains";
       if (roomId === "deep_dark_lake") return "gollum";
@@ -4117,11 +4265,11 @@
       }
 
       if (beforeDragonDefeat && !this.autoplayHas("firestone")) {
-        if (this.currentRoom !== "hobbit_hole") return this.autoplayRouteCommandTo("hobbit_hole");
-        const topDrawer = this.items.top_drawer;
+        if (this.currentRoom !== "bag_end_guest_room") return this.autoplayRouteCommandTo("bag_end_guest_room");
+        const guestTrunk = this.items.guest_room_trunk;
         const ornateBox = this.items.ornate_box;
-        if (topDrawer && !topDrawer.open) return "open top drawer";
-        if (!this.flags.autoplayexaminedtopdrawer) return this.autoplayOnce("autoplayexaminedtopdrawer", "examine top drawer");
+        if (guestTrunk && !guestTrunk.open) return "open guest trunk";
+        if (!this.flags.autoplayexaminedguesttrunk) return this.autoplayOnce("autoplayexaminedguesttrunk", "examine guest trunk");
         if (ornateBox && !this.player.inventory.includes(ornateBox.id)) return "take ornate box";
         if (ornateBox && !ornateBox.open) return "open ornate box";
         if (!this.flags.autoplayexaminedornatebox) return this.autoplayOnce("autoplayexaminedornatebox", "examine ornate box");

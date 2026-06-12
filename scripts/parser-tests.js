@@ -853,6 +853,24 @@ const gameCases = [
     notExpectedIncluded: ["I don't see that here."],
   },
   {
+    name: "thorin is re-anchored to the inn for the pony scene",
+    setup(game) {
+      game.currentRoom = "green_dragon_inn";
+      game.player.position = "green_dragon_inn";
+      game.characters.thorin.position = "bag_end_parlour";
+      game.companionDirector.sync();
+    },
+    inputs: ["Thorin, could you take a look through the window?"],
+    expectedIncluded: [
+      "Thorin stretches to reach the window.",
+      "He peers through the window, his eyes narrowing, but it's too dark to see anything.",
+    ],
+    notExpectedIncluded: [
+      "There is no one named Thorin here.",
+      "There is no one named thorin here.",
+    ],
+  },
+  {
     name: "vocative trailing for me still performs delegated action",
     inputs: ["Gandalf, could you open the round green door for me?"],
     expectedIncluded: ["Gandalf opens the round green door."],
@@ -1250,6 +1268,22 @@ const gameCases = [
     ],
   },
   {
+    name: "garden companion narrative stays outdoors",
+    setup(game) {
+      game.currentRoom = "bilbos_garden";
+      game.player.position = "bilbos_garden";
+      placeCharacterWithPlayer(game, "thorin");
+    },
+    drive(game) {
+      game.describeRoom({ full: true });
+    },
+    expectedIncluded: ["Thorin"],
+    notExpectedIncluded: [
+      "keeps one eye on the kitchen",
+      "stands near the window, watching the dark beyond the glass",
+    ],
+  },
+  {
     name: "delegated push climb social and combine actions keep npc subject",
     setup(game) {
       placeCharacterWithPlayer(game, "gandalf");
@@ -1432,6 +1466,40 @@ const gameCases = [
       game.print(`Autoplay dark-room command: ${command}`);
     },
     expectedIncluded: ["Autoplay dark-room command: light lantern"],
+  },
+  {
+    name: "ornate box starts in guest trunk instead of top drawer",
+    inputs: ["open top drawer", "examine top drawer", "go west", "go south", "open guest trunk", "examine guest trunk"],
+    expectedIncluded: [
+      "You see the top drawer; inside there is: a neatly folded linen sheet.",
+      "You see a sturdy trunk placed at the foot of the guest bed; inside there is: a folded quilt smelling faintly of lavender and cupboard freshness, a small, ornate box.",
+    ],
+    notExpectedIncluded: [
+      "You see the top drawer; inside there is: a neatly folded linen sheet, a small, ornate box.",
+    ],
+  },
+  {
+    name: "autoplay retrieves ornate box from guest trunk",
+    drive(game) {
+      const issued = [];
+      for (let step = 0; step < 20 && !game.autoplayHas("firestone"); step += 1) {
+        const command = game.nextAutoplayCommand();
+        if (!command) throw new Error(`Autoplay stopped unexpectedly at step ${step} in ${game.currentRoom}.`);
+        issued.push(command);
+        game.execute(command);
+      }
+      if (!game.autoplayHas("firestone")) {
+        throw new Error(`Autoplay did not retrieve the firestone. Commands: ${issued.join(" | ")}`);
+      }
+      if (!issued.includes("open guest trunk")) {
+        throw new Error(`Expected autoplay to open the guest trunk. Commands: ${issued.join(" | ")}`);
+      }
+      if (!issued.includes("take ornate box")) {
+        throw new Error(`Expected autoplay to take the ornate box from the guest trunk. Commands: ${issued.join(" | ")}`);
+      }
+      game.print(`Autoplay firestone path: ${issued.join(" -> ")}`);
+    },
+    expectedIncluded: [/Autoplay firestone path: .+open guest trunk.+take ornate box.+take firestone/],
   },
   {
     name: "lamp can be lit and turned off",
