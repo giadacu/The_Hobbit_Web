@@ -76,12 +76,13 @@ function bootGame() {
     documentElement: makeElement("html"),
     fonts: { ready: Promise.resolve() },
   };
+  const storage = new Map();
   global.localStorage = {
-    getItem() { return null; },
-    setItem() {},
-    removeItem() {},
-    key() { return null; },
-    get length() { return 0; },
+    getItem(key) { return storage.has(key) ? storage.get(key) : null; },
+    setItem(key, value) { storage.set(String(key), String(value)); },
+    removeItem(key) { storage.delete(String(key)); },
+    key(index) { return [...storage.keys()][index] || null; },
+    get length() { return storage.size; },
   };
   global.requestAnimationFrame = (fn) => setTimeout(() => fn(Date.now()), 0);
   global.cancelAnimationFrame = clearTimeout;
@@ -1642,6 +1643,157 @@ const gameCases = [
     ],
     notExpectedIncluded: [
       "You see the top drawer; inside there is: a neatly folded linen sheet, a small, ornate box.",
+    ],
+  },
+  {
+    name: "clarified object is remembered for later ambiguous reference",
+    drive(game) {
+      game.execute("open drawer");
+      game.execute("top");
+      game.execute("examine drawer");
+      const clarificationCount = outputLines.filter((line) => line.includes("Do you mean the top drawer, the middle drawer, or the bottom drawer?")).length;
+      game.print(`Drawer clarification count: ${clarificationCount}`);
+    },
+    expectedIncluded: [
+      "You open the top drawer.",
+      "You see the top drawer; inside there is: a neatly folded linen sheet.",
+      "Drawer clarification count: 1",
+    ],
+  },
+  {
+    name: "explicit specific object updates remembered ambiguous reference",
+    drive(game) {
+      game.execute("open drawer");
+      game.execute("top");
+      game.execute("open bottom drawer");
+      game.execute("close drawer");
+    },
+    expectedIncluded: [
+      "You open the top drawer.",
+      "You open the bottom drawer.",
+      "You close the bottom drawer.",
+    ],
+    notExpectedIncluded: [
+      "You close the top drawer.",
+    ],
+  },
+  {
+    name: "remembered ambiguous reference expires after several turns",
+    drive(game) {
+      game.execute("open drawer");
+      game.execute("top");
+      game.execute("look");
+      game.execute("inventory");
+      game.execute("wait");
+      game.execute("examine drawer");
+      const clarificationCount = outputLines.filter((line) => line.includes("Do you mean the top drawer, the middle drawer, or the bottom drawer?")).length;
+      game.print(`Drawer clarification count after expiry: ${clarificationCount}`);
+    },
+    expectedIncluded: [
+      "You open the top drawer.",
+      "Drawer clarification count after expiry: 2",
+    ],
+  },
+  {
+    name: "remembered ambiguous reference still works before expiry",
+    drive(game) {
+      game.execute("open drawer");
+      game.execute("top");
+      game.execute("look");
+      game.execute("inventory");
+      game.execute("close drawer");
+      const clarificationCount = outputLines.filter((line) => line.includes("Do you mean the top drawer, the middle drawer, or the bottom drawer?")).length;
+      game.print(`Drawer clarification count before expiry: ${clarificationCount}`);
+    },
+    expectedIncluded: [
+      "You open the top drawer.",
+      "You close the top drawer.",
+      "Drawer clarification count before expiry: 1",
+    ],
+  },
+  {
+    name: "remembered ambiguous reference survives save and load",
+    drive(game) {
+      game.execute("open drawer");
+      game.execute("top");
+      game.save("clarification-memory");
+      game.execute("open bottom drawer");
+      game.load("clarification-memory");
+      game.execute("close drawer");
+      const clarificationCount = outputLines.filter((line) => line.includes("Do you mean the top drawer, the middle drawer, or the bottom drawer?")).length;
+      game.print(`Drawer clarification count across save load: ${clarificationCount}`);
+    },
+    expectedIncluded: [
+      'Game "clarification-memory" loaded.',
+      "You close the top drawer.",
+      "Drawer clarification count across save load: 0",
+    ],
+  },
+  {
+    name: "remembered drawer reference does not affect key clarification",
+    drive(game) {
+      game.execute("open drawer");
+      game.execute("top");
+      game.execute("open bottom drawer");
+      game.execute("take key from bottom drawer");
+      game.execute("brass");
+    },
+    expectedIncluded: [
+      "Do you mean the delicate key, the sturdy key, or the brass key?",
+      "You take the brass key from the bottom drawer.",
+    ],
+  },
+  {
+    name: "take from specific container updates remembered item and container references",
+    drive(game) {
+      game.execute("open top drawer");
+      game.execute("open bottom drawer");
+      game.execute("take brass key");
+      game.execute("take sturdy key from bottom drawer");
+      game.execute("drop key");
+      game.execute("close drawer");
+    },
+    expectedIncluded: [
+      "You take the brass key from the bottom drawer.",
+      "You take the sturdy key from the bottom drawer.",
+      "You leave the sturdy key.",
+      "You close the bottom drawer.",
+    ],
+    notExpectedIncluded: [
+      "You leave the brass key.",
+      "You close the top drawer.",
+    ],
+  },
+  {
+    name: "take from container still clarifies ambiguous item",
+    drive(game) {
+      game.execute("open bottom drawer");
+      game.execute("take key from bottom drawer");
+      game.execute("sturdy");
+    },
+    expectedIncluded: [
+      "Do you mean the delicate key, the sturdy key, or the brass key?",
+      "You take the sturdy key from the bottom drawer.",
+    ],
+    notExpectedIncluded: [
+      "small key",
+    ],
+  },
+  {
+    name: "put in specific container updates remembered container reference",
+    drive(game) {
+      game.execute("open top drawer");
+      game.execute("open bottom drawer");
+      game.execute("take brass key");
+      game.execute("put brass key in top drawer");
+      game.execute("close drawer");
+    },
+    expectedIncluded: [
+      "You put the brass key in the top drawer.",
+      "You close the top drawer.",
+    ],
+    notExpectedIncluded: [
+      "You close the bottom drawer.",
     ],
   },
   {

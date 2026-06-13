@@ -28,6 +28,7 @@
   const CARRY_CAPACITY_PER_STRENGTH = 3;
   const PLAYER_CARRY_BONUS = 32;
   const LANTERN_BURN_TURNS = 10;
+  const CLARIFICATION_MEMORY_TURNS = 3;
   const LAYOUT_SWITCH_IDLE_MS = 1600;
   const LAYOUT_MOUSE_ACTIVITY_THRESHOLD = 28;
   const LAYOUT_SPLIT_PREF_KEY = "hobbit-web-layout-2-scene-width";
@@ -2174,6 +2175,7 @@
       this.audioErrorShown = false;
       this.pendingClarification = null;
       this.forcedChoice = null;
+      this.clarifiedReferences = {};
       this.commandIssuer = null;
       this.lastConversationCharacterId = null;
       this.lastReferencedCharacterId = null;
@@ -2662,149 +2664,159 @@
       const [verb, ...rest] = command.split(/\s+/);
       const object = rest.join(" ").trim();
       if (!verb) return false;
+      const rememberedChoice = !this.forcedChoice ? this.resolveRememberedClarification(verb, object) : null;
+      const explicitReferences = this.explicitClarificationReferences(verb, object);
+      if (rememberedChoice) this.forcedChoice = rememberedChoice;
 
-      if (this.player.insideContainer && !["look", "examine", "inspect", "climb"].includes(verb)) {
-        const container = this.items[this.player.insideContainer];
-        const name = container?.name || "container";
-        this.print(this.player.name === "You" ? `You should climb out of the ${name} first.` : `${this.player.name} should climb out of the ${name} first.`);
+      try {
+        if (this.player.insideContainer && !["look", "examine", "inspect", "climb"].includes(verb)) {
+          const container = this.items[this.player.insideContainer];
+          const name = container?.name || "container";
+          this.print(this.player.name === "You" ? `You should climb out of the ${name} first.` : `${this.player.name} should climb out of the ${name} first.`);
+          return false;
+        }
+
+        if (this.trySpecialAction(verb, object)) return false;
+
+        if (!object && !commandsWithoutObject.has(verb)) {
+          this.print("Please specify your action and the object. For example, type 'open door' or 'climb into tree'.");
+          return false;
+        }
+
+        if (this.needsClarification(verb, object)) return false;
+
+        const handlers = {
+          take: () => this.take(object),
+          get: () => this.take(object),
+          leave: () => this.drop(object),
+          drop: () => this.drop(object),
+          put: () => this.drop(object),
+          open: () => this.open(object),
+          close: () => this.close(object),
+          unlock: () => this.unlock(object),
+          lock: () => this.lock(object),
+          look: () => this.look(object),
+          examine: () => this.examine(object),
+          inspect: () => this.examine(object),
+          search: () => this.examine(object),
+          explore: () => this.examine(object),
+          investigate: () => this.examine(object),
+          listen: () => this.sense("listen", object),
+          smell: () => this.sense("smell", object),
+          sniff: () => this.sense("smell", object),
+          watch: () => this.sense("watch", object),
+          eavesdrop: () => this.sense("listen", object),
+          scout: () => this.sense("search", object),
+          touch: () => this.touch("touch", object),
+          feel: () => this.touch("feel", object),
+          knock: () => this.touch("knock", object),
+          inventory: () => this.inventory(),
+          i: () => this.inventory(),
+          wait: () => this.wait(),
+          hello: () => this.hello(),
+          tips: () => this.tips(object),
+          verbs: () => this.verbs(),
+          mysaves: () => this.listSaves(),
+          save: () => this.save(object),
+          load: () => this.load(object),
+          quit: () => this.quit(),
+          map: () => this.showMap(),
+          location: () => this.print(actorizeSecondPerson(this.player, `You are currently in ${this.room().name.replace(/_/g, " ")}.`)),
+          music: () => this.handleMusicCommand(object),
+          autoplay: () => this.autoplay(object),
+          wear: () => this.wear(object),
+          remove: () => this.remove(object),
+          give: () => this.give(object),
+          show: () => this.show(object),
+          hand: () => this.give(object),
+          pass: () => this.give(object),
+          bring: () => this.give(object),
+          send: () => this.give(object),
+          return: () => this.give(object),
+          deliver: () => this.give(object),
+          ask: () => this.askFor(object),
+          borrow: () => this.askFor(object),
+          request: () => this.askFor(object),
+          carry: () => this.take(object),
+          hold: () => this.take(object),
+          catch: () => this.take(object),
+          follow: () => this.followCharacter(object),
+          guard: () => this.physicalAction("guard", object),
+          help: () => this.physicalAction("help", object),
+          explain: () => this.physicalAction("explain", object),
+          negotiate: () => this.physicalAction("negotiate", object),
+          print: () => this.physicalAction("print", object),
+          call: () => this.socialAction("call", object),
+          wash: () => this.physicalAction("wash", object),
+          check: () => this.examine(object),
+          start: () => this.physicalAction("start", object),
+          refill: () => this.physicalAction("refill", object),
+          inform: () => this.socialAction("inform", object),
+          review: () => this.examine(object),
+          mend: () => this.mend(object),
+          repair: () => this.mend(object),
+          fix: () => this.mend(object),
+          write: () => this.write(object),
+          light: () => this.light(object),
+          pick: () => this.pick(object),
+          cut: () => this.cutTrim("cut", object),
+          trim: () => this.cutTrim("trim", object),
+          fill: () => this.fill(object),
+          water: () => this.water(object),
+          plant: () => this.plant(object),
+          rake: () => this.rakeGarden(object),
+          dig: () => this.dig(object),
+          kill: () => this.attack(object),
+          attack: () => this.attack(object),
+          break: () => this.breakThing(object),
+          push: () => this.pushPull("push", object),
+          pull: () => this.pushPull("pull", object),
+          move: () => this.pushPull("move", object),
+          place: () => this.drop(object),
+          set: () => this.drop(object),
+          store: () => this.drop(object),
+          lift: () => this.touch("lift", object),
+          turn: () => this.touch("turn", object),
+          use: () => this.touch("use", object),
+          find: () => this.examine(object),
+          read: () => this.read(object),
+          answer: () => this.socialAction("answer", object),
+          thank: () => this.socialAction("thank", object),
+          flatter: () => this.socialAction("flatter", object),
+          insult: () => this.socialAction("insult", object),
+          hide: () => this.physicalAction("hide", object),
+          sneak: () => this.physicalAction("sneak", object),
+          escape: () => this.physicalAction("escape", object),
+          throw: () => this.throwItem(object),
+          climb: () => this.climb(object),
+          eat: () => this.eat(object),
+          drink: () => this.drink(object),
+          jump: () => this.physicalAction("jump", object),
+          sit: () => this.physicalAction("sit", object),
+          lie: () => this.physicalAction("lie", object),
+          stand: () => this.physicalAction("stand", object),
+          sleep: () => this.physicalAction("sleep", object),
+          rest: () => this.physicalAction("rest", object),
+          run: () => this.physicalAction("run", object),
+          wake: () => this.physicalAction("wake", object),
+          crawl: () => this.physicalAction("crawl", object),
+          leap: () => this.physicalAction("jump", object),
+          dive: () => this.physicalAction("dive", object),
+          swim: () => this.physicalAction("swim", object),
+          ride: () => this.physicalAction("ride", object),
+          cook: () => this.physicalAction("cook", object),
+          combine: () => this.combine(object),
+        };
+
+        if (handlers[verb]) handlers[verb]();
+        else this.unrecognized(command);
+        for (const reference of explicitReferences) {
+          this.rememberClarifiedReference(reference.target, reference.choice);
+        }
         return false;
+      } finally {
+        if (rememberedChoice && sameChoice(this.forcedChoice, rememberedChoice)) this.forcedChoice = null;
       }
-
-      if (this.trySpecialAction(verb, object)) return false;
-
-      if (!object && !commandsWithoutObject.has(verb)) {
-        this.print("Please specify your action and the object. For example, type 'open door' or 'climb into tree'.");
-        return false;
-      }
-
-      if (this.needsClarification(verb, object)) return false;
-
-      const handlers = {
-        take: () => this.take(object),
-        get: () => this.take(object),
-        leave: () => this.drop(object),
-        drop: () => this.drop(object),
-        put: () => this.drop(object),
-        open: () => this.open(object),
-        close: () => this.close(object),
-        unlock: () => this.unlock(object),
-        lock: () => this.lock(object),
-        look: () => this.look(object),
-        examine: () => this.examine(object),
-        inspect: () => this.examine(object),
-        search: () => this.examine(object),
-        explore: () => this.examine(object),
-        investigate: () => this.examine(object),
-        listen: () => this.sense("listen", object),
-        smell: () => this.sense("smell", object),
-        sniff: () => this.sense("smell", object),
-        watch: () => this.sense("watch", object),
-        eavesdrop: () => this.sense("listen", object),
-        scout: () => this.sense("search", object),
-        touch: () => this.touch("touch", object),
-        feel: () => this.touch("feel", object),
-        knock: () => this.touch("knock", object),
-        inventory: () => this.inventory(),
-        i: () => this.inventory(),
-        wait: () => this.wait(),
-        hello: () => this.hello(),
-        tips: () => this.tips(object),
-        verbs: () => this.verbs(),
-        mysaves: () => this.listSaves(),
-        save: () => this.save(object),
-        load: () => this.load(object),
-        quit: () => this.quit(),
-        map: () => this.showMap(),
-        location: () => this.print(actorizeSecondPerson(this.player, `You are currently in ${this.room().name.replace(/_/g, " ")}.`)),
-        music: () => this.handleMusicCommand(object),
-        autoplay: () => this.autoplay(object),
-        wear: () => this.wear(object),
-        remove: () => this.remove(object),
-        give: () => this.give(object),
-        show: () => this.show(object),
-        hand: () => this.give(object),
-        pass: () => this.give(object),
-        bring: () => this.give(object),
-        send: () => this.give(object),
-        return: () => this.give(object),
-        deliver: () => this.give(object),
-        ask: () => this.askFor(object),
-        borrow: () => this.askFor(object),
-        request: () => this.askFor(object),
-        carry: () => this.take(object),
-        hold: () => this.take(object),
-        catch: () => this.take(object),
-        follow: () => this.followCharacter(object),
-        guard: () => this.physicalAction("guard", object),
-        help: () => this.physicalAction("help", object),
-        explain: () => this.physicalAction("explain", object),
-        negotiate: () => this.physicalAction("negotiate", object),
-        print: () => this.physicalAction("print", object),
-        call: () => this.socialAction("call", object),
-        wash: () => this.physicalAction("wash", object),
-        check: () => this.examine(object),
-        start: () => this.physicalAction("start", object),
-        refill: () => this.physicalAction("refill", object),
-        inform: () => this.socialAction("inform", object),
-        review: () => this.examine(object),
-        mend: () => this.mend(object),
-        repair: () => this.mend(object),
-        fix: () => this.mend(object),
-        write: () => this.write(object),
-        light: () => this.light(object),
-        pick: () => this.pick(object),
-        cut: () => this.cutTrim("cut", object),
-        trim: () => this.cutTrim("trim", object),
-        fill: () => this.fill(object),
-        water: () => this.water(object),
-        plant: () => this.plant(object),
-        rake: () => this.rakeGarden(object),
-        dig: () => this.dig(object),
-        kill: () => this.attack(object),
-        attack: () => this.attack(object),
-        break: () => this.breakThing(object),
-        push: () => this.pushPull("push", object),
-        pull: () => this.pushPull("pull", object),
-        move: () => this.pushPull("move", object),
-        place: () => this.drop(object),
-        set: () => this.drop(object),
-        store: () => this.drop(object),
-        lift: () => this.touch("lift", object),
-        turn: () => this.touch("turn", object),
-        use: () => this.touch("use", object),
-        find: () => this.examine(object),
-        read: () => this.read(object),
-        answer: () => this.socialAction("answer", object),
-        thank: () => this.socialAction("thank", object),
-        flatter: () => this.socialAction("flatter", object),
-        insult: () => this.socialAction("insult", object),
-        hide: () => this.physicalAction("hide", object),
-        sneak: () => this.physicalAction("sneak", object),
-        escape: () => this.physicalAction("escape", object),
-        throw: () => this.throwItem(object),
-        climb: () => this.climb(object),
-        eat: () => this.eat(object),
-        drink: () => this.drink(object),
-        jump: () => this.physicalAction("jump", object),
-        sit: () => this.physicalAction("sit", object),
-        lie: () => this.physicalAction("lie", object),
-        stand: () => this.physicalAction("stand", object),
-        sleep: () => this.physicalAction("sleep", object),
-        rest: () => this.physicalAction("rest", object),
-        run: () => this.physicalAction("run", object),
-        wake: () => this.physicalAction("wake", object),
-        crawl: () => this.physicalAction("crawl", object),
-        leap: () => this.physicalAction("jump", object),
-        dive: () => this.physicalAction("dive", object),
-        swim: () => this.physicalAction("swim", object),
-        ride: () => this.physicalAction("ride", object),
-        cook: () => this.physicalAction("cook", object),
-        combine: () => this.combine(object),
-      };
-
-      if (handlers[verb]) handlers[verb]();
-      else this.unrecognized(command);
-      return false;
     }
 
     performAs(character, action) {
@@ -3440,16 +3452,18 @@
       if (!objectText) return false;
       const request = parseAllTarget(primaryObjectText(verb, objectText));
       if (request.all || !request.target) return false;
-      const choices = this.ambiguousChoices(verb, request.target);
+      const choices = this.ambiguousChoices(verb, request.target, objectText);
       if (choices.length <= 1) return false;
+      if (sameChoice(this.forcedChoice, this.recallClarifiedReference(request.target, choices))) return false;
       this.pendingClarification = {
         verb,
         objectText,
         choices,
+        target: request.target,
         actorId: this.player?.id || null,
       };
-      const labels = choices.map((choice, index) => `${index + 1}. ${choice.name}`).join("; ");
-      this.print(`Which ${request.target} do you mean? ${labels}.`, "system");
+      const labels = joinAlternatives(choices.map((choice) => clarificationLabel(choice.name)));
+      this.print(`Do you mean ${labels}?`, "system");
       return true;
     }
 
@@ -3464,16 +3478,19 @@
       return pending.choices.some((choice) => matches(choice.name, answer));
     }
 
-    ambiguousChoices(verb, objectText) {
+    ambiguousChoices(verb, objectText, fullObjectText = objectText) {
       const itemVerbs = new Set(["take", "get", "open", "close", "unlock", "lock", "examine", "inspect", "break", "push", "pull", "drop", "leave", "put", "wear", "remove", "eat", "drink", "give", "combine"]);
       const doorVerbs = new Set(["open", "close", "unlock", "lock", "examine", "inspect", "break"]);
       const inventoryOnly = new Set(["drop", "leave", "put", "wear", "remove", "eat", "drink", "give", "combine"]);
       const choices = [];
 
       if (itemVerbs.has(verb)) {
-        const itemMatches = inventoryOnly.has(verb)
-          ? this.player.inventory.map((id) => ({ item: this.items[id], parent: null })).filter(({ item }) => item && matches(item.name, objectText))
-          : this.visibleSearchAll(objectText, { includeInventory: verb !== "take" && verb !== "get" });
+        const source = ["take", "get"].includes(verb) ? this.parseSourceReference(fullObjectText) : null;
+        const itemMatches = source
+          ? this.findSourceItemMatches(source.itemName, source.sourceName)
+          : (inventoryOnly.has(verb)
+            ? this.player.inventory.map((id) => ({ item: this.items[id], parent: null })).filter(({ item }) => item && matches(item.name, objectText))
+            : this.visibleSearchAll(objectText, { includeInventory: verb !== "take" && verb !== "get" }));
         for (const { item } of itemMatches) {
           choices.push({ type: "item", id: item.id, name: item.name });
         }
@@ -3486,6 +3503,136 @@
       }
 
       return uniqueChoices(choices);
+    }
+
+    resolveRememberedClarification(verb, objectText) {
+      if (!objectText) return null;
+      const request = parseAllTarget(primaryObjectText(verb, objectText));
+      if (request.all || !request.target) return null;
+      const choices = this.ambiguousChoices(verb, request.target, objectText);
+      if (choices.length <= 1) return null;
+      return this.recallClarifiedReference(request.target, choices);
+    }
+
+    resolveExplicitClarification(verb, objectText) {
+      if (!objectText) return null;
+      const request = parseAllTarget(primaryObjectText(verb, objectText));
+      if (request.all || !request.target) return null;
+      const choices = this.ambiguousChoices(verb, request.target, objectText);
+      return choices.length === 1 ? choices[0] : null;
+    }
+
+    explicitClarificationReferences(verb, objectText) {
+      const references = [];
+      const seen = new Set();
+      const addReference = (target, choice) => {
+        const normalizedTarget = normalize(target);
+        if (!normalizedTarget || !choice?.type || !choice?.id) return;
+        const key = `${normalizedTarget}:${choice.type}:${choice.id}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        references.push({ target, choice });
+      };
+
+      const primaryTarget = primaryObjectText(verb, objectText);
+      const primaryChoice = this.resolveExplicitClarification(verb, objectText);
+      if (primaryChoice && primaryTarget) addReference(primaryTarget, primaryChoice);
+
+      if (["take", "get"].includes(verb)) {
+        const source = this.parseSourceReference(objectText);
+        if (source) {
+          const sourceChoice = this.resolveVisibleReference(source.sourceName, { closedContainers: true });
+          if (sourceChoice) addReference(source.sourceName, sourceChoice);
+
+          const itemChoice = this.resolveContainedItemReference(source.itemName, source.sourceName);
+          if (itemChoice) addReference(source.itemName, itemChoice);
+        }
+      }
+
+      if (["drop", "leave", "put"].includes(verb)) {
+        const placement = this.parsePlacementCommand(objectText);
+        if (placement) {
+          const targetChoice = this.resolveVisibleReference(placement.targetName, { closedContainers: true });
+          if (targetChoice) addReference(placement.targetName, targetChoice);
+        }
+      }
+
+      return references;
+    }
+
+    parseSourceReference(objectText) {
+      const outOfMatch = normalize(objectText).match(/^(.+?)\s+out\s+of\s+(.+)$/);
+      if (outOfMatch) {
+        return {
+          itemName: outOfMatch[1].trim(),
+          sourceName: outOfMatch[2].trim(),
+        };
+      }
+      const fromMatch = objectText.split(" from ");
+      if (fromMatch.length === 2) {
+        return {
+          itemName: fromMatch[0].trim(),
+          sourceName: fromMatch[1].trim(),
+        };
+      }
+      return null;
+    }
+
+    resolveVisibleReference(name, options = {}) {
+      const choices = [];
+      const itemMatches = this.visibleSearchAll(name, {
+        includeInventory: options.includeInventory !== false,
+        closedContainers: Boolean(options.closedContainers),
+      });
+      for (const { item } of itemMatches) {
+        choices.push({ type: "item", id: item.id, name: item.name });
+      }
+      for (const { door } of this.findDoorsAll(name)) {
+        choices.push({ type: "door", id: door.id, name: door.name });
+      }
+      const unique = uniqueChoices(choices);
+      return unique.length === 1 ? unique[0] : null;
+    }
+
+    resolveContainedItemReference(itemName, sourceName) {
+      const character = this.resolveCharacterTarget(sourceName);
+      if (character) {
+        const held = this.findCharacterItem(character, itemName)?.item;
+        return held ? { type: "item", id: held.id, name: held.name } : null;
+      }
+      const container = this.visibleSearch(sourceName, { closedContainers: true })?.item;
+      if (!container?.container) return null;
+      const nested = this.findItemInsideContainer(container, itemName);
+      if (!nested?.item) return null;
+      return { type: "item", id: nested.item.id, name: nested.item.name };
+    }
+
+    findSourceItemMatches(itemName, sourceName) {
+      const character = this.resolveCharacterTarget(sourceName);
+      if (character) {
+        return [...(character.inventory || []), ...(character.worn || [])]
+          .map((id) => this.items[id])
+          .filter((item) => item && matches(item.name, itemName))
+          .map((item) => ({ item, parent: character }));
+      }
+      const container = this.visibleSearch(sourceName, { closedContainers: true })?.item;
+      if (!container?.container) return [];
+      return this.findAllItemsInsideContainer(container, itemName);
+    }
+
+    findAllItemsInsideContainer(container, itemName) {
+      const results = [];
+      const name = normalize(itemName);
+      const scan = (itemIds, parent) => {
+        for (const id of itemIds || []) {
+          const item = this.items[id];
+          if (!item) continue;
+          if (matches(item.name, name)) results.push({ item, parent });
+          if (item.container) scan(item.contents, item);
+        }
+      };
+      scan(container.contents, container);
+      return results;
     }
 
     handleClarification(response) {
@@ -3507,18 +3654,51 @@
 
       if (matchesFound.length !== 1) {
         this.pendingClarification = pending;
-        const labels = pending.choices.map((choice, index) => `${index + 1}. ${choice.name}`).join("; ");
+        const labels = joinAlternatives(pending.choices.map((choice) => clarificationLabel(choice.name)));
         this.print(`Please be more specific: ${labels}.`, "system");
         return;
       }
 
       this.forcedChoice = matchesFound[0];
+      this.rememberClarifiedReference(pending.target, matchesFound[0]);
       try {
         const resolvedObject = replacePrimaryObject(pending.verb, pending.objectText, matchesFound[0].name);
         const actor = pending.actorId ? this.characters[pending.actorId] || this.player : this.player;
         this.processCommand(`${pending.verb} ${resolvedObject}`.trim(), actor);
       } finally {
         this.forcedChoice = null;
+      }
+    }
+
+    rememberClarifiedReference(target, choice) {
+      const keys = clarificationMemoryKeys(target);
+      if (!keys.length || !choice?.type || !choice?.id) return;
+      for (const key of keys) {
+        this.clarifiedReferences[key] = {
+          type: choice.type,
+          id: choice.id,
+          name: choice.name,
+          rememberedTurn: Number(this.turnCount) || 0,
+        };
+      }
+    }
+
+    recallClarifiedReference(target, choices = []) {
+      this.pruneClarifiedReferences();
+      const key = clarificationMemoryKey(target);
+      if (!key) return null;
+      const remembered = this.clarifiedReferences?.[key];
+      if (!remembered) return null;
+      return choices.find((choice) => sameChoice(choice, remembered)) || null;
+    }
+
+    pruneClarifiedReferences() {
+      const currentTurn = Number(this.turnCount) || 0;
+      for (const [key, remembered] of Object.entries(this.clarifiedReferences || {})) {
+        const rememberedTurn = Number(remembered?.rememberedTurn);
+        if (!Number.isFinite(rememberedTurn) || currentTurn - rememberedTurn >= CLARIFICATION_MEMORY_TURNS) {
+          delete this.clarifiedReferences[key];
+        }
       }
     }
 
@@ -4396,6 +4576,7 @@
         storyRunCount: this.storyRunCount,
         flags: this.flags,
         visitedRooms: [...this.visitedRooms],
+        clarifiedReferences: this.clarifiedReferences,
         visitedTrollsClearing: this.visitedTrollsClearing,
         waitCounter: this.waitCounter,
         secretDoorWaitCounter: this.secretDoorWaitCounter,
@@ -4420,6 +4601,7 @@
       this.storyRunCount = Number(save.storyRunCount) || this.storyRunCount;
       this.flags = save.flags || {};
       this.visitedRooms = new Set(save.visitedRooms || [this.currentRoom]);
+      this.clarifiedReferences = save.clarifiedReferences || {};
       this.visitedTrollsClearing = Boolean(save.visitedTrollsClearing);
       this.waitCounter = save.waitCounter || 0;
       this.secretDoorWaitCounter = save.secretDoorWaitCounter || 0;
@@ -6830,6 +7012,7 @@
       this.autoplayCapturingOutput = false;
       this.pendingClarification = null;
       this.forcedChoice = null;
+      this.clarifiedReferences = {};
       this.commandIssuer = null;
       this.lastConversationCharacterId = null;
       this.lastReferencedCharacterId = null;
@@ -7800,6 +7983,13 @@
     return `${articleFor(text)} ${text}`;
   }
 
+  function clarificationLabel(name) {
+    const text = String(name || "");
+    if (!text) return "";
+    if (/^(a|an|the)\s/i.test(text) || isProperName(text)) return text;
+    return `the ${text}`;
+  }
+
   function displayCharacterName(character) {
     if (character.id === "you" || character.name === "You") return "you";
     return isProperName(character.name) ? character.name : `the ${character.name}`;
@@ -7885,15 +8075,29 @@
   }
 
   function primaryObjectText(verb, objectText) {
+    if (["take", "get"].includes(verb)) {
+      const outOfMatch = normalize(objectText).match(/^(.+?)\s+out\s+of\s+(.+)$/);
+      if (outOfMatch) return outOfMatch[1].trim();
+      if (objectText.includes(" from ")) return objectText.split(" from ")[0];
+    }
     if (["give"].includes(verb) && objectText.includes(" to ")) return objectText.split(" to ")[0];
+    if (["unlock", "lock"].includes(verb) && objectText.includes(" with ")) return objectText.split(" with ")[0];
     if (["break", "kill", "attack", "combine"].includes(verb) && objectText.includes(" with ")) return objectText.split(" with ")[0];
     if (["drop", "leave", "put"].includes(verb) && objectText.includes(" in ")) return objectText.split(" in ")[0];
     return objectText;
   }
 
   function replacePrimaryObject(verb, objectText, replacement) {
+    if (["take", "get"].includes(verb)) {
+      const outOfMatch = normalize(objectText).match(/^(.+?)\s+out\s+of\s+(.+)$/);
+      if (outOfMatch) return `${replacement} out of ${outOfMatch[2].trim()}`;
+      if (objectText.includes(" from ")) return `${replacement} from ${objectText.split(" from ").slice(1).join(" from ")}`;
+    }
     if (["give"].includes(verb) && objectText.includes(" to ")) {
       return `${replacement} to ${objectText.split(" to ").slice(1).join(" to ")}`;
+    }
+    if (["unlock", "lock"].includes(verb) && objectText.includes(" with ")) {
+      return `${replacement} with ${objectText.split(" with ").slice(1).join(" with ")}`;
     }
     if (["break", "kill", "attack", "combine"].includes(verb) && objectText.includes(" with ")) {
       return `${replacement} with ${objectText.split(" with ").slice(1).join(" with ")}`;
@@ -7929,6 +8133,30 @@
     if (names.length <= 1) return names[0] || "";
     if (names.length === 2) return `${names[0]} and ${names[1]}`;
     return `${names.slice(0, -1).join(", ")}, and ${names.at(-1)}`;
+  }
+
+  function joinAlternatives(names) {
+    if (names.length <= 1) return names[0] || "";
+    if (names.length === 2) return `${names[0]} or ${names[1]}`;
+    return `${names.slice(0, -1).join(", ")}, or ${names.at(-1)}`;
+  }
+
+  function sameChoice(first, second) {
+    return Boolean(first && second && first.type === second.type && first.id === second.id);
+  }
+
+  function clarificationMemoryKeys(text) {
+    const normalized = normalizeWords(text || "");
+    if (!normalized) return [];
+    const keys = [normalized];
+    const parts = normalized.split(/\s+/).filter(Boolean);
+    const head = parts.at(-1) || "";
+    if (head && head !== normalized) keys.push(head);
+    return [...new Set(keys)];
+  }
+
+  function clarificationMemoryKey(text) {
+    return clarificationMemoryKeys(text)[0] || "";
   }
 
   function isProperName(name) {
