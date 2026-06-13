@@ -29,6 +29,10 @@
   const PLAYER_CARRY_BONUS = 32;
   const LANTERN_BURN_TURNS = 10;
   const CLARIFICATION_MEMORY_TURNS = 3;
+  const AMBIGUOUS_ITEM_VERBS = new Set(["take", "get", "open", "close", "unlock", "lock", "examine", "inspect", "break", "push", "pull", "drop", "leave", "put", "wear", "remove", "eat", "drink", "give", "combine"]);
+  const AMBIGUOUS_DOOR_VERBS = new Set(["open", "close", "unlock", "lock", "examine", "inspect", "break"]);
+  const INVENTORY_ONLY_AMBIGUOUS_VERBS = new Set(["drop", "leave", "put", "wear", "remove", "eat", "drink", "give", "combine"]);
+  const WITH_ITEM_CLARIFICATION_VERBS = new Set(["unlock", "lock", "break", "kill", "attack", "combine"]);
   const LAYOUT_SWITCH_IDLE_MS = 1600;
   const LAYOUT_MOUSE_ACTIVITY_THRESHOLD = 28;
   const LAYOUT_SPLIT_PREF_KEY = "hobbit-web-layout-2-scene-width";
@@ -2664,7 +2668,7 @@
       const [verb, ...rest] = command.split(/\s+/);
       const object = rest.join(" ").trim();
       if (!verb) return false;
-      const rememberedChoice = !this.forcedChoice ? this.resolveRememberedClarification(verb, object) : null;
+      const rememberedChoice = !this.forcedChoice ? this.resolveRememberedCommandChoice(verb, object) : null;
       const explicitReferences = this.explicitClarificationReferences(verb, object);
       if (rememberedChoice) this.forcedChoice = rememberedChoice;
 
@@ -3449,20 +3453,15 @@
     }
 
     needsClarification(verb, objectText) {
-      if (!objectText) return false;
-      const request = parseAllTarget(primaryObjectText(verb, objectText));
-      if (request.all || !request.target) return false;
-      const choices = this.ambiguousChoices(verb, request.target, objectText);
-      if (choices.length <= 1) return false;
-      if (sameChoice(this.forcedChoice, this.recallClarifiedReference(request.target, choices))) return false;
+      const request = this.firstClarificationRequest(verb, objectText);
+      if (!request) return false;
+      const remembered = request.choices.length > 1 ? this.recallClarifiedReference(request.target, request.choices) : null;
+      if (remembered && sameChoice(this.forcedChoice, remembered)) return false;
       this.pendingClarification = {
-        verb,
-        objectText,
-        choices,
-        target: request.target,
+        ...request,
         actorId: this.player?.id || null,
       };
-      const labels = joinAlternatives(choices.map((choice) => clarificationLabel(choice.name)));
+      const labels = joinAlternatives(request.choices.map((choice) => clarificationLabel(choice.name)));
       this.print(`Do you mean ${labels}?`, "system");
       return true;
     }
@@ -3479,16 +3478,13 @@
     }
 
     ambiguousChoices(verb, objectText, fullObjectText = objectText) {
-      const itemVerbs = new Set(["take", "get", "open", "close", "unlock", "lock", "examine", "inspect", "break", "push", "pull", "drop", "leave", "put", "wear", "remove", "eat", "drink", "give", "combine"]);
-      const doorVerbs = new Set(["open", "close", "unlock", "lock", "examine", "inspect", "break"]);
-      const inventoryOnly = new Set(["drop", "leave", "put", "wear", "remove", "eat", "drink", "give", "combine"]);
       const choices = [];
 
-      if (itemVerbs.has(verb)) {
+      if (AMBIGUOUS_ITEM_VERBS.has(verb)) {
         const source = ["take", "get"].includes(verb) ? this.parseSourceReference(fullObjectText) : null;
         const itemMatches = source
           ? this.findSourceItemMatches(source.itemName, source.sourceName)
-          : (inventoryOnly.has(verb)
+          : (INVENTORY_ONLY_AMBIGUOUS_VERBS.has(verb)
             ? this.player.inventory.map((id) => ({ item: this.items[id], parent: null })).filter(({ item }) => item && matches(item.name, objectText))
             : this.visibleSearchAll(objectText, { includeInventory: verb !== "take" && verb !== "get" }));
         for (const { item } of itemMatches) {
@@ -3496,7 +3492,7 @@
         }
       }
 
-      if (doorVerbs.has(verb)) {
+      if (AMBIGUOUS_DOOR_VERBS.has(verb)) {
         for (const { door } of this.findDoorsAll(objectText)) {
           choices.push({ type: "door", id: door.id, name: door.name });
         }
@@ -3505,13 +3501,100 @@
       return uniqueChoices(choices);
     }
 
-    resolveRememberedClarification(verb, objectText) {
-      if (!objectText) return null;
+    firstClarificationRequest(verb, objectText) {
+      for (const request of this.clarificationRequests(verb, objectText)) {
+        if (request.choices.length > 1) return request;
+      }
+      return null;
+    }
+
+    clarificationRequests(verb, objectText) {
+      if (!objectText) return [];
+      const requests = [];
+
+      const primary = this.primaryClarificationRequest(verb, objectText);
+      if (primary) requests.push(primary);
+
+      if (["take", "get"].includes(verb)) {
+        const source = this.parseSourceReference(objectText);
+        if (source) {
+          const sourceChoices = this.sourceTargetChoices(source.sourceName, source.itemName);
+          if (sourceChoices.length) {
+            requests.push({
+              verb,
+              objectText,
+              choices: sourceChoices,
+              target: normalize(source.sourceName),
+              slot: "source-target",
+            });
+          }
+        }
+      }
+
+      if (["drop", "leave", "put"].includes(verb)) {
+        const placement = this.parsePlacementCommand(objectText);
+        if (placement) {
+          const targetChoices = this.visibleReferenceChoices(placement.targetName, {
+            includeInventory: false,
+            closedContainers: true,
+            includeDoors: false,
+          });
+          if (targetChoices.length) {
+            requests.push({
+              verb,
+              objectText,
+              choices: targetChoices,
+              target: normalize(placement.targetName),
+              slot: "placement-target",
+            });
+          }
+        }
+      }
+
+      if (WITH_ITEM_CLARIFICATION_VERBS.has(verb)) {
+        const withTarget = this.parseWithReference(objectText);
+        if (withTarget?.itemName) {
+          const keyChoices = this.inventoryReferenceChoices(withTarget.itemName);
+          if (keyChoices.length) {
+            requests.push({
+              verb,
+              objectText,
+              choices: keyChoices,
+              target: normalize(withTarget.itemName),
+              slot: "with-item",
+            });
+          }
+        }
+      }
+
+      return requests;
+    }
+
+    primaryClarificationRequest(verb, objectText) {
       const request = parseAllTarget(primaryObjectText(verb, objectText));
       if (request.all || !request.target) return null;
       const choices = this.ambiguousChoices(verb, request.target, objectText);
-      if (choices.length <= 1) return null;
-      return this.recallClarifiedReference(request.target, choices);
+      if (!choices.length) return null;
+      return {
+        verb,
+        objectText,
+        choices,
+        target: request.target,
+        slot: "primary",
+      };
+    }
+
+    resolveRememberedCommandChoice(verb, objectText) {
+      for (const request of this.clarificationRequests(verb, objectText)) {
+        if (request.choices.length <= 1) continue;
+        const remembered = this.recallClarifiedReference(request.target, request.choices);
+        if (remembered) return remembered;
+      }
+      return null;
+    }
+
+    resolveRememberedClarification(verb, objectText) {
+      return this.resolveRememberedCommandChoice(verb, objectText);
     }
 
     resolveExplicitClarification(verb, objectText) {
@@ -3557,6 +3640,14 @@
         }
       }
 
+      if (WITH_ITEM_CLARIFICATION_VERBS.has(verb)) {
+        const withTarget = this.parseWithReference(objectText);
+        if (withTarget?.itemName) {
+          const keyChoice = this.resolveInventoryReference(withTarget.itemName);
+          if (keyChoice) addReference(withTarget.itemName, keyChoice);
+        }
+      }
+
       return references;
     }
 
@@ -3579,6 +3670,11 @@
     }
 
     resolveVisibleReference(name, options = {}) {
+      const unique = this.visibleReferenceChoices(name, options);
+      return unique.length === 1 ? unique[0] : null;
+    }
+
+    visibleReferenceChoices(name, options = {}) {
       const choices = [];
       const itemMatches = this.visibleSearchAll(name, {
         includeInventory: options.includeInventory !== false,
@@ -3587,11 +3683,24 @@
       for (const { item } of itemMatches) {
         choices.push({ type: "item", id: item.id, name: item.name });
       }
-      for (const { door } of this.findDoorsAll(name)) {
-        choices.push({ type: "door", id: door.id, name: door.name });
+      if (options.includeDoors !== false) {
+        for (const { door } of this.findDoorsAll(name)) {
+          choices.push({ type: "door", id: door.id, name: door.name });
+        }
       }
-      const unique = uniqueChoices(choices);
-      return unique.length === 1 ? unique[0] : null;
+      return uniqueChoices(choices);
+    }
+
+    inventoryReferenceChoices(name) {
+      return uniqueChoices(this.player.inventory
+        .map((id) => this.items[id])
+        .filter((item) => item && matches(item.name, name))
+        .map((item) => ({ type: "item", id: item.id, name: item.name })));
+    }
+
+    resolveInventoryReference(name) {
+      const choices = this.inventoryReferenceChoices(name);
+      return choices.length === 1 ? choices[0] : null;
     }
 
     resolveContainedItemReference(itemName, sourceName) {
@@ -3615,9 +3724,10 @@
           .filter((item) => item && matches(item.name, itemName))
           .map((item) => ({ item, parent: character }));
       }
-      const container = this.visibleSearch(sourceName, { closedContainers: true })?.item;
-      if (!container?.container) return [];
-      return this.findAllItemsInsideContainer(container, itemName);
+      const containers = this.sourceTargetChoices(sourceName, itemName)
+        .map((choice) => this.items[choice.id])
+        .filter((item) => item?.container);
+      return containers.flatMap((container) => this.findAllItemsInsideContainer(container, itemName));
     }
 
     findAllItemsInsideContainer(container, itemName) {
@@ -3633,6 +3743,33 @@
       };
       scan(container.contents, container);
       return results;
+    }
+
+    sourceTargetChoices(sourceName, itemName = "") {
+      const visibleChoices = this.visibleReferenceChoices(sourceName, {
+        includeInventory: false,
+        closedContainers: true,
+        includeDoors: false,
+      }).filter((choice) => this.items[choice.id]?.container);
+      if (!itemName) return visibleChoices;
+      return visibleChoices.filter((choice) => Boolean(this.findItemInsideContainer(this.items[choice.id], itemName)));
+    }
+
+    parseWithReference(objectText) {
+      const parts = String(objectText || "").split(" with ");
+      if (parts.length < 2) return null;
+      return {
+        targetName: parts[0].trim(),
+        itemName: parts.slice(1).join(" with ").trim(),
+      };
+    }
+
+    resolveClarifiedObjectText(pending, replacement) {
+      if (pending.slot === "primary") return replacePrimaryObject(pending.verb, pending.objectText, replacement);
+      if (pending.slot === "source-target") return replaceSourceTarget(pending.objectText, replacement);
+      if (pending.slot === "placement-target") return replacePlacementTarget(pending.objectText, replacement);
+      if (pending.slot === "with-item") return replaceWithItem(pending.objectText, replacement);
+      return replacePrimaryObject(pending.verb, pending.objectText, replacement);
     }
 
     handleClarification(response) {
@@ -3662,7 +3799,7 @@
       this.forcedChoice = matchesFound[0];
       this.rememberClarifiedReference(pending.target, matchesFound[0]);
       try {
-        const resolvedObject = replacePrimaryObject(pending.verb, pending.objectText, matchesFound[0].name);
+        const resolvedObject = this.resolveClarifiedObjectText(pending, matchesFound[0].name);
         const actor = pending.actorId ? this.characters[pending.actorId] || this.player : this.player;
         this.processCommand(`${pending.verb} ${resolvedObject}`.trim(), actor);
       } finally {
@@ -3864,12 +4001,7 @@
     }
 
     parsePlacementCommand(objectName) {
-      const text = normalize(objectName);
-      const relationPattern = "(?:in front of|next to|to the left of|to the right of|on top of|inside|into|under|behind|beside|near|at|on|in)";
-      const match = text.match(new RegExp(`^(.+?)\\s+(${relationPattern})\\s+(.+)$`));
-      if (!match) return null;
-      const relation = match[2].replace(/^into$|^inside$/, "in");
-      return { itemName: match[1].trim(), relation, targetName: match[3].trim() };
+      return parsePlacementTargetText(objectName);
     }
 
     dropCharacter(character) {
@@ -4048,23 +4180,35 @@
     }
 
     unlock(objectName) {
-      const cleanName = objectName.split(" with ")[0].trim();
+      const withTarget = this.parseWithReference(objectName);
+      const cleanName = withTarget?.targetName || objectName.split(" with ")[0].trim();
       const target = this.findDoor(cleanName)?.door || this.visibleSearch(cleanName)?.item;
       if (!target) return this.print(this.heldItemMessage(cleanName) || "I don't see that here.");
       if (matches(target.name, "secret door") && !this.flags.secretdoorsun) return this.print("The rock face shows no door yet.");
       if (!target.locked) return this.print(`The ${target.name} is already unlocked.`);
-      const key = this.keyFor(target);
+      const namedKey = withTarget?.itemName ? this.findInInventory(withTarget.itemName) : null;
+      if (withTarget?.itemName && !namedKey) {
+        return this.print(this.heldItemMessage(withTarget.itemName) || `You do not have the ${withTarget.itemName}.`);
+      }
+      const key = namedKey || this.keyFor(target);
       if (!key) return this.print(this.heldItemMessage(target.requiredKey || "key") || `You do not have the required key for the ${target.name}.`);
+      if (!this.keyMatchesTarget(key, target)) return this.print(`The ${key.name} does not unlock the ${target.name}.`);
       target.locked = false;
       this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "unlock")} the ${target.name} with the ${key.name}.`);
     }
 
     lock(objectName) {
-      const cleanName = objectName.split(" with ")[0].trim();
+      const withTarget = this.parseWithReference(objectName);
+      const cleanName = withTarget?.targetName || objectName.split(" with ")[0].trim();
       const target = this.findDoor(cleanName)?.door || this.visibleSearch(cleanName)?.item;
       if (!target) return this.print(this.heldItemMessage(cleanName) || "I don't see that here.");
-      const key = this.keyFor(target);
+      const namedKey = withTarget?.itemName ? this.findInInventory(withTarget.itemName) : null;
+      if (withTarget?.itemName && !namedKey) {
+        return this.print(this.heldItemMessage(withTarget.itemName) || `You do not have the ${withTarget.itemName}.`);
+      }
+      const key = namedKey || this.keyFor(target);
       if (!key) return this.print(this.heldItemMessage(target.requiredKey || "key") || `You do not have the required key for the ${target.name}.`);
+      if (!this.keyMatchesTarget(key, target)) return this.print(`The ${key.name} does not lock the ${target.name}.`);
       target.locked = true;
       target.open = false;
       this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "lock")} the ${target.name} with the ${key.name}.`);
@@ -4073,8 +4217,13 @@
     keyFor(target) {
       const required = normalize(target.requiredKey || "");
       return this.player.inventory.map((id) => this.items[id]).find((item) => {
-        return matches(item?.name, required) || matches(item?.description, required) || matches(item?.keyFor, normalize(target.name));
+        return this.keyMatchesTarget(item, target);
       });
+    }
+
+    keyMatchesTarget(item, target) {
+      const required = normalize(target?.requiredKey || "");
+      return matches(item?.name, required) || matches(item?.description, required) || matches(item?.keyFor, normalize(target?.name));
     }
 
     look(objectName = "") {
@@ -7701,7 +7850,7 @@
     name = normalizeWords(name);
     query = normalizeWords(query);
     if (!query) return false;
-    return query.split(/\s+/).every((word) => name.split(/\s+/).some((nameWord) => nameWord === word || nameWord.includes(word)));
+    return query.split(/\s+/).every((word) => name.split(/\s+/).some((nameWord) => tokenMatches(nameWord, word)));
   }
 
   function matchesAny(text, choices) {
@@ -7729,8 +7878,18 @@
     const requiredWords = normalizeWords(String(requiredName || "").replace("*", "")).split(/\s+/).filter(Boolean);
     if (!requiredWords.length) return true;
     return requiredWords.some((requiredWord) => {
-      return commandWords.some((commandWord) => requiredWord === commandWord || requiredWord.includes(commandWord) || commandWord.includes(requiredWord));
+      return commandWords.some((commandWord) => tokenMatches(requiredWord, commandWord) || tokenMatches(commandWord, requiredWord));
     });
+  }
+
+  function tokenMatches(nameWord, queryWord) {
+    const name = String(nameWord || "");
+    const query = String(queryWord || "");
+    if (!name || !query) return false;
+    if (name === query) return true;
+    if (name.startsWith(query)) return true;
+    if (query.length >= 5 && name.endsWith(query)) return true;
+    return false;
   }
 
   function splitCommandParts(text) {
@@ -8081,9 +8240,11 @@
       if (objectText.includes(" from ")) return objectText.split(" from ")[0];
     }
     if (["give"].includes(verb) && objectText.includes(" to ")) return objectText.split(" to ")[0];
-    if (["unlock", "lock"].includes(verb) && objectText.includes(" with ")) return objectText.split(" with ")[0];
-    if (["break", "kill", "attack", "combine"].includes(verb) && objectText.includes(" with ")) return objectText.split(" with ")[0];
-    if (["drop", "leave", "put"].includes(verb) && objectText.includes(" in ")) return objectText.split(" in ")[0];
+    if (WITH_ITEM_CLARIFICATION_VERBS.has(verb) && objectText.includes(" with ")) return objectText.split(" with ")[0];
+    if (["drop", "leave", "put"].includes(verb)) {
+      const placement = parsePlacementTargetText(objectText);
+      if (placement) return placement.itemName;
+    }
     return objectText;
   }
 
@@ -8096,16 +8257,45 @@
     if (["give"].includes(verb) && objectText.includes(" to ")) {
       return `${replacement} to ${objectText.split(" to ").slice(1).join(" to ")}`;
     }
-    if (["unlock", "lock"].includes(verb) && objectText.includes(" with ")) {
+    if (WITH_ITEM_CLARIFICATION_VERBS.has(verb) && objectText.includes(" with ")) {
       return `${replacement} with ${objectText.split(" with ").slice(1).join(" with ")}`;
     }
-    if (["break", "kill", "attack", "combine"].includes(verb) && objectText.includes(" with ")) {
-      return `${replacement} with ${objectText.split(" with ").slice(1).join(" with ")}`;
-    }
-    if (["drop", "leave", "put"].includes(verb) && objectText.includes(" in ")) {
-      return `${replacement} in ${objectText.split(" in ").slice(1).join(" in ")}`;
+    if (["drop", "leave", "put"].includes(verb)) {
+      const placement = parsePlacementTargetText(objectText);
+      if (placement) return `${replacement} ${placement.relation} ${placement.targetName}`;
     }
     return replacement;
+  }
+
+  function replaceSourceTarget(objectText, replacement) {
+    const normalized = normalize(objectText);
+    const outOfMatch = normalized.match(/^(.+?)\s+out\s+of\s+(.+)$/);
+    if (outOfMatch) return `${outOfMatch[1].trim()} out of ${replacement}`;
+    if (objectText.includes(" from ")) {
+      return `${objectText.split(" from ")[0].trim()} from ${replacement}`;
+    }
+    return objectText;
+  }
+
+  function replacePlacementTarget(objectText, replacement) {
+    const placement = parsePlacementTargetText(objectText);
+    if (!placement) return objectText;
+    return `${placement.itemName} ${placement.relation} ${replacement}`;
+  }
+
+  function replaceWithItem(objectText, replacement) {
+    const parts = String(objectText || "").split(" with ");
+    if (parts.length < 2) return objectText;
+    return `${parts[0].trim()} with ${replacement}`;
+  }
+
+  function parsePlacementTargetText(objectText) {
+    const text = normalize(objectText);
+    const relationPattern = "(?:in front of|next to|to the left of|to the right of|on top of|inside|into|under|behind|beside|near|at|on|in)";
+    const match = text.match(new RegExp(`^(.+?)\\s+(${relationPattern})\\s+(.+)$`));
+    if (!match) return null;
+    const relation = match[2].replace(/^into$|^inside$/, "in");
+    return { itemName: match[1].trim(), relation, targetName: match[3].trim() };
   }
 
   function uniqueChoices(choices) {

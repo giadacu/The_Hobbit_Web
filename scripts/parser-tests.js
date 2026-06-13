@@ -1744,6 +1744,46 @@ const gameCases = [
     ],
   },
   {
+    name: "put in ambiguous drawer clarifies destination drawer",
+    drive(game) {
+      game.execute("open top drawer");
+      game.execute("open bottom drawer");
+      game.execute("take brass key");
+      game.clarifiedReferences = {};
+      game.execute("put brass key in drawer");
+      game.execute("top");
+    },
+    expectedIncluded: [
+      "Do you mean the top drawer, the middle drawer, or the bottom drawer?",
+      "You put the brass key in the top drawer.",
+    ],
+  },
+  {
+    name: "put into ambiguous drawer clarifies carried item before destination",
+    setup(game) {
+      game.player.inventory = game.player.inventory.filter((id) => id !== "small_key");
+      if (game.items.small_key) game.items.small_key.location = { type: "room", id: game.currentRoom };
+    },
+    drive(game) {
+      game.execute("open top drawer");
+      game.execute("open bottom drawer");
+      game.execute("take brass key");
+      game.execute("take sturdy key from bottom drawer");
+      game.clarifiedReferences = {};
+      game.execute("put key into drawer");
+      game.execute("brass");
+      game.execute("top");
+    },
+    expectedIncluded: [
+      "Do you mean the brass key or the sturdy key?",
+      "Do you mean the top drawer, the middle drawer, or the bottom drawer?",
+      "You put the brass key in the top drawer.",
+    ],
+    notExpectedIncluded: [
+      "You put the sturdy key",
+    ],
+  },
+  {
     name: "take from specific container updates remembered item and container references",
     drive(game) {
       game.execute("open top drawer");
@@ -1780,6 +1820,64 @@ const gameCases = [
     ],
   },
   {
+    name: "unlock with wrong named key fails instead of auto-using the right one",
+    drive(game) {
+      game.execute("open bottom drawer");
+      game.execute("take brass key");
+      game.execute("open door");
+      game.execute("go east");
+      game.execute("unlock shed with brass key");
+    },
+    expectedIncluded: [
+      "The brass key does not unlock the garden shed.",
+    ],
+    notExpectedIncluded: [
+      "You unlock the shed with the sturdy key.",
+    ],
+  },
+  {
+    name: "unlock with ambiguous key clarifies the key operand",
+    setup(game) {
+      game.player.inventory = game.player.inventory.filter((id) => id !== "small_key");
+      if (game.items.small_key) game.items.small_key.location = { type: "room", id: game.currentRoom };
+    },
+    drive(game) {
+      game.execute("open bottom drawer");
+      game.execute("take sturdy key");
+      game.execute("take brass key");
+      game.execute("open door");
+      game.execute("go east");
+      game.execute("unlock shed with key");
+      game.execute("sturdy");
+    },
+    expectedIncluded: [
+      "Do you mean the sturdy key or the brass key?",
+      "You unlock the garden shed with the sturdy key.",
+    ],
+  },
+  {
+    name: "combine with ambiguous secondary item clarifies the with operand",
+    setup(game) {
+      giveItemToCharacter(game, "golden_ring", game.player.id);
+      giveItemToCharacter(game, "small_key", game.player.id);
+      giveItemToCharacter(game, "brass_key", game.player.id);
+      game.player.inventory = game.player.inventory.filter((id) => id !== "sturdy_key");
+      if (game.items.sturdy_key) game.items.sturdy_key.location = { type: "room", id: game.currentRoom };
+      game.data.combinations["golden ring+small key"] = { nome: "odd trinket", descrizione: "an odd trinket", peso: 1 };
+    },
+    drive(game) {
+      game.execute("combine golden ring with key");
+      game.execute("small");
+    },
+    expectedIncluded: [
+      "Do you mean the small key or the brass key?",
+      "You combine the golden ring with the small key, making the odd trinket.",
+    ],
+    notExpectedIncluded: [
+      "Those objects do not combine into anything useful.",
+    ],
+  },
+  {
     name: "put in specific container updates remembered container reference",
     drive(game) {
       game.execute("open top drawer");
@@ -1794,6 +1892,33 @@ const gameCases = [
     ],
     notExpectedIncluded: [
       "You close the bottom drawer.",
+    ],
+  },
+  {
+    name: "matcher does not accept arbitrary inner substrings",
+    drive(game) {
+      game.execute("open raw");
+      game.execute("open bottom drawer");
+      game.execute("take ass");
+    },
+    expectedIncluded: [
+      "I don't see that here.",
+    ],
+    notExpectedIncluded: [
+      "You take the brass key",
+    ],
+  },
+  {
+    name: "matcher still accepts useful compound suffixes",
+    setup(game) {
+      game.items.firestone.location = { type: "room", id: game.currentRoom };
+      game.items.firestone.visible = true;
+    },
+    drive(game) {
+      game.execute("take stone");
+    },
+    expectedIncluded: [
+      "You take the firestone.",
     ],
   },
   {
