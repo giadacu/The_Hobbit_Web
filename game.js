@@ -656,6 +656,18 @@
     },
   ];
 
+  const MOVEMENT_NARRATIVE_RULES = [
+    {
+      when: ({ game, fromRoomId, toRoomId }) => (
+        fromRoomId === "trolls_clearing"
+        && toRoomId === "dreary"
+        && game.player.inventory.includes("the_large_key")
+        && !game.trollsTransformed
+      ),
+      text: "Keeping low and clutching the stolen key, you slip away from the trolls' clearing into the gloomy empty land beyond.",
+    },
+  ];
+
   function applyImmersionExpansion(data) {
     if (!data || data.__immersionExpansionApplied) return data;
     data.__immersionExpansionApplied = true;
@@ -3080,7 +3092,7 @@
         load: () => game.load(object),
         quit: () => game.quit(),
         map: () => game.showMap(),
-        location: () => game.print(actorizeSecondPerson(game.player, `You are now in ${roomDisplayName(game.room())}.`)),
+        location: () => game.print(actorizeSecondPerson(game.player, `You are now ${roomLocationPhrase(game.room())}.`)),
         music: () => game.handleMusicCommand(object),
         autoplay: () => game.autoplay(object),
         wear: () => game.wear(object),
@@ -4970,7 +4982,7 @@
       const trigger = this.spiderEyesTriggerFor(previousRoom, currentRoom, direction);
       if (!trigger) return;
       if (game.flags[this.spiderEyesResolvedFlag(currentRoom)]) return;
-      game.recordAutosave(`before the spider ambush near ${roomDisplayName(game.rooms[currentRoom] || currentRoom)}`, {
+      game.recordAutosave(`before the spider ambush near ${roomDisplayName(game.rooms[currentRoom] || currentRoom, { article: true })}`, {
         key: `hazard:spider-eyes:${currentRoom}`,
       });
       game.spiderEyesState = {
@@ -5860,12 +5872,12 @@
 
     showMap() {
       const game = this.game;
-      const exits = game.roomConnections().map((connection) => {
-        const destination = roomDisplayName(game.rooms[connection.to] || connection.to);
-        const direction = normalize(connection.direction);
-        if (direction === "up") return `above lies ${destination}`;
-        if (direction === "down") return `below lies ${destination}`;
-        return `to the ${connection.direction} lies ${destination}`;
+      const exits = game.roomConnections().map((connection, index) => {
+        const destination = roomDisplayName(game.rooms[connection.to] || connection.to, { article: true });
+        const direction = mapDirectionLabel(connection.direction);
+        if (direction === "up") return index === 0 ? `the way rises to ${destination}` : `above to ${destination}`;
+        if (direction === "down") return index === 0 ? `the way descends to ${destination}` : `below to ${destination}`;
+        return index === 0 ? `${direction} leads to ${destination}` : `${direction} to ${destination}`;
       });
       game.print(exits.length ? `From here, ${joinNames(exits)}.` : "No exits are visible from here.");
     }
@@ -5917,7 +5929,7 @@
           return game.igniteLantern(actorActionSentence(game.player, action.desc1));
         }
         if (String(action.destination || "").includes("endgame")) {
-          const roomLabel = game.room() ? roomDisplayName(game.room()) : "this place";
+          const roomLabel = game.room() ? roomDisplayName(game.room(), { article: true }) : "this place";
           game.recordAutosave(`before a dangerous action in ${roomLabel}`, {
             key: `special:${game.currentRoom}:${action.verb}:${action.obj1 || ""}:${action.obj2 || ""}:${action.destination}`,
           });
@@ -6667,6 +6679,20 @@
 
     collectNarrativeTexts(rules = [], context = {}) {
       return this.matchingNarrativeRules(rules, context).flatMap((rule) => narrativeRuleTexts(rule, context));
+    }
+
+    movementTransitionNarrative(fromRoomId, toRoomId, direction) {
+      return this.resolveNarrativeText(
+        MOVEMENT_NARRATIVE_RULES,
+        this.narrativeContext({
+          fromRoomId,
+          toRoomId,
+          direction,
+          roomId: toRoomId,
+          room: this.rooms[toRoomId],
+        }),
+        "",
+      );
     }
 
     contextualRoomDescription(room = this.room()) {
@@ -8322,7 +8348,7 @@
         const connection = this.roomConnections().find((c) => c.to === target.id);
         if (connection) return this.move(connection.direction);
         if (!this.visitedRooms.has(target.id)) {
-          this.print(actorizeSecondPerson(this.player, `You have not yet been to ${roomDisplayName(target)}, so you cannot go there directly.`));
+          this.print(actorizeSecondPerson(this.player, `You have not yet been to ${roomDisplayName(target, { article: true })}, so you cannot go there directly.`));
           return false;
         }
         return this.goDirectlyTo(target.id);
@@ -8357,7 +8383,7 @@
         return false;
       }
       const distance = this.findTravelDistance(this.currentRoom, roomId);
-      const name = roomDisplayName(this.rooms[roomId] || roomId);
+      const name = roomDisplayName(this.rooms[roomId] || roomId, { article: true });
       if (distance >= 99) {
         this.print(`You cannot find an open route to ${name} from here.`);
         return false;
@@ -8473,6 +8499,8 @@
         this.print(`${this.player.name} goes ${direction}.`);
         return true;
       }
+      const transitionNarrative = this.movementTransitionNarrative(previousRoom, connection.to, direction);
+      if (transitionNarrative) this.print(transitionNarrative);
       this.describeRoom();
       this.triggerSpiderEyesEncounter(previousRoom, connection.to, direction);
       this.maybeAutosaveForRoom(connection.to);
@@ -9717,14 +9745,79 @@
     return text ? text[0].toUpperCase() + text.slice(1) : text;
   }
 
-  function roomDisplayName(room) {
+  function roomDisplayName(room, options = {}) {
+    const { article = false } = options;
+    const roomId = typeof room === "string" && !/\s/.test(room) ? room : (room?.id || "");
     const raw = typeof room === "string" ? room : (room?.name || room?.id || "");
     const cleaned = String(raw)
       .replace(/[_-]+/g, " ")
       .replace(/\s+/g, " ")
       .trim();
-    if (!cleaned) return "somewhere";
-    return cleaned.split(" ").map((word) => capitalize(word)).join(" ");
+    if (!cleaned) return article ? "somewhere" : "somewhere";
+
+    const normalizedId = normalize(roomId);
+    const normalizedName = normalize(cleaned);
+
+    const explicit = {
+      bilbos_garden: { bare: "Bilbo's garden", article: false },
+      hobbit_hole: { bare: "Hobbit Hole", article: false },
+      bag_end_parlour: { bare: "parlour", article: true },
+      bag_end_study: { bare: "study", article: true },
+      bag_end_dining_room: { bare: "dining room", article: true },
+      bag_end_pantry: { bare: "pantry", article: true },
+      bag_end_kitchen: { bare: "kitchen", article: true },
+      bag_end_guest_room: { bare: "guest room", article: true },
+      bag_end_cellar_room: { bare: "cellar", article: true },
+      lane_beneath_hill: { bare: "Lane beneath the Hill", article: true },
+      party_field: { bare: "Party Field", article: true },
+      bywater_bridge: { bare: "Bywater Bridge", article: false },
+      green_dragon_inn: { bare: "Green Dragon Inn", article: true },
+      green_dragon_inn_outside: { bare: "outside the Green Dragon Inn", article: false },
+    }[normalizedId];
+
+    if (explicit) return article && explicit.article ? `the ${explicit.bare}` : explicit.bare;
+
+    if (normalizedName === "bilbos garden") return article ? "Bilbo's garden" : "Bilbo's garden";
+
+    const genericRoom = /^bag_end_/.test(normalizedId)
+      || /\b(parlour|study|dining room|pantry|kitchen|guest room|cellar|watch chamber|great hall|treasure approach|upper tunnels|marketplace|town square|terrace|bridge|courtyard|library|hall of fire|guest chambers|garden|stable|animal yard|forest path|dark glade|deer trail|ruined clearing|guard post|feast hall|storage rooms|docks|warehouses|tavern)\b/.test(normalizedName);
+    const properPlace = /\b(bilbo|hobbit hole|bag end|rivendell|bywater|green dragon|beorn|mirkwood|erebor|lake town|laketown|dale|thorin|gollum|smaug)\b/.test(normalizedName);
+
+    let bare = cleaned;
+    if (genericRoom && !properPlace) bare = normalizedName;
+    else bare = titleCasePlaceName(cleaned);
+
+    if (!article) return bare;
+    if (properPlace || bare.startsWith("outside the ")) return bare;
+    return `the ${bare}`;
+  }
+
+  function roomLocationPhrase(room) {
+    const text = roomDisplayName(room, { article: true });
+    return text.startsWith("outside the ") ? text : `in ${text}`;
+  }
+
+  function mapDirectionLabel(direction = "") {
+    const text = normalize(direction);
+    if (text === "north east") return "northeast";
+    if (text === "north west") return "northwest";
+    if (text === "south east") return "southeast";
+    if (text === "south west") return "southwest";
+    return text;
+  }
+
+  function titleCasePlaceName(text = "") {
+    const littleWords = new Set(["and", "or", "the", "of", "in", "on", "at", "by", "beneath", "beyond", "under", "over", "to"]);
+    return String(text || "")
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((word, index, words) => {
+        const lower = word.toLowerCase();
+        if (index > 0 && index < words.length - 1 && littleWords.has(lower)) return lower;
+        return capitalize(lower);
+      })
+      .join(" ")
+      .replace(/\bBilbos\b/g, "Bilbo's");
   }
 
   function characterConfiguredExamineText(character) {

@@ -963,7 +963,7 @@ const gameCases = [
   {
     name: "go outside alias uses visible exit",
     inputs: ["open the door", "go outside", "location"],
-    expectedIncluded: ["You are now in Bilbos Garden."],
+    expectedIncluded: ["You are now in Bilbo's garden."],
   },
   {
     name: "go back inside alias returns indoors",
@@ -1019,15 +1019,15 @@ const gameCases = [
       game.execute("location");
     },
     expectedIncluded: [
-      "The road to Pantry is known to you, and before long you arrive there again.",
-      "You are now in Pantry.",
+      "The road to the pantry is known to you, and before long you arrive there again.",
+      "You are now in the pantry.",
     ],
   },
   {
     name: "go to unvisited room uses cleaned room name",
     inputs: ["go to guest room"],
     expectedIncluded: [
-      "You have not yet been to Guest Room, so you cannot go there directly.",
+      "You have not yet been to the guest room, so you cannot go there directly.",
     ],
     notExpectedIncluded: [
       "bag_end_guest_room",
@@ -1242,7 +1242,7 @@ const gameCases = [
       game.execute("east");
       game.execute("location");
     },
-    expectedIncluded: ["You are now in Lane Beneath The Hill."],
+    expectedIncluded: ["You are now in the Lane beneath the Hill."],
     notExpectedIncluded: ['Gandalf lifts a hand. "Not yet, Bilbo. There is more company yet to come."'],
   },
   {
@@ -1267,10 +1267,10 @@ const gameCases = [
       game.execute("location");
     },
     expectedIncluded: [
-      "You are now in Lane Beneath The Hill.",
-      "You are now in Party Field.",
+      "You are now in the Lane beneath the Hill.",
+      "You are now in the Party Field.",
       "You are now in Bywater Bridge.",
-      "You are now in Green Dragon Inn Outside.",
+      "You are now outside the Green Dragon Inn.",
     ],
   },
   {
@@ -1623,6 +1623,7 @@ const gameCases = [
       "You carefully approach the troll, eyes fixed on the gleaming key.",
       "He nearly notices you, then shifts his great bulk, grumbling to himself.",
       "You take the large key.",
+      "Keeping low and clutching the stolen key, you slip away from the trolls' clearing into the gloomy empty land beyond.",
     ],
     notExpectedIncluded: ["The hideous troll eats you. You are dead."],
   },
@@ -1904,7 +1905,7 @@ const gameCases = [
       game.execute("map");
     },
     expectedIncluded: [
-      "From here, to the north lies Parlour.",
+      "From here, north leads to the parlour.",
     ],
     notExpectedIncluded: [
       "From here:",
@@ -2586,7 +2587,7 @@ const gameCases = [
       game.execute("examine seed cakes");
     },
     expectedIncluded: [
-      "You are now in Parlour.",
+      "You are now in the parlour.",
       "You see a plate of fragrant seed-cakes, cut small enough to vanish at a dwarf's convenience.",
     ],
   },
