@@ -1242,8 +1242,76 @@ const gameCases = [
       game.execute("east");
       game.execute("location");
     },
-    expectedIncluded: ["You are now in Green Dragon Inn Outside."],
+    expectedIncluded: ["You are now in Lane Beneath The Hill."],
     notExpectedIncluded: ['Gandalf lifts a hand. "Not yet, Bilbo. There is more company yet to come."'],
+  },
+  {
+    name: "shire road to the green dragon passes through the new intermediate rooms",
+    drive(game) {
+      const controller = game.unexpectedParty;
+      let guard = 0;
+      while (!controller.state.questBriefingDone && guard < 80) {
+        controller.state.cooldown = 0;
+        controller.advanceTurn();
+        guard += 1;
+      }
+      game.currentRoom = "bilbos_garden";
+      game.player.position = "bilbos_garden";
+      game.execute("east");
+      game.execute("location");
+      game.execute("east");
+      game.execute("location");
+      game.execute("east");
+      game.execute("location");
+      game.execute("east");
+      game.execute("location");
+    },
+    expectedIncluded: [
+      "You are now in Lane Beneath The Hill.",
+      "You are now in Party Field.",
+      "You are now in Bywater Bridge.",
+      "You are now in Green Dragon Inn Outside.",
+    ],
+  },
+  {
+    name: "lane beneath the hill feels inhabited and examinable",
+    drive(game) {
+      const controller = game.unexpectedParty;
+      let guard = 0;
+      while (!controller.state.questBriefingDone && guard < 80) {
+        controller.state.cooldown = 0;
+        controller.advanceTurn();
+        guard += 1;
+      }
+      game.currentRoom = "lane_beneath_hill";
+      game.player.position = "lane_beneath_hill";
+      placeCharacterWithPlayer(game, "lane_hobbit");
+      game.describeRoom({ full: true });
+      game.execute("examine robin");
+      game.execute("ask passing hobbit about bread");
+    },
+    expectedIncluded: [
+      "A robin sings from a hawthorn bush",
+      "a small red-breasted robin with the self-possession of a bird convinced the lane belongs to it",
+      "The passing hobbit says 'You can smell the baking all along the lane when the ovens are honest. Best kind of village clock I know.'",
+    ],
+  },
+  {
+    name: "shire atmospheric events add pastoral life",
+    drive(game) {
+      game.currentRoom = "party_field";
+      game.player.position = "party_field";
+      for (let turn = 0; turn < 50; turn += 1) {
+        game.turnCount = turn;
+        delete game.flags.atmosphere_shire_party_field_cooldown;
+        const before = outputLines.length;
+        game.maybeAtmosphericEvent();
+        if (outputLines.length > before) break;
+      }
+    },
+    expectedIncluded: [
+      /(Children's laughter skips across the grass|Somebody shakes out a length of bunting|A little breeze stirs the lanterns and awning-cloth)/,
+    ],
   },
   {
     name: "bag end house atmosphere does not imply dwarves before arrival",

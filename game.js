@@ -126,6 +126,10 @@
       "Comfort is a fine hearth, Bilbo, but the world seldom knocks twice.",
       "There is more road beyond this door than most hobbits ever dream.",
     ],
+    shire: [
+      "The Shire disguises wisdom as comfort, which is one reason so many overlook both.",
+      "A kindly road and a warm hedge may still lead farther than a hobbit means to go.",
+    ],
     green_dragon: [
       "Ale loosens tongues, and loose tongues often run ahead of wisdom.",
       "Many tales begin in comfort and end in courage.",
@@ -237,6 +241,12 @@
     "bag_end_kitchen",
     "bag_end_guest_room",
     "bag_end_cellar_room",
+  ]);
+
+  const IMMERSION_SHIRE_ROOMS = new Set([
+    "lane_beneath_hill",
+    "party_field",
+    "bywater_bridge",
   ]);
 
   const IMMERSION_RIVENDELL_ROOMS = new Set([
@@ -375,6 +385,21 @@
       "Bees move lazily among the flowers, and the Hill feels hushed but homely in the mild evening air.",
       "A light breeze stirs the herbs and clipped borders, carrying soil, roses, and the quiet comfort of the Hill.",
       "The garden path lies peaceful beneath the round door, while birds and distant village sounds make the world seem kindly for a moment.",
+    ],
+    shire_lane: [
+      "A warm smell of baking drifts down the lane as if several kitchens had agreed that the morning ought not be wasted.",
+      "From beyond the hedges comes the mild complaint of sheep, answered from another field in tones equally offended and content.",
+      "A robin and a blackbird dispute a hawthorn bough in voices too earnest for so small a matter.",
+    ],
+    shire_party_field: [
+      "Children's laughter skips across the grass, rising and falling like swallows over summer water.",
+      "Somebody shakes out a length of bunting beneath the trees, and the field seems already half prepared for merrymaking.",
+      "A little breeze stirs the lanterns and awning-cloth, so that the whole field looks as though it is waiting cheerfully for company.",
+    ],
+    shire_bridge: [
+      "The mill-wheel turns with patient steadiness, and the water below the bridge keeps up its bright unimportant chatter.",
+      "A pair of ducks quack with deep domestic authority and drift downstream beneath the reeds.",
+      "Blue smoke rises beyond the trees in easy folds, carrying the smell of supper-plans not yet urgent enough to hurry anyone.",
     ],
     rivendell: [
       "A brief strain of elven song rises from elsewhere in the valley, then is gone like a bird on the wind.",
@@ -700,6 +725,10 @@
         position: null,
         movementMode: config.movementMode || "never",
         visible: config.visible !== false,
+        examineText: config.examineText || "",
+        talkLines: clone(config.talkLines || []),
+        topicResponses: clone(config.topicResponses || []),
+        ambientLines: clone(config.ambientLines || []),
       };
       return data.characters[id];
     };
@@ -735,6 +764,9 @@
       ["bag_end_kitchen", "Kitchen", "The kitchen is warm, bright, and busily practical: copper pans hang in order, a kettle mutters on the hob, and the table is marked by generations of competent chopping, kneading, and tea-making. If Bag End has a heart, it beats here.", "bag_end_kitchen.jpeg", "relaxed"],
       ["bag_end_guest_room", "Guest Room", "A carefully prepared guest room waits here with a turned-down bed, a wash-stand, and curtains that give the place a surprising air of ceremony. It was not furnished with dwarves in mind, yet it is doing its quiet best.", "bag_end_guest_room.jpeg", "relaxed"],
       ["bag_end_cellar_room", "Cellar", "The cellar is cool, dry, and heavily provisioned. Barrels rest in shadow, preserves gleam in neat rows, and a prudent abundance of ale, potatoes, and stored comforts makes plain that Bag End expected hard winters long before it expected adventures.", "bag_end_cellar_room.jpeg", "relaxed"],
+      ["lane_beneath_hill", "Lane Beneath the Hill", "The road winds gently down from the Hill, bordered on either side by neat hedges and well-kept gardens. Bright flowers nod in the breeze, and beyond the fences lie green fields where sheep graze contentedly. The air is sweet with fresh earth and the agreeable rumor of baking from somewhere farther in the village. A robin sings from a hawthorn bush with complete indifference to the concerns of larger folk, while little paths stray off now and then toward snug hobbit-holes tucked into the hillside. The main road keeps on toward Hobbiton proper and the inns beyond.", "Bilbosgarden.jpeg", "relaxed"],
+      ["party_field", "Party Field", "A broad stretch of green turf opens beside the road beneath a cluster of ancient trees. Here the hobbits hold their fairs, feasts, and merrymakings when the weather is kind. Wooden tables stand stacked beneath a canvas awning, and colored lanterns hang from the lower branches awaiting some future evening's importance. The grass is soft underfoot, bright with wildflowers, and the laughter of children at play goes pleasantly to and fro upon the air. It is a place made for comfort rather than enterprise, and all the better for it.", "Bilbosgarden.jpeg", "relaxed"],
+      ["bywater_bridge", "Bywater Bridge", "The road crosses a small stone bridge over a clear-running stream. Beneath it the water chatters over smooth pebbles and slips away among reeds and watercress. On the far bank stands a little mill with a turning wheel, its steady creak mingling with the murmur of the water in a way that suggests useful work done without hurry. Ducks paddle lazily in the shallows, smoke rises from chimneys beyond the trees, and ahead, not far now, the Green Dragon's sign may sometimes be glimpsed through the branches when the sun catches it just so.", "Green_dragon.jpeg", "relaxed"],
       ["rivendell_courtyard", "Courtyard", "White stone and living ivy share this quiet courtyard, where the sound of falling water softens every footstep. Benches stand in sun and shade alike, inviting weary travelers to believe that peace may yet be a practical thing.", "Rivendell.jpeg", "relaxed"],
       ["rivendell_library", "Library", "Tall shelves and carved ladders fill the library with the hush of well-kept wisdom. Scrolls, red-bound volumes, maps, and forgotten songs wait here with the patience of things certain they will outlast haste.", "map.jpeg", "relaxed"],
       ["rivendell_hall_of_fire", "Hall of Fire", "Firelight and song belong equally to this hall. Cushioned seats ring the hearth, the rafters hold echoes of ancient music, and any tale told here seems at once older and truer than it did outside.", "Rivendell.jpeg", "relaxed"],
@@ -776,6 +808,10 @@
     ].forEach(([id, name, description, image, sound]) => ensureRoom(id, { name, description, image, sound }));
 
     ensureTwoWay("hobbit_hole", "east", "bilbos_garden", "west");
+    ensureTwoWay("bilbos_garden", "east", "lane_beneath_hill", "west");
+    ensureTwoWay("lane_beneath_hill", "east", "party_field", "west");
+    ensureTwoWay("party_field", "east", "bywater_bridge", "west");
+    ensureTwoWay("bywater_bridge", "east", "green_dragon_inn_outside", "west");
     ensureTwoWay("hobbit_hole", "west", "bag_end_parlour");
     ensureTwoWay("hobbit_hole", "south", "bag_end_dining_room");
     ensureTwoWay("hobbit_hole", "north east", "bag_end_study", "south west");
@@ -843,6 +879,25 @@
       ["hall_console_table", "console table", "a narrow console table with a polished top and a discreet little drawer", { container: true }],
       ["hall_little_drawer", "discreet little drawer", "the discreet little drawer", { container: true, listed: false }],
       ["hall_letter_tray", "letter tray", "a brass tray meant for cards, notes, and other civilized arrivals"],
+      ["lane_hedges", "hedges", "thick neat hedges clipped with the serious care hobbits usually reserve for family reputation"],
+      ["lane_flowers", "flowers", "bright flowers nodding companionably along the roadside borders"],
+      ["lane_robin", "robin", "a small red-breasted robin with the self-possession of a bird convinced the lane belongs to it"],
+      ["lane_hawthorn_bush", "hawthorn bush", "a hawthorn bush white with blossom and loud with small bird-opinion"],
+      ["lane_garden_gate", "garden gate", "a tidy wicket gate opening toward a well-swept little path"],
+      ["lane_hobbit_holes", "distant hobbit-holes", "a glimpse of round doors and turf-grown roofs tucked warmly into the slope"],
+      ["party_lanterns", "lanterns", "colored lanterns hanging quietly from low branches until some worthy evening calls them to brightness"],
+      ["party_ancient_trees", "ancient trees", "broad old party-trees with roots fit for sitting upon and branches ready for lanterns"],
+      ["party_wooden_tables", "wooden tables", "stout wooden tables stacked beneath the awning against the next feast-day"],
+      ["party_canvas_awning", "canvas awning", "a canvas awning rolled back for fair weather but kept ready against either rain or excessive sunshine"],
+      ["party_childrens_toys", "children's toys", "hoops, ribbons, and a small painted ball abandoned only because some better game has just occurred to their owners"],
+      ["party_grass_wildflowers", "grass and wildflowers", "soft turf starred with daisies, buttercups, and other flowers too cheerful to catalogue"],
+      ["bridge_stonework", "stone bridge", "a little stone bridge, soundly built and modest enough not to boast of it"],
+      ["bridge_stream", "stream", "clear water hurrying over pebbles with a noise that seems far too pleased with itself to be called serious"],
+      ["bridge_watercress", "watercress", "fresh green watercress growing where the stream slows and brightens"],
+      ["bridge_mill_wheel", "mill wheel", "a wooden mill-wheel turning with that patient reliability upon which whole villages are content to depend"],
+      ["bridge_ducks", "ducks", "well-fed ducks conducting themselves with the calm authority of creatures who have never once hurried for anyone"],
+      ["bridge_reeds", "reeds", "reed-beds nodding over the shallows and hiding more water than seems likely"],
+      ["bridge_inn_sign", "distant Green Dragon sign", "the Green Dragon's sign glimpsed now and then through the branches, green and gold when the light catches it kindly"],
       ["parlour_hearth", "parlour hearth", "a welcoming hearth laid to cheer guests who know how to appreciate one"],
       ["parlour_sideboard", "sideboard", "a handsome sideboard with cupboards for cups, plates, and comforting reserves", { container: true }],
       ["parlour_biscuit_tin", "biscuit tin", "a painted biscuit tin that rattles with hospitable promise", { container: true, portable: true, weight: 4 }],
@@ -931,6 +986,25 @@
       ["hobbit_hole", "hall_umbrella_stand"],
       ["hobbit_hole", "hall_console_table"],
       ["hobbit_hole", "hall_letter_tray"],
+      ["lane_beneath_hill", "lane_hedges"],
+      ["lane_beneath_hill", "lane_flowers"],
+      ["lane_beneath_hill", "lane_robin"],
+      ["lane_beneath_hill", "lane_hawthorn_bush"],
+      ["lane_beneath_hill", "lane_garden_gate"],
+      ["lane_beneath_hill", "lane_hobbit_holes"],
+      ["party_field", "party_lanterns"],
+      ["party_field", "party_ancient_trees"],
+      ["party_field", "party_wooden_tables"],
+      ["party_field", "party_canvas_awning"],
+      ["party_field", "party_childrens_toys"],
+      ["party_field", "party_grass_wildflowers"],
+      ["bywater_bridge", "bridge_stonework"],
+      ["bywater_bridge", "bridge_stream"],
+      ["bywater_bridge", "bridge_watercress"],
+      ["bywater_bridge", "bridge_mill_wheel"],
+      ["bywater_bridge", "bridge_ducks"],
+      ["bywater_bridge", "bridge_reeds"],
+      ["bywater_bridge", "bridge_inn_sign"],
       ["bag_end_parlour", "parlour_hearth"],
       ["bag_end_parlour", "parlour_sideboard"],
       ["bag_end_parlour", "parlour_biscuit_tin"],
@@ -1014,6 +1088,63 @@
       ["laketown_merchant", "merchant", { friendly: "neutral", strength: 4 }],
       ["laketown_fisherman", "fisherman", { friendly: "neutral", strength: 4 }],
       ["laketown_guard", "town guard", { friendly: "neutral", strength: 6 }],
+      ["lane_hobbit", "passing hobbit", {
+        friendly: true,
+        strength: 3,
+        examineText: "A trim little hobbit in a well-brushed waistcoat, with bright eyes, tidy manners, and the look of someone who knows exactly where the best bread may be had this morning.",
+        talkLines: [
+          "The passing hobbit tips his hat and says 'Good morning to you. Fine weather for walking, and better still for breakfast.'",
+          "The passing hobbit smiles and says 'A pleasant day, and the ovens have been busy besides. One cannot ask much fairer of the Shire.'",
+        ],
+        topicResponses: [
+          { keywords: ["bread", "baking", "bakery", "food", "breakfast"], response: "The passing hobbit says 'You can smell the baking all along the lane when the ovens are honest. Best kind of village clock I know.'" },
+          { keywords: ["green dragon", "inn", "drink", "ale"], response: "The passing hobbit says 'The Green Dragon keeps good ale and better company, so long as one does not arrive thirstier than polite.'" },
+          { keywords: ["garden", "flowers", "hedge"], response: "The passing hobbit says 'A hedge tells you a great deal about a household. Neglected hedges make me uneasy.'" },
+          { keywords: ["gossip", "news", "hobbiton"], response: "The passing hobbit says 'Nothing alarming, which is how we generally like our news in Hobbiton.'" },
+        ],
+        ambientLines: [
+          "Good morning! Mind the lane there; folk come down it thinking of breakfast and not of their feet.",
+          "Smells like seed-cake weather, if you ask me.",
+        ],
+      }],
+      ["party_hobbit", "hobbit decorator", {
+        friendly: true,
+        strength: 3,
+        examineText: "A cheerful hobbit with ribbons over one arm, a hammer tucked in the belt, and the steady capability of someone who has rescued many a feast from poor planning.",
+        talkLines: [
+          "The hobbit decorator says 'There is always some celebration coming if one has any decency about it.'",
+          "The hobbit decorator grins and says 'Lanterns by day look idle, but give them evening and they know their business.'",
+        ],
+        topicResponses: [
+          { keywords: ["party", "feast", "celebration", "fair"], response: "The hobbit decorator says 'Tables, lanterns, good bread, better cheese, and enough warning to borrow extra mugs: that is half of festivity already settled.'" },
+          { keywords: ["children", "toys", "games"], response: "The hobbit decorator says 'Children can turn an empty field into a fair before the grown folk have found the trestles.'" },
+          { keywords: ["lanterns", "trees", "decorations"], response: "The hobbit decorator says 'Hang the lanterns low enough to look merry and high enough that nobody walks into them after supper. That is the art of it.'" },
+          { keywords: ["food", "cakes", "ale"], response: "The hobbit decorator says 'A party without plenty is only a meeting that has lost heart.'" },
+        ],
+        ambientLines: [
+          "If this weather holds, we shall have lanterns up by supper-time and no trouble at all.",
+          "Mind the ribbons there; they behave like cats when a breeze gets among them.",
+        ],
+      }],
+      ["bridge_hobbit", "miller", {
+        friendly: true,
+        strength: 4,
+        examineText: "A flour-dusted hobbit with strong wrists, a mild face, and the settled contentment of one whose days are measured by water, grain, and the certainty of supper.",
+        talkLines: [
+          "The miller gives you a nod and says 'The wheel turns, the flour keeps coming, and nobody is in a hurry. A sound day by any measure.'",
+          "The miller rests a hand on the bridge rail and says 'If a stream chatters this cheerfully, it means the world is mostly behaving itself.'",
+        ],
+        topicResponses: [
+          { keywords: ["mill", "wheel", "flour"], response: "The miller says 'A good wheel asks only water enough, timber enough, and the good sense not to meddle with it while it is working.'" },
+          { keywords: ["ducks", "stream", "watercress", "bridge"], response: "The miller says 'The ducks think the bridge was built entirely for their convenience, and perhaps it was.'" },
+          { keywords: ["green dragon", "inn", "ale"], response: "The miller says 'Not far now. You may glimpse the sign through the branches if the sun feels obliging.'" },
+          { keywords: ["gossip", "bywater", "news"], response: "The miller says 'There is talk of a gathering or two, a new batch of pies at the inn, and no scandal worth spoiling a meal over.'" },
+        ],
+        ambientLines: [
+          "Hear that wheel? Best sort of village music, if you ask me.",
+          "The ducks are in better spirits than most folk before luncheon.",
+        ],
+      }],
       ["mirkwood_spider_scout", "great spider", { friendly: false, strength: 8 }],
       ["mirkwood_spider_brood", "web-spinner", { friendly: false, strength: 7 }],
     ].forEach(([id, name, options]) => ensureCharacter(id, { name, movementMode: "never", visible: true, ...options }));
@@ -1021,6 +1152,9 @@
     [
       ["rivendell_hall_of_fire", "rivendell_singer"],
       ["rivendell_library", "rivendell_lorekeeper"],
+      ["lane_beneath_hill", "lane_hobbit"],
+      ["party_field", "party_hobbit"],
+      ["bywater_bridge", "bridge_hobbit"],
       ["beorn_stable", "beorn_horse"],
       ["beorn_animal_yard", "beorn_hound"],
       ["beorn_animal_yard", "beorn_sheep"],
@@ -2065,6 +2199,7 @@
 
     chapterForRoom(roomId = this.game.currentRoom) {
       if (["green_dragon_inn", "green_dragon_inn_outside"].includes(roomId)) return "green_dragon";
+      if (IMMERSION_SHIRE_ROOMS.has(roomId)) return "shire";
       if (IMMERSION_BAG_END_ROOMS.has(roomId)) return "bag_end";
       if (roomId === "deep_dark_lake") return "isolation";
       if (IMMERSION_GOBLIN_ROOMS.has(roomId)) return "goblins";
@@ -2099,6 +2234,10 @@
       const chapter = this.chapterForRoom();
       if (chapter === "green_dragon") {
         this.syncGreenDragonLeaders();
+        return;
+      }
+      if (chapter === "shire") {
+        this.syncShireRoadCompanions();
         return;
       }
       if (chapter === "bag_end") {
@@ -2158,10 +2297,29 @@
       }
     }
 
+    syncShireRoadCompanions() {
+      for (const dwarfId of this.ambientDwarfIds()) {
+        const dwarf = this.game.characters[dwarfId];
+        if (!dwarf) continue;
+        dwarf.position = null;
+        dwarf.followingPlayer = false;
+        dwarf.movementMode = "never";
+      }
+      const gandalf = this.game.characters.gandalf;
+      if (gandalf && !gandalf.followingPlayer) gandalf.position = this.game.currentRoom;
+      const thorin = this.game.characters.thorin;
+      if (thorin) {
+        thorin.position = null;
+        thorin.followingPlayer = false;
+        thorin.movementMode = "never";
+      }
+    }
+
     chapterRooms(chapter, focusRoom) {
       const nearby = [focusRoom, ...this.game.connectionsFrom(focusRoom).map((connection) => connection.to)];
       const uniqueNearby = [...new Set(nearby)];
       if (chapter === "journey") return uniqueNearby;
+      if (chapter === "shire") return [...new Set([...uniqueNearby.filter((room) => IMMERSION_SHIRE_ROOMS.has(room)), "lane_beneath_hill", "party_field", "bywater_bridge"])];
       if (chapter === "goblins") return uniqueNearby.filter((room) => IMMERSION_GOBLIN_ROOMS.has(room) && room !== "deep_dark_lake");
       if (chapter === "rivendell") return uniqueNearby.filter((room) => IMMERSION_RIVENDELL_ROOMS.has(room));
       if (chapter === "beorn") return uniqueNearby.filter((room) => IMMERSION_BEORN_ROOMS.has(room) || ["treeless_opening", "great_river"].includes(room));
@@ -2188,6 +2346,7 @@
       const rooms = candidateRooms.length ? candidateRooms : [focusRoom];
       const focusBias = {
         green_dragon: 2,
+        shire: 3,
         journey: 4,
         rivendell: 3,
         beorn: 3,
@@ -2241,6 +2400,7 @@
     }
 
     companionPoseRegion(roomId = this.game.currentRoom) {
+      if (IMMERSION_SHIRE_ROOMS.has(roomId)) return "shire";
       if (roomId === "beorns_house") return "beorn_house";
       if (["treeless_opening", "great_river"].includes(roomId)) return "beorn_wild";
       if (roomId === "wooden_town") return "laketown_town";
@@ -2254,6 +2414,21 @@
           "stands among the flowers with the air of a guest surprised by so much gardening",
           "paces the garden path, glancing now and then toward the round green door",
           "waits in the garden with road-worn patience, boots careful of the neat borders",
+        ],
+        lane_beneath_hill: [
+          "walks the lane at an easy pace, taking in the hedges and gardens with a look halfway between courtesy and thought",
+          "waits by the roadside as though even this gentle country deserves to be studied properly",
+          "stands listening to the quiet village sounds with a softened expression rare enough to be worth noticing",
+        ],
+        party_field: [
+          "stands beneath the old trees with the look of one briefly won over by comfort",
+          "paces the edge of the field while children's laughter and birdsong go lightly all about",
+          "lingers near the stacked tables as though measuring the place for some future feast or council",
+        ],
+        bywater_bridge: [
+          "rests a hand on the bridge-rail, listening to the water as though it carried more than one kind of news",
+          "watches the stream and the mill with the patience of one not often hurried by peaceful places",
+          "stands near the bridge parapet, letting the village quiet settle around him without quite trusting it",
         ],
         green_dragon_inn: [
           "stands near the window, watching the dark beyond the glass",
@@ -2280,6 +2455,7 @@
       }
       const posesByRegion = {
         bag_end: ["stands near the hearth", "has claimed a chair and half the available table-space", "keeps one eye on the kitchen"],
+        shire: ["looks almost at ease among the hedges and bright fields", "walks with unusual patience through the gentle country of the Shire", "seems, for a little while, content to let a peaceful road be merely peaceful"],
         green_dragon: ["waits like a traveller between one decision and the next", "keeps an eye on doors, windows, and whoever might be listening", "looks as though the inn is only a pause in a longer business"],
         journey: ["studies the road ahead", "rests with pack still within arm's reach", "keeps a wary eye on the country round about"],
         rivendell: ["looks more rested here than on the open road", "studies the elvish work with open respect", "listens in spite of himself for distant song"],
@@ -4553,6 +4729,8 @@
 
     specialTalkResponse(character) {
       const game = this.game;
+      const configuredTalk = characterConfiguredTalkLine(character, game);
+      if (configuredTalk) return configuredTalk;
       if (game.unexpectedParty?.isAmbientDwarf(character)) {
         return game.unexpectedParty.dwarfProfile(character).talk;
       }
@@ -4590,6 +4768,8 @@
     specialConversationResponse(character, topic) {
       const game = this.game;
       const text = normalize(topic);
+      const configuredResponse = characterConfiguredTopicResponse(character, text);
+      if (configuredResponse) return configuredResponse;
       if (game.unexpectedParty?.isAmbientDwarf(character)) {
         if (matchesAny(text, ["food", "supper", "tea", "ale", "beer", "pantry"])) return game.unexpectedParty.dwarfProfile(character).ask;
         if (matchesAny(text, ["quest", "road", "journey", "mountain", "thorin"])) return `${character.name} says 'We have not come merely to enjoy your excellent housekeeping, though I mean to do my best with it while it lasts.'`;
@@ -7057,10 +7237,11 @@
     examineCharacter(character) {
       const loadout = this.characterLoadoutText(character, { includeEmpty: true });
       const temperament = character.friendly === false ? "They look dangerous." : "";
+      const customSummary = characterConfiguredExamineText(character);
       const companionSummary = this.unexpectedParty?.isAmbientDwarf(character) ? this.unexpectedParty.describeCharacter(character) : "";
       const gollumSummary = matches(character.name, "gollum") ? this.gollumRoomNarrative() : "";
       const smaugSummary = matches(character.name, "dragon") ? this.smaugRoomNarrative() : "";
-      this.print([actorizeSecondPerson(this.player, `You examine ${character.name}.`), companionSummary, gollumSummary, smaugSummary, loadout, temperament].filter(Boolean).join(" "));
+      this.print([actorizeSecondPerson(this.player, `You examine ${character.name}.`), customSummary, companionSummary, gollumSummary, smaugSummary, loadout, temperament].filter(Boolean).join(" "));
     }
 
     sense(verb, objectName = "") {
@@ -7101,6 +7282,9 @@
 
     atmosphereRegionKey(roomId = this.currentRoom) {
       if (roomId === "bilbos_garden") return "bag_end_garden";
+      if (roomId === "lane_beneath_hill") return "shire_lane";
+      if (roomId === "party_field") return "shire_party_field";
+      if (roomId === "bywater_bridge") return "shire_bridge";
       if (IMMERSION_BAG_END_ROOMS.has(roomId)) return "bag_end_house";
       if (IMMERSION_RIVENDELL_ROOMS.has(roomId)) return "rivendell";
       if (IMMERSION_MOUNTAIN_ROOMS.has(roomId)) return "mountains";
@@ -7129,7 +7313,7 @@
       return (
         connection.from === "bilbos_garden"
         && connection.direction === "east"
-        && connection.to === "green_dragon_inn_outside"
+        && connection.to === "lane_beneath_hill"
         && !this.bagEndQuestHasBegun()
       );
     }
@@ -8512,9 +8696,9 @@
       if (!character.visible || character.carriedBy || character.position !== this.currentRoom) return false;
       if (character.id === this.player.id || this.player.noticeable === false) return false;
 
-      let lines = null;
-      if (matches(character.name, "elrond") && this.currentRoom === "rivendell") lines = ELROND_AMBIENT_LINES;
-      if (matches(character.name, "beorn") && this.currentRoom === "beorns_house") lines = BEORN_AMBIENT_LINES;
+      let lines = characterConfiguredAmbientLines(character);
+      if (!lines?.length && matches(character.name, "elrond") && this.currentRoom === "rivendell") lines = ELROND_AMBIENT_LINES;
+      if (!lines?.length && matches(character.name, "beorn") && this.currentRoom === "beorns_house") lines = BEORN_AMBIENT_LINES;
       if (!lines?.length) return false;
 
       const cooldownKey = `ambientcooldown_${character.id}`;
@@ -8530,6 +8714,7 @@
     gandalfAmbientKeyForRoom(roomId) {
       if (!roomId) return null;
       if (["hobbit_hole", "bilbos_garden"].includes(roomId)) return "bag_end";
+      if (IMMERSION_SHIRE_ROOMS.has(roomId)) return "shire";
       if (["green_dragon_inn", "green_dragon_inn_outside"].includes(roomId)) return "green_dragon";
       if (["trolls_clearing", "hidden_path", "trolls_cave"].includes(roomId)) return "trolls";
       if (roomId === "rivendell") return "rivendell";
@@ -9540,6 +9725,31 @@
       .trim();
     if (!cleaned) return "somewhere";
     return cleaned.split(" ").map((word) => capitalize(word)).join(" ");
+  }
+
+  function characterConfiguredExamineText(character) {
+    return String(character?.examineText || "").trim();
+  }
+
+  function characterConfiguredAmbientLines(character) {
+    return Array.isArray(character?.ambientLines) ? character.ambientLines.filter(Boolean) : [];
+  }
+
+  function characterConfiguredTalkLine(character, game) {
+    const lines = Array.isArray(character?.talkLines) ? character.talkLines.filter(Boolean) : [];
+    if (!lines.length) return "";
+    const seed = hashString(`${game?.storySeed || "story"}:talk:${character.id || character.name}:${game?.currentRoom || ""}:${game?.turnCount || 0}`);
+    return lines[Math.abs(seed) % lines.length];
+  }
+
+  function characterConfiguredTopicResponse(character, topic) {
+    const entries = Array.isArray(character?.topicResponses) ? character.topicResponses : [];
+    for (const entry of entries) {
+      const keywords = Array.isArray(entry?.keywords) ? entry.keywords : [];
+      if (!keywords.length) continue;
+      if (matchesAny(topic, keywords)) return String(entry.response || "").trim();
+    }
+    return "";
   }
 
   function autosaveMarkedText(label = "") {
