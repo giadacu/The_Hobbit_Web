@@ -2154,10 +2154,3596 @@
     }
   }
 
+  class WorldModel {
+    constructor(game) {
+      this.game = game;
+    }
+
+    itemsInRoom(roomId) {
+      return Object.values(this.game.items).filter((item) => item.location?.type === "room" && item.location.id === roomId);
+    }
+
+    peopleInRoom(roomId = this.game.currentRoom) {
+      return Object.values(this.game.characters).filter((character) => character.position === roomId);
+    }
+
+    visibleSearch(objectName, options = {}) {
+      if (this.game.forcedChoice?.type === "item" && matches(this.game.forcedChoice.name, objectName)) {
+        return { item: this.game.items[this.game.forcedChoice.id], parent: null };
+      }
+      return this.visibleSearchAll(objectName, options)[0] || null;
+    }
+
+    visibleSearchAll(objectName, options = {}) {
+      const name = normalize(objectName);
+      const candidates = [];
+      const scan = (itemIds, parent = null) => {
+        for (const id of itemIds) {
+          const item = this.game.items[id];
+          if (!item) continue;
+          if (item.visible && matches(item.name, name)) candidates.push({ item, parent });
+          if (item.container && (item.open || item.noLid || options.closedContainers)) scan(item.contents, item);
+        }
+      };
+      if (!this.game.roomIsDark()) scan(this.itemsInRoom(this.game.currentRoom).map((item) => item.id));
+      if (options.includeInventory !== false) scan(this.game.player.inventory, { inventory: true });
+      return candidates;
+    }
+
+    findInInventory(objectName) {
+      const name = normalize(objectName);
+      if (this.game.forcedChoice?.type === "item" && matches(this.game.forcedChoice.name, name)) {
+        const item = this.game.items[this.game.forcedChoice.id];
+        if (item && this.game.player.inventory.includes(item.id)) return item;
+      }
+      const id = this.game.player.inventory.find((itemId) => matches(this.game.items[itemId]?.name, name));
+      return id ? this.game.items[id] : null;
+    }
+
+    findKnownItem(objectName) {
+      const name = normalize(objectName);
+      return Object.values(this.game.items).find((item) => matches(item?.name, name)) || null;
+    }
+
+    findVisibleCharacterHolding(objectName) {
+      if (this.game.roomIsDark()) return null;
+      const name = normalize(objectName);
+      for (const character of this.peopleInRoom()) {
+        if (character.id === this.game.player.id || !character.visible) continue;
+        const inventoryId = (character.inventory || []).find((id) => matches(this.game.items[id]?.name, name));
+        if (inventoryId) return { character, item: this.game.items[inventoryId], worn: false };
+        const wornId = (character.worn || []).find((id) => matches(this.game.items[id]?.name, name));
+        if (wornId) return { character, item: this.game.items[wornId], worn: true };
+      }
+      return null;
+    }
+
+    heldItemMessage(objectName) {
+      const held = this.findVisibleCharacterHolding(objectName);
+      if (!held) return "";
+      const verb = held.worn ? "wearing" : "carrying";
+      if (held.character.name === "You") return `You are ${verb} the ${held.item.name}.`;
+      return `${held.character.name} is ${verb} the ${held.item.name}.`;
+    }
+
+    findItemInsideContainer(container, itemName) {
+      if (!container?.container) return null;
+      const name = normalize(itemName);
+      const scan = (itemIds, parent) => {
+        for (const id of itemIds || []) {
+          const item = this.game.items[id];
+          if (!item) continue;
+          if (matches(item.name, name)) return { item, parent };
+          if (item.container && (item.open || item.noLid)) {
+            const nested = scan(item.contents, item);
+            if (nested) return nested;
+          }
+        }
+        return null;
+      };
+      return scan(container.contents, container);
+    }
+
+    findDoor(name) {
+      const needle = normalize(name);
+      if (this.game.forcedChoice?.type === "door" && matches(this.game.forcedChoice.name, needle)) {
+        const connection = this.game.roomConnections().find((candidate) => candidate.door === this.game.forcedChoice.id);
+        return connection ? { door: this.game.doors[this.game.forcedChoice.id], connection } : null;
+      }
+      for (const connection of this.game.roomConnections()) {
+        const door = connection.door && this.game.doors[connection.door];
+        if (door && matches(door.name, needle)) return { door, connection };
+      }
+      return null;
+    }
+
+    findDoorsAll(name) {
+      const needle = normalize(name);
+      return this.game.roomConnections()
+        .filter((connection) => connection.door && this.game.doors[connection.door])
+        .map((connection) => ({ door: this.game.doors[connection.door], connection }))
+        .filter(({ door }) => matches(door.name, needle));
+    }
+  }
+
+  class ClarificationController {
+    constructor(game) {
+      this.game = game;
+    }
+
+    needsClarification(verb, objectText) {
+      const game = this.game;
+      const request = this.firstClarificationRequest(verb, objectText);
+      if (!request) return false;
+      const remembered = request.choices.length > 1 ? this.recallClarifiedReference(request.target, request.choices) : null;
+      if (remembered && sameChoice(game.forcedChoice, remembered)) return false;
+      game.pendingClarification = {
+        ...request,
+        actorId: game.player?.id || null,
+      };
+      const labels = joinAlternatives(request.choices.map((choice) => clarificationLabel(choice.name)));
+      game.print(`Do you mean ${labels}?`, "system");
+      return true;
+    }
+
+    isClarificationAnswer(response) {
+      const game = this.game;
+      const pending = game.pendingClarification;
+      if (!pending) return false;
+      const answer = normalize(response);
+      if (!answer) return false;
+      if (["cancel", "stop", "no"].includes(answer)) return true;
+      const number = Number.parseInt(answer, 10);
+      if (Number.isInteger(number) && number >= 1 && number <= pending.choices.length) return true;
+      return pending.choices.some((choice) => matches(choice.name, answer));
+    }
+
+    ambiguousChoices(verb, objectText, fullObjectText = objectText) {
+      const game = this.game;
+      const choices = [];
+
+      if (AMBIGUOUS_ITEM_VERBS.has(verb)) {
+        const source = ["take", "get"].includes(verb) ? this.parseSourceReference(fullObjectText) : null;
+        const itemMatches = source
+          ? this.findSourceItemMatches(source.itemName, source.sourceName)
+          : (INVENTORY_ONLY_AMBIGUOUS_VERBS.has(verb)
+            ? game.player.inventory.map((id) => ({ item: game.items[id], parent: null })).filter(({ item }) => item && matches(item.name, objectText))
+            : game.visibleSearchAll(objectText, { includeInventory: verb !== "take" && verb !== "get" }));
+        for (const { item } of itemMatches) {
+          choices.push({ type: "item", id: item.id, name: item.name });
+        }
+      }
+
+      if (AMBIGUOUS_DOOR_VERBS.has(verb)) {
+        for (const { door } of game.findDoorsAll(objectText)) {
+          choices.push({ type: "door", id: door.id, name: door.name });
+        }
+      }
+
+      return uniqueChoices(choices);
+    }
+
+    firstClarificationRequest(verb, objectText) {
+      for (const request of this.clarificationRequests(verb, objectText)) {
+        if (request.choices.length > 1) return request;
+      }
+      return null;
+    }
+
+    clarificationRequests(verb, objectText) {
+      const game = this.game;
+      if (!objectText) return [];
+      const requests = [];
+
+      const primary = this.primaryClarificationRequest(verb, objectText);
+      if (primary) requests.push(primary);
+
+      if (["take", "get"].includes(verb)) {
+        const source = this.parseSourceReference(objectText);
+        if (source) {
+          const sourceChoices = this.sourceTargetChoices(source.sourceName, source.itemName);
+          if (sourceChoices.length) {
+            requests.push({
+              verb,
+              objectText,
+              choices: sourceChoices,
+              target: normalize(source.sourceName),
+              slot: "source-target",
+            });
+          }
+        }
+      }
+
+      if (["drop", "leave", "put"].includes(verb)) {
+        const placement = game.parsePlacementCommand(objectText);
+        if (placement) {
+          const targetChoices = this.visibleReferenceChoices(placement.targetName, {
+            includeInventory: false,
+            closedContainers: true,
+            includeDoors: false,
+          });
+          if (targetChoices.length) {
+            requests.push({
+              verb,
+              objectText,
+              choices: targetChoices,
+              target: normalize(placement.targetName),
+              slot: "placement-target",
+            });
+          }
+        }
+      }
+
+      if (WITH_ITEM_CLARIFICATION_VERBS.has(verb)) {
+        const withTarget = this.parseWithReference(objectText);
+        if (withTarget?.itemName) {
+          const keyChoices = this.inventoryReferenceChoices(withTarget.itemName);
+          if (keyChoices.length) {
+            requests.push({
+              verb,
+              objectText,
+              choices: keyChoices,
+              target: normalize(withTarget.itemName),
+              slot: "with-item",
+            });
+          }
+        }
+      }
+
+      return requests;
+    }
+
+    primaryClarificationRequest(verb, objectText) {
+      const request = parseAllTarget(primaryObjectText(verb, objectText));
+      if (request.all || !request.target) return null;
+      const choices = this.ambiguousChoices(verb, request.target, objectText);
+      if (!choices.length) return null;
+      return {
+        verb,
+        objectText,
+        choices,
+        target: request.target,
+        slot: "primary",
+      };
+    }
+
+    resolveRememberedCommandChoice(verb, objectText) {
+      for (const request of this.clarificationRequests(verb, objectText)) {
+        if (request.choices.length <= 1) continue;
+        const remembered = this.recallClarifiedReference(request.target, request.choices);
+        if (remembered) return remembered;
+      }
+      return null;
+    }
+
+    resolveRememberedClarification(verb, objectText) {
+      return this.resolveRememberedCommandChoice(verb, objectText);
+    }
+
+    resolveExplicitClarification(verb, objectText) {
+      if (!objectText) return null;
+      const request = parseAllTarget(primaryObjectText(verb, objectText));
+      if (request.all || !request.target) return null;
+      const choices = this.ambiguousChoices(verb, request.target, objectText);
+      return choices.length === 1 ? choices[0] : null;
+    }
+
+    explicitClarificationReferences(verb, objectText) {
+      const game = this.game;
+      const references = [];
+      const seen = new Set();
+      const addReference = (target, choice) => {
+        const normalizedTarget = normalize(target);
+        if (!normalizedTarget || !choice?.type || !choice?.id) return;
+        const key = `${normalizedTarget}:${choice.type}:${choice.id}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        references.push({ target, choice });
+      };
+
+      const primaryTarget = primaryObjectText(verb, objectText);
+      const primaryChoice = this.resolveExplicitClarification(verb, objectText);
+      if (primaryChoice && primaryTarget) addReference(primaryTarget, primaryChoice);
+
+      if (["take", "get"].includes(verb)) {
+        const source = this.parseSourceReference(objectText);
+        if (source) {
+          const sourceChoice = this.resolveVisibleReference(source.sourceName, { closedContainers: true });
+          if (sourceChoice) addReference(source.sourceName, sourceChoice);
+          const itemChoice = this.resolveContainedItemReference(source.itemName, source.sourceName);
+          if (itemChoice) addReference(source.itemName, itemChoice);
+        }
+      }
+
+      if (["drop", "leave", "put"].includes(verb)) {
+        const placement = game.parsePlacementCommand(objectText);
+        if (placement) {
+          const targetChoice = this.resolveVisibleReference(placement.targetName, { closedContainers: true });
+          if (targetChoice) addReference(placement.targetName, targetChoice);
+        }
+      }
+
+      if (WITH_ITEM_CLARIFICATION_VERBS.has(verb)) {
+        const withTarget = this.parseWithReference(objectText);
+        if (withTarget?.itemName) {
+          const keyChoice = this.resolveInventoryReference(withTarget.itemName);
+          if (keyChoice) addReference(withTarget.itemName, keyChoice);
+        }
+      }
+
+      return references;
+    }
+
+    parseSourceReference(objectText) {
+      const outOfMatch = normalize(objectText).match(/^(.+?)\s+out\s+of\s+(.+)$/);
+      if (outOfMatch) {
+        return {
+          itemName: outOfMatch[1].trim(),
+          sourceName: outOfMatch[2].trim(),
+        };
+      }
+      const fromMatch = objectText.split(" from ");
+      if (fromMatch.length === 2) {
+        return {
+          itemName: fromMatch[0].trim(),
+          sourceName: fromMatch[1].trim(),
+        };
+      }
+      return null;
+    }
+
+    resolveVisibleReference(name, options = {}) {
+      const unique = this.visibleReferenceChoices(name, options);
+      return unique.length === 1 ? unique[0] : null;
+    }
+
+    visibleReferenceChoices(name, options = {}) {
+      const game = this.game;
+      const choices = [];
+      const itemMatches = game.visibleSearchAll(name, {
+        includeInventory: options.includeInventory !== false,
+        closedContainers: Boolean(options.closedContainers),
+      });
+      for (const { item } of itemMatches) {
+        choices.push({ type: "item", id: item.id, name: item.name });
+      }
+      if (options.includeDoors !== false) {
+        for (const { door } of game.findDoorsAll(name)) {
+          choices.push({ type: "door", id: door.id, name: door.name });
+        }
+      }
+      return uniqueChoices(choices);
+    }
+
+    inventoryReferenceChoices(name) {
+      const game = this.game;
+      return uniqueChoices(game.player.inventory
+        .map((id) => game.items[id])
+        .filter((item) => item && matches(item.name, name))
+        .map((item) => ({ type: "item", id: item.id, name: item.name })));
+    }
+
+    resolveInventoryReference(name) {
+      const choices = this.inventoryReferenceChoices(name);
+      return choices.length === 1 ? choices[0] : null;
+    }
+
+    resolveContainedItemReference(itemName, sourceName) {
+      const game = this.game;
+      const character = game.resolveCharacterTarget(sourceName);
+      if (character) {
+        const held = game.findCharacterItem(character, itemName)?.item;
+        return held ? { type: "item", id: held.id, name: held.name } : null;
+      }
+      const container = game.visibleSearch(sourceName, { closedContainers: true })?.item;
+      if (!container?.container) return null;
+      const nested = game.findItemInsideContainer(container, itemName);
+      if (!nested?.item) return null;
+      return { type: "item", id: nested.item.id, name: nested.item.name };
+    }
+
+    findSourceItemMatches(itemName, sourceName) {
+      const game = this.game;
+      const character = game.resolveCharacterTarget(sourceName);
+      if (character) {
+        return [...(character.inventory || []), ...(character.worn || [])]
+          .map((id) => game.items[id])
+          .filter((item) => item && matches(item.name, itemName))
+          .map((item) => ({ item, parent: character }));
+      }
+      const containers = this.sourceTargetChoices(sourceName, itemName)
+        .map((choice) => game.items[choice.id])
+        .filter((item) => item?.container);
+      return containers.flatMap((container) => this.findAllItemsInsideContainer(container, itemName));
+    }
+
+    findAllItemsInsideContainer(container, itemName) {
+      const game = this.game;
+      const results = [];
+      const name = normalize(itemName);
+      const scan = (itemIds, parent) => {
+        for (const id of itemIds || []) {
+          const item = game.items[id];
+          if (!item) continue;
+          if (matches(item.name, name)) results.push({ item, parent });
+          if (item.container) scan(item.contents, item);
+        }
+      };
+      scan(container.contents, container);
+      return results;
+    }
+
+    sourceTargetChoices(sourceName, itemName = "") {
+      const game = this.game;
+      const visibleChoices = this.visibleReferenceChoices(sourceName, {
+        includeInventory: false,
+        closedContainers: true,
+        includeDoors: false,
+      }).filter((choice) => game.items[choice.id]?.container);
+      if (!itemName) return visibleChoices;
+      return visibleChoices.filter((choice) => Boolean(game.findItemInsideContainer(game.items[choice.id], itemName)));
+    }
+
+    parseWithReference(objectText) {
+      const parts = String(objectText || "").split(" with ");
+      if (parts.length < 2) return null;
+      return {
+        targetName: parts[0].trim(),
+        itemName: parts.slice(1).join(" with ").trim(),
+      };
+    }
+
+    resolveClarifiedObjectText(pending, replacement) {
+      if (pending.slot === "primary") return replacePrimaryObject(pending.verb, pending.objectText, replacement);
+      if (pending.slot === "source-target") return replaceSourceTarget(pending.objectText, replacement);
+      if (pending.slot === "placement-target") return replacePlacementTarget(pending.objectText, replacement);
+      if (pending.slot === "with-item") return replaceWithItem(pending.objectText, replacement);
+      return replacePrimaryObject(pending.verb, pending.objectText, replacement);
+    }
+
+    handleClarification(response) {
+      const game = this.game;
+      const pending = game.pendingClarification;
+      game.pendingClarification = null;
+      const answer = normalize(response);
+      if (["cancel", "stop", "no"].includes(answer)) {
+        game.print("Cancelled.", "system");
+        return;
+      }
+
+      let matchesFound = [];
+      const number = Number.parseInt(answer, 10);
+      if (Number.isInteger(number) && number >= 1 && number <= pending.choices.length) {
+        matchesFound = [pending.choices[number - 1]];
+      } else {
+        matchesFound = pending.choices.filter((choice) => matches(choice.name, answer));
+      }
+
+      if (matchesFound.length !== 1) {
+        game.pendingClarification = pending;
+        const labels = joinAlternatives(pending.choices.map((choice) => clarificationLabel(choice.name)));
+        game.print(`Please be more specific: ${labels}.`, "system");
+        return;
+      }
+
+      game.forcedChoice = matchesFound[0];
+      this.rememberClarifiedReference(pending.target, matchesFound[0]);
+      try {
+        const resolvedObject = this.resolveClarifiedObjectText(pending, matchesFound[0].name);
+        const actor = pending.actorId ? game.characters[pending.actorId] || game.player : game.player;
+        game.processCommand(`${pending.verb} ${resolvedObject}`.trim(), actor);
+      } finally {
+        game.forcedChoice = null;
+      }
+    }
+
+    rememberClarifiedReference(target, choice) {
+      const game = this.game;
+      const keys = clarificationMemoryKeys(target);
+      if (!keys.length || !choice?.type || !choice?.id) return;
+      for (const key of keys) {
+        game.clarifiedReferences[key] = {
+          type: choice.type,
+          id: choice.id,
+          name: choice.name,
+          rememberedTurn: Number(game.turnCount) || 0,
+        };
+      }
+    }
+
+    recallClarifiedReference(target, choices = []) {
+      const game = this.game;
+      this.pruneClarifiedReferences();
+      const key = clarificationMemoryKey(target);
+      if (!key) return null;
+      const remembered = game.clarifiedReferences?.[key];
+      if (!remembered) return null;
+      return choices.find((choice) => sameChoice(choice, remembered)) || null;
+    }
+
+    pruneClarifiedReferences() {
+      const game = this.game;
+      const currentTurn = Number(game.turnCount) || 0;
+      for (const [key, remembered] of Object.entries(game.clarifiedReferences || {})) {
+        const rememberedTurn = Number(remembered?.rememberedTurn);
+        if (!Number.isFinite(rememberedTurn) || currentTurn - rememberedTurn >= CLARIFICATION_MEMORY_TURNS) {
+          delete game.clarifiedReferences[key];
+        }
+      }
+    }
+  }
+
+  class CommandRouter {
+    constructor(game) {
+      this.game = game;
+    }
+
+    dispatch(verb, object, originalCommand = "") {
+      const game = this.game;
+      const handlers = {
+        take: () => game.take(object),
+        get: () => game.take(object),
+        leave: () => game.drop(object),
+        drop: () => game.drop(object),
+        put: () => game.drop(object),
+        open: () => game.open(object),
+        close: () => game.close(object),
+        unlock: () => game.unlock(object),
+        lock: () => game.lock(object),
+        look: () => game.look(object),
+        examine: () => game.examine(object),
+        inspect: () => game.examine(object),
+        search: () => game.examine(object),
+        explore: () => game.examine(object),
+        investigate: () => game.examine(object),
+        listen: () => game.sense("listen", object),
+        smell: () => game.sense("smell", object),
+        sniff: () => game.sense("smell", object),
+        watch: () => game.sense("watch", object),
+        eavesdrop: () => game.sense("listen", object),
+        scout: () => game.sense("search", object),
+        touch: () => game.touch("touch", object),
+        feel: () => game.touch("feel", object),
+        knock: () => game.touch("knock", object),
+        inventory: () => game.inventory(),
+        i: () => game.inventory(),
+        wait: () => game.wait(),
+        hello: () => game.hello(),
+        tips: () => game.tips(object),
+        verbs: () => game.verbs(),
+        mysaves: () => game.listSaves(),
+        save: () => game.save(object),
+        load: () => game.load(object),
+        quit: () => game.quit(),
+        map: () => game.showMap(),
+        location: () => game.print(actorizeSecondPerson(game.player, `You are currently in ${game.room().name.replace(/_/g, " ")}.`)),
+        music: () => game.handleMusicCommand(object),
+        autoplay: () => game.autoplay(object),
+        wear: () => game.wear(object),
+        remove: () => game.remove(object),
+        give: () => game.give(object),
+        show: () => game.show(object),
+        hand: () => game.give(object),
+        pass: () => game.give(object),
+        bring: () => game.give(object),
+        send: () => game.give(object),
+        return: () => game.give(object),
+        deliver: () => game.give(object),
+        ask: () => game.askFor(object),
+        borrow: () => game.askFor(object),
+        request: () => game.askFor(object),
+        carry: () => game.take(object),
+        hold: () => game.take(object),
+        catch: () => game.take(object),
+        follow: () => game.followCharacter(object),
+        guard: () => game.physicalAction("guard", object),
+        help: () => game.physicalAction("help", object),
+        explain: () => game.physicalAction("explain", object),
+        negotiate: () => game.physicalAction("negotiate", object),
+        print: () => game.physicalAction("print", object),
+        call: () => game.socialAction("call", object),
+        wash: () => game.physicalAction("wash", object),
+        check: () => game.examine(object),
+        start: () => game.physicalAction("start", object),
+        refill: () => game.physicalAction("refill", object),
+        inform: () => game.socialAction("inform", object),
+        review: () => game.examine(object),
+        mend: () => game.mend(object),
+        repair: () => game.mend(object),
+        fix: () => game.mend(object),
+        write: () => game.write(object),
+        light: () => game.light(object),
+        pick: () => game.pick(object),
+        cut: () => game.cutTrim("cut", object),
+        trim: () => game.cutTrim("trim", object),
+        fill: () => game.fill(object),
+        water: () => game.water(object),
+        plant: () => game.plant(object),
+        rake: () => game.rakeGarden(object),
+        dig: () => game.dig(object),
+        kill: () => game.attack(object),
+        attack: () => game.attack(object),
+        break: () => game.breakThing(object),
+        push: () => game.pushPull("push", object),
+        pull: () => game.pushPull("pull", object),
+        move: () => game.pushPull("move", object),
+        place: () => game.drop(object),
+        set: () => game.drop(object),
+        store: () => game.drop(object),
+        lift: () => game.touch("lift", object),
+        turn: () => game.touch("turn", object),
+        use: () => game.touch("use", object),
+        find: () => game.examine(object),
+        read: () => game.read(object),
+        answer: () => game.socialAction("answer", object),
+        thank: () => game.socialAction("thank", object),
+        flatter: () => game.socialAction("flatter", object),
+        insult: () => game.socialAction("insult", object),
+        hide: () => game.physicalAction("hide", object),
+        sneak: () => game.physicalAction("sneak", object),
+        escape: () => game.physicalAction("escape", object),
+        throw: () => game.throwItem(object),
+        climb: () => game.climb(object),
+        eat: () => game.eat(object),
+        drink: () => game.drink(object),
+        jump: () => game.physicalAction("jump", object),
+        sit: () => game.physicalAction("sit", object),
+        lie: () => game.physicalAction("lie", object),
+        stand: () => game.physicalAction("stand", object),
+        sleep: () => game.physicalAction("sleep", object),
+        rest: () => game.physicalAction("rest", object),
+        run: () => game.physicalAction("run", object),
+        wake: () => game.physicalAction("wake", object),
+        crawl: () => game.physicalAction("crawl", object),
+        leap: () => game.physicalAction("jump", object),
+        dive: () => game.physicalAction("dive", object),
+        swim: () => game.physicalAction("swim", object),
+        ride: () => game.physicalAction("ride", object),
+        cook: () => game.physicalAction("cook", object),
+        combine: () => game.combine(object),
+      };
+
+      if (handlers[verb]) {
+        handlers[verb]();
+        return true;
+      }
+      game.unrecognized(originalCommand || `${verb} ${object}`.trim());
+      return false;
+    }
+  }
+
+  class InteractionRules {
+    constructor(game) {
+      this.game = game;
+    }
+
+    take(objectName) {
+      const game = this.game;
+      if (!objectName) return game.print("What would you like to take?");
+      if (objectName.includes("door")) return game.print(`You cannot take the ${objectName}.`);
+      const outOfMatch = normalize(objectName).match(/^(.+?)\s+out\s+of\s+(.+)$/);
+      if (outOfMatch) {
+        const itemName = outOfMatch[1].trim();
+        const container = game.visibleSearch(outOfMatch[2].trim(), { closedContainers: true })?.item;
+        if (!container || !container.container) return game.print("I don't see that here.");
+        if (!container.open && !container.noLid) return game.print(`The ${container.name} is closed.`);
+        const nested = game.findItemInsideContainer(container, itemName);
+        if (!nested) return game.print("I don't see that here.");
+        const item = nested.item;
+        if (item.weight > game.player.strength * 5) return game.print(`The ${item.name} is too heavy to take.`);
+        if (!game.canCarryAdditionalWeight(item.weight || 0)) return game.print(game.carryTooMuchMessage(item));
+        game.detachItem(item.id);
+        item.location = { type: "character", id: game.player.id };
+        game.player.inventory.push(item.id);
+        if (matches(item.name, "treasure")) game.flags.treasuretaken = true;
+        return game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "take")} the ${item.name} from the ${container.name}.`);
+      }
+      const fromMatch = objectName.split(" from ");
+      const request = parseAllTarget(fromMatch[0]);
+      const targetName = normalize(request.target);
+      if (request.all) return this.takeAll(targetName);
+      if (fromMatch.length === 2) {
+        const character = game.resolveCharacterTarget(fromMatch[1]);
+        if (character) return game.takeItemFromCharacter(character, targetName);
+        const container = game.visibleSearch(fromMatch[1], { closedContainers: true })?.item;
+        if (container?.container) {
+          if (!container.open && !container.noLid) return game.print(`The ${container.name} is closed.`);
+          const nested = game.findItemInsideContainer(container, targetName);
+          if (!nested) return game.print("I don't see that here.");
+          const item = nested.item;
+          if (item.weight > game.player.strength * 5) return game.print(`The ${item.name} is too heavy to take.`);
+          if (!game.canCarryAdditionalWeight(item.weight || 0)) return game.print(game.carryTooMuchMessage(item));
+          game.detachItem(item.id);
+          item.location = { type: "character", id: game.player.id };
+          game.player.inventory.push(item.id);
+          if (matches(item.name, "treasure")) game.flags.treasuretaken = true;
+          return game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "take")} the ${item.name} from the ${container.name}.`);
+        }
+      }
+      const found = game.visibleSearch(targetName);
+      if (!found) {
+        const character = game.peopleInRoom().find((candidate) => candidate.id !== game.player.id && candidate.visible && matches(candidate.name, targetName));
+        if (character) return this.carryCharacter(character);
+        const carried = game.findInInventory(targetName);
+        if (carried) return game.print(`${actorSubject(game.player, true)} ${game.player.name === "You" ? "are" : "is"} already carrying the ${carried.name}.`);
+        const heldMessage = game.heldItemMessage(targetName);
+        if (heldMessage) return game.print(heldMessage);
+        return game.print("I don't see that here.");
+      }
+      const item = found.item;
+      if (item.location?.type === "character" && item.location.id === game.player.id) {
+        return game.print(`${actorSubject(game.player, true)} ${game.player.name === "You" ? "are" : "is"} already carrying the ${item.name}.`);
+      }
+      if (matches(item.name, "treasure") && game.liveDragon() && game.player.noticeable !== false) {
+        return game.print("The dragon guards the treasure too closely. You need the ring's cover or Bard's help.");
+      }
+      if (!item.portable) return game.print(`The ${item.name} can't be taken.`);
+      if (item.weight > game.player.strength * 5) return game.print(`The ${item.name} is too heavy to take.`);
+      if (!game.canCarryAdditionalWeight(item.weight || 0)) return game.print(game.carryTooMuchMessage(item));
+      game.detachItem(item.id);
+      item.location = { type: "character", id: game.player.id };
+      game.player.inventory.push(item.id);
+      if (matches(item.name, "treasure")) game.flags.treasuretaken = true;
+      const source = found.parent?.id ? ` from the ${found.parent.name}` : "";
+      game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "take")} the ${item.name}${source}.`);
+    }
+
+    carryCharacter(character) {
+      const game = this.game;
+      if (!matches(character.name, "bard") && !matches(character.name, "thorin")) {
+        return game.print(`${character.name} will not let you pick them up.`);
+      }
+      if (character.carriedBy === game.player.id) return game.print(`${character.name} is already with you.`);
+      character.carriedBy = game.player.id;
+      character.position = game.currentRoom;
+      character.followingPlayer = false;
+      character.justEntered = false;
+      game.print(actorizeSecondPerson(game.player, `You pick up ${character.name}.`));
+    }
+
+    characterCannotFollowVertical(character, direction) {
+      return matches(character?.name, "bard") && ["up", "down"].includes(normalize(direction));
+    }
+
+    releaseCarriedCharacter(character, { follow = false, message = "" } = {}) {
+      const game = this.game;
+      if (!character) return;
+      character.carriedBy = null;
+      character.position = game.currentRoom;
+      character.justEntered = false;
+      if (follow) {
+        character.movementMode = "follow";
+        character.followingPlayer = true;
+      }
+      if (message) game.print(message);
+    }
+
+    takeAll(objectName) {
+      const game = this.game;
+      const foundItems = game.visibleSearchAll(objectName, { includeInventory: false })
+        .filter(({ item }) => item.portable && item.weight <= game.player.strength * 5);
+      if (foundItems.some(({ item }) => matches(item.name, "treasure")) && game.liveDragon() && game.player.noticeable !== false) {
+        return game.print("The dragon guards the treasure too closely. You need the ring's cover or Bard's help.");
+      }
+      if (!foundItems.length) return game.print("I don't see anything like that here that can be taken.");
+      const taken = [];
+      const leftBehind = [];
+      for (const { item } of foundItems) {
+        if (!game.canCarryAdditionalWeight(item.weight || 0)) {
+          leftBehind.push(item.name);
+          continue;
+        }
+        game.detachItem(item.id);
+        item.location = { type: "character", id: game.player.id };
+        game.player.inventory.push(item.id);
+        if (matches(item.name, "treasure")) game.flags.treasuretaken = true;
+        taken.push(item.name);
+      }
+      if (taken.length) {
+        game.print(actorizeSecondPerson(game.player, `You take the ${joinNames(taken)}.`));
+        if (leftBehind.length) game.print(actorizeSecondPerson(game.player, `You leave behind ${joinNames(leftBehind)} because carrying more would exceed your limit.`));
+        return;
+      }
+      game.print(leftBehind.length
+        ? actorizeSecondPerson(game.player, `You cannot carry the ${joinNames(leftBehind)} because carrying more would exceed your limit.`)
+        : actorizeSecondPerson(game.player, "You cannot carry any more."));
+    }
+
+    drop(objectName) {
+      const game = this.game;
+      if (!objectName) return game.print("What would you like to leave?");
+      const placement = this.parsePlacementCommand(objectName);
+      const inParts = objectName.split(" in ");
+      const itemName = placement?.itemName || inParts[0].trim();
+      const carriedCharacter = Object.values(game.characters).find((character) => character.carriedBy === game.player.id && matches(character.name, normalize(itemName)));
+      if (carriedCharacter && inParts.length === 1) return this.dropCharacter(carriedCharacter);
+      const item = game.findInInventory(itemName);
+      if (!item) return game.print(game.heldItemMessage(itemName) || actorizeSecondPerson(game.player, `You don't have the ${itemName}.`));
+      if (placement) {
+        const container = game.visibleSearch(placement.targetName)?.item;
+        if (!container || !container.container) {
+          game.detachItem(item.id);
+          item.location = { type: "room", id: game.currentRoom };
+          return game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "place")} the ${item.name} ${placement.relation} the ${placement.targetName}.`);
+        }
+        if (!container.open && !container.noLid) return game.print(`The ${container.name} is closed.`);
+        if (container.id === item.id || this.isInside(item.id, container.id)) return game.print(actorizeSecondPerson(game.player, `You cannot put the ${item.name} in itself.`));
+        if ((item.weight || 0) >= (container.weight || 0)) return game.print(`The ${item.name} is too big for the ${container.name}.`);
+        game.detachItem(item.id);
+        item.location = { type: "item", id: container.id };
+        container.contents.push(item.id);
+        game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "put")} the ${item.name} ${placement.relation} the ${container.name}.`);
+        this.checkVictory(item, container);
+        return;
+      }
+      game.detachItem(item.id);
+      item.location = { type: "room", id: game.currentRoom };
+      game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "leave")} the ${item.name}.`);
+    }
+
+    parsePlacementCommand(objectName) {
+      return parsePlacementTargetText(objectName);
+    }
+
+    dropCharacter(character) {
+      this.releaseCarriedCharacter(character, {
+        message: actorizeSecondPerson(this.game.player, `You put ${character.name} down.`),
+      });
+    }
+
+    checkVictory(item, container) {
+      const game = this.game;
+      if (game.currentRoom !== "hobbit_hole") return;
+      if (!matches(item?.name, "treasure")) return;
+      if (!matches(container?.name, "heavy wooden chest")) return;
+      if (game.liveDragon()) {
+        game.print("The treasure is safely home, but Smaug still lives.");
+        return;
+      }
+      game.winGame("Congratulations. You have killed Smaug and found the treasure - a real thief!");
+    }
+
+    isInside(containerId, itemId) {
+      const container = this.game.items[containerId];
+      if (!container?.contents?.length) return false;
+      if (container.contents.includes(itemId)) return true;
+      return container.contents.some((childId) => this.isInside(childId, itemId));
+    }
+
+    open(objectName) {
+      const game = this.game;
+      const request = parseAllTarget(objectName);
+      if (request.all) return this.openAll(request.target);
+      const doorFound = game.findDoor(objectName);
+      if (doorFound) {
+        const { door } = doorFound;
+        if (door.open) return game.print(`The ${door.name} is already open.`);
+        if (matches(door.name, "secret door") && !game.flags.secretdoorsun) return game.print("The rock face shows no door yet.");
+        if (door.locked) {
+          const key = this.keyFor(door);
+          if (!key) return game.print(`The ${door.name} is locked.`);
+          door.locked = false;
+        }
+        door.open = true;
+        game.setFlag(`${compact(door.name)}open`, true);
+        return game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "open")} the ${door.name}.`);
+      }
+      const item = game.visibleSearch(objectName)?.item;
+      if (!item) return game.print(game.heldItemMessage(objectName) || "I don't see that here.");
+      if (!item.container && this.openNonContainerItem(item)) return;
+      if (!item.container) return game.print(`The ${item.name} cannot be opened.`);
+      if (item.noLid) return game.print(`The ${item.name} has no lid and is always open.`);
+      if (item.open) return game.print(`The ${item.name} is already open.`);
+      if (item.locked) {
+        const key = this.keyFor(item);
+        if (!key) return game.print(`The ${item.name} is locked.`);
+        item.locked = false;
+      }
+      item.open = true;
+      game.setFlag(`${compact(item.name)}open`, true);
+      game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "open")} the ${item.name}.`);
+    }
+
+    openAll(objectName) {
+      const game = this.game;
+      const items = game.visibleSearchAll(objectName)
+        .map(({ item }) => item)
+        .filter((item, index, list) => list.findIndex((other) => other.id === item.id) === index);
+      const messages = [];
+      for (const item of items) {
+        if (!item.container || item.noLid || item.open) continue;
+        if (item.locked) {
+          const key = this.keyFor(item);
+          if (!key) {
+            messages.push(`The ${item.name} is locked.`);
+            continue;
+          }
+          item.locked = false;
+        }
+        item.open = true;
+        game.setFlag(`${compact(item.name)}open`, true);
+        messages.push(`${actorSubject(game.player, true)} ${actorVerb(game.player, "open")} the ${item.name}.`);
+      }
+      game.print(messages.length ? messages.join(" ") : "I don't see anything like that here that can be opened.");
+    }
+
+    openNonContainerItem(item) {
+      const game = this.game;
+      if (matches(item.name, "curious map")) {
+        if (item.broken) {
+          game.print(actorizeSecondPerson(game.player, "You try to unfold the broken curious map, but it only separates into useless fragments."));
+          return true;
+        }
+        if (item.open) {
+          game.print("The curious map is already unfolded.");
+          return true;
+        }
+        item.open = true;
+        if (item.mended) {
+          game.print(actorizeSecondPerson(game.player, "You carefully unfold the mended curious map. The strange markings are readable again, though the joins are still visible."));
+          return true;
+        }
+        game.print(actorizeSecondPerson(game.player, "You unfold the curious map. You see a map with strange markings."));
+        return true;
+      }
+      if (matches(item.name, "elegant lamp")) {
+        return game.lightItem(item);
+      }
+      if (matches(item.name, "dark glass inkwell")) {
+        if (item.open) return game.print("The dark glass inkwell is already open.");
+        item.open = true;
+        game.print(actorizeSecondPerson(game.player, "You unstopper the dark glass inkwell."));
+        return true;
+      }
+      return false;
+    }
+
+    close(objectName) {
+      const game = this.game;
+      const request = parseAllTarget(objectName);
+      if (request.all) return this.closeAll(request.target);
+      const doorFound = game.findDoor(objectName);
+      if (doorFound) {
+        doorFound.door.open = false;
+        game.setFlag(`${compact(doorFound.door.name)}open`, false);
+        return game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "close")} the ${doorFound.door.name}.`);
+      }
+      const item = game.visibleSearch(objectName)?.item;
+      if (!item) return game.print(game.heldItemMessage(objectName) || "I don't see that here.");
+      if (!item.container && this.closeNonContainerItem(item)) return;
+      if (!item.container) return game.print(`The ${item.name} cannot be closed.`);
+      if (item.noLid) return game.print(`The ${item.name} has no lid.`);
+      item.open = false;
+      game.setFlag(`${compact(item.name)}open`, false);
+      game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "close")} the ${item.name}.`);
+    }
+
+    closeAll(objectName) {
+      const game = this.game;
+      const items = game.visibleSearchAll(objectName)
+        .map(({ item }) => item)
+        .filter((item, index, list) => list.findIndex((other) => other.id === item.id) === index);
+      const closed = [];
+      for (const item of items) {
+        if (!item.container || item.noLid || !item.open) continue;
+        item.open = false;
+        game.setFlag(`${compact(item.name)}open`, false);
+        closed.push(item.name);
+      }
+      game.print(closed.length ? `${actorSubject(game.player, true)} ${actorVerb(game.player, "close")} the ${joinNames(closed)}.` : "I don't see anything like that here that can be closed.");
+    }
+
+    closeNonContainerItem(item) {
+      const game = this.game;
+      if (matches(item.name, "curious map")) {
+        if (item.broken) {
+          game.print("The broken curious map cannot be folded neatly.");
+          return true;
+        }
+        if (!item.open) {
+          game.print("The curious map is already folded.");
+          return true;
+        }
+        item.open = false;
+        if (item.mended) {
+          game.print(actorizeSecondPerson(game.player, "You carefully fold the mended curious map, keeping the repaired joins aligned."));
+          return true;
+        }
+        game.print(actorizeSecondPerson(game.player, "You fold the curious map."));
+        return true;
+      }
+      if (matches(item.name, "elegant lamp")) {
+        if (!item.open) return game.print("The elegant lamp is already unlit.");
+        item.open = false;
+        game.print(actorizeSecondPerson(game.player, "You turn off the elegant lamp."));
+        return true;
+      }
+      if (matches(item.name, "dark glass inkwell")) {
+        if (!item.open) return game.print("The dark glass inkwell is already closed.");
+        item.open = false;
+        game.print(actorizeSecondPerson(game.player, "You stopper the dark glass inkwell."));
+        return true;
+      }
+      return false;
+    }
+
+    unlock(objectName) {
+      const game = this.game;
+      const withTarget = game.parseWithReference(objectName);
+      const cleanName = withTarget?.targetName || objectName.split(" with ")[0].trim();
+      const target = game.findDoor(cleanName)?.door || game.visibleSearch(cleanName)?.item;
+      if (!target) return game.print(game.heldItemMessage(cleanName) || "I don't see that here.");
+      if (matches(target.name, "secret door") && !game.flags.secretdoorsun) return game.print("The rock face shows no door yet.");
+      if (!target.locked) return game.print(`The ${target.name} is already unlocked.`);
+      const namedKey = withTarget?.itemName ? game.findInInventory(withTarget.itemName) : null;
+      if (withTarget?.itemName && !namedKey) {
+        return game.print(game.heldItemMessage(withTarget.itemName) || `You do not have the ${withTarget.itemName}.`);
+      }
+      const key = namedKey || this.keyFor(target);
+      if (!key) return game.print(game.heldItemMessage(target.requiredKey || "key") || `You do not have the required key for the ${target.name}.`);
+      if (!this.keyMatchesTarget(key, target)) return game.print(`The ${key.name} does not unlock the ${target.name}.`);
+      target.locked = false;
+      game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "unlock")} the ${target.name} with the ${key.name}.`);
+    }
+
+    lock(objectName) {
+      const game = this.game;
+      const withTarget = game.parseWithReference(objectName);
+      const cleanName = withTarget?.targetName || objectName.split(" with ")[0].trim();
+      const target = game.findDoor(cleanName)?.door || game.visibleSearch(cleanName)?.item;
+      if (!target) return game.print(game.heldItemMessage(cleanName) || "I don't see that here.");
+      const namedKey = withTarget?.itemName ? game.findInInventory(withTarget.itemName) : null;
+      if (withTarget?.itemName && !namedKey) {
+        return game.print(game.heldItemMessage(withTarget.itemName) || `You do not have the ${withTarget.itemName}.`);
+      }
+      const key = namedKey || this.keyFor(target);
+      if (!key) return game.print(game.heldItemMessage(target.requiredKey || "key") || `You do not have the required key for the ${target.name}.`);
+      if (!this.keyMatchesTarget(key, target)) return game.print(`The ${key.name} does not lock the ${target.name}.`);
+      target.locked = true;
+      target.open = false;
+      game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "lock")} the ${target.name} with the ${key.name}.`);
+    }
+
+    keyFor(target) {
+      const game = this.game;
+      return game.player.inventory.map((id) => game.items[id]).find((item) => this.keyMatchesTarget(item, target));
+    }
+
+    keyMatchesTarget(item, target) {
+      const required = normalize(target?.requiredKey || "");
+      return matches(item?.name, required) || matches(item?.description, required) || matches(item?.keyFor, normalize(target?.name));
+    }
+  }
+
+  class SocialRules {
+    constructor(game) {
+      this.game = game;
+    }
+
+    isTalkCommand(command) {
+      return /^(?:say|talk|speak|whisper|yell)\s+/.test(command);
+    }
+
+    handleCharacterFirstCommand(command) {
+      const game = this.game;
+      const people = game.peopleInRoom()
+        .filter((character) => character.id !== game.player.id && character.visible)
+        .sort((a, b) => b.name.length - a.name.length);
+      for (const character of people) {
+        const name = normalize(character.name);
+        if (command === name) {
+          if (game.unexpectedParty?.blocksDirectInteraction(character, "talk")) return true;
+          game.print(`${character.name} listens intently, expecting your words.`);
+          return true;
+        }
+        if (!command.startsWith(`${name} `)) continue;
+        const order = command.slice(name.length).trim().replace(/^to\s+/, "");
+        if (!order) continue;
+        if (character.friendly === false) {
+          this.respondToTalk(character);
+          return true;
+        }
+        if (game.unexpectedParty?.blocksDirectInteraction(character, "order")) return true;
+        this.delegateCharacterOrder(character, order);
+        return true;
+      }
+      return false;
+    }
+
+    give(command) {
+      const game = this.game;
+      const parsed = this.parseGiveCommand(command);
+      if (!parsed) return game.print("Use: give [item] to [character].");
+      const item = game.findInInventory(parsed.itemName);
+      const target = this.resolveCharacterTarget(parsed.targetName);
+      if (!item) return game.print(game.heldItemMessage(parsed.itemName) || `${game.player.name} does not have the ${parsed.itemName}.`);
+      if (!target) return game.print(`There is no one named ${parsed.targetName} here.`);
+      if (game.unexpectedParty?.blocksDirectInteraction(target, "gift")) return;
+      if (target.id === game.player.id) return game.print(`${game.player.name} already has the ${item.name}.`);
+      game.detachItem(item.id);
+      item.location = { type: "character", id: target.id };
+      target.inventory.push(item.id);
+      game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "give")} the ${item.name} to ${target.name}.`);
+      game.reactToGift(target, item);
+    }
+
+    show(command) {
+      const game = this.game;
+      const parsed = this.parseGiveCommand(command);
+      if (!parsed) return game.print("Use: show [item] to [character].");
+      const item = game.findInInventory(parsed.itemName);
+      const target = this.resolveCharacterTarget(parsed.targetName);
+      if (!item) return game.print(game.heldItemMessage(parsed.itemName) || `${game.player.name} does not have the ${parsed.itemName}.`);
+      if (!target) return game.print(`There is no one named ${parsed.targetName} here.`);
+      if (game.unexpectedParty?.blocksDirectInteraction(target, "gift")) return;
+      game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "show")} the ${item.name} to ${target.name}.`);
+      this.reactToShownItem(target, item);
+    }
+
+    reactToShownItem(character, item) {
+      const game = this.game;
+      if ((matches(character.name, "gandalf") || matches(character.name, "elrond")) && matches(item.name, "curious map")) {
+        return game.print(`${character.name} studies the ${item.name} carefully.`);
+      }
+      game.print(`${character.name} looks at the ${item.name}, but says nothing useful.`);
+    }
+
+    askFor(command) {
+      const game = this.game;
+      const conversation = this.parseAskConversationCommand(command);
+      const delegated = conversation ? null : this.parseAskToCommand(command);
+      const parsed = this.parseAskForCommand(command);
+      const resolved = conversation || delegated || parsed;
+      if (!resolved) return game.print("Use: ask [character] for [item], or ask [character] to [command].");
+      if (resolved.topic) return this.askCharacterAbout(resolved.characterName, resolved.topic);
+      if (resolved.order) return this.askCharacterTo(resolved.characterName, resolved.order);
+      return this.askCharacterForItem(resolved.characterName, resolved.itemName);
+    }
+
+    askCharacterForItem(characterName, itemName) {
+      const game = this.game;
+      const character = this.resolveAskForCharacterTarget(characterName, itemName);
+      if (!character) return game.print(`There is no one named ${characterName} here.`);
+      if (game.unexpectedParty?.blocksDirectInteraction(character, "item")) return;
+      const special = this.specialAskForResponse(character, itemName);
+      if (special) return game.print(special);
+      const requestedCharacter = this.findKnownCharacter(itemName);
+      if (requestedCharacter) {
+        this.rememberConversationCharacter(character);
+        this.rememberReferencedCharacter(requestedCharacter);
+        return this.askCharacterAbout(character.name, `where ${requestedCharacter.name} is`);
+      }
+      return this.receiveItemFromCharacter(character, itemName);
+    }
+
+    specialAskForResponse(character, itemName) {
+      const text = normalize(itemName);
+      if (matches(character.name, "beorn") && matchesAny(text, ["food", "meal", "supper", "breakfast", "shelter", "rest"])) {
+        return "Beorn says 'There is food and a roof for honest guests. Help yourself, but do not mistake hospitality for weakness.'";
+      }
+      if (matches(character.name, "elrond") && matchesAny(text, ["advice", "help", "counsel", "map"])) {
+        return "Elrond says 'What aid I may offer is best received in thought, and not in haste.'";
+      }
+      return "";
+    }
+
+    resolveAskForCharacterTarget(characterName, itemName) {
+      const game = this.game;
+      const directTarget = this.resolveCharacterTarget(characterName);
+      if (directTarget) return directTarget;
+      const pronoun = normalize(characterName);
+      if (!["him", "her", "them"].includes(pronoun)) return null;
+      const visibleHolder = game.findVisibleCharacterHolding(itemName)?.character;
+      if (visibleHolder) return visibleHolder;
+      const lastConversation = this.lastConversationCharacter();
+      if (lastConversation?.position === game.currentRoom && lastConversation.visible) return lastConversation;
+      const lastReferenced = this.lastReferencedCharacter();
+      if (lastReferenced?.position === game.currentRoom && lastReferenced.visible) return lastReferenced;
+      return null;
+    }
+
+    receiveItemFromCharacter(character, itemName) {
+      const game = this.game;
+      if (character.friendly === false) return this.respondToTalk(character);
+      if (game.player.name === "You" && game.player.noticeable === false) return game.print(`${character.name} says 'who's talking?'`);
+      const held = game.findCharacterItem(character, itemName);
+      if (!held) return game.print(`${character.name} does not have the ${itemName}.`);
+      if (held.worn) return game.print(`${character.name} is wearing the ${held.item.name}.`);
+      if (!game.canCarryAdditionalWeight(held.item.weight || 0)) return game.print(game.carryTooMuchMessage(held.item));
+      game.detachItem(held.item.id);
+      held.item.location = { type: "character", id: game.player.id };
+      game.player.inventory.push(held.item.id);
+      game.print(`${character.name} gives you the ${held.item.name}.`);
+    }
+
+    takeItemFromCharacter(character, itemName) {
+      const game = this.game;
+      if (character.friendly === false) return this.respondToTalk(character);
+      const held = game.findCharacterItem(character, itemName);
+      if (!held) return game.print(`${character.name} does not have the ${itemName}.`);
+      if (held.worn) return game.print(`${character.name} is wearing the ${held.item.name}.`);
+      if (!game.canCarryAdditionalWeight(held.item.weight || 0)) return game.print(game.carryTooMuchMessage(held.item));
+      game.detachItem(held.item.id);
+      held.item.location = { type: "character", id: game.player.id };
+      game.player.inventory.push(held.item.id);
+      game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "take")} the ${held.item.name} from ${character.name}.`);
+    }
+
+    askCharacterTo(characterName, order) {
+      const game = this.game;
+      const character = this.resolveCharacterTarget(characterName);
+      if (!character) return game.print(`There is no one named ${characterName} here.`);
+      if (character.friendly === false) return this.respondToTalk(character);
+      if (game.player.name === "You" && game.player.noticeable === false) return game.print(`${character.name} says 'who's talking?'`);
+      if (game.unexpectedParty?.blocksDirectInteraction(character, "order")) return;
+      this.rememberConversationCharacter(character);
+      this.rememberReferencedCharacter(order);
+      if (this.handleBardDragonCommand(character, order)) return;
+      this.delegateCharacterOrder(character, order);
+    }
+
+    delegateCharacterOrder(character, order) {
+      const game = this.game;
+      this.rememberConversationCharacter(character);
+      this.rememberReferencedCharacter(order);
+      const delegatedSplitter = this.delegatedSplitterFor(character);
+      this.seedDelegatedSplitter(delegatedSplitter);
+      for (const action of delegatedSplitter.split(order)) {
+        const interpreted = this.interpretFriendlyOrder(character, action);
+        if (interpreted.message) game.print(interpreted.message);
+        if (!interpreted.action) continue;
+        const moved = game.processCommand(interpreted.action, character);
+        if (moved) break;
+      }
+      this.rememberDelegatedSplitter(delegatedSplitter);
+    }
+
+    delegatedSplitterFor(character) {
+      const game = this.game;
+      if (!character?.id) return new CommandSplitter(game.data);
+      if (!game.delegatedSplitters.has(character.id)) {
+        game.delegatedSplitters.set(character.id, new CommandSplitter(game.data));
+      }
+      return game.delegatedSplitters.get(character.id);
+    }
+
+    seedDelegatedSplitter(splitter) {
+      const game = this.game;
+      if (!splitter) return;
+      splitter.lastObject ||= game.sharedDelegatedContext.lastObject;
+      splitter.lastDirectObject ||= game.sharedDelegatedContext.lastDirectObject;
+      splitter.lastTargetObject ||= game.sharedDelegatedContext.lastTargetObject;
+    }
+
+    rememberDelegatedSplitter(splitter) {
+      const game = this.game;
+      if (!splitter) return;
+      game.sharedDelegatedContext = {
+        lastObject: splitter.lastObject || game.sharedDelegatedContext.lastObject,
+        lastDirectObject: splitter.lastDirectObject || game.sharedDelegatedContext.lastDirectObject,
+        lastTargetObject: splitter.lastTargetObject || game.sharedDelegatedContext.lastTargetObject,
+      };
+    }
+
+    interpretFriendlyOrder(character, action) {
+      const text = normalize(action);
+      const [verb, ...restWords] = text.split(/\s+/);
+      const object = restWords.join(" ").trim();
+
+      const progressive = this.progressiveFriendlyOrder(character, verb, object, text);
+      if (progressive) return progressive;
+
+      if (verb === "wait" && /\b(?:until|till)\b/.test(object)) {
+        return {
+          message: `${character.name} says 'I will wait a while, but not forever.'`,
+          action: "wait",
+        };
+      }
+
+      const protectedMessage = this.protectedOrderRefusal(character, verb, object);
+      if (protectedMessage) return { message: protectedMessage, action: "" };
+
+      return { message: "", action };
+    }
+
+    progressiveFriendlyOrder(character, verb, object, action) {
+      const game = this.game;
+      const guardedVerbs = new Set(["give", "hand", "pass", "send", "deliver", "return"]);
+      if (!guardedVerbs.has(verb) || !matches(character.name, "gandalf")) return null;
+
+      const parsed = this.parseGiveCommand(object);
+      const itemName = parsed?.itemName || object.split(" to ")[0]?.trim() || object;
+      const item = game.findCharacterItem(character, itemName)?.item;
+      const actualName = item?.name || itemName;
+      if (!matches(actualName, "curious map")) return null;
+
+      const key = "gandalf_map_transfer_requests";
+      const count = (game.flags[key] || 0) + 1;
+      game.flags[key] = count;
+
+      if (count === 1) {
+        return {
+          message: "Gandalf says 'I think the curious map is safer in my hands for now.'",
+          action: "",
+        };
+      }
+      if (count === 2) {
+        return {
+          message: "Gandalf says 'You may have it soon, but let me keep it a little longer.'",
+          action: "",
+        };
+      }
+      return {
+        message: "Gandalf sighs and says 'Very well. Take it, and use it wisely.'",
+        action,
+      };
+    }
+
+    protectedOrderRefusal(character, verb, object) {
+      const game = this.game;
+      const guardedVerbs = new Set(["drop", "leave", "give", "hand", "pass", "send", "deliver", "return"]);
+      if (!guardedVerbs.has(verb)) return "";
+
+      let itemName = object;
+      if (verb === "give" || ["hand", "pass", "send", "deliver", "return"].includes(verb)) {
+        const parsed = this.parseGiveCommand(object);
+        itemName = parsed?.itemName || object.split(" to ")[0]?.trim() || object;
+      }
+      const item = game.findCharacterItem(character, itemName)?.item;
+      const actualName = item?.name || itemName;
+
+      if (matches(character.name, "gandalf") && matches(actualName, "curious map")) {
+        return "Gandalf says 'I think the curious map is safer in my hands for now.'";
+      }
+      if (matches(character.name, "thorin") && (matches(actualName, "curious key") || matches(actualName, "treasure") || matches(actualName, "arkenstone"))) {
+        return "Thorin says 'That is not something I mean to part with lightly.'";
+      }
+      if (matches(character.name, "bilbo") && matches(actualName, "golden ring")) {
+        return "Bilbo says 'I would rather keep the ring to myself just now.'";
+      }
+      return "";
+    }
+
+    askCharacterAbout(characterName, topic) {
+      const game = this.game;
+      const character = this.resolveCharacterTarget(characterName);
+      if (!character) return game.print(`There is no one named ${characterName} here.`);
+      if (matches(character.name, "dragon")) {
+        const special = game.specialConversationResponse(character, topic) || game.specialTalkResponse(character);
+        return game.print(special);
+      }
+      if (character.friendly === false) return this.respondToTalk(character);
+      if (game.player.name === "You" && game.player.noticeable === false) return game.print(`${character.name} says 'who's talking?'`);
+      if (game.unexpectedParty?.blocksDirectInteraction(character, "ask")) return;
+      this.rememberConversationCharacter(character);
+      this.rememberReferencedCharacter(topic);
+      const special = game.specialConversationResponse(character, topic);
+      if (special) return game.print(special);
+      game.print(`${character.name} considers ${game.formatConversationTopic(topic)}, but gives no clear answer.`);
+    }
+
+    parseAskForCommand(command) {
+      const text = normalize(command);
+      if (!text) return null;
+      const polite = text.replace(/^(?:please\s+)?/, "").replace(/\s+please$/, "").trim();
+      const match = polite.match(/^(.+?)\s+for\s+(.+)$/);
+      if (match) return { characterName: match[1].trim(), itemName: match[2].trim() };
+      const fromMatch = polite.match(/^(.+?)\s+from\s+(.+)$/);
+      if (fromMatch) return { characterName: fromMatch[2].trim(), itemName: fromMatch[1].trim() };
+      return null;
+    }
+
+    parseAskConversationCommand(command) {
+      const game = this.game;
+      const text = normalize(command);
+      if (!text) return null;
+      const aboutMatch = text.match(/^(.+?)\s+about\s+(.+)$/);
+      if (aboutMatch) return { characterName: aboutMatch[1].trim(), topic: aboutMatch[2].trim() };
+      const match = text.match(/^(.+?)\s+(where|whether|if|what|why|how|that)\s+(.+)$/);
+      if (match) {
+        return {
+          characterName: match[1].trim(),
+          topic: game.normalizeConversationTopic(match[2], match[3]),
+        };
+      }
+      const riddle = text.match(/^(.+?)\s+(?:a\s+)?riddle$/);
+      if (riddle) return { characterName: riddle[1].trim(), topic: "a riddle" };
+      return null;
+    }
+
+    parseAskToCommand(command) {
+      const game = this.game;
+      const text = normalize(command);
+      if (!text) return null;
+      if (/^.+?\s+(?:where|whether|if|what|why|how|that)\b/.test(text)) return null;
+      const match = text.match(/^(.+?)\s+to\s+(.+)$/);
+      if (match) return { characterName: match[1].trim(), order: match[2].trim() };
+      if (/^.+?\s+(?:for|about|where|whether|if|what|why|how|that)\b/.test(text)) return null;
+      const people = game.peopleInRoom()
+        .filter((character) => character.id !== game.player.id && character.visible)
+        .sort((a, b) => b.name.length - a.name.length);
+      for (const character of people) {
+        const name = normalize(character.name);
+        if (text.startsWith(`${name} `)) {
+          return { characterName: name, order: text.slice(name.length).trim() };
+        }
+      }
+      return null;
+    }
+
+    parseGiveCommand(command) {
+      const text = normalize(command);
+      if (!text) return null;
+      if (text.startsWith("me ")) {
+        return { itemName: text.slice(3).trim(), targetName: "me" };
+      }
+      const giveMeNatural = text.match(/^(.+?)\s+(?:to\s+)?me$/);
+      if (giveMeNatural) return { itemName: giveMeNatural[1].trim(), targetName: "me" };
+      const giveMeMatch = text.match(/^(.+)\s+to\s+(me|you)$/);
+      if (giveMeMatch) return { itemName: giveMeMatch[1].trim(), targetName: giveMeMatch[2] };
+      const parts = text.split(/\s+(?:to|at|into)\s+/);
+      if (parts.length !== 2) return null;
+      return { itemName: parts[0].trim(), targetName: parts[1].trim() };
+    }
+
+    resolveCharacterTarget(targetName) {
+      const game = this.game;
+      const name = this.normalizeCharacterAlias(targetName);
+      if (["me", "you"].includes(name) && game.commandIssuer) {
+        return game.peopleInRoom().find((p) => p.id === game.commandIssuer.id) || null;
+      }
+      return game.peopleInRoom().find((p) => p.id !== game.player.id && matches(p.name, name)) || null;
+    }
+
+    findKnownCharacter(targetName) {
+      const game = this.game;
+      const name = this.normalizeCharacterAlias(targetName);
+      if (!name || ["me", "you"].includes(name)) return null;
+      return Object.values(game.characters).find((character) => character.id !== game.player.id && matches(character.name, name)) || null;
+    }
+
+    lastConversationCharacter() {
+      const game = this.game;
+      return game.lastConversationCharacterId ? game.characters[game.lastConversationCharacterId] || null : null;
+    }
+
+    lastReferencedCharacter() {
+      const game = this.game;
+      return game.lastReferencedCharacterId ? game.characters[game.lastReferencedCharacterId] || null : null;
+    }
+
+    rememberConversationCharacter(character) {
+      if (!character?.id) return;
+      this.game.lastConversationCharacterId = character.id;
+    }
+
+    rememberReferencedCharacter(textOrCharacter) {
+      const game = this.game;
+      if (!textOrCharacter) return;
+      if (typeof textOrCharacter === "object" && textOrCharacter.id) {
+        if (textOrCharacter.id !== game.player.id) game.lastReferencedCharacterId = textOrCharacter.id;
+        return;
+      }
+      const text = normalize(textOrCharacter);
+      if (!text) return;
+      const candidates = Object.values(game.characters)
+        .filter((character) => character.id !== game.player.id)
+        .sort((a, b) => b.name.length - a.name.length);
+      const found = candidates.find((character) => matches(character.name, text) || wordInCommand(text, character.name));
+      if (found) game.lastReferencedCharacterId = found.id;
+    }
+
+    normalizeCharacterAlias(targetName) {
+      const name = normalize(targetName);
+      const aliases = {
+        smaug: "dragon",
+        elves: "wood elf",
+        elf: "wood elf",
+        dwarves: "thorin",
+        dwarf: "thorin",
+      };
+      return aliases[name] || name;
+    }
+
+    handleTalk(command) {
+      const game = this.game;
+      const parsed = this.parseTalkCommand(command);
+      if (!parsed) return game.print("You speak, but only silence meets your words.");
+      const character = this.resolveCharacterTarget(parsed.characterName);
+      if (!character) return game.print("You speak, but only silence meets your words.");
+      if (character.friendly === false) return this.respondToTalk(character);
+      if (game.player.name === "You" && game.player.noticeable === false) return game.print(`${character.name} says 'who's talking?'`);
+      if (game.unexpectedParty?.blocksDirectInteraction(character, parsed.order ? "order" : "talk")) return;
+      if (matches(character.name, "gollum") && parsed.order && game.handleGollumSpeech(parsed.order)) return;
+      if (parsed.order) {
+        this.rememberConversationCharacter(character);
+        this.rememberReferencedCharacter(parsed.order);
+        if (this.handleBardDragonCommand(character, parsed.order)) return;
+        this.delegateCharacterOrder(character, parsed.order);
+        return;
+      }
+      this.rememberConversationCharacter(character);
+      const special = game.specialTalkResponse(character);
+      if (special) return game.print(special);
+      game.print(`${character.name} listens intently, expecting your words.`);
+    }
+
+    parseTalkCommand(command) {
+      const game = this.game;
+      let text = normalize(command).replace(/^(say|talk|speak|whisper|yell)\s+/, "").trim();
+      text = text.replace(/^(to|with)\s+/, "").trim();
+      if (!text) return null;
+      const quoted = text.match(/^(.+?)\s+"(.+)"$/);
+      if (quoted) return { characterName: quoted[1].trim(), order: quoted[2].trim() };
+      const people = game.peopleInRoom()
+        .filter((character) => character.id !== game.player.id && character.visible)
+        .sort((a, b) => b.name.length - a.name.length);
+      for (const character of people) {
+        const name = normalize(character.name);
+        if (text === name) return { characterName: name, order: "" };
+        if (text.startsWith(`${name} `)) return { characterName: name, order: text.slice(name.length).trim().replace(/^to\s+/, "") };
+      }
+      return { characterName: text, order: "" };
+    }
+
+    respondToTalk(character) {
+      const game = this.game;
+      if (matches(character.name, "gollum") && game.currentRoom === "deep_dark_lake") {
+        if (game.gollumState?.pocketQuestionAsked) return game.print("Gollum is no longer listening. He is hunting for his precious.");
+        const line = game.beginGollumRiddleContest() || "Gollum watches you in silence from the dark water.";
+        return game.print(line);
+      }
+      if (matches(character.name, "dragon")) {
+        const line = game.specialTalkResponse(character) || `${character.name} watches and waits.`;
+        return game.print(line);
+      }
+      game.print(`${character.name} glares at you, unimpressed.`);
+    }
+
+    handleBardDragonCommand(character, command) {
+      const game = this.game;
+      if (!matches(character.name, "bard")) return false;
+      const text = normalizeWords(command);
+      if (/\bget\b/.test(text) && /\barrow\b/.test(text) && /\bquiver\b/.test(text)) {
+        const hasArrow = character.inventory.some((itemId) => matches(game.items[itemId]?.name, "arrow"));
+        if (hasArrow) game.flags.bardreadiedarrow = true;
+        game.print(hasArrow ? "Bard readies the strong arrow from his quiver." : "Bard searches his quiver, but finds no arrow.");
+        return true;
+      }
+      const dragon = Object.values(game.characters).find((candidate) => matches(candidate.name, "dragon"));
+      const liveDragonVisible = Boolean(dragon && dragon.visible !== false);
+      const asksToAttack = /\b(kill|attack|shoot|slay|fire)\b/.test(text)
+        || /\btake\b.*\bshot\b/.test(text)
+        || (/\bloose\b/.test(text) && /\barrow\b/.test(text));
+      const targetsDragon = /\bdragon\b/.test(text) || (liveDragonVisible && (/\btake\b.*\bshot\b/.test(text) || /\bloose\b/.test(text)));
+      if (!asksToAttack || !targetsDragon) return false;
+
+      const hasBow = character.inventory.some((itemId) => matches(game.items[itemId]?.name, "bow"));
+      const hasArrow = character.inventory.some((itemId) => matches(game.items[itemId]?.name, "arrow"));
+      if (!hasBow || !hasArrow) {
+        game.print("Bard checks his gear, but he lacks the bow and arrow needed to face the dragon.");
+        return true;
+      }
+      if (!dragon || dragon.visible === false) {
+        game.print("Bard says the dragon has already been slain.");
+        return true;
+      }
+      dragon.visible = false;
+      dragon.attackFlag = 0;
+      game.flags.dragondefeated = true;
+      game.print("Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky.");
+      return true;
+    }
+  }
+
+  class LayoutController {
+    constructor(game) {
+      this.game = game;
+    }
+
+    initialize() {
+      const game = this.game;
+      game.layoutSwitchHideTimer = null;
+      game.layoutSwitchAutoHide = this.shouldAutoHideLayoutSwitch();
+      game.layoutResizeCleanup = null;
+      game.layoutMouseAnchor = null;
+      game.layoutMode = this.loadLayoutModePreference();
+      game.layout2SceneWidth = this.loadLayout2SceneWidthPreference();
+      this.applyLayout2SceneWidth(game.layout2SceneWidth, { persist: false });
+      this.applyLayoutMode(game.layoutMode);
+      this.initializeLayoutSwitchVisibility();
+      this.initializeLayoutDivider();
+    }
+
+    render() {
+      const game = this.game;
+      const room = game.room();
+      const scene = roomImage.closest(".scene");
+      if (game.roomIsDark()) {
+        this.finishImageTransition(scene);
+        game.currentImageSrc = "";
+        roomImage.setAttribute("hidden", "hidden");
+        roomImage.removeAttribute("src");
+        roomImage.alt = "";
+      } else if (room?.image) {
+        roomImage.removeAttribute("hidden");
+        const src = assetUrl(IMAGE_ROOT, room.image);
+        this.swapRoomImage(scene, src);
+        roomImage.alt = room.name;
+      } else {
+        this.finishImageTransition(scene);
+        game.currentImageSrc = "";
+        roomImage.setAttribute("hidden", "hidden");
+        roomImage.removeAttribute("src");
+        roomImage.alt = "";
+      }
+      fillList(inventoryList, game.player.inventory.map((id) => game.inventorySidebarLabel(game.items[id])).filter(Boolean), "nothing");
+      if (inventoryStatus) inventoryStatus.textContent = `Weight ${game.currentCarryWeight()}/${game.carryCapacity()}`;
+      fillList(exitsList, game.roomConnections().map((c) => c.direction), "none");
+      fillList(peopleList, game.visiblePeopleInRoom().filter((p) => p.name !== "You" && p.visible).map((p) => p.name), "none");
+    }
+
+    swapRoomImage(scene, nextSrc) {
+      const game = this.game;
+      const previousSrc = game.currentImageSrc || roomImage.getAttribute("src") || "";
+      if (previousSrc === nextSrc) {
+        if (roomImage.getAttribute("src") !== nextSrc) roomImage.src = nextSrc;
+        game.currentImageSrc = nextSrc;
+        return;
+      }
+
+      roomImage.src = nextSrc;
+      game.currentImageSrc = nextSrc;
+
+      if (!previousSrc || !imageReveal || !imageRevealFill || !imageRevealOutline) {
+        this.finishImageTransition(scene);
+        return;
+      }
+
+      this.finishImageTransition(scene);
+      imageRevealFill.src = previousSrc;
+      imageRevealOutline.src = nextSrc;
+      imageRevealFill.alt = "";
+      imageRevealOutline.alt = "";
+      imageReveal.removeAttribute("hidden");
+
+      scene?.classList.remove("is-transitioning");
+      void scene?.offsetWidth;
+      scene?.classList.add("is-transitioning");
+
+      const cycle = ++game.imageTransitionCycle;
+      game.imageTransitionTimer = setTimeout(() => {
+        if (cycle !== game.imageTransitionCycle) return;
+        this.finishImageTransition(scene);
+      }, 1240);
+    }
+
+    finishImageTransition(scene) {
+      const game = this.game;
+      clearTimeout(game.imageTransitionTimer);
+      game.imageTransitionTimer = null;
+      game.imageTransitionCycle += 1;
+      scene?.classList.remove("is-transitioning");
+      imageReveal?.setAttribute("hidden", "hidden");
+      imageRevealFill?.removeAttribute("src");
+      imageRevealOutline?.removeAttribute("src");
+      if (imageRevealFill) imageRevealFill.alt = "";
+      if (imageRevealOutline) imageRevealOutline.alt = "";
+    }
+
+    loadLayoutModePreference() {
+      const saved = String(localStorage.getItem(LAYOUT_PREF_KEY) || "").trim();
+      return ["1", "2"].includes(saved) ? saved : "1";
+    }
+
+    loadLayout2SceneWidthPreference() {
+      const saved = Number.parseFloat(localStorage.getItem(LAYOUT_SPLIT_PREF_KEY) || "");
+      return Number.isFinite(saved) ? saved : DEFAULT_LAYOUT_2_SCENE_WIDTH;
+    }
+
+    shouldAutoHideLayoutSwitch() {
+      if (!layoutSwitch || typeof window.matchMedia !== "function") return false;
+      return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+    }
+
+    initializeLayoutSwitchVisibility() {
+      const game = this.game;
+      if (!layoutSwitch) return;
+      if (!game.layoutSwitchAutoHide) {
+        layoutSwitch.classList.remove("layout-switch--auto-hide");
+        layoutSwitch.classList.remove("is-visible");
+        layoutDivider?.classList?.remove("layout-divider--auto-hide");
+        layoutDivider?.classList?.remove("is-visible");
+        return;
+      }
+      layoutSwitch.classList.add("layout-switch--auto-hide");
+      layoutSwitch.classList.remove("is-visible");
+      layoutDivider?.classList?.add("layout-divider--auto-hide");
+      layoutDivider?.classList?.remove("is-visible");
+    }
+
+    showLayoutSwitch() {
+      const game = this.game;
+      if (!game.layoutSwitchAutoHide) return;
+      layoutSwitch?.classList?.add("is-visible");
+      if (game.layoutMode === "2") layoutDivider?.classList?.add("is-visible");
+    }
+
+    hideLayoutSwitch() {
+      const game = this.game;
+      if (!game.layoutSwitchAutoHide) return;
+      this.cancelLayoutSwitchHide();
+      layoutSwitch?.classList?.remove("is-visible");
+      layoutDivider?.classList?.remove("is-visible");
+    }
+
+    cancelLayoutSwitchHide() {
+      const game = this.game;
+      clearTimeout(game.layoutSwitchHideTimer);
+      game.layoutSwitchHideTimer = null;
+    }
+
+    scheduleLayoutSwitchHide(delay = LAYOUT_SWITCH_IDLE_MS) {
+      const game = this.game;
+      if (!game.layoutSwitchAutoHide || !layoutSwitch) return;
+      this.cancelLayoutSwitchHide();
+      game.layoutSwitchHideTimer = setTimeout(() => {
+        if (document.activeElement === layoutSwitch || layoutSwitch.contains?.(document.activeElement)) return;
+        this.hideLayoutSwitch();
+      }, delay);
+    }
+
+    revealLayoutSwitch() {
+      const game = this.game;
+      if (!game.layoutSwitchAutoHide || !layoutSwitch) return;
+      this.showLayoutSwitch();
+      this.scheduleLayoutSwitchHide();
+    }
+
+    handleLayoutMouseDown(event) {
+      this.game.layoutMouseAnchor = { x: event?.clientX ?? 0, y: event?.clientY ?? 0 };
+      this.revealLayoutSwitch();
+    }
+
+    handleLayoutMouseActivity(event) {
+      const game = this.game;
+      if (!game.layoutSwitchAutoHide) return;
+      const x = event?.clientX;
+      const y = event?.clientY;
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        this.revealLayoutSwitch();
+        return;
+      }
+      if (!game.layoutMouseAnchor) {
+        game.layoutMouseAnchor = { x, y };
+        return;
+      }
+      const dx = x - game.layoutMouseAnchor.x;
+      const dy = y - game.layoutMouseAnchor.y;
+      if (Math.hypot(dx, dy) < LAYOUT_MOUSE_ACTIVITY_THRESHOLD) return;
+      game.layoutMouseAnchor = { x, y };
+      this.revealLayoutSwitch();
+    }
+
+    layout2SceneBounds() {
+      const shellWidth = gameShell?.getBoundingClientRect?.().width || window.innerWidth || 1280;
+      const dividerWidth = layoutDivider?.getBoundingClientRect?.().width || 14;
+      const minPanelWidth = shellWidth <= 860 ? 240 : 320;
+      if (!shellWidth) return { min: 36, max: 72 };
+      const min = Math.max(24, (minPanelWidth / shellWidth) * 100);
+      const max = Math.min(76, 100 - (((minPanelWidth + dividerWidth) / shellWidth) * 100));
+      if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return { min: 36, max: 72 };
+      return { min, max };
+    }
+
+    normalizeLayout2SceneWidth(value) {
+      const numeric = Number.parseFloat(value);
+      const { min, max } = this.layout2SceneBounds();
+      const candidate = Number.isFinite(numeric) ? numeric : DEFAULT_LAYOUT_2_SCENE_WIDTH;
+      return Math.min(max, Math.max(min, candidate));
+    }
+
+    applyLayout2SceneWidth(value, options = {}) {
+      const game = this.game;
+      const normalized = this.normalizeLayout2SceneWidth(value);
+      game.layout2SceneWidth = normalized;
+      document.body?.style?.setProperty?.("--layout-2-scene-width", `${normalized}%`);
+      document.documentElement?.style?.setProperty?.("--layout-2-scene-width", `${normalized}%`);
+      if (options.persist !== false) localStorage.setItem(LAYOUT_SPLIT_PREF_KEY, String(normalized));
+      return normalized;
+    }
+
+    refreshLayout() {
+      const game = this.game;
+      if (!gameShell?.style) return;
+      if (game.layoutMode === "2") this.applyLayout2SceneWidth(game.layout2SceneWidth, { persist: false });
+      gameShell.style.setProperty("--layout-refresh-token", String(Date.now()));
+      gameShell.getBoundingClientRect?.();
+      requestAnimationFrame(() => gameShell.style.removeProperty("--layout-refresh-token"));
+    }
+
+    updateLayout2SceneWidthFromPointer(clientX) {
+      if (!gameShell?.getBoundingClientRect) return;
+      const rect = gameShell.getBoundingClientRect();
+      if (!rect.width) return;
+      const percent = ((clientX - rect.left) / rect.width) * 100;
+      this.applyLayout2SceneWidth(percent);
+    }
+
+    stopLayoutResize() {
+      const game = this.game;
+      document.body?.classList?.remove("is-resizing-layout");
+      if (typeof game.layoutResizeCleanup === "function") game.layoutResizeCleanup();
+      game.layoutResizeCleanup = null;
+      if (game.layoutSwitchAutoHide) this.scheduleLayoutSwitchHide(700);
+    }
+
+    initializeLayoutDivider() {
+      const game = this.game;
+      if (!layoutDivider) return;
+      layoutDivider.addEventListener("pointerdown", (event) => {
+        if (game.layoutMode !== "2" || event.button !== 0) return;
+        if (!gameShell?.getBoundingClientRect) return;
+        event.preventDefault();
+        this.stopLayoutResize();
+        this.showLayoutSwitch();
+        this.cancelLayoutSwitchHide();
+        document.body?.classList?.add("is-resizing-layout");
+        this.updateLayout2SceneWidthFromPointer(event.clientX);
+        const move = (moveEvent) => this.updateLayout2SceneWidthFromPointer(moveEvent.clientX);
+        const finish = () => this.stopLayoutResize();
+        document.addEventListener("pointermove", move);
+        document.addEventListener("pointerup", finish, { once: true });
+        document.addEventListener("pointercancel", finish, { once: true });
+        game.layoutResizeCleanup = () => {
+          document.removeEventListener("pointermove", move);
+          document.removeEventListener("pointerup", finish);
+          document.removeEventListener("pointercancel", finish);
+        };
+      });
+    }
+
+    applyLayoutMode(mode) {
+      const game = this.game;
+      const normalized = ["1", "2"].includes(String(mode)) ? String(mode) : "1";
+      game.layoutMode = normalized;
+      document.body?.setAttribute("data-layout", normalized);
+      document.documentElement?.setAttribute?.("data-layout", normalized);
+      if (normalized === "2") this.applyLayout2SceneWidth(game.layout2SceneWidth, { persist: false });
+      const syncPressed = (button, value) => {
+        if (!button) return;
+        button.setAttribute("aria-pressed", normalized === value ? "true" : "false");
+      };
+      syncPressed(layoutMode1Button, "1");
+      syncPressed(layoutMode2Button, "2");
+      if (normalized !== "2") this.stopLayoutResize();
+    }
+
+    setLayoutMode(mode) {
+      this.applyLayoutMode(mode);
+      localStorage.setItem(LAYOUT_PREF_KEY, this.game.layoutMode);
+    }
+  }
+
+  class SaveSystem {
+    constructor(game) {
+      this.game = game;
+    }
+
+    initialize() {
+      const game = this.game;
+      game.autosaveSnapshot = null;
+      game.autosaveMeta = null;
+      game.autosaveCounter = 0;
+    }
+
+    save(name) {
+      const game = this.game;
+      if (!name) return game.print("Error: You must specify a filename to save.");
+      localStorage.setItem(SAVE_PREFIX + name, JSON.stringify(this.createSnapshot()));
+      game.print(`Game saved as "${name}".`);
+    }
+
+    load(name) {
+      const game = this.game;
+      if (!name) return game.print("Error: You must specify a filename to load.");
+      const raw = localStorage.getItem(SAVE_PREFIX + name);
+      if (!raw) return game.print(`No saved game named "${name}" was found.`);
+      const save = JSON.parse(raw);
+      this.restoreSnapshot(save);
+      game.print(`Game "${name}" loaded.`);
+      game.describeRoom({ full: true });
+    }
+
+    listSaves() {
+      const game = this.game;
+      const saves = Object.keys(localStorage).filter((key) => key.startsWith(SAVE_PREFIX)).map((key) => key.slice(SAVE_PREFIX.length));
+      game.print(saves.length ? `Saved games:\n${saves.join("\n")}` : "No saved games found.");
+    }
+
+    createSnapshot() {
+      const game = this.game;
+      return clone({
+        items: game.items,
+        doors: game.doors,
+        characters: game.characters,
+        currentRoom: game.currentRoom,
+        storySeed: game.storySeed,
+        storyRunCount: game.storyRunCount,
+        flags: game.flags,
+        visitedRooms: [...game.visitedRooms],
+        clarifiedReferences: game.clarifiedReferences,
+        visitedTrollsClearing: game.visitedTrollsClearing,
+        waitCounter: game.waitCounter,
+        secretDoorWaitCounter: game.secretDoorWaitCounter,
+        trollsTransformed: game.trollsTransformed,
+        trollsDefeated: game.trollsDefeated,
+        spiderEyesState: game.spiderEyesState,
+        gollumState: game.gollumState,
+        turnCount: game.turnCount,
+        endgame: game.endgame,
+        unexpectedParty: game.unexpectedParty?.serialize(),
+      });
+    }
+
+    restoreSnapshot(save) {
+      const game = this.game;
+      game.clearArrivalNoticeTimers();
+      game.stopAutoplay();
+      game.items = save.items;
+      game.doors = save.doors;
+      game.characters = save.characters;
+      game.currentRoom = save.currentRoom;
+      game.storySeed = Number(save.storySeed) || game.nextStorySeed();
+      game.storyRunCount = Number(save.storyRunCount) || game.storyRunCount;
+      game.flags = save.flags || {};
+      game.visitedRooms = new Set(save.visitedRooms || [game.currentRoom]);
+      game.clarifiedReferences = save.clarifiedReferences || {};
+      game.visitedTrollsClearing = Boolean(save.visitedTrollsClearing);
+      game.waitCounter = save.waitCounter || 0;
+      game.secretDoorWaitCounter = save.secretDoorWaitCounter || 0;
+      game.trollsTransformed = Boolean(save.trollsTransformed);
+      game.trollsDefeated = Boolean(save.trollsDefeated);
+      game.spiderEyesState = save.spiderEyesState || null;
+      game.gollumState = game.restoreGollumState(save.gollumState);
+      game.turnCount = Number(save.turnCount) || 0;
+      game.endgame = false;
+      game.endgameRestartArmed = false;
+      game.pendingEndgameChoice = null;
+      game.player = game.characters[game.data.player];
+      game.normalizeCharacterMovementModes();
+      game.normalizeLanternState();
+      game.addZXFinaleState();
+      game.unexpectedParty?.load(save.unexpectedParty || null);
+      game.companionDirector?.sync();
+      output.replaceChildren();
+      output.classList.remove("end-screen");
+      input.value = "";
+      input.focus();
+      game.render();
+    }
+
+    recordAutosave(label, options = {}) {
+      const game = this.game;
+      if (game.endgame) return false;
+      const key = options.key || `${game.currentRoom}:${label}`;
+      const turnCount = Number(game.turnCount) || 0;
+      const previous = game.autosaveMeta;
+      if (!options.force && previous?.key === key && previous?.turnCount === turnCount) return false;
+      game.autosaveSnapshot = this.createSnapshot();
+      game.autosaveCounter += 1;
+      game.autosaveMeta = {
+        id: game.autosaveCounter,
+        key,
+        label,
+        roomId: game.currentRoom,
+        roomName: game.room()?.name || game.currentRoom,
+        turnCount,
+      };
+      game.print(`Autosave: ${label}.`, "system");
+      return true;
+    }
+
+    resumeFromAutosave() {
+      const game = this.game;
+      if (!game.autosaveSnapshot) {
+        game.print("There is no autosave available.", "system");
+        return false;
+      }
+      this.restoreSnapshot(clone(game.autosaveSnapshot));
+      game.print(`Resumed from autosave${game.autosaveMeta?.label ? `: ${game.autosaveMeta.label}` : ""}.`, "system");
+      game.describeRoom({ full: true });
+      return true;
+    }
+  }
+
+  class SpecialEncounters {
+    constructor(game) {
+      this.game = game;
+    }
+
+    createGollumState() {
+      const game = this.game;
+      const riddleIds = this.selectGollumRiddleIds();
+      return {
+        met: false,
+        contestStarted: false,
+        awaitingAnswer: false,
+        currentRiddleIndex: 0,
+        riddleIds,
+        awaitingPlayerRiddle: false,
+        pocketQuestionAsked: false,
+        enraged: false,
+        escaped: false,
+        activityIndex: 0,
+        activityCooldown: 0,
+        revealStyle: Math.abs(hashString(`${game.storySeed}:gollum-reveal`)) % 4,
+        deathStyle: Math.abs(hashString(`${game.storySeed}:gollum-death`)) % 4,
+      };
+    }
+
+    restoreGollumState(savedState = null) {
+      if (!savedState) return this.createGollumState();
+      const base = this.createGollumState();
+      const restored = { ...base, ...savedState };
+      restored.currentRiddleIndex = Math.max(0, Number(restored.currentRiddleIndex) || 0);
+      if (!Array.isArray(restored.riddleIds) || !restored.riddleIds.length) restored.riddleIds = base.riddleIds;
+      restored.riddleIds = restored.riddleIds
+        .map((value) => Number(value))
+        .filter((value) => Number.isInteger(value) && value >= 0 && value < GOLLUM_RIDDLE_POOL.length)
+        .slice(0, 2);
+      if (!restored.riddleIds.length) restored.riddleIds = base.riddleIds;
+      if (restored.currentRiddleIndex >= restored.riddleIds.length) restored.currentRiddleIndex = restored.riddleIds.length - 1;
+      restored.activityIndex = Number.isInteger(restored.activityIndex) ? restored.activityIndex : base.activityIndex;
+      restored.activityCooldown = Number.isFinite(restored.activityCooldown) ? restored.activityCooldown : base.activityCooldown;
+      restored.revealStyle = Number.isInteger(restored.revealStyle) ? restored.revealStyle : base.revealStyle;
+      restored.deathStyle = Number.isInteger(restored.deathStyle) ? restored.deathStyle : base.deathStyle;
+      return restored;
+    }
+
+    selectGollumRiddleIds() {
+      const game = this.game;
+      const pool = GOLLUM_RIDDLE_POOL.map((_entry, index) => index);
+      const chosen = [];
+      while (pool.length && chosen.length < 2) {
+        const pickIndex = Math.abs(hashString(`${game.storySeed}:gollum-riddle:${chosen.length}:${pool.length}`)) % pool.length;
+        chosen.push(pool.splice(pickIndex, 1)[0]);
+      }
+      return chosen;
+    }
+
+    activeGollumRiddles(state = this.game.gollumState) {
+      const ids = Array.isArray(state?.riddleIds) && state.riddleIds.length ? state.riddleIds : this.selectGollumRiddleIds();
+      return ids.map((id) => GOLLUM_RIDDLE_POOL[id]).filter(Boolean);
+    }
+
+    currentGollumRiddle(state = this.game.gollumState) {
+      const riddles = this.activeGollumRiddles(state);
+      return riddles[state?.currentRiddleIndex || 0] || riddles[0] || null;
+    }
+
+    gollumRevealLines() {
+      const styles = [
+        [
+          "A small boat glides out across the black water. In it crouches Gollum, pale eyes shining in the dark.",
+          "Gollum whispers 'What is it, my precious? Lost, is it? Hungry, is it?'",
+          "For the moment he seems more curious than murderous. Riddles may yet buy you time.",
+        ],
+        [
+          "A wet scraping reaches you from the stones, and then Gollum unfolds himself from the darkness at the water's edge.",
+          "His pale eyes blink once. 'Lost, is it? Lost and found by us, perhapses?' he whispers.",
+          "He seems intent on studying you before deciding whether you are guest, game, or thief.",
+        ],
+        [
+          "Something disturbs the black water. A narrow boat noses silently from the dark, and Gollum is suddenly there, peering at you over its side.",
+          "Gollum rocks gently and murmurs 'A nasty little Baggins in the dark. Shall we talk, precious?'",
+          "His hunger is plain, but so is his fascination. A riddle-game might hold him for a while.",
+        ],
+        [
+          "You catch a flash of pale eyes before the rest of him emerges from shadow, one hand on a boat, the other on the slick stones.",
+          "Gollum gives a thin smile. 'We knows a stranger when we smells one, yes. We talks first, perhaps.'",
+          "He has not attacked yet. There is room, for the moment, for words and riddles.",
+        ],
+      ];
+      return styles[this.game.gollumState?.revealStyle || 0] || styles[0];
+    }
+
+    gollumContestOpener() {
+      const game = this.game;
+      const openers = [
+        {
+          first: "Gollum glides over the black water and whispers 'If Baggins answers true, then Baggins may ask. If not, we eats him, yes.'",
+          repeat: "Gollum paddles nearer and whispers 'If Baggins answers true, then Baggins may ask. If not, we eats him, yes.'",
+        },
+        {
+          first: "Gollum tilts his head and rasps 'Answer true, little Baggins, and then you may ask. Answer false, and we keeps you forever.'",
+          repeat: "Gollum taps the boat with one claw. 'Again, yes. Answer true and ask. Answer false and feed us.'",
+        },
+        {
+          first: "Gollum folds himself low in the boat. 'Riddles first, precious. True answers earn a question. False answers earn the dark.'",
+          repeat: "Gollum circles closer. 'More riddles, yes. Truth buys time. Mistakes buy death.'",
+        },
+      ];
+      const variant = openers[Math.abs(hashString(`${game.storySeed}:gollum-opener`)) % openers.length];
+      return game.gollumState?.met ? variant.repeat : variant.first;
+    }
+
+    gollumWrongAnswerOutcome() {
+      const styles = [
+        {
+          attack: "Gollum's pale eyes flare with hunger. 'Wrong, precious. Wrong!' He springs from the boat and falls on you in the dark.",
+          ending: "Gollum catches you in the dark.",
+        },
+        {
+          attack: "Gollum lets out a shrill cry of delight. 'Wrong! Wrong!' He darts low, knife-quick, and drags you down among the wet stones.",
+          ending: "Gollum tears you down beside the black water.",
+        },
+        {
+          attack: "With a hiss like tearing cloth, Gollum launches himself at your throat. The dark water splashes, cold hands close, and the cave spins.",
+          ending: "Gollum strangles you in the dark.",
+        },
+        {
+          attack: "Gollum shrieks 'False!' and comes at you in a frenzy of claws and teeth, driving you backward into the black water.",
+          ending: "Gollum drags you under the dark lake.",
+        },
+      ];
+      return styles[this.game.gollumState?.deathStyle || 0] || styles[0];
+    }
+
+    gollumRoomNarrative() {
+      const game = this.game;
+      const gollum = this.currentGollum();
+      if (!gollum || gollum.position !== "deep_dark_lake" || gollum.visible === false) return "";
+      if (!game.gollumState?.met) return "The black water gives back no light, and some patient thing beyond it seems to be listening.";
+      return GOLLUM_ACTIVITY_LINES[game.gollumState?.activityIndex || 0] || GOLLUM_ACTIVITY_LINES[0];
+    }
+
+    smaugRoomNarrative() {
+      return SMAUG_STATE_DESCRIPTIONS[this.currentSmaugState()] || SMAUG_STATE_DESCRIPTIONS.sleeping;
+    }
+
+    advanceGollumActivity() {
+      const game = this.game;
+      if (game.currentRoom !== "deep_dark_lake" || !game.gollumState) return;
+      const gollum = this.currentGollum();
+      if (!gollum || gollum.visible === false) return;
+      game.gollumState.activityCooldown = Math.max(0, (game.gollumState.activityCooldown || 0) - 1);
+      if (game.gollumState.activityCooldown > 0) return;
+      const nextIndex = Math.abs(hashString(`${game.storySeed}:gollum-activity:${game.turnCount}`)) % GOLLUM_ACTIVITY_LINES.length;
+      game.gollumState.activityIndex = nextIndex;
+      game.gollumState.activityCooldown = 2 + (nextIndex % 2);
+      if (game.gollumState.met && !game.gollumState.awaitingAnswer && !game.gollumState.awaitingPlayerRiddle && !game.gollumState.pocketQuestionAsked && game.turnCount % 3 === 0) {
+        game.print(GOLLUM_ACTIVITY_LINES[nextIndex]);
+      }
+    }
+
+    currentSmaugState() {
+      return this.game.flags.smaugstate || "sleeping";
+    }
+
+    setSmaugState(state, announce = false) {
+      const game = this.game;
+      const normalized = SMAUG_STATE_DESCRIPTIONS[state] ? state : "sleeping";
+      const previous = this.currentSmaugState();
+      game.flags.smaugstate = normalized;
+      if (announce && previous !== normalized && IMMERSION_EREBOR_INNER_ROOMS.has(game.currentRoom)) {
+        const lines = {
+          curious: "Smaug stirs, one vast lid lifting over a watchful eye.",
+          suspicious: "Smaug's voice rolls through the hall, soft and terrible, as he begins to suspect an intruder.",
+          searching: "Smaug rises from the treasure and begins to search the hall in deadly earnest.",
+          enraged: "Smaug's patience breaks. Rage shakes the treasure as the dragon lashes the chamber with tail and voice.",
+          sleeping: "At last the dragon settles again upon the gold, though not peacefully.",
+        };
+        game.print(lines[normalized] || SMAUG_STATE_DESCRIPTIONS[normalized]);
+      }
+    }
+
+    advanceSmaugAwareness() {
+      const game = this.game;
+      const dragon = Object.values(game.characters).find((character) => matches(character.name, "dragon") && character.visible !== false);
+      if (!dragon) return;
+      if (!(IMMERSION_EREBOR_INNER_ROOMS.has(game.currentRoom) || IMMERSION_EREBOR_OUTER_ROOMS.has(game.currentRoom) || game.flags.treasuretaken)) {
+        this.setSmaugState("sleeping");
+        return;
+      }
+      let state = "sleeping";
+      if (game.flags.treasuretaken) state = "enraged";
+      else if (IMMERSION_EREBOR_INNER_ROOMS.has(game.currentRoom) && game.player.noticeable !== false) {
+        const tempo = (game.turnCount + (game.flags.smaugSuspicion || 0)) % 6;
+        state = tempo <= 1 ? "curious" : tempo <= 3 ? "suspicious" : "searching";
+      } else if (IMMERSION_EREBOR_INNER_ROOMS.has(game.currentRoom)) {
+        state = "suspicious";
+      } else if (IMMERSION_EREBOR_OUTER_ROOMS.has(game.currentRoom)) {
+        state = "curious";
+      }
+      if (state === "searching" && game.player.noticeable !== false && game.turnCount % 5 === 0) {
+        state = "enraged";
+      }
+      game.flags.smaugSuspicion = (game.flags.smaugSuspicion || 0) + (IMMERSION_EREBOR_INNER_ROOMS.has(game.currentRoom) ? 1 : 0);
+      this.setSmaugState(state, true);
+    }
+
+    specialTalkResponse(character) {
+      const game = this.game;
+      if (game.unexpectedParty?.isAmbientDwarf(character)) {
+        return game.unexpectedParty.dwarfProfile(character).talk;
+      }
+      if (matches(character.name, "elrond") && game.currentRoom === "rivendell") {
+        return "Elrond folds his hands and says 'Speak without haste. In Rivendell, even quiet words may be worth the hearing.'";
+      }
+      if (matches(character.name, "beorn") && game.currentRoom === "beorns_house") {
+        return "Beorn studies you in silence for a moment and says 'Say what you mean, little one, and spare me needless words.'";
+      }
+      if (matches(character.name, "gollum")) {
+        if (!game.gollumState?.contestStarted) {
+          return game.pick([
+            "Gollum rocks softly on the black water and whispers 'Riddles, yes, riddles. Ask Gollum a riddle, and we shall see who goes and who is eaten.'",
+            "Gollum tilts his head and rasps 'Riddles first, yes. Ask Gollum a riddle, and then we shall see what becomes of Baggins.'",
+            "Gollum grins in the dark. 'A riddle-game, precious. That will tell whether Baggins goes free or feeds us.'",
+          ], hashString(`${game.storySeed}:gollum-talk-intro`));
+        }
+        if (game.gollumState.awaitingAnswer) return "Gollum hisses 'Answer first, precious.'";
+        if (game.gollumState.awaitingPlayerRiddle) return "Gollum licks his lips. 'Now Baggins asks, yes. Ask it, precious, ask it.'";
+        if (game.gollumState.pocketQuestionAsked) return "Gollum is past speech now. He hunts only for his precious.";
+      }
+      if (matches(character.name, "dragon")) {
+        const lines = {
+          sleeping: "A deep rumble answers you. Whether it is speech or dreaming, it contains very little reassurance.",
+          curious: "Smaug says 'A courteous little voice in my halls? Come nearer, and let us see what sort of thief has learned manners.'",
+          suspicious: "Smaug says 'You smell of doorways, moonlight, and secrets. Tell me, little trespasser, who taught you to walk so softly?'",
+          searching: "Smaug says 'Come out, come out, thief in the dark. I know now that I am not alone.'",
+          enraged: "Smaug's answer is a furnace-breath growl: 'When I find you, I shall know your taste as well as your scent.'",
+        };
+        return lines[this.currentSmaugState()] || lines.sleeping;
+      }
+      return "";
+    }
+
+    specialConversationResponse(character, topic) {
+      const game = this.game;
+      const text = normalize(topic);
+      if (game.unexpectedParty?.isAmbientDwarf(character)) {
+        if (matchesAny(text, ["food", "supper", "tea", "ale", "beer", "pantry"])) return game.unexpectedParty.dwarfProfile(character).ask;
+        if (matchesAny(text, ["quest", "road", "journey", "mountain", "thorin"])) return `${character.name} says 'We have not come merely to enjoy your excellent housekeeping, though I mean to do my best with it while it lasts.'`;
+        return game.unexpectedParty.dwarfProfile(character).ask;
+      }
+      if (matches(character.name, "gollum")) {
+        if (text === "a riddle" || text === "riddle") return this.beginGollumRiddleContest();
+        if (text.includes("pocket")) return this.resolveGollumPocketQuestion();
+        if (text.includes("exit") || text.includes("way out")) {
+          return game.gollumState?.pocketQuestionAsked
+            ? "Gollum rasps from the dark 'North, yes. But not for thieves. Not for Baggins, no.'"
+            : "Gollum bares his teeth. 'Win first, then ask of ways out, precious.'";
+        }
+      }
+      if (matches(character.name, "elrond")) {
+        if (matchesAny(text, ["map", "moon letters", "moon-letters", "markings"])) {
+          return "Elrond says 'Such maps do not speak plainly to hasty eyes. Patience, and the right light, reveal more than force ever could.'";
+        }
+        if (matchesAny(text, ["secret door", "door", "key"])) {
+          return "Elrond says 'Many doors in the elder tales were meant to be found at their proper hour, and not before.'";
+        }
+      }
+      if (matches(character.name, "beorn")) {
+        if (matchesAny(text, ["mirkwood", "forest", "wood"])) {
+          return "Beorn says 'The forest ahead is black with old hunger. Keep to the path, and trust no feast that waits for you in silence.'";
+        }
+        if (matchesAny(text, ["goblins", "wargs", "wolves"])) {
+          return "Beorn snorts. 'Goblins breed mischief as marshes breed flies, and wargs are seldom far behind them.'";
+        }
+        if (matchesAny(text, ["food", "meal", "shelter", "night", "rest"])) {
+          return "Beorn says 'There is food and a roof here for decent guests. Take both with thanks, and do not abuse either.'";
+        }
+      }
+      if (matches(character.name, "dragon")) {
+        if (matchesAny(text, ["treasure", "gold", "cup", "hoard"])) return "Smaug says 'My armour is like tenfold shields, my teeth are swords, my claws are spears, and this wealth is mine by fire and fear.'";
+        if (matchesAny(text, ["thorin", "dwarves", "company"])) return "Smaug says 'Ah, the dwarves. Greed remembers old tunnels better than wisdom does.'";
+        if (matchesAny(text, ["door", "entrance", "way in", "secret"])) return "Smaug gives a low pleased rumble. 'You ask many careful questions for so small a guest. That interests me.'";
+      }
+      return "";
+    }
+
+    currentGollum() {
+      const game = this.game;
+      return game.characters.gollum || Object.values(game.characters).find((character) => matches(character.name, "gollum")) || null;
+    }
+
+    isGollumPresentInLake() {
+      const gollum = this.currentGollum();
+      return Boolean(gollum && gollum.visible !== false && gollum.position === "deep_dark_lake");
+    }
+
+    ensureLakeRingInPocket() {
+      const game = this.game;
+      const ring = game.items.golden_ring;
+      if (!ring) return false;
+      if (game.player.inventory.includes(ring.id) || game.player.worn.includes(ring.id)) return false;
+      game.detachItem(ring.id);
+      ring.visible = true;
+      ring.location = { type: "character", id: game.player.id };
+      game.player.inventory.push(ring.id);
+      return true;
+    }
+
+    beginGollumRiddleContest() {
+      const game = this.game;
+      const gollum = this.currentGollum();
+      if (!gollum || gollum.position !== game.currentRoom) return "";
+      this.ensureLakeRingInPocket();
+      if (!game.gollumState) game.gollumState = this.createGollumState();
+      if (game.gollumState.pocketQuestionAsked) return "Gollum is done with riddles. He wants only his precious now, yes.";
+      if (game.gollumState.awaitingAnswer) return "Gollum hisses 'Answer first, precious.'";
+      if (game.gollumState.awaitingPlayerRiddle) return "Gollum curls his fingers over the boat's edge. 'Baggins asks now. Speak the riddle, then.'";
+      game.gollumState.contestStarted = true;
+      game.gollumState.awaitingAnswer = true;
+      gollum.friendly = "neutral";
+      const riddle = this.currentGollumRiddle();
+      if (!riddle) return "Gollum watches you in tense silence from the dark water.";
+      return `${this.gollumContestOpener()} ${riddle.question}`;
+    }
+
+    gollumAnswerMatches(input, answers) {
+      const normalized = normalize(input).replace(/^(?:it is|it's|its|the answer is)\s+/, "").trim();
+      if (!normalized) return false;
+      return answers.some((answer) => {
+        const expected = normalize(answer);
+        return normalized === expected || normalized.endsWith(` ${expected}`);
+      });
+    }
+
+    handleGollumAnswer(answerText = "") {
+      const game = this.game;
+      if (!game.gollumState?.awaitingAnswer || game.currentRoom !== "deep_dark_lake") return false;
+      const riddles = this.activeGollumRiddles();
+      const riddle = riddles[game.gollumState.currentRiddleIndex];
+      if (!riddle) return false;
+      if (!this.gollumAnswerMatches(answerText, riddle.answers)) {
+        const outcome = this.gollumWrongAnswerOutcome();
+        game.print(outcome.attack, "danger");
+        game.endGame(outcome.ending, { fatal: true });
+        return true;
+      }
+      if (game.gollumState.currentRiddleIndex < riddles.length - 1) {
+        game.gollumState.currentRiddleIndex += 1;
+        const nextRiddle = riddles[game.gollumState.currentRiddleIndex];
+        game.print(`Gollum nods reluctantly. 'Right, precious. Right.' ${nextRiddle.question}`);
+        return true;
+      }
+      game.gollumState.awaitingAnswer = false;
+      game.gollumState.awaitingPlayerRiddle = true;
+      game.print("Gollum narrows his pale eyes. 'Baggins has answered. Now Baggins asks, yes. Ask it, precious, ask it.'");
+      return true;
+    }
+
+    resolveGollumPocketQuestion() {
+      const game = this.game;
+      if (game.currentRoom !== "deep_dark_lake") return "";
+      if (!game.gollumState?.awaitingPlayerRiddle) {
+        return game.gollumState?.awaitingAnswer
+          ? "Gollum taps the side of the boat impatiently. 'First Baggins answers. Then Baggins asks.'"
+          : "Gollum blinks in the dark, waiting for a proper riddle-game to begin.";
+      }
+      this.ensureLakeRingInPocket();
+      const gollum = this.currentGollum();
+      if (gollum) {
+        gollum.friendly = false;
+        gollum.attackFlag = 0;
+      }
+      game.gollumState.awaitingPlayerRiddle = false;
+      game.gollumState.pocketQuestionAsked = true;
+      game.gollumState.enraged = true;
+      return "You ask 'What have I got in my pocket?' Gollum freezes, then hisses wild guesses: 'Knife? String? Handses?' At last he slips away to fetch what he meant to give you, only to discover that his ring is gone. He returns shrieking for his precious, and the little ring in your pocket suddenly feels heavier than gold.";
+    }
+
+    handleGollumSpeech(text) {
+      const game = this.game;
+      const normalized = normalize(text);
+      if (!normalized) return false;
+      if (normalized.includes("pocket")) {
+        game.print(this.resolveGollumPocketQuestion());
+        return true;
+      }
+      if (normalized.includes("riddle")) {
+        game.print(this.beginGollumRiddleContest());
+        return true;
+      }
+      if (game.gollumState?.awaitingPlayerRiddle) {
+        game.print("Gollum scowls. 'That is no fair riddle. Ask properly, precious, ask properly.'");
+        return true;
+      }
+      return false;
+    }
+
+    gollumBlocksDirection(direction) {
+      const game = this.game;
+      if (game.currentRoom !== "deep_dark_lake" || direction !== "north") return "";
+      if (!game.gollumState?.met) return "";
+      if (!this.isGollumPresentInLake()) return "";
+      if (!game.gollumState.pocketQuestionAsked) {
+        return "Gollum crouches between you and the northern passage. You will have to get through the riddle-game first.";
+      }
+      if (game.player.noticeable === false) return "";
+      return "Gollum is waiting by the way north, clawing at the stones and hunting for his precious. You will need better concealment to slip past him.";
+    }
+  }
+
+  class HazardDirector {
+    constructor(game) {
+      this.game = game;
+    }
+
+    handleTimedSpecials() {
+      const game = this.game;
+      if (game.currentRoom !== "trolls_clearing" && game.visitedTrollsClearing && !game.trollsTransformed) {
+        game.waitCounter += 1;
+        if (game.waitCounter >= 3) {
+          game.print("Day dawns.");
+          this.transformTrolls();
+          game.waitCounter = 0;
+        }
+      }
+      if (game.currentRoom === "dark_dungeon") game.toggleDoorByName("red door", "Someone opens the red door.", "Someone closes the red door.");
+      if (game.currentRoom === "large_dry_cave") game.toggleDoorByName("small hidden crevice", "A small hidden crevice is revealed.", "The small hidden crevice disappears.");
+      if (["front_gate", "stoe_of_ravenhill", "little_steep_bay", "lonely_mountain"].includes(game.currentRoom) && !game.flags.secretdoorsun) {
+        game.secretDoorWaitCounter += 1;
+        if (game.secretDoorWaitCounter >= 1) {
+          game.flags.secretdoorsun = true;
+          game.print("The sun shines on the rock and reveals a secret door.");
+        }
+      }
+      if (game.flags.treasuretaken && game.currentRoom === "lonely_mountain" && game.liveDragon()) {
+        game.print("A shadow passes over the mountain. Smaug is searching for the thief.");
+      }
+    }
+
+    triggerSpiderEyesEncounter(previousRoom, currentRoom, direction) {
+      const game = this.game;
+      if (!game.flags.dragondefeated) return;
+      const trigger = this.spiderEyesTriggerFor(previousRoom, currentRoom, direction);
+      if (!trigger) return;
+      if (game.flags[this.spiderEyesResolvedFlag(currentRoom)]) return;
+      game.recordAutosave(`before the spider ambush near ${game.rooms[currentRoom]?.name?.replace(/_/g, " ") || currentRoom}`, {
+        key: `hazard:spider-eyes:${currentRoom}`,
+      });
+      game.spiderEyesState = {
+        active: true,
+        room: currentRoom,
+        waits: 0,
+        safeDirections: trigger.safeDirections,
+        safeDestination: trigger.safeDestination,
+      };
+      game.print("You see some pale bulbous eyes.");
+    }
+
+    handleSpiderEyesCommand(command) {
+      const game = this.game;
+      const state = game.spiderEyesState;
+      if (!state?.active || game.currentRoom !== state.room) return false;
+      const text = normalize(command);
+      if (text === "wait") return false;
+      const direction = game.isDirection(command)
+        ? game.normalizeDirection(command)
+        : command.startsWith("go ")
+          ? game.normalizeDirection(command.slice(3).trim())
+          : "";
+      if (state.waits === 2 && direction && (state.safeDirections || []).includes(direction)) {
+        game.flags[this.spiderEyesResolvedFlag(state.room)] = true;
+        const destination = state.safeDestination || null;
+        game.spiderEyesState = null;
+        if (destination) {
+          const previousRoom = game.currentRoom;
+          game.currentRoom = destination;
+          game.player.position = destination;
+          game.moveFollowers(previousRoom, destination, direction);
+          game.describeRoom();
+          this.checkSpecialSituations();
+          return true;
+        }
+        return false;
+      }
+      this.killBySpiderEyes();
+      return true;
+    }
+
+    spiderEyesTriggerFor(previousRoom, currentRoom, direction) {
+      if (currentRoom === "forest_road_2" && ["waterfall", "forest", "running_river"].includes(previousRoom) && direction === "west") {
+        return { safeDirections: ["west"], safeDestination: null };
+      }
+      if (currentRoom === "forest_road" && previousRoom === "forest_road_2" && direction === "west") {
+        return { safeDirections: ["west"], safeDestination: "beorns_house" };
+      }
+      return null;
+    }
+
+    spiderEyesResolvedFlag(roomId) {
+      return `spidereyesresolved_${roomId}`;
+    }
+
+    killBySpiderEyes() {
+      this.game.endGame("Something stings. You are dead.", { fatal: true });
+    }
+
+    checkSpecialSituations() {
+      this.checkGollumEncounter();
+      this.checkKidnapping();
+      this.checkTrollsClearing();
+    }
+
+    checkGollumEncounter() {
+      const game = this.game;
+      if (game.currentRoom !== "deep_dark_lake") return;
+      if (!game.gollumState) game.gollumState = game.createGollumState();
+      const gollum = game.currentGollum();
+      if (!gollum || !gollum.visible) return;
+
+      if (!game.gollumState.met) {
+        game.recordAutosave("before meeting Gollum", { key: "hazard:gollum:room" });
+        game.gollumState.met = true;
+        gollum.friendly = "neutral";
+        if (game.ensureLakeRingInPocket()) {
+          game.print("Groping beside the water in the dark, your fingers close around a small cold ring. Almost without thinking, you slip it into your pocket.");
+        }
+        for (const line of game.gollumRevealLines()) game.print(line);
+        return;
+      }
+
+      if (game.gollumState.pocketQuestionAsked && game.player.noticeable !== false) {
+        game.print("Gollum prowls between you and the northern passage, sniffing for the ring.");
+      }
+    }
+
+    checkTrollsClearing() {
+      const game = this.game;
+      if (game.currentRoom !== "trolls_clearing") return;
+      if (!game.visitedTrollsClearing) {
+        game.recordAutosave("before facing the trolls", { key: "hazard:trolls:room" });
+        game.visitedTrollsClearing = true;
+        game.waitCounter = 0;
+        game.print("You crouch low behind a mossy boulder, heart pounding, as the trolls argue by the flickering campfire in the moonlit clearing.");
+        game.print("What shall us do with him?");
+        game.print("Roast him!");
+        game.print("He wouldn't make above a mouthful.");
+        game.print("P'raps there are more like him round about.");
+        return;
+      }
+      if (game.trollsTransformed) {
+        game.trollsDefeated = true;
+        game.print("You see the stone remains of the trolls.");
+        return;
+      }
+      const liveTroll = game.peopleInRoom().find((p) => ["hideous troll", "vicious troll"].includes(normalize(p.name)) && p.visible);
+      if (liveTroll && !game.trollsDefeated) {
+        game.print("The hideous troll eats you. You are dead.", "danger");
+        game.endGame("You are dead.", { fatal: true });
+      }
+    }
+
+    maybeAutosaveForRoom(roomId = this.game.currentRoom) {
+      const game = this.game;
+      const hazardMap = {
+        deep_dark_lake: { label: "before meeting Gollum", key: "hazard:gollum:room" },
+        trolls_clearing: { label: "before facing the trolls", key: "hazard:trolls:room" },
+        west_bank: { label: "before testing the fast river", key: "hazard:river:west-bank" },
+        cellar: { label: "before the barrel escape", key: "hazard:river:cellar" },
+        forest_road_2: { label: "before crossing the spider-haunted road", key: "hazard:spiders:forest-road-2" },
+        forest_road: { label: "before the second spider-haunted crossing", key: "hazard:spiders:forest-road" },
+      };
+      const hazard = hazardMap[roomId];
+      if (!hazard) return false;
+      return game.recordAutosave(hazard.label, { key: hazard.key });
+    }
+
+    transformTrolls() {
+      const game = this.game;
+      if (game.trollsTransformed) return;
+      for (const character of Object.values(game.characters)) {
+        if (!["hideous troll", "vicious troll"].includes(normalize(character.name))) continue;
+        game.dropInventory(character);
+        character.visible = false;
+        character.position = "trolls_clearing";
+      }
+      game.trollsTransformed = true;
+      const room = game.rooms.trolls_clearing;
+      if (room?.transformedImage) room.image = room.transformedImage;
+      if (game.currentRoom === "trolls_clearing") game.print("You see the stone remains of the trolls.");
+    }
+
+    checkKidnapping() {
+      const game = this.game;
+      const woodElf = Object.values(game.characters).find((p) => normalize(p.name) === "wood elf" && p.visible);
+      if (!woodElf || woodElf.position !== game.player.position) return;
+      if (game.player.wearingRing && game.player.noticeable === false) {
+        game.print("The wood elf cannot see you because you are wearing the ring.");
+        return;
+      }
+      const dungeon = game.rooms.dark_dungeon;
+      if (!dungeon) return;
+      game.print("The wood elf captures you");
+      game.player.position = "dark_dungeon";
+      game.currentRoom = "dark_dungeon";
+      woodElf.position = game.rooms.beorns_house ? "beorns_house" : woodElf.position;
+      game.describeRoom();
+    }
+  }
+
+  class GameFlowController {
+    constructor(game) {
+      this.game = game;
+    }
+
+    initialize() {
+      this.resetAutoplayState();
+    }
+
+    resetAutoplayState() {
+      const game = this.game;
+      game.autoplayRunning = false;
+      game.autoplayTimer = null;
+      game.autoplayTypingTimer = null;
+      game.autoplayDelay = 450;
+      game.autoplayMode = "normal";
+      game.autoplayWaits = 0;
+      game.autoplayRunId = 0;
+      game.autoplayCapturedText = "";
+      game.autoplayCapturingOutput = false;
+    }
+
+    autoplay(object = "") {
+      const game = this.game;
+      const mode = normalize(object);
+      if (mode === "stop" || mode === "off") return this.stopAutoplay("Autoplay stopped.");
+      if (game.autoplayRunning) return game.print("Autoplay is already running. Type 'stop autoplay' or 'autoplay stop' to stop it.", "system");
+      game.autoplayMode = mode === "fast" ? "fast" : "slow";
+      game.autoplayDelay = game.autoplayMode === "fast" ? 450 : 2700;
+      game.autoplayRunning = true;
+      game.autoplayWaits = 0;
+      game.autoplayRunId += 1;
+      game.print(`Autoplay ${game.autoplayMode} started. Type 'stop autoplay' or 'autoplay stop' to stop it.`, "system");
+      this.scheduleAutoplayStep();
+    }
+
+    scheduleAutoplayStep(delay = this.game.autoplayDelay) {
+      const game = this.game;
+      if (!game.autoplayRunning) return;
+      const runId = game.autoplayRunId;
+      clearTimeout(game.autoplayTimer);
+      game.autoplayTimer = setTimeout(() => this.runAutoplayStep(runId), delay);
+    }
+
+    runAutoplayStep(runId = this.game.autoplayRunId) {
+      const game = this.game;
+      if (!game.autoplayRunning || runId !== game.autoplayRunId) return;
+      if (game.endgame) return this.stopAutoplay("Autoplay finished.");
+      const command = this.nextAutoplayCommand();
+      if (!command) return this.stopAutoplay("Autoplay stopped: no safe next command was found.");
+      this.typeAutoplayCommand(command, runId);
+    }
+
+    typeAutoplayCommand(command, runId) {
+      const game = this.game;
+      clearTimeout(game.autoplayTypingTimer);
+      input.value = "";
+      input.focus();
+      let index = 0;
+      const typeDelay = game.autoplayMode === "slow" ? 42 : 6;
+      const submitDelay = game.autoplayMode === "slow" ? 180 : 20;
+      const typeNext = () => {
+        if (!game.autoplayRunning || runId !== game.autoplayRunId) return;
+        input.value = command.slice(0, index);
+        if (index >= command.length) {
+          game.autoplayTypingTimer = setTimeout(() => this.executeAutoplayCommand(command, runId), submitDelay);
+          return;
+        }
+        index += 1;
+        game.autoplayTypingTimer = setTimeout(typeNext, typeDelay);
+      };
+      typeNext();
+    }
+
+    executeAutoplayCommand(command, runId) {
+      const game = this.game;
+      if (!game.autoplayRunning || runId !== game.autoplayRunId) return;
+      input.value = "";
+      game.print(`> ${command}`, "command");
+      game.autoplayCapturedText = "";
+      game.autoplayCapturingOutput = true;
+      try {
+        game.execute(command);
+      } finally {
+        game.autoplayCapturingOutput = false;
+      }
+      if (!game.autoplayRunning || runId !== game.autoplayRunId) return;
+      if (game.endgame) return this.stopAutoplay("Autoplay finished.");
+      this.scheduleAutoplayStep(this.autoplayDelayForText(game.autoplayCapturedText));
+    }
+
+    stopAutoplay(message) {
+      const game = this.game;
+      clearTimeout(game.autoplayTimer);
+      clearTimeout(game.autoplayTypingTimer);
+      game.autoplayTimer = null;
+      game.autoplayTypingTimer = null;
+      game.autoplayRunning = false;
+      game.autoplayRunId += 1;
+      input.value = "";
+      if (message) game.print(message, "system");
+    }
+
+    autoplayDelayForText(text) {
+      const game = this.game;
+      if (game.autoplayMode !== "slow") return game.autoplayDelay;
+      const cleaned = String(text || "").replace(/\s+/g, " ").trim();
+      if (!cleaned) return game.autoplayDelay;
+      const words = cleaned.split(/\s+/).filter(Boolean).length;
+      const sentencePauses = (cleaned.match(/[.!?]/g) || []).length;
+      const readingDelay = 1050 + words * 248 + sentencePauses * 338;
+      return Math.max(game.autoplayDelay, Math.min(readingDelay, 16500));
+    }
+
+    autoplayShouldLightLantern() {
+      const game = this.game;
+      if (game.hasActiveLantern()) return false;
+      if (game.currentRoom === "deep_dark_lake" && game.gollumState?.pocketQuestionAsked && game.player.noticeable !== false) return false;
+      if (game.roomNeedsLantern(game.currentRoom)) return true;
+      if (game.currentRoom === "green_dragon_inn" && !game.flags.seenpony) return true;
+      return false;
+    }
+
+    nextAutoplayCommand() {
+      const game = this.game;
+      const beforeDragonDefeat = !game.flags.dragondefeated;
+
+      if (game.spiderEyesState?.active && game.currentRoom === game.spiderEyesState.room) {
+        if ((game.spiderEyesState.waits || 0) < 2) return "wait";
+        return game.spiderEyesState.safeDirections?.[0] || null;
+      }
+
+      if (game.currentRoom === "lower_halls" && game.liveDragon() && game.flags.bardreadiedarrow) {
+        return "say to bard \"shoot dragon\"";
+      }
+
+      if (beforeDragonDefeat && !this.autoplayHas("small key")) {
+        if (game.currentRoom !== "hobbit_hole") return this.autoplayRouteCommandTo("hobbit_hole");
+        if (!game.visibleSearch("small key")) return "lift carpet";
+        return "take small key";
+      }
+
+      if (beforeDragonDefeat && !this.autoplayHas("firestone")) {
+        if (game.currentRoom !== "bag_end_guest_room") return this.autoplayRouteCommandTo("bag_end_guest_room");
+        const guestTrunk = game.items.guest_room_trunk;
+        const ornateBox = game.items.ornate_box;
+        if (guestTrunk && !guestTrunk.open) return "open guest trunk";
+        if (!game.flags.autoplayexaminedguesttrunk) return this.autoplayOnce("autoplayexaminedguesttrunk", "examine guest trunk");
+        if (ornateBox && !game.player.inventory.includes(ornateBox.id)) return "take ornate box";
+        if (ornateBox && !ornateBox.open) return "open ornate box";
+        if (!game.flags.autoplayexaminedornatebox) return this.autoplayOnce("autoplayexaminedornatebox", "examine ornate box");
+        return "take firestone";
+      }
+
+      if (beforeDragonDefeat && !this.autoplayHas("sturdy key")) {
+        if (game.currentRoom !== "hobbit_hole") return this.autoplayRouteCommandTo("hobbit_hole");
+        const bottomDrawer = game.items.bottom_drawer;
+        if (bottomDrawer && !bottomDrawer.open) return "open bottom drawer";
+        if (!game.flags.autoplayexaminedbottomdrawer) return this.autoplayOnce("autoplayexaminedbottomdrawer", "examine bottom drawer");
+        return "take sturdy key";
+      }
+
+      if (beforeDragonDefeat && !this.autoplayHas("brass lantern")) {
+        if (game.currentRoom !== "bilbos_garden") return this.autoplayRouteCommandTo("bilbos_garden");
+        const shed = game.items.garden_shed;
+        if (shed?.locked) return "unlock garden shed";
+        if (shed && !shed.open) return "open garden shed";
+        if (!game.flags.autoplayexaminedgardenshed) return this.autoplayOnce("autoplayexaminedgardenshed", "examine garden shed");
+        return "take lantern";
+      }
+
+      if (beforeDragonDefeat && this.autoplayShouldLightLantern()) return "light lantern";
+
+      if (beforeDragonDefeat && !game.flags.seenpony) {
+        if (!game.bagEndQuestHasBegun()) return "wait";
+        const thorin = Object.values(game.characters).find((character) => matches(character.name, "thorin"));
+        if (game.currentRoom !== "green_dragon_inn") return this.autoplayRouteCommandTo("green_dragon_inn");
+        if (thorin?.position !== game.currentRoom) thorin.position = game.currentRoom;
+        return "say to thorin \"look through window\"";
+      }
+
+      if (beforeDragonDefeat && !game.visitedRooms.has("dreary") && game.currentRoom !== "dreary") {
+        if (game.currentRoom !== "green_dragon_inn_outside") return this.autoplayRouteCommandTo("green_dragon_inn_outside");
+        if (!game.items.low_branch?.visible) return "examine oak tree";
+        return "climb branch";
+      }
+
+      if (beforeDragonDefeat && !this.autoplayHas("large key")) {
+        if (!game.visitedTrollsClearing) return this.autoplayRouteCommandTo("trolls_clearing");
+        if (game.currentRoom !== "trolls_clearing") return this.autoplayRouteCommandTo("trolls_clearing");
+        if (!game.trollsTransformed) return "carefully take large key and south west";
+        return "take large key";
+      }
+
+      if (beforeDragonDefeat && !this.autoplayHas("majestic sword")) {
+        if (game.currentRoom !== "trolls_cave") return this.autoplayRouteCommandTo("trolls_cave");
+        const chest = game.items.arcane_chest;
+        if (!chest.visible) return game.hasActiveLantern() ? "examine discarded armor" : "carefully examine discarded armor";
+        if (!chest.open) return "open arcane chest";
+        if (!game.flags.autoplayexaminedarcanechest) return this.autoplayOnce("autoplayexaminedarcanechest", "examine arcane chest");
+        const prepSwordLoad = this.autoplayRequiredPickupPrepCommand("majestic sword");
+        if (prepSwordLoad) return prepSwordLoad;
+        return "take sword";
+      }
+
+      if (beforeDragonDefeat && !this.autoplayHas("sturdy rope")) {
+        if (game.currentRoom !== "trolls_cave") return this.autoplayRouteCommandTo("trolls_cave");
+        const prepRopeLoad = this.autoplayRequiredPickupPrepCommand("sturdy rope");
+        if (prepRopeLoad) return prepRopeLoad;
+        return "take rope";
+      }
+
+      if (beforeDragonDefeat && game.currentRoom === "deep_dark_lake" && !game.gollumState?.pocketQuestionAsked) {
+        if (!game.gollumState?.met) return "look";
+        if (game.gollumState?.awaitingAnswer) {
+          const riddle = game.currentGollumRiddle();
+          if (riddle?.answers?.[0]) return `answer ${riddle.answers[0]}`;
+          return "ask gollum a riddle";
+        }
+        if (game.gollumState?.awaitingPlayerRiddle) return "say to gollum \"what have i got in my pocket\"";
+        return "ask gollum a riddle";
+      }
+
+      if (beforeDragonDefeat && game.currentRoom === "deep_dark_lake" && game.gollumState?.pocketQuestionAsked) {
+        if (game.player.noticeable !== false) return "wear ring";
+        return "north";
+      }
+
+      const hostile = game.peopleInRoom().find((character) => character.visible && character.friendly === false && !matches(character.name, "dragon"));
+      if (beforeDragonDefeat && hostile && this.autoplayHas("majestic sword")) return `kill ${hostile.name} with sword`;
+
+      if (beforeDragonDefeat && game.visitedTrollsClearing && this.autoplayHas("large key") && !game.trollsTransformed && game.currentRoom !== "trolls_clearing") return "wait";
+
+      if (beforeDragonDefeat && !this.autoplayHas("golden ring")) {
+        if (game.currentRoom === "deep_dark_lake") {
+          if (!game.gollumState?.met) return "look";
+          if (game.gollumState?.awaitingAnswer) {
+            const riddle = game.currentGollumRiddle();
+            if (riddle?.answers?.[0]) return `answer ${riddle.answers[0]}`;
+            return "ask gollum a riddle";
+          }
+          if (game.gollumState?.awaitingPlayerRiddle) return "say to gollum \"what have i got in my pocket\"";
+          if (game.gollumState?.pocketQuestionAsked && game.player.noticeable !== false) return "wear ring";
+          if (game.gollumState?.pocketQuestionAsked && game.player.noticeable === false) return "north";
+          return "ask gollum a riddle";
+        }
+        return this.autoplayRouteCommandTo("deep_dark_lake");
+      }
+
+      if (beforeDragonDefeat && (game.player.strength || 1) < 6) {
+        if (game.currentRoom !== "beorns_house") return this.autoplayRouteCommandTo("beorns_house");
+        if (this.autoplayHas("meal")) return "eat meal";
+        const curtain = game.items.curtain;
+        const cupboard = game.items.cupboard;
+        if (curtain && !curtain.open) return "open curtain";
+        if (cupboard && !cupboard.open) return "open cupboard";
+        if (!game.flags.autoplayexaminedcupboard) return this.autoplayOnce("autoplayexaminedcupboard", "examine cupboard");
+        return "take meal";
+      }
+
+      if (game.currentRoom === "west_bank") {
+        if (!game.flags.seenboat) return "look across river";
+        if (!game.flags.ropeinboat) return "throw rope across river";
+        if (!game.flags.boatiswest) return "pull rope";
+        return "climb into boat";
+      }
+
+      if (game.currentRoom === "dark_dungeon") {
+        const redDoor = game.doors.porta_dark_dungeon_cellar;
+        if (redDoor && !redDoor.open) return this.autoplayHas("majestic sword") ? "break red door with sword" : "wait";
+        return "south west";
+      }
+
+      if (game.currentRoom === "cellar") {
+        const trapDoor = game.doors.porta_cellar_long_lake;
+        if (trapDoor && !trapDoor.open) return "open trap door";
+        return "down";
+      }
+
+      const bard = Object.values(game.characters).find((character) => matches(character.name, "bard"));
+      if (!game.flags.dragondefeated) {
+        const bardWithPlayer = bard?.carriedBy === game.player.id
+          || (bard?.movementMode === "follow" && bard?.position === game.currentRoom && bard.visible);
+        if (!bardWithPlayer) {
+          if (bard?.position === game.currentRoom && bard.visible) return "pick up bard";
+          const bardCorridor = {
+            elvish_clearing: "north east",
+            elvenkings_halls: "south",
+            cellar: game.doors.porta_cellar_long_lake?.open ? "down" : "open trap door",
+            long_lake: "east",
+          };
+          if (bardCorridor[game.currentRoom]) return bardCorridor[game.currentRoom];
+          const commandToBard = this.autoplayRouteCommandTo(bard?.position || "wooden_town");
+          if (commandToBard) return commandToBard;
+          return this.autoplayRouteCommandTo("west_bank");
+        }
+        if (!game.flags.bardreadiedarrow) return "say to bard \"get strong arrow from quiver\"";
+      }
+
+      if (game.currentRoom === "lower_halls" && !this.autoplayHas("treasure")) {
+        if (game.liveDragon()) return "say to bard \"shoot dragon\"";
+        const prepTreasureLoad = this.autoplayTreasurePickupPrepCommand();
+        if (prepTreasureLoad) return prepTreasureLoad;
+        return "take treasure";
+      }
+
+      if (!this.autoplayHas("treasure")) return this.autoplayRouteCommandTo("lower_halls");
+      if (this.autoplayHas("treasure") && game.currentRoom !== "hobbit_hole") return this.autoplayRouteCommandTo("hobbit_hole");
+
+      if (this.autoplayHas("treasure") && game.currentRoom === "hobbit_hole") {
+        const chest = game.items.heavy_wooden_chest;
+        if (chest.locked) return "unlock chest";
+        if (!chest.open) return "open chest";
+        return "put treasure in chest";
+      }
+
+      return null;
+    }
+
+    autoplayHas(name) {
+      const game = this.game;
+      return [...game.player.inventory, ...(game.player.worn || [])].some((itemId) => matches(game.items[itemId]?.name, name));
+    }
+
+    autoplayTreasurePickupPrepCommand() {
+      const game = this.game;
+      if (this.autoplayHas("treasure")) return null;
+      if (!["front_gate", "lower_halls"].includes(game.currentRoom)) return null;
+      const treasure = game.items.treasure;
+      if (!treasure) return null;
+      const spareCapacity = game.carryCapacity() - game.currentCarryWeight();
+      if (spareCapacity >= (treasure.weight || 0)) return null;
+      const expendable = ["golden ring", "firestone", "sturdy key", "brass lantern", "sturdy rope", "majestic sword", "large key", "small key"];
+      for (const name of expendable) {
+        if (this.autoplayHas(name)) return `drop ${name}`;
+      }
+      return null;
+    }
+
+    autoplayRequiredPickupPrepCommand(itemName) {
+      const game = this.game;
+      const item = game.findKnownItem(itemName);
+      if (!item) return null;
+      const spareCapacity = game.carryCapacity() - game.currentCarryWeight();
+      if (spareCapacity >= (item.weight || 0)) return null;
+      const expendableByNeed = {
+        "majestic sword": ["ornate box", "small key", "sturdy key"],
+        "sturdy rope": ["ornate box", "small key", "sturdy key", "firestone", "brass lantern"],
+        "golden ring": ["ornate box"],
+      };
+      const expendable = expendableByNeed[item.name] || [];
+      for (const name of expendable) {
+        if (this.autoplayHas(name)) return `drop ${name}`;
+      }
+      return null;
+    }
+
+    autoplayOnce(flag, command) {
+      this.game.flags[flag] = true;
+      return command;
+    }
+
+    autoplayRouteCommandTo(destination) {
+      const game = this.game;
+      const path = this.autoplayPathTo(destination);
+      if (!path?.length) return null;
+      const connection = path[0];
+      const visibleConnection = game.roomConnections().find((candidate) => candidate.direction === connection.direction);
+      const actualConnection = visibleConnection || connection;
+      const web = game.blockingWebFor(connection);
+      if (web && !web.broken) return "smash web";
+      const woodElf = Object.values(game.characters).find((character) => matches(character.name, "wood elf") && character.visible);
+      if (woodElf?.position === connection.to && this.autoplayHas("golden ring") && game.player.noticeable !== false) return "wear ring";
+      const door = actualConnection.door && game.doors[actualConnection.door];
+      if (door && !door.open && !door.broken) {
+        if (door.locked && game.keyFor(door)) return `unlock ${door.name}`;
+        if (door.locked && this.autoplayHas("majestic sword")) return `break ${door.name} with sword`;
+        return `open ${door.name}`;
+      }
+      if (!game.hasActiveLantern() && this.autoplayHas("brass lantern") && game.roomNeedsLantern(connection.to)) {
+        return "light lantern";
+      }
+      return connection.direction;
+    }
+
+    autoplayPathTo(destination) {
+      const game = this.game;
+      if (!destination || game.currentRoom === destination) return [];
+      const queue = [{ room: game.currentRoom, path: [] }];
+      const seen = new Set([game.currentRoom]);
+      while (queue.length) {
+        const current = queue.shift();
+        for (const connection of game.connectionsFromVisible(current.room)) {
+          if (seen.has(connection.to) || !this.autoplayCanPlanConnection(connection)) continue;
+          const path = [...current.path, connection];
+          if (connection.to === destination) return path;
+          seen.add(connection.to);
+          queue.push({ room: connection.to, path });
+        }
+      }
+      return null;
+    }
+
+    autoplayCanPlanConnection(connection) {
+      const game = this.game;
+      if (game.narrativeTravelBlock(connection)) return false;
+      const door = connection.door && game.doors[connection.door];
+      if (!door || door.broken) return true;
+      if (matches(door.name, "secret door") && !game.flags.secretdoorsun) return false;
+      if (door.locked && !game.keyFor(door) && !this.autoplayHas("majestic sword")) return false;
+      return true;
+    }
+
+    endGame(message, options = {}) {
+      const game = this.game;
+      this.stopAutoplay();
+      game.clearArrivalNoticeTimers();
+      output.replaceChildren();
+      output.classList.add("end-screen");
+      game.endgame = true;
+      game.endgameRestartArmed = true;
+      game.pendingEndgameChoice = options.fatal ? "death" : null;
+      const totalRooms = Math.max(Object.keys(game.rooms).length, 1);
+      const percentage = (game.visitedRooms.size / totalRooms) * 100;
+      const endMessage = message ? `${message.replace(/[.!?]*$/, "")}. ` : "";
+      game.print(`${endMessage}You have mastered ${percentage.toFixed(2)}% of this adventure.`, "danger");
+      if (options.fatal && game.autosaveSnapshot) {
+        const roomText = game.autosaveMeta?.roomName ? ` at ${game.autosaveMeta.roomName.replace(/_/g, " ")}` : "";
+        game.print(`Type 'autosave' to continue from the last checkpoint${roomText}, or 'restart' to begin again.`, "system");
+      } else if (options.fatal) {
+        game.print("Type 'restart' to begin again.", "system");
+      } else {
+        game.print("Press any key or click to restart.", "system");
+      }
+    }
+
+    winGame(message) {
+      const game = this.game;
+      this.stopAutoplay();
+      game.clearArrivalNoticeTimers();
+      output.replaceChildren();
+      output.classList.add("end-screen");
+      game.endgame = true;
+      game.endgameRestartArmed = true;
+      game.pendingEndgameChoice = null;
+      const totalRooms = Math.max(Object.keys(game.rooms).length, 1);
+      const percentage = (game.visitedRooms.size / totalRooms) * 100;
+      const endMessage = message ? `${message.replace(/[.!?]*$/, "")}. ` : "";
+      game.print(`${endMessage}You have mastered ${percentage.toFixed(2)}% of this adventure.`, "success");
+      game.print("Press any key or click to restart.", "system");
+    }
+
+    restartGame() {
+      const game = this.game;
+      this.stopAutoplay();
+      game.clearArrivalNoticeTimers();
+      game.rooms = clone(game.data.rooms);
+      game.items = clone(game.data.items);
+      game.doors = clone(game.data.doors);
+      game.characters = clone(game.data.characters);
+      game.connections = game.normalizeConnections(clone(game.data.connections));
+      game.currentRoom = game.data.startRoom;
+      game.flags = {};
+      game.endgame = false;
+      game.endgameRestartArmed = false;
+      game.pendingEndgameChoice = null;
+      game.visitedTrollsClearing = false;
+      game.waitCounter = 0;
+      game.secretDoorWaitCounter = 0;
+      game.trollsTransformed = false;
+      game.trollsDefeated = false;
+      game.visitedRooms = new Set();
+      game.tipsEnabled = false;
+      game.tipIndex = 0;
+      this.resetAutoplayState();
+      game.pendingClarification = null;
+      game.forcedChoice = null;
+      game.clarifiedReferences = {};
+      game.commandIssuer = null;
+      game.lastConversationCharacterId = null;
+      game.lastReferencedCharacterId = null;
+      game.splitter = new CommandSplitter(game.data);
+      game.delegatedSplitters = new Map();
+      game.sharedDelegatedContext = { lastObject: null, lastDirectObject: null, lastTargetObject: null };
+      output.replaceChildren();
+      output.classList.remove("end-screen");
+      game.initState();
+      game.describeRoom(true);
+      input.value = "";
+      input.focus();
+    }
+  }
+
+  class ExplorationController {
+    constructor(game) {
+      this.game = game;
+    }
+
+    look(objectName = "") {
+      const game = this.game;
+      const text = normalize(objectName).replace(/^(?:around\s+)?for\s+/, "").replace(/^around\s+/, "");
+      if (!text || ["around", "room", "place", "area", "here", "surroundings"].includes(text)) {
+        return game.describeRoom({ full: true });
+      }
+      const direction = text.match(/^(across|at|in|inside|into|under|behind|through|over|around)\s+(.+)$/);
+      if (direction) {
+        const relation = direction[1];
+        const target = direction[2];
+        if (relation === "at") return game.examine(target);
+        if (["in", "inside", "into"].includes(relation)) return game.examine(target);
+        return this.inspectEnvironment("look", target, relation);
+      }
+      return game.examine(text);
+    }
+
+    examine(objectName = "") {
+      const game = this.game;
+      const text = normalize(objectName).replace(/^(?:around\s+)?for\s+/, "").replace(/^around\s+/, "");
+      if (!text || ["around", "room", "place", "area", "here", "surroundings"].includes(text)) {
+        return this.inspectEnvironment("search", "area");
+      }
+      const door = game.findDoor(text)?.door;
+      const subject = actorSubject(game.player, true);
+      if (door) return game.print(`${subject} ${actorVerb(game.player, "see")} the ${door.name}. It is ${door.open ? "open" : "closed"}.`);
+      const character = game.resolveCharacterTarget(text);
+      if (character) return game.examineCharacter(character);
+      const scopedCharacter = game.findKnownCharacter(text.replace(/\s+(?:in|inside|into|at|under|behind|near|around|through|over|on)\s+.+$/, ""));
+      const knownCharacter = scopedCharacter || game.findKnownCharacter(text);
+      if (knownCharacter) return game.print(`There is no one named ${knownCharacter.name} here.`);
+      const item = game.visibleSearch(text)?.item;
+      if (!item) {
+        const heldMessage = game.heldItemMessage(text);
+        if (heldMessage) return game.print(heldMessage);
+        const knownItem = game.findKnownItem(text);
+        if (knownItem?.portable) return game.print(`${subject} ${actorVerb(game.player, "do")} not have the ${knownItem.name}.`);
+        return this.inspectEnvironment("examine", text);
+      }
+      let description = item.description;
+      if (item.broken) {
+        const ruin = game.brokenItemDescription(item);
+        return game.print(`${subject} ${actorVerb(game.player, "see")} ${ruin}.`);
+      }
+      if (item.mended) description = game.mendedItemDescription(item);
+      if (item.container && item.open && item.contents.length) {
+        const visible = item.contents.map((id) => game.items[id]).filter((child) => child?.visible);
+        if (visible.length) description += `; inside there is: ${visible.map((child) => game.describeItemShort(child)).join(", ")}`;
+      }
+      game.revealFromSpecial("examine", text);
+      if (item.location?.type === "character" && item.location.id === game.player.id && game.player.name !== "You") {
+        return game.print(`${subject} ${actorVerb(game.player, "examine")} the ${item.name} in ${displayCharacterName(game.player)}'s possession. ${subject} ${actorVerb(game.player, "see")} ${description}.`);
+      }
+      game.print(`${subject} ${actorVerb(game.player, "see")} ${description}.`);
+    }
+
+    read(objectName = "") {
+      const game = this.game;
+      const text = normalize(objectName);
+      if (!text) return game.print("Read what?");
+      const item = game.visibleSearch(objectName)?.item;
+      if (!item) {
+        const heldMessage = game.heldItemMessage(objectName);
+        if (heldMessage) return game.print(heldMessage);
+        return game.print("I don't see that here.");
+      }
+      if (item.broken) {
+        const subject = actorSubject(game.player, true);
+        return game.print(`${subject} ${actorVerb(game.player, "try")} to read the broken ${item.name}, but its markings are torn into useless fragments.`);
+      }
+      if (item.mended && matches(item.name, "curious map")) {
+        const subject = actorSubject(game.player, true);
+        return game.print(`${subject} ${actorVerb(game.player, "read")} the carefully mended ${item.name}. ${subject} ${actorVerb(game.player, "see")} a map with strange markings, its torn lines pieced back together.`);
+      }
+      return this.examine(objectName);
+    }
+
+    sense(verb, objectName = "") {
+      const game = this.game;
+      const text = normalize(objectName);
+      if (text) {
+        const item = game.visibleSearch(text)?.item;
+        if (item) {
+          const subject = actorSubject(game.player, true);
+          if (verb === "listen") return game.print(`${subject} ${actorVerb(game.player, "listen")} to the ${item.name}, but hear${game.player.name === "You" ? "" : "s"} nothing useful.`);
+          if (verb === "smell") return game.print(`${subject} ${actorVerb(game.player, "smell")} the ${item.name}, but learn${game.player.name === "You" ? "" : "s"} nothing new.`);
+          if (verb === "watch") return game.print(`${subject} ${actorVerb(game.player, "watch")} the ${item.name} for a while, but it does not change.`);
+          return game.print(`${subject} ${actorVerb(game.player, "study")} the ${item.name}, but discover${game.player.name === "You" ? "" : "s"} nothing new.`);
+        }
+        const door = game.findDoor(text)?.door;
+        if (door) {
+          const subject = actorSubject(game.player, true);
+          if (verb === "listen") return game.print(`${subject} ${actorVerb(game.player, "listen")} at the ${door.name}, but hear${game.player.name === "You" ? "" : "s"} nothing clear beyond it.`);
+          if (verb === "watch") return game.print(`${subject} ${actorVerb(game.player, "watch")} the ${door.name}. It remains ${door.open ? "open" : "closed"}.`);
+          return game.print(`${subject} ${actorVerb(game.player, "notice")} nothing unusual about the ${door.name}.`);
+        }
+        const heldMessage = game.heldItemMessage(text);
+        if (heldMessage) return game.print(heldMessage);
+      }
+      this.inspectEnvironment(verb, text || (verb === "smell" ? "air" : "area"));
+    }
+
+    touch(verb, objectName = "") {
+      const game = this.game;
+      const text = normalize(objectName);
+      if (!text) return this.inspectEnvironment(verb, "area");
+      const item = game.visibleSearch(text)?.item;
+      if (item) {
+        if (verb === "knock") {
+          return game.print(item.container || item.strength > 8
+            ? actorizeSecondPerson(game.player, `You knock on the ${item.name}. It sounds solid.`)
+            : actorizeSecondPerson(game.player, `You knock on the ${item.name}, but nothing happens.`));
+        }
+        return game.print(actorizeSecondPerson(game.player, `You ${verb} the ${item.name}, but discover nothing new.`));
+      }
+      const door = game.findDoor(text)?.door;
+      if (door) {
+        if (verb === "knock") return game.print(actorizeSecondPerson(game.player, `You knock on the ${door.name}, but no one answers.`));
+        return game.print(actorizeSecondPerson(game.player, `You ${verb} the ${door.name}. It is ${door.open ? "open" : "closed"}.`));
+      }
+      const heldMessage = game.heldItemMessage(text);
+      if (heldMessage) return game.print(heldMessage);
+      this.inspectEnvironment(verb, text);
+    }
+
+    inspectEnvironment(verb, target = "", relation = "") {
+      const game = this.game;
+      const room = game.room();
+      const text = normalize(target);
+      const description = room?.description || "";
+      const lower = normalize(description);
+      const sample = this.descriptionSentenceFor(text);
+      const subject = actorSubject(game.player, true);
+      const suffix = sample ? ` ${sample}` : "";
+
+      if (!text || ["area", "room", "place", "here", "surroundings"].includes(text)) {
+        if (["search", "examine", "look"].includes(verb)) {
+          return game.print(`${subject} search${subject === "You" ? "" : "es"} the area carefully.${suffix || " Nothing else is revealed."}`);
+        }
+        if (verb === "listen") return game.print(actorizeSecondPerson(game.player, this.ambientSoundMessage(lower)));
+        if (verb === "smell") return game.print(actorizeSecondPerson(game.player, this.ambientSmellMessage(lower)));
+      }
+
+      if (["air", "smell", "scent", "odor", "odour"].includes(text)) return game.print(actorizeSecondPerson(game.player, this.ambientSmellMessage(lower)));
+      if (["sound", "sounds", "noise", "noises", "silence", "music"].includes(text)) return game.print(actorizeSecondPerson(game.player, this.ambientSoundMessage(lower)));
+
+      if (matchesAny(text, ["ground", "floor", "earth", "path", "trail", "road", "footprints"])) {
+        if (lower.includes("footprint") || lower.includes("imprint")) return game.print("The ground bears heavy marks, worth remembering but not something you can pick up.");
+        if (lower.includes("drop") || lower.includes("cliff")) return game.print("The footing is dangerous. One careless step would be a poor idea.");
+        if (lower.includes("moss")) return game.print("The ground is soft with moss and earth.");
+        return game.print(`${subject} ${actorVerb(game.player, "study")} the ${text}. It shows no hidden passage or useful object.`);
+      }
+
+      if (matchesAny(text, ["wall", "walls", "rock", "rocks", "stone", "stones", "ceiling", "crack", "cracks"])) {
+        if (lower.includes("cave") || lower.includes("cavern") || lower.includes("passage")) return game.print(`The stone is cold and rough. ${subject} ${actorVerb(game.player, "find")} no loose block or hidden catch.`);
+        if (lower.includes("secret door") || lower.includes("rock face")) return game.print("The rock face gives away nothing yet.");
+        return game.print(`${subject} ${actorVerb(game.player, "inspect")} the ${text}. Nothing moves.`);
+      }
+
+      if (matchesAny(text, ["tree", "trees", "branch", "branches", "forest", "vines", "roots"])) {
+        if (lower.includes("forest") || lower.includes("tree") || lower.includes("branch") || lower.includes("root")) {
+          return game.print(`${subject} ${actorVerb(game.player, "study")} the trees and roots. They are part of the landscape, not an object you can use here.`);
+        }
+        return game.print("There are no useful trees or branches here.");
+      }
+
+      if (matchesAny(text, ["river", "water", "stream", "lake", "boat", "shore", "bank"])) {
+        if (lower.includes("river") || lower.includes("water") || lower.includes("stream") || lower.includes("lake") || lower.includes("bank")) {
+          return game.print(`${subject} ${actorVerb(game.player, "examine")} the water and its banks. The current looks important, but ${game.player.name === "You" ? "you find" : `${game.player.name} finds`} nothing loose.`);
+        }
+        return game.print("There is no useful water here.");
+      }
+
+      if (matchesAny(text, ["fire", "embers", "pit", "ashes", "smoke"])) {
+        if (lower.includes("fire") || lower.includes("ember") || lower.includes("smoke")) return game.print("The remains of fire tell you someone has been here, but there is nothing useful to take.");
+        return game.print("There is no fire here.");
+      }
+
+      if (matchesAny(text, ["shadow", "shadows", "dark", "darkness", "mist", "mists"])) {
+        return game.print(`${subject} ${actorVerb(game.player, "peer")} into the gloom, but it keeps its secrets.`);
+      }
+
+      if (relation === "under" || relation === "behind") {
+        return game.print(`${subject} ${actorVerb(game.player, "look")} ${relation} the ${text}, but find${game.player.name === "You" ? "" : "s"} nothing hidden.`);
+      }
+      if (verb === "listen") return game.print(actorizeSecondPerson(game.player, this.ambientSoundMessage(lower)));
+      if (verb === "smell") return game.print(actorizeSecondPerson(game.player, this.ambientSmellMessage(lower)));
+      if (verb === "knock") return game.print(`${subject} ${actorVerb(game.player, "knock")} on the ${text}, but nothing answers.`);
+      if (verb === "touch" || verb === "feel") return game.print(`${subject} ${actorVerb(game.player, verb)} the ${text}, but learn${game.player.name === "You" ? "" : "s"} nothing useful.`);
+      game.print(`${subject} ${actorVerb(game.player, "find")} nothing special about the ${text}.`);
+    }
+
+    descriptionSentenceFor(target) {
+      const game = this.game;
+      const text = normalize(target);
+      if (!text || ["area", "room", "place", "here", "surroundings"].includes(text)) return "";
+      const sentences = (game.room()?.description || "").match(/[^.?!]+[.?!]/g) || [];
+      return sentences.find((sentence) => normalize(sentence).includes(text))?.trim() || "";
+    }
+
+    ambientSoundMessage(description) {
+      const game = this.game;
+      const subject = actorSubject(game.player, true);
+      if (description.includes("music")) return `${subject} ${actorVerb(game.player, "listen")}. Music and distant voices drift through the air.`;
+      if (description.includes("dripping") || description.includes("drips")) return `${subject} ${actorVerb(game.player, "listen")}. Water drips somewhere in the dark.`;
+      if (description.includes("wind") || description.includes("howl")) return `${subject} ${actorVerb(game.player, "listen")}. The wind moves restlessly around you.`;
+      if (description.includes("river") || description.includes("stream") || description.includes("water")) return `${subject} ${actorVerb(game.player, "listen")}. Water murmurs nearby.`;
+      if (description.includes("silence")) return `${subject} ${actorVerb(game.player, "listen")}. The silence feels heavy.`;
+      return `${subject} ${actorVerb(game.player, "listen")} carefully, but hear${game.player.name === "You" ? "" : "s"} nothing useful.`;
+    }
+
+    ambientSmellMessage(description) {
+      const game = this.game;
+      if (description.includes("damp") || description.includes("moss") || description.includes("mold")) return "The air smells damp, earthy, and old.";
+      if (description.includes("forest") || description.includes("foliage") || description.includes("pine")) return "The air smells of leaves, bark, and wild earth.";
+      if (description.includes("fire") || description.includes("ember") || description.includes("smoke")) return "The air carries a faint smoky smell.";
+      if (description.includes("food") || description.includes("meal") || description.includes("wine")) return "There is a homely smell of food and drink.";
+      if (description.includes("dragon") || description.includes("smaug")) return "The air smells hot, dry, and dangerous.";
+      return `${actorSubject(game.player, true)} ${actorVerb(game.player, "smell")} the air, but notice${game.player.name === "You" ? "" : "s"} nothing useful.`;
+    }
+
+    showMap() {
+      const game = this.game;
+      const exits = game.roomConnections().map((c) => `${c.direction}: ${game.rooms[c.to]?.name || c.to}`).join("\n");
+      game.print(exits ? `From here:\n${exits}` : "No exits are visible from here.");
+    }
+  }
+
+  class SpecialActionController {
+    constructor(game) {
+      this.game = game;
+    }
+
+    trySpecialAction(verb, objectText) {
+      const game = this.game;
+      const roomName = game.room().name;
+      const adverb = game.splitter.lastAdverb;
+      for (const action of game.data.specialActions) {
+        if (action.verb !== verb) continue;
+        if (action.location && action.location !== roomName) continue;
+        if (action.special_char && !matches(game.player.name, normalize(action.special_char))) continue;
+        if (!this.matchesSpecialActionObjects(action, objectText, adverb)) continue;
+        if (this.isPonyWindowAction(action) && game.flags.ponysequencecompleted) {
+          if (action.desc1) game.print(actorActionSentence(game.player, action.desc1));
+          game.print(game.flags.lanternon
+            ? "He peers through the window, but the stable stands empty now."
+            : "He peers through the window, his eyes narrowing, but it's too dark to see anything.");
+          return true;
+        }
+        if (this.isPonySequenceAction(action) && game.flags.ponysequencecompleted) continue;
+        const unavailable = this.specialActionUnavailable(action);
+        if (unavailable) {
+          game.print(unavailable);
+          return true;
+        }
+        if (!this.flagIn1Allowed(action.flag_in1)) continue;
+        if (!this.flagIn2Allowed(action.flag_in2)) {
+          const flagName = String(action.flag_in2 || "").replace("*", "");
+          if (flagName && game.flags[flagName]) {
+            const revealed = action.reveals ? this.findRevealedItem(action.reveals) : null;
+            if (revealed?.location?.type === "room" && revealed.location.id === game.currentRoom) {
+              if (action.desc2) game.print(action.desc2);
+            } else {
+              game.print(this.alreadyDidMessage(action));
+            }
+            if (revealed) revealed.visible = true;
+            return true;
+          }
+          continue;
+        }
+        if (this.isLanternLightAction(action)) {
+          return game.igniteLantern(actorActionSentence(game.player, action.desc1));
+        }
+        if (String(action.destination || "").includes("endgame")) {
+          const roomLabel = game.room()?.name?.replace(/_/g, " ") || "this place";
+          game.recordAutosave(`before a dangerous action in ${roomLabel}`, {
+            key: `special:${game.currentRoom}:${action.verb}:${action.obj1 || ""}:${action.obj2 || ""}:${action.destination}`,
+          });
+        }
+        if (action.desc1) game.print(actorActionSentence(game.player, action.desc1));
+        if (action.desc2) game.print(action.desc2, action.destination?.includes("endgame") ? "danger" : "");
+        this.performSpecialActionTransfer(action);
+        if (action.flag_out) this.setFlag(action.flag_out.replace("*", ""), true);
+        if (action.reveals) this.reveal(action.reveals);
+        if (this.isPonySequenceAction(action)) {
+          game.flags.ponysequencecompleted = true;
+          game.flags.ponypassageopen = true;
+          if (game.items.calm_pony) game.items.calm_pony.visible = false;
+        }
+        if (action.destination) {
+          if (action.destination.includes("endgame")) {
+            game.endGame("The adventure ends.", { fatal: true });
+          } else if (game.roomByName(action.destination)) {
+            game.currentRoom = game.roomByName(action.destination).id;
+            game.player.position = game.currentRoom;
+            game.describeRoom();
+            game.maybeAutosaveForRoom(game.currentRoom);
+            game.checkSpecialSituations();
+          }
+        }
+        return Boolean(action.desc1 || action.desc2 || action.reveals || action.destination);
+      }
+      return false;
+    }
+
+    performSpecialActionTransfer(action) {
+      const game = this.game;
+      if (!["take", "steal"].includes(action.verb)) return false;
+      const targetName = String(action.obj1 || "").trim();
+      if (!targetName.startsWith("*")) return false;
+      const held = game.findVisibleCharacterHolding(targetName.replace(/^\*/, ""));
+      if (!held?.item || held.worn || !held.item.portable) return false;
+      if (held.item.weight > game.player.strength * 5) {
+        game.print(`The ${held.item.name} is too heavy to take.`);
+        return true;
+      }
+      if (!game.canCarryAdditionalWeight(held.item.weight || 0)) {
+        game.print(game.carryTooMuchMessage(held.item));
+        return true;
+      }
+      game.detachItem(held.item.id);
+      held.item.location = { type: "character", id: game.player.id };
+      game.player.inventory.push(held.item.id);
+      if (matches(held.item.name, "treasure")) game.flags.treasuretaken = true;
+      game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "take")} the ${held.item.name}.`);
+      return true;
+    }
+
+    isPonySequenceAction(action) {
+      return action.location === "Green Dragon Inn Outside"
+        && action.verb === "climb"
+        && ["on", "onto"].includes(action.adverb)
+        && action.obj2 === "low branch"
+        && action.destination === "Dreary"
+        && action.flag_in1 === "seenpony";
+    }
+
+    isPonyWindowAction(action) {
+      return action.location === "Green Dragon Inn"
+        && action.verb === "look"
+        && action.special_char === "Thorin"
+        && action.obj2 === "window";
+    }
+
+    isLanternLightAction(action) {
+      return action.verb === "light"
+        && matches(action.obj1 || "", "brass lantern")
+        && matches(action.obj2 || "", "firestone");
+    }
+
+    matchesSpecialActionObjects(action, objectText, adverb) {
+      const game = this.game;
+      const text = normalizeWords(objectText);
+      const requiredAdverb = String(action.adverb || "").trim();
+      if (game.currentRoom === "trolls_cave" && action.reveals === "arcane chest") {
+        const obj1Matches = !action.obj1 || commandObjectMatches(text, action.obj1);
+        if (!obj1Matches) return false;
+        if (game.hasActiveLantern()) return true;
+        return requiredAdverb === adverb || wordInCommand(text, requiredAdverb);
+      }
+      const adverbMatches = !requiredAdverb || requiredAdverb === adverb || wordInCommand(text, requiredAdverb);
+      const obj1Matches = !action.obj1 || commandObjectMatches(text, action.obj1);
+      let obj2Matches = !action.obj2 || commandObjectMatches(text, action.obj2);
+      if (!obj2Matches && requiredAdverb === "with") obj2Matches = this.hasInventoryMatch(action.obj2);
+      if (!obj1Matches || !obj2Matches) return false;
+      if (adverbMatches) return true;
+      const mentionedPrimary = action.obj1 && commandObjectMatches(text, action.obj1);
+      const mentionedSecondary = action.obj2 && commandObjectMatches(text, action.obj2);
+      return Boolean(mentionedPrimary || mentionedSecondary);
+    }
+
+    hasInventoryMatch(name) {
+      const game = this.game;
+      const query = normalize(String(name || "").replace("*", ""));
+      if (!query) return false;
+      return game.player.inventory.some((itemId) => matches(game.items[itemId]?.name, query));
+    }
+
+    specialActionUnavailable(action) {
+      const game = this.game;
+      const canUseVisiblePortable = new Set(["climb", "jump", "swim"]);
+      for (const objectName of [action.obj1, action.obj2].filter(Boolean)) {
+        if (String(objectName).includes("*")) continue;
+        const query = normalize(String(objectName).replace("*", ""));
+        const inventoryItem = game.player.inventory.map((id) => game.items[id]).find((item) => matches(item?.name, query));
+        if (inventoryItem) continue;
+        const roomItem = game.visibleSearch(query, { includeInventory: false })?.item;
+        if (roomItem && canUseVisiblePortable.has(action.verb)) continue;
+        if (roomItem?.portable) return `${actorSubject(game.player, true)} ${actorVerb(game.player, "do")} not have the ${roomItem.name}.`;
+        if (roomItem) continue;
+        if (game.findDoor(query)) continue;
+        const heldMessage = game.heldItemMessage(query);
+        if (heldMessage) return heldMessage;
+        const knownPortable = Object.values(game.items).find((item) => item.portable && matches(item.name, query));
+        if (knownPortable) return `${actorSubject(game.player, true)} ${actorVerb(game.player, "do")} not have the ${knownPortable.name}.`;
+        return "I do not see that here.";
+      }
+      return "";
+    }
+
+    revealFromSpecial(verb, objectName) {
+      const game = this.game;
+      for (const action of game.data.specialActions) {
+        if (action.verb === verb && action.location === game.room().name && action.reveals && objectName.includes((action.obj1 || action.obj2 || "").replace("*", ""))) {
+          this.reveal(action.reveals);
+        }
+      }
+    }
+
+    reveal(name) {
+      const game = this.game;
+      const room = game.roomByName(name);
+      if (room) return;
+      const item = this.findRevealedItem(name);
+      if (item) item.visible = true;
+    }
+
+    findRevealedItem(name) {
+      const game = this.game;
+      return Object.values(game.items).find((candidate) => matches(candidate.name, normalize(name))) || null;
+    }
+
+    alreadyDidMessage(action) {
+      const game = this.game;
+      const target = action.obj1 || action.obj2;
+      const verb = pastTense(action.verb);
+      return target ? actorizeSecondPerson(game.player, `You have already ${verb} the ${target.replace("*", "")}.`) : "That has already been done.";
+    }
+
+    flagIn1Allowed(flag) {
+      if (!flag) return true;
+      const inverted = String(flag).startsWith("*");
+      const name = String(flag).replace("*", "");
+      const value = this.getFlag(name);
+      return inverted ? !value : value;
+    }
+
+    flagIn2Allowed(flag) {
+      if (!flag) return true;
+      const inverted = String(flag).startsWith("*");
+      const name = String(flag).replace("*", "");
+      const value = this.getFlag(name);
+      return inverted ? value : !value;
+    }
+
+    getFlag(name) {
+      const game = this.game;
+      const normalizedName = String(name || "").replace("*", "");
+      const builtIns = {
+        trolls_transformed: game.trollsTransformed,
+        trolls_defeated: game.trollsDefeated,
+        visited_trolls_clearing: game.visitedTrollsClearing,
+      };
+      if (Object.prototype.hasOwnProperty.call(builtIns, normalizedName)) return Boolean(builtIns[normalizedName]);
+      return Boolean(game.flags[normalizedName]);
+    }
+
+    setFlag(name, value) {
+      const game = this.game;
+      game.flags[name] = value;
+      if (name.endsWith("open")) game.flags[name.replace(/open$/, "closed")] = !value;
+    }
+  }
+
   class HobbitGame {
     constructor(data) {
       this.data = data;
       this.splitter = new CommandSplitter(data);
+      this.world = new WorldModel(this);
+      this.clarifier = new ClarificationController(this);
+      this.commandRouter = new CommandRouter(this);
+      this.interactions = new InteractionRules(this);
+      this.social = new SocialRules(this);
+      this.layout = new LayoutController(this);
+      this.storage = new SaveSystem(this);
+      this.encounters = new SpecialEncounters(this);
+      this.hazards = new HazardDirector(this);
+      this.flow = new GameFlowController(this);
+      this.exploration = new ExplorationController(this);
+      this.specialActions = new SpecialActionController(this);
       this.rooms = clone(data.rooms);
       this.items = clone(data.items);
       this.doors = clone(data.doors);
@@ -2185,15 +5771,6 @@
       this.lastReferencedCharacterId = null;
       this.delegatedSplitters = new Map();
       this.sharedDelegatedContext = { lastObject: null, lastDirectObject: null, lastTargetObject: null };
-      this.autoplayRunning = false;
-      this.autoplayTimer = null;
-      this.autoplayTypingTimer = null;
-      this.autoplayDelay = 450;
-      this.autoplayMode = "normal";
-      this.autoplayWaits = 0;
-      this.autoplayRunId = 0;
-      this.autoplayCapturedText = "";
-      this.autoplayCapturingOutput = false;
       this.endgameRestartArmed = false;
       this.pendingEndgameChoice = null;
       this.arrivalNoticeTimers = [];
@@ -2202,9 +5779,6 @@
       this.turnCount = 0;
       this.storyRunCount = 0;
       this.storySeed = 0;
-      this.autosaveSnapshot = null;
-      this.autosaveMeta = null;
-      this.autosaveCounter = 0;
       this.imageTransitionTimer = null;
       this.currentImageSrc = roomImage.getAttribute("src") || "";
       this.imageTransitionCycle = 0;
@@ -2214,16 +5788,9 @@
       this.audio.volume = 0.75;
       this.unexpectedParty = new UnexpectedPartyController(this);
       this.companionDirector = new CompanionDirector(this);
-      this.layoutSwitchHideTimer = null;
-      this.layoutSwitchAutoHide = this.shouldAutoHideLayoutSwitch();
-      this.layoutResizeCleanup = null;
-      this.layoutMouseAnchor = null;
-      this.layoutMode = this.loadLayoutModePreference();
-      this.layout2SceneWidth = this.loadLayout2SceneWidthPreference();
-      this.applyLayout2SceneWidth(this.layout2SceneWidth, { persist: false });
-      this.applyLayoutMode(this.layoutMode);
-      this.initializeLayoutSwitchVisibility();
-      this.initializeLayoutDivider();
+      this.storage.initialize();
+      this.layout.initialize();
+      this.flow.initialize();
       this.initState();
       this.bind();
       this.describeRoom(true);
@@ -2299,128 +5866,35 @@
     }
 
     createGollumState() {
-      const riddleIds = this.selectGollumRiddleIds();
-      return {
-        met: false,
-        contestStarted: false,
-        awaitingAnswer: false,
-        currentRiddleIndex: 0,
-        riddleIds,
-        awaitingPlayerRiddle: false,
-        pocketQuestionAsked: false,
-        enraged: false,
-        escaped: false,
-        activityIndex: 0,
-        activityCooldown: 0,
-        revealStyle: Math.abs(hashString(`${this.storySeed}:gollum-reveal`)) % 4,
-        deathStyle: Math.abs(hashString(`${this.storySeed}:gollum-death`)) % 4,
-      };
+      return this.encounters.createGollumState();
     }
 
     restoreGollumState(savedState = null) {
-      if (!savedState) return this.createGollumState();
-      const base = this.createGollumState();
-      const restored = { ...base, ...savedState };
-      restored.currentRiddleIndex = Math.max(0, Number(restored.currentRiddleIndex) || 0);
-      if (!Array.isArray(restored.riddleIds) || !restored.riddleIds.length) restored.riddleIds = base.riddleIds;
-      restored.riddleIds = restored.riddleIds
-        .map((value) => Number(value))
-        .filter((value) => Number.isInteger(value) && value >= 0 && value < GOLLUM_RIDDLE_POOL.length)
-        .slice(0, 2);
-      if (!restored.riddleIds.length) restored.riddleIds = base.riddleIds;
-      if (restored.currentRiddleIndex >= restored.riddleIds.length) restored.currentRiddleIndex = restored.riddleIds.length - 1;
-      restored.activityIndex = Number.isInteger(restored.activityIndex) ? restored.activityIndex : base.activityIndex;
-      restored.activityCooldown = Number.isFinite(restored.activityCooldown) ? restored.activityCooldown : base.activityCooldown;
-      restored.revealStyle = Number.isInteger(restored.revealStyle) ? restored.revealStyle : base.revealStyle;
-      restored.deathStyle = Number.isInteger(restored.deathStyle) ? restored.deathStyle : base.deathStyle;
-      return restored;
+      return this.encounters.restoreGollumState(savedState);
     }
 
     selectGollumRiddleIds() {
-      const pool = GOLLUM_RIDDLE_POOL.map((_entry, index) => index);
-      const chosen = [];
-      while (pool.length && chosen.length < 2) {
-        const pickIndex = Math.abs(hashString(`${this.storySeed}:gollum-riddle:${chosen.length}:${pool.length}`)) % pool.length;
-        chosen.push(pool.splice(pickIndex, 1)[0]);
-      }
-      return chosen;
+      return this.encounters.selectGollumRiddleIds();
     }
 
     activeGollumRiddles(state = this.gollumState) {
-      const ids = Array.isArray(state?.riddleIds) && state.riddleIds.length ? state.riddleIds : this.selectGollumRiddleIds();
-      return ids.map((id) => GOLLUM_RIDDLE_POOL[id]).filter(Boolean);
+      return this.encounters.activeGollumRiddles(state);
     }
 
     currentGollumRiddle(state = this.gollumState) {
-      const riddles = this.activeGollumRiddles(state);
-      return riddles[state?.currentRiddleIndex || 0] || riddles[0] || null;
+      return this.encounters.currentGollumRiddle(state);
     }
 
     gollumRevealLines() {
-      const styles = [
-        [
-          "A small boat glides out across the black water. In it crouches Gollum, pale eyes shining in the dark.",
-          "Gollum whispers 'What is it, my precious? Lost, is it? Hungry, is it?'",
-          "For the moment he seems more curious than murderous. Riddles may yet buy you time.",
-        ],
-        [
-          "A wet scraping reaches you from the stones, and then Gollum unfolds himself from the darkness at the water's edge.",
-          "His pale eyes blink once. 'Lost, is it? Lost and found by us, perhapses?' he whispers.",
-          "He seems intent on studying you before deciding whether you are guest, game, or thief.",
-        ],
-        [
-          "Something disturbs the black water. A narrow boat noses silently from the dark, and Gollum is suddenly there, peering at you over its side.",
-          "Gollum rocks gently and murmurs 'A nasty little Baggins in the dark. Shall we talk, precious?'",
-          "His hunger is plain, but so is his fascination. A riddle-game might hold him for a while.",
-        ],
-        [
-          "You catch a flash of pale eyes before the rest of him emerges from shadow, one hand on a boat, the other on the slick stones.",
-          "Gollum gives a thin smile. 'We knows a stranger when we smells one, yes. We talks first, perhaps.'",
-          "He has not attacked yet. There is room, for the moment, for words and riddles.",
-        ],
-      ];
-      return styles[this.gollumState?.revealStyle || 0] || styles[0];
+      return this.encounters.gollumRevealLines();
     }
 
     gollumContestOpener() {
-      const openers = [
-        {
-          first: "Gollum glides over the black water and whispers 'If Baggins answers true, then Baggins may ask. If not, we eats him, yes.'",
-          repeat: "Gollum paddles nearer and whispers 'If Baggins answers true, then Baggins may ask. If not, we eats him, yes.'",
-        },
-        {
-          first: "Gollum tilts his head and rasps 'Answer true, little Baggins, and then you may ask. Answer false, and we keeps you forever.'",
-          repeat: "Gollum taps the boat with one claw. 'Again, yes. Answer true and ask. Answer false and feed us.'",
-        },
-        {
-          first: "Gollum folds himself low in the boat. 'Riddles first, precious. True answers earn a question. False answers earn the dark.'",
-          repeat: "Gollum circles closer. 'More riddles, yes. Truth buys time. Mistakes buy death.'",
-        },
-      ];
-      const variant = openers[Math.abs(hashString(`${this.storySeed}:gollum-opener`)) % openers.length];
-      return this.gollumState?.met ? variant.repeat : variant.first;
+      return this.encounters.gollumContestOpener();
     }
 
     gollumWrongAnswerOutcome() {
-      const outcomes = [
-        {
-          attack: "Gollum's pale eyes flare with hunger. 'Wrong, precious. Wrong!' He springs from the boat and falls on you in the dark.",
-          ending: "Gollum catches you in the dark.",
-        },
-        {
-          attack: "Gollum lets out a shrill cry of delight. 'Wrong! Wrong!' He darts low, knife-quick, and drags you down among the wet stones.",
-          ending: "Gollum tears you down beside the black water.",
-        },
-        {
-          attack: "With a hiss like tearing cloth, Gollum launches himself at your throat. The dark water splashes, cold hands close, and the cave spins.",
-          ending: "Gollum strangles you in the dark.",
-        },
-        {
-          attack: "Gollum shrieks 'False!' and comes at you in a frenzy of claws and teeth, driving you backward into the black water.",
-          ending: "Gollum drags you under the dark lake.",
-        },
-      ];
-      return outcomes[this.gollumState?.deathStyle || 0] || outcomes[0];
+      return this.encounters.gollumWrongAnswerOutcome();
     }
 
     addZXFinaleState() {
@@ -2689,131 +6163,7 @@
 
         if (this.needsClarification(verb, object)) return false;
 
-        const handlers = {
-          take: () => this.take(object),
-          get: () => this.take(object),
-          leave: () => this.drop(object),
-          drop: () => this.drop(object),
-          put: () => this.drop(object),
-          open: () => this.open(object),
-          close: () => this.close(object),
-          unlock: () => this.unlock(object),
-          lock: () => this.lock(object),
-          look: () => this.look(object),
-          examine: () => this.examine(object),
-          inspect: () => this.examine(object),
-          search: () => this.examine(object),
-          explore: () => this.examine(object),
-          investigate: () => this.examine(object),
-          listen: () => this.sense("listen", object),
-          smell: () => this.sense("smell", object),
-          sniff: () => this.sense("smell", object),
-          watch: () => this.sense("watch", object),
-          eavesdrop: () => this.sense("listen", object),
-          scout: () => this.sense("search", object),
-          touch: () => this.touch("touch", object),
-          feel: () => this.touch("feel", object),
-          knock: () => this.touch("knock", object),
-          inventory: () => this.inventory(),
-          i: () => this.inventory(),
-          wait: () => this.wait(),
-          hello: () => this.hello(),
-          tips: () => this.tips(object),
-          verbs: () => this.verbs(),
-          mysaves: () => this.listSaves(),
-          save: () => this.save(object),
-          load: () => this.load(object),
-          quit: () => this.quit(),
-          map: () => this.showMap(),
-          location: () => this.print(actorizeSecondPerson(this.player, `You are currently in ${this.room().name.replace(/_/g, " ")}.`)),
-          music: () => this.handleMusicCommand(object),
-          autoplay: () => this.autoplay(object),
-          wear: () => this.wear(object),
-          remove: () => this.remove(object),
-          give: () => this.give(object),
-          show: () => this.show(object),
-          hand: () => this.give(object),
-          pass: () => this.give(object),
-          bring: () => this.give(object),
-          send: () => this.give(object),
-          return: () => this.give(object),
-          deliver: () => this.give(object),
-          ask: () => this.askFor(object),
-          borrow: () => this.askFor(object),
-          request: () => this.askFor(object),
-          carry: () => this.take(object),
-          hold: () => this.take(object),
-          catch: () => this.take(object),
-          follow: () => this.followCharacter(object),
-          guard: () => this.physicalAction("guard", object),
-          help: () => this.physicalAction("help", object),
-          explain: () => this.physicalAction("explain", object),
-          negotiate: () => this.physicalAction("negotiate", object),
-          print: () => this.physicalAction("print", object),
-          call: () => this.socialAction("call", object),
-          wash: () => this.physicalAction("wash", object),
-          check: () => this.examine(object),
-          start: () => this.physicalAction("start", object),
-          refill: () => this.physicalAction("refill", object),
-          inform: () => this.socialAction("inform", object),
-          review: () => this.examine(object),
-          mend: () => this.mend(object),
-          repair: () => this.mend(object),
-          fix: () => this.mend(object),
-          write: () => this.write(object),
-          light: () => this.light(object),
-          pick: () => this.pick(object),
-          cut: () => this.cutTrim("cut", object),
-          trim: () => this.cutTrim("trim", object),
-          fill: () => this.fill(object),
-          water: () => this.water(object),
-          plant: () => this.plant(object),
-          rake: () => this.rakeGarden(object),
-          dig: () => this.dig(object),
-          kill: () => this.attack(object),
-          attack: () => this.attack(object),
-          break: () => this.breakThing(object),
-          push: () => this.pushPull("push", object),
-          pull: () => this.pushPull("pull", object),
-          move: () => this.pushPull("move", object),
-          place: () => this.drop(object),
-          set: () => this.drop(object),
-          store: () => this.drop(object),
-          lift: () => this.touch("lift", object),
-          turn: () => this.touch("turn", object),
-          use: () => this.touch("use", object),
-          find: () => this.examine(object),
-          read: () => this.read(object),
-          answer: () => this.socialAction("answer", object),
-          thank: () => this.socialAction("thank", object),
-          flatter: () => this.socialAction("flatter", object),
-          insult: () => this.socialAction("insult", object),
-          hide: () => this.physicalAction("hide", object),
-          sneak: () => this.physicalAction("sneak", object),
-          escape: () => this.physicalAction("escape", object),
-          throw: () => this.throwItem(object),
-          climb: () => this.climb(object),
-          eat: () => this.eat(object),
-          drink: () => this.drink(object),
-          jump: () => this.physicalAction("jump", object),
-          sit: () => this.physicalAction("sit", object),
-          lie: () => this.physicalAction("lie", object),
-          stand: () => this.physicalAction("stand", object),
-          sleep: () => this.physicalAction("sleep", object),
-          rest: () => this.physicalAction("rest", object),
-          run: () => this.physicalAction("run", object),
-          wake: () => this.physicalAction("wake", object),
-          crawl: () => this.physicalAction("crawl", object),
-          leap: () => this.physicalAction("jump", object),
-          dive: () => this.physicalAction("dive", object),
-          swim: () => this.physicalAction("swim", object),
-          ride: () => this.physicalAction("ride", object),
-          cook: () => this.physicalAction("cook", object),
-          combine: () => this.combine(object),
-        };
-
-        if (handlers[verb]) handlers[verb]();
-        else this.unrecognized(command);
+        this.commandRouter.dispatch(verb, object, command);
         for (const reference of explicitReferences) {
           this.rememberClarifiedReference(reference.target, reference.choice);
         }
@@ -2838,32 +6188,11 @@
     }
 
     isTalkCommand(command) {
-      return /^(?:say|talk|speak|whisper|yell)\s+/.test(command);
+      return this.social.isTalkCommand(command);
     }
 
     handleCharacterFirstCommand(command) {
-      const people = this.peopleInRoom()
-        .filter((character) => character.id !== this.player.id && character.visible)
-        .sort((a, b) => b.name.length - a.name.length);
-      for (const character of people) {
-        const name = normalize(character.name);
-        if (command === name) {
-          if (this.unexpectedParty?.blocksDirectInteraction(character, "talk")) return true;
-          this.print(`${character.name} listens intently, expecting your words.`);
-          return true;
-        }
-        if (!command.startsWith(`${name} `)) continue;
-        const order = command.slice(name.length).trim().replace(/^to\s+/, "");
-        if (!order) continue;
-        if (character.friendly === false) {
-          this.respondToTalk(character);
-          return true;
-        }
-        if (this.unexpectedParty?.blocksDirectInteraction(character, "order")) return true;
-        this.delegateCharacterOrder(character, order);
-        return true;
-      }
-      return false;
+      return this.social.handleCharacterFirstCommand(command);
     }
 
     isUnsupportedConditional(command) {
@@ -3045,262 +6374,95 @@
     }
 
     render() {
-      const room = this.room();
-      const scene = roomImage.closest(".scene");
-      if (this.roomIsDark()) {
-        this.finishImageTransition(scene);
-        this.currentImageSrc = "";
-        roomImage.setAttribute("hidden", "hidden");
-        roomImage.removeAttribute("src");
-        roomImage.alt = "";
-      } else if (room?.image) {
-        roomImage.removeAttribute("hidden");
-        const src = assetUrl(IMAGE_ROOT, room.image);
-        this.swapRoomImage(scene, src);
-        roomImage.alt = room.name;
-      } else {
-        this.finishImageTransition(scene);
-        this.currentImageSrc = "";
-        roomImage.setAttribute("hidden", "hidden");
-        roomImage.removeAttribute("src");
-        roomImage.alt = "";
-      }
-      fillList(inventoryList, this.player.inventory.map((id) => this.inventorySidebarLabel(this.items[id])).filter(Boolean), "nothing");
-      if (inventoryStatus) inventoryStatus.textContent = `Weight ${this.currentCarryWeight()}/${this.carryCapacity()}`;
-      fillList(exitsList, this.roomConnections().map((c) => c.direction), "none");
-      fillList(peopleList, this.visiblePeopleInRoom().filter((p) => p.name !== "You" && p.visible).map((p) => p.name), "none");
+      return this.layout.render();
     }
 
     swapRoomImage(scene, nextSrc) {
-      const previousSrc = this.currentImageSrc || roomImage.getAttribute("src") || "";
-      if (previousSrc === nextSrc) {
-        if (roomImage.getAttribute("src") !== nextSrc) roomImage.src = nextSrc;
-        this.currentImageSrc = nextSrc;
-        return;
-      }
-
-      roomImage.src = nextSrc;
-      this.currentImageSrc = nextSrc;
-
-      if (!previousSrc || !imageReveal || !imageRevealFill || !imageRevealOutline) {
-        this.finishImageTransition(scene);
-        return;
-      }
-
-      this.finishImageTransition(scene);
-      imageRevealFill.src = previousSrc;
-      imageRevealOutline.src = nextSrc;
-      imageRevealFill.alt = "";
-      imageRevealOutline.alt = "";
-      imageReveal.removeAttribute("hidden");
-
-      scene?.classList.remove("is-transitioning");
-      void scene?.offsetWidth;
-      scene?.classList.add("is-transitioning");
-
-      const cycle = ++this.imageTransitionCycle;
-      this.imageTransitionTimer = setTimeout(() => {
-        if (cycle !== this.imageTransitionCycle) return;
-        this.finishImageTransition(scene);
-      }, 920);
+      return this.layout.swapRoomImage(scene, nextSrc);
     }
 
     finishImageTransition(scene) {
-      clearTimeout(this.imageTransitionTimer);
-      this.imageTransitionTimer = null;
-      this.imageTransitionCycle += 1;
-      scene?.classList.remove("is-transitioning");
-      imageReveal?.setAttribute("hidden", "hidden");
-      imageRevealFill?.removeAttribute("src");
-      imageRevealOutline?.removeAttribute("src");
-      if (imageRevealFill) imageRevealFill.alt = "";
-      if (imageRevealOutline) imageRevealOutline.alt = "";
+      return this.layout.finishImageTransition(scene);
     }
 
     loadLayoutModePreference() {
-      const saved = String(localStorage.getItem(LAYOUT_PREF_KEY) || "").trim();
-      return ["1", "2"].includes(saved) ? saved : "1";
+      return this.layout.loadLayoutModePreference();
     }
 
     loadLayout2SceneWidthPreference() {
-      const saved = Number.parseFloat(localStorage.getItem(LAYOUT_SPLIT_PREF_KEY) || "");
-      return Number.isFinite(saved) ? saved : DEFAULT_LAYOUT_2_SCENE_WIDTH;
+      return this.layout.loadLayout2SceneWidthPreference();
     }
 
     shouldAutoHideLayoutSwitch() {
-      if (!layoutSwitch || typeof window.matchMedia !== "function") return false;
-      return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+      return this.layout.shouldAutoHideLayoutSwitch();
     }
 
     initializeLayoutSwitchVisibility() {
-      if (!layoutSwitch) return;
-      if (!this.layoutSwitchAutoHide) {
-        layoutSwitch.classList.remove("layout-switch--auto-hide");
-        layoutSwitch.classList.remove("is-visible");
-        layoutDivider?.classList?.remove("layout-divider--auto-hide");
-        layoutDivider?.classList?.remove("is-visible");
-        return;
-      }
-      layoutSwitch.classList.add("layout-switch--auto-hide");
-      layoutSwitch.classList.remove("is-visible");
-      layoutDivider?.classList?.add("layout-divider--auto-hide");
-      layoutDivider?.classList?.remove("is-visible");
+      return this.layout.initializeLayoutSwitchVisibility();
     }
 
     showLayoutSwitch() {
-      if (!this.layoutSwitchAutoHide) return;
-      layoutSwitch?.classList?.add("is-visible");
-      if (this.layoutMode === "2") layoutDivider?.classList?.add("is-visible");
+      return this.layout.showLayoutSwitch();
     }
 
     hideLayoutSwitch() {
-      if (!this.layoutSwitchAutoHide) return;
-      this.cancelLayoutSwitchHide();
-      layoutSwitch?.classList?.remove("is-visible");
-      layoutDivider?.classList?.remove("is-visible");
+      return this.layout.hideLayoutSwitch();
     }
 
     cancelLayoutSwitchHide() {
-      clearTimeout(this.layoutSwitchHideTimer);
-      this.layoutSwitchHideTimer = null;
+      return this.layout.cancelLayoutSwitchHide();
     }
 
     scheduleLayoutSwitchHide(delay = LAYOUT_SWITCH_IDLE_MS) {
-      if (!this.layoutSwitchAutoHide || !layoutSwitch) return;
-      this.cancelLayoutSwitchHide();
-      this.layoutSwitchHideTimer = setTimeout(() => {
-        if (document.activeElement === layoutSwitch || layoutSwitch.contains?.(document.activeElement)) return;
-        this.hideLayoutSwitch();
-      }, delay);
+      return this.layout.scheduleLayoutSwitchHide(delay);
     }
 
     revealLayoutSwitch() {
-      if (!this.layoutSwitchAutoHide || !layoutSwitch) return;
-      this.showLayoutSwitch();
-      this.scheduleLayoutSwitchHide();
+      return this.layout.revealLayoutSwitch();
     }
 
     handleLayoutMouseDown(event) {
-      this.layoutMouseAnchor = { x: event?.clientX ?? 0, y: event?.clientY ?? 0 };
-      this.revealLayoutSwitch();
+      return this.layout.handleLayoutMouseDown(event);
     }
 
     handleLayoutMouseActivity(event) {
-      if (!this.layoutSwitchAutoHide) return;
-      const x = event?.clientX;
-      const y = event?.clientY;
-      if (!Number.isFinite(x) || !Number.isFinite(y)) {
-        this.revealLayoutSwitch();
-        return;
-      }
-      if (!this.layoutMouseAnchor) {
-        this.layoutMouseAnchor = { x, y };
-        return;
-      }
-      const dx = x - this.layoutMouseAnchor.x;
-      const dy = y - this.layoutMouseAnchor.y;
-      if (Math.hypot(dx, dy) < LAYOUT_MOUSE_ACTIVITY_THRESHOLD) return;
-      this.layoutMouseAnchor = { x, y };
-      this.revealLayoutSwitch();
+      return this.layout.handleLayoutMouseActivity(event);
     }
 
     layout2SceneBounds() {
-      const shellWidth = gameShell?.getBoundingClientRect?.().width || window.innerWidth || 1280;
-      const dividerWidth = layoutDivider?.getBoundingClientRect?.().width || 14;
-      const minPanelWidth = shellWidth <= 860 ? 240 : 320;
-      if (!shellWidth) {
-        return { min: 36, max: 72 };
-      }
-      const min = Math.max(24, (minPanelWidth / shellWidth) * 100);
-      const max = Math.min(76, 100 - (((minPanelWidth + dividerWidth) / shellWidth) * 100));
-      if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) {
-        return { min: 36, max: 72 };
-      }
-      return { min, max };
+      return this.layout.layout2SceneBounds();
     }
 
     normalizeLayout2SceneWidth(value) {
-      const numeric = Number.parseFloat(value);
-      const { min, max } = this.layout2SceneBounds();
-      const candidate = Number.isFinite(numeric) ? numeric : DEFAULT_LAYOUT_2_SCENE_WIDTH;
-      return Math.min(max, Math.max(min, candidate));
+      return this.layout.normalizeLayout2SceneWidth(value);
     }
 
     applyLayout2SceneWidth(value, options = {}) {
-      const normalized = this.normalizeLayout2SceneWidth(value);
-      this.layout2SceneWidth = normalized;
-      document.body?.style?.setProperty?.("--layout-2-scene-width", `${normalized}%`);
-      document.documentElement?.style?.setProperty?.("--layout-2-scene-width", `${normalized}%`);
-      if (options.persist !== false) localStorage.setItem(LAYOUT_SPLIT_PREF_KEY, String(normalized));
-      return normalized;
+      return this.layout.applyLayout2SceneWidth(value, options);
     }
 
     refreshLayout() {
-      if (!gameShell?.style) return;
-      if (this.layoutMode === "2") this.applyLayout2SceneWidth(this.layout2SceneWidth, { persist: false });
-      // Nudge a fresh grid calculation after boot so layout 1 does not wait for user input to settle.
-      gameShell.style.setProperty("--layout-refresh-token", String(Date.now()));
-      gameShell.getBoundingClientRect?.();
-      requestAnimationFrame(() => gameShell.style.removeProperty("--layout-refresh-token"));
+      return this.layout.refreshLayout();
     }
 
     updateLayout2SceneWidthFromPointer(clientX) {
-      if (!gameShell?.getBoundingClientRect) return;
-      const rect = gameShell.getBoundingClientRect();
-      if (!rect.width) return;
-      const percent = ((clientX - rect.left) / rect.width) * 100;
-      this.applyLayout2SceneWidth(percent);
+      return this.layout.updateLayout2SceneWidthFromPointer(clientX);
     }
 
     stopLayoutResize() {
-      document.body?.classList?.remove("is-resizing-layout");
-      if (typeof this.layoutResizeCleanup === "function") this.layoutResizeCleanup();
-      this.layoutResizeCleanup = null;
-      if (this.layoutSwitchAutoHide) this.scheduleLayoutSwitchHide(700);
+      return this.layout.stopLayoutResize();
     }
 
     initializeLayoutDivider() {
-      if (!layoutDivider) return;
-      layoutDivider.addEventListener("pointerdown", (event) => {
-        if (this.layoutMode !== "2" || event.button !== 0) return;
-        if (!gameShell?.getBoundingClientRect) return;
-        event.preventDefault();
-        this.stopLayoutResize();
-        this.showLayoutSwitch();
-        this.cancelLayoutSwitchHide();
-        document.body?.classList?.add("is-resizing-layout");
-        this.updateLayout2SceneWidthFromPointer(event.clientX);
-        const move = (moveEvent) => this.updateLayout2SceneWidthFromPointer(moveEvent.clientX);
-        const finish = () => this.stopLayoutResize();
-        document.addEventListener("pointermove", move);
-        document.addEventListener("pointerup", finish, { once: true });
-        document.addEventListener("pointercancel", finish, { once: true });
-        this.layoutResizeCleanup = () => {
-          document.removeEventListener("pointermove", move);
-          document.removeEventListener("pointerup", finish);
-          document.removeEventListener("pointercancel", finish);
-        };
-      });
+      return this.layout.initializeLayoutDivider();
     }
 
     applyLayoutMode(mode) {
-      const normalized = ["1", "2"].includes(String(mode)) ? String(mode) : "1";
-      this.layoutMode = normalized;
-      document.body?.setAttribute("data-layout", normalized);
-      document.documentElement?.setAttribute?.("data-layout", normalized);
-      if (normalized === "2") this.applyLayout2SceneWidth(this.layout2SceneWidth, { persist: false });
-      const syncPressed = (button, value) => {
-        if (!button) return;
-        button.setAttribute("aria-pressed", normalized === value ? "true" : "false");
-      };
-      syncPressed(layoutMode1Button, "1");
-      syncPressed(layoutMode2Button, "2");
-      if (normalized !== "2") this.stopLayoutResize();
+      return this.layout.applyLayoutMode(mode);
     }
 
     setLayoutMode(mode) {
-      this.applyLayoutMode(mode);
-      localStorage.setItem(LAYOUT_PREF_KEY, this.layoutMode);
+      return this.layout.setLayoutMode(mode);
     }
 
     print(text, kind = "") {
@@ -3318,11 +6480,11 @@
     }
 
     itemsInRoom(roomId) {
-      return Object.values(this.items).filter((item) => item.location?.type === "room" && item.location.id === roomId);
+      return this.world.itemsInRoom(roomId);
     }
 
-    peopleInRoom() {
-      return Object.values(this.characters).filter((character) => character.position === this.currentRoom);
+    peopleInRoom(roomId = this.currentRoom) {
+      return this.world.peopleInRoom(roomId);
     }
 
     characterPresence(character) {
@@ -3355,951 +6517,231 @@
     }
 
     visibleSearch(objectName, options = {}) {
-      if (this.forcedChoice?.type === "item" && matches(this.forcedChoice.name, objectName)) {
-        return { item: this.items[this.forcedChoice.id], parent: null };
-      }
-      return this.visibleSearchAll(objectName, options)[0] || null;
+      return this.world.visibleSearch(objectName, options);
     }
 
     visibleSearchAll(objectName, options = {}) {
-      const name = normalize(objectName);
-      const candidates = [];
-      const scan = (itemIds, parent = null) => {
-        for (const id of itemIds) {
-          const item = this.items[id];
-          if (!item) continue;
-          if (item.visible && matches(item.name, name)) candidates.push({ item, parent });
-          if (item.container && (item.open || item.noLid || options.closedContainers)) scan(item.contents, item);
-        }
-      };
-      if (!this.roomIsDark()) scan(this.itemsInRoom(this.currentRoom).map((item) => item.id));
-      if (options.includeInventory !== false) scan(this.player.inventory, { inventory: true });
-      return candidates;
+      return this.world.visibleSearchAll(objectName, options);
     }
 
     findInInventory(objectName) {
-      const name = normalize(objectName);
-      if (this.forcedChoice?.type === "item" && matches(this.forcedChoice.name, name)) {
-        const item = this.items[this.forcedChoice.id];
-        if (item && this.player.inventory.includes(item.id)) return item;
-      }
-      const id = this.player.inventory.find((itemId) => matches(this.items[itemId]?.name, name));
-      return id ? this.items[id] : null;
+      return this.world.findInInventory(objectName);
     }
 
     findKnownItem(objectName) {
-      const name = normalize(objectName);
-      return Object.values(this.items).find((item) => matches(item?.name, name)) || null;
+      return this.world.findKnownItem(objectName);
     }
 
     findVisibleCharacterHolding(objectName) {
-      if (this.roomIsDark()) return null;
-      const name = normalize(objectName);
-      for (const character of this.peopleInRoom()) {
-        if (character.id === this.player.id || !character.visible) continue;
-        const inventoryId = (character.inventory || []).find((id) => matches(this.items[id]?.name, name));
-        if (inventoryId) return { character, item: this.items[inventoryId], worn: false };
-        const wornId = (character.worn || []).find((id) => matches(this.items[id]?.name, name));
-        if (wornId) return { character, item: this.items[wornId], worn: true };
-      }
-      return null;
+      return this.world.findVisibleCharacterHolding(objectName);
     }
 
     heldItemMessage(objectName) {
-      const held = this.findVisibleCharacterHolding(objectName);
-      if (!held) return "";
-      const verb = held.worn ? "wearing" : "carrying";
-      if (held.character.name === "You") return `You are ${verb} the ${held.item.name}.`;
-      return `${held.character.name} is ${verb} the ${held.item.name}.`;
+      return this.world.heldItemMessage(objectName);
     }
 
     findItemInsideContainer(container, itemName) {
-      if (!container?.container) return null;
-      const name = normalize(itemName);
-      const scan = (itemIds, parent) => {
-        for (const id of itemIds || []) {
-          const item = this.items[id];
-          if (!item) continue;
-          if (matches(item.name, name)) return { item, parent };
-          if (item.container && (item.open || item.noLid)) {
-            const nested = scan(item.contents, item);
-            if (nested) return nested;
-          }
-        }
-        return null;
-      };
-      return scan(container.contents, container);
+      return this.world.findItemInsideContainer(container, itemName);
     }
 
     findDoor(name) {
-      const needle = normalize(name);
-      if (this.forcedChoice?.type === "door" && matches(this.forcedChoice.name, needle)) {
-        const connection = this.roomConnections().find((c) => c.door === this.forcedChoice.id);
-        return connection ? { door: this.doors[this.forcedChoice.id], connection } : null;
-      }
-      for (const connection of this.roomConnections()) {
-        const door = connection.door && this.doors[connection.door];
-        if (door && matches(door.name, needle)) return { door, connection };
-      }
-      return null;
+      return this.world.findDoor(name);
     }
 
     findDoorsAll(name) {
-      const needle = normalize(name);
-      return this.roomConnections()
-        .filter((connection) => connection.door && this.doors[connection.door])
-        .map((connection) => ({ door: this.doors[connection.door], connection }))
-        .filter(({ door }) => matches(door.name, needle));
+      return this.world.findDoorsAll(name);
     }
 
     needsClarification(verb, objectText) {
-      const request = this.firstClarificationRequest(verb, objectText);
-      if (!request) return false;
-      const remembered = request.choices.length > 1 ? this.recallClarifiedReference(request.target, request.choices) : null;
-      if (remembered && sameChoice(this.forcedChoice, remembered)) return false;
-      this.pendingClarification = {
-        ...request,
-        actorId: this.player?.id || null,
-      };
-      const labels = joinAlternatives(request.choices.map((choice) => clarificationLabel(choice.name)));
-      this.print(`Do you mean ${labels}?`, "system");
-      return true;
+      return this.clarifier.needsClarification(verb, objectText);
     }
 
     isClarificationAnswer(response) {
-      const pending = this.pendingClarification;
-      if (!pending) return false;
-      const answer = normalize(response);
-      if (!answer) return false;
-      if (["cancel", "stop", "no"].includes(answer)) return true;
-      const number = Number.parseInt(answer, 10);
-      if (Number.isInteger(number) && number >= 1 && number <= pending.choices.length) return true;
-      return pending.choices.some((choice) => matches(choice.name, answer));
+      return this.clarifier.isClarificationAnswer(response);
     }
 
     ambiguousChoices(verb, objectText, fullObjectText = objectText) {
-      const choices = [];
-
-      if (AMBIGUOUS_ITEM_VERBS.has(verb)) {
-        const source = ["take", "get"].includes(verb) ? this.parseSourceReference(fullObjectText) : null;
-        const itemMatches = source
-          ? this.findSourceItemMatches(source.itemName, source.sourceName)
-          : (INVENTORY_ONLY_AMBIGUOUS_VERBS.has(verb)
-            ? this.player.inventory.map((id) => ({ item: this.items[id], parent: null })).filter(({ item }) => item && matches(item.name, objectText))
-            : this.visibleSearchAll(objectText, { includeInventory: verb !== "take" && verb !== "get" }));
-        for (const { item } of itemMatches) {
-          choices.push({ type: "item", id: item.id, name: item.name });
-        }
-      }
-
-      if (AMBIGUOUS_DOOR_VERBS.has(verb)) {
-        for (const { door } of this.findDoorsAll(objectText)) {
-          choices.push({ type: "door", id: door.id, name: door.name });
-        }
-      }
-
-      return uniqueChoices(choices);
+      return this.clarifier.ambiguousChoices(verb, objectText, fullObjectText);
     }
 
     firstClarificationRequest(verb, objectText) {
-      for (const request of this.clarificationRequests(verb, objectText)) {
-        if (request.choices.length > 1) return request;
-      }
-      return null;
+      return this.clarifier.firstClarificationRequest(verb, objectText);
     }
 
     clarificationRequests(verb, objectText) {
-      if (!objectText) return [];
-      const requests = [];
-
-      const primary = this.primaryClarificationRequest(verb, objectText);
-      if (primary) requests.push(primary);
-
-      if (["take", "get"].includes(verb)) {
-        const source = this.parseSourceReference(objectText);
-        if (source) {
-          const sourceChoices = this.sourceTargetChoices(source.sourceName, source.itemName);
-          if (sourceChoices.length) {
-            requests.push({
-              verb,
-              objectText,
-              choices: sourceChoices,
-              target: normalize(source.sourceName),
-              slot: "source-target",
-            });
-          }
-        }
-      }
-
-      if (["drop", "leave", "put"].includes(verb)) {
-        const placement = this.parsePlacementCommand(objectText);
-        if (placement) {
-          const targetChoices = this.visibleReferenceChoices(placement.targetName, {
-            includeInventory: false,
-            closedContainers: true,
-            includeDoors: false,
-          });
-          if (targetChoices.length) {
-            requests.push({
-              verb,
-              objectText,
-              choices: targetChoices,
-              target: normalize(placement.targetName),
-              slot: "placement-target",
-            });
-          }
-        }
-      }
-
-      if (WITH_ITEM_CLARIFICATION_VERBS.has(verb)) {
-        const withTarget = this.parseWithReference(objectText);
-        if (withTarget?.itemName) {
-          const keyChoices = this.inventoryReferenceChoices(withTarget.itemName);
-          if (keyChoices.length) {
-            requests.push({
-              verb,
-              objectText,
-              choices: keyChoices,
-              target: normalize(withTarget.itemName),
-              slot: "with-item",
-            });
-          }
-        }
-      }
-
-      return requests;
+      return this.clarifier.clarificationRequests(verb, objectText);
     }
 
     primaryClarificationRequest(verb, objectText) {
-      const request = parseAllTarget(primaryObjectText(verb, objectText));
-      if (request.all || !request.target) return null;
-      const choices = this.ambiguousChoices(verb, request.target, objectText);
-      if (!choices.length) return null;
-      return {
-        verb,
-        objectText,
-        choices,
-        target: request.target,
-        slot: "primary",
-      };
+      return this.clarifier.primaryClarificationRequest(verb, objectText);
     }
 
     resolveRememberedCommandChoice(verb, objectText) {
-      for (const request of this.clarificationRequests(verb, objectText)) {
-        if (request.choices.length <= 1) continue;
-        const remembered = this.recallClarifiedReference(request.target, request.choices);
-        if (remembered) return remembered;
-      }
-      return null;
+      return this.clarifier.resolveRememberedCommandChoice(verb, objectText);
     }
 
     resolveRememberedClarification(verb, objectText) {
-      return this.resolveRememberedCommandChoice(verb, objectText);
+      return this.clarifier.resolveRememberedClarification(verb, objectText);
     }
 
     resolveExplicitClarification(verb, objectText) {
-      if (!objectText) return null;
-      const request = parseAllTarget(primaryObjectText(verb, objectText));
-      if (request.all || !request.target) return null;
-      const choices = this.ambiguousChoices(verb, request.target, objectText);
-      return choices.length === 1 ? choices[0] : null;
+      return this.clarifier.resolveExplicitClarification(verb, objectText);
     }
 
     explicitClarificationReferences(verb, objectText) {
-      const references = [];
-      const seen = new Set();
-      const addReference = (target, choice) => {
-        const normalizedTarget = normalize(target);
-        if (!normalizedTarget || !choice?.type || !choice?.id) return;
-        const key = `${normalizedTarget}:${choice.type}:${choice.id}`;
-        if (seen.has(key)) return;
-        seen.add(key);
-        references.push({ target, choice });
-      };
-
-      const primaryTarget = primaryObjectText(verb, objectText);
-      const primaryChoice = this.resolveExplicitClarification(verb, objectText);
-      if (primaryChoice && primaryTarget) addReference(primaryTarget, primaryChoice);
-
-      if (["take", "get"].includes(verb)) {
-        const source = this.parseSourceReference(objectText);
-        if (source) {
-          const sourceChoice = this.resolveVisibleReference(source.sourceName, { closedContainers: true });
-          if (sourceChoice) addReference(source.sourceName, sourceChoice);
-
-          const itemChoice = this.resolveContainedItemReference(source.itemName, source.sourceName);
-          if (itemChoice) addReference(source.itemName, itemChoice);
-        }
-      }
-
-      if (["drop", "leave", "put"].includes(verb)) {
-        const placement = this.parsePlacementCommand(objectText);
-        if (placement) {
-          const targetChoice = this.resolveVisibleReference(placement.targetName, { closedContainers: true });
-          if (targetChoice) addReference(placement.targetName, targetChoice);
-        }
-      }
-
-      if (WITH_ITEM_CLARIFICATION_VERBS.has(verb)) {
-        const withTarget = this.parseWithReference(objectText);
-        if (withTarget?.itemName) {
-          const keyChoice = this.resolveInventoryReference(withTarget.itemName);
-          if (keyChoice) addReference(withTarget.itemName, keyChoice);
-        }
-      }
-
-      return references;
+      return this.clarifier.explicitClarificationReferences(verb, objectText);
     }
 
     parseSourceReference(objectText) {
-      const outOfMatch = normalize(objectText).match(/^(.+?)\s+out\s+of\s+(.+)$/);
-      if (outOfMatch) {
-        return {
-          itemName: outOfMatch[1].trim(),
-          sourceName: outOfMatch[2].trim(),
-        };
-      }
-      const fromMatch = objectText.split(" from ");
-      if (fromMatch.length === 2) {
-        return {
-          itemName: fromMatch[0].trim(),
-          sourceName: fromMatch[1].trim(),
-        };
-      }
-      return null;
+      return this.clarifier.parseSourceReference(objectText);
     }
 
     resolveVisibleReference(name, options = {}) {
-      const unique = this.visibleReferenceChoices(name, options);
-      return unique.length === 1 ? unique[0] : null;
+      return this.clarifier.resolveVisibleReference(name, options);
     }
 
     visibleReferenceChoices(name, options = {}) {
-      const choices = [];
-      const itemMatches = this.visibleSearchAll(name, {
-        includeInventory: options.includeInventory !== false,
-        closedContainers: Boolean(options.closedContainers),
-      });
-      for (const { item } of itemMatches) {
-        choices.push({ type: "item", id: item.id, name: item.name });
-      }
-      if (options.includeDoors !== false) {
-        for (const { door } of this.findDoorsAll(name)) {
-          choices.push({ type: "door", id: door.id, name: door.name });
-        }
-      }
-      return uniqueChoices(choices);
+      return this.clarifier.visibleReferenceChoices(name, options);
     }
 
     inventoryReferenceChoices(name) {
-      return uniqueChoices(this.player.inventory
-        .map((id) => this.items[id])
-        .filter((item) => item && matches(item.name, name))
-        .map((item) => ({ type: "item", id: item.id, name: item.name })));
+      return this.clarifier.inventoryReferenceChoices(name);
     }
 
     resolveInventoryReference(name) {
-      const choices = this.inventoryReferenceChoices(name);
-      return choices.length === 1 ? choices[0] : null;
+      return this.clarifier.resolveInventoryReference(name);
     }
 
     resolveContainedItemReference(itemName, sourceName) {
-      const character = this.resolveCharacterTarget(sourceName);
-      if (character) {
-        const held = this.findCharacterItem(character, itemName)?.item;
-        return held ? { type: "item", id: held.id, name: held.name } : null;
-      }
-      const container = this.visibleSearch(sourceName, { closedContainers: true })?.item;
-      if (!container?.container) return null;
-      const nested = this.findItemInsideContainer(container, itemName);
-      if (!nested?.item) return null;
-      return { type: "item", id: nested.item.id, name: nested.item.name };
+      return this.clarifier.resolveContainedItemReference(itemName, sourceName);
     }
 
     findSourceItemMatches(itemName, sourceName) {
-      const character = this.resolveCharacterTarget(sourceName);
-      if (character) {
-        return [...(character.inventory || []), ...(character.worn || [])]
-          .map((id) => this.items[id])
-          .filter((item) => item && matches(item.name, itemName))
-          .map((item) => ({ item, parent: character }));
-      }
-      const containers = this.sourceTargetChoices(sourceName, itemName)
-        .map((choice) => this.items[choice.id])
-        .filter((item) => item?.container);
-      return containers.flatMap((container) => this.findAllItemsInsideContainer(container, itemName));
+      return this.clarifier.findSourceItemMatches(itemName, sourceName);
     }
 
     findAllItemsInsideContainer(container, itemName) {
-      const results = [];
-      const name = normalize(itemName);
-      const scan = (itemIds, parent) => {
-        for (const id of itemIds || []) {
-          const item = this.items[id];
-          if (!item) continue;
-          if (matches(item.name, name)) results.push({ item, parent });
-          if (item.container) scan(item.contents, item);
-        }
-      };
-      scan(container.contents, container);
-      return results;
+      return this.clarifier.findAllItemsInsideContainer(container, itemName);
     }
 
     sourceTargetChoices(sourceName, itemName = "") {
-      const visibleChoices = this.visibleReferenceChoices(sourceName, {
-        includeInventory: false,
-        closedContainers: true,
-        includeDoors: false,
-      }).filter((choice) => this.items[choice.id]?.container);
-      if (!itemName) return visibleChoices;
-      return visibleChoices.filter((choice) => Boolean(this.findItemInsideContainer(this.items[choice.id], itemName)));
+      return this.clarifier.sourceTargetChoices(sourceName, itemName);
     }
 
     parseWithReference(objectText) {
-      const parts = String(objectText || "").split(" with ");
-      if (parts.length < 2) return null;
-      return {
-        targetName: parts[0].trim(),
-        itemName: parts.slice(1).join(" with ").trim(),
-      };
+      return this.clarifier.parseWithReference(objectText);
     }
 
     resolveClarifiedObjectText(pending, replacement) {
-      if (pending.slot === "primary") return replacePrimaryObject(pending.verb, pending.objectText, replacement);
-      if (pending.slot === "source-target") return replaceSourceTarget(pending.objectText, replacement);
-      if (pending.slot === "placement-target") return replacePlacementTarget(pending.objectText, replacement);
-      if (pending.slot === "with-item") return replaceWithItem(pending.objectText, replacement);
-      return replacePrimaryObject(pending.verb, pending.objectText, replacement);
+      return this.clarifier.resolveClarifiedObjectText(pending, replacement);
     }
 
     handleClarification(response) {
-      const pending = this.pendingClarification;
-      this.pendingClarification = null;
-      const answer = normalize(response);
-      if (["cancel", "stop", "no"].includes(answer)) {
-        this.print("Cancelled.", "system");
-        return;
-      }
-
-      let matchesFound = [];
-      const number = Number.parseInt(answer, 10);
-      if (Number.isInteger(number) && number >= 1 && number <= pending.choices.length) {
-        matchesFound = [pending.choices[number - 1]];
-      } else {
-        matchesFound = pending.choices.filter((choice) => matches(choice.name, answer));
-      }
-
-      if (matchesFound.length !== 1) {
-        this.pendingClarification = pending;
-        const labels = joinAlternatives(pending.choices.map((choice) => clarificationLabel(choice.name)));
-        this.print(`Please be more specific: ${labels}.`, "system");
-        return;
-      }
-
-      this.forcedChoice = matchesFound[0];
-      this.rememberClarifiedReference(pending.target, matchesFound[0]);
-      try {
-        const resolvedObject = this.resolveClarifiedObjectText(pending, matchesFound[0].name);
-        const actor = pending.actorId ? this.characters[pending.actorId] || this.player : this.player;
-        this.processCommand(`${pending.verb} ${resolvedObject}`.trim(), actor);
-      } finally {
-        this.forcedChoice = null;
-      }
+      return this.clarifier.handleClarification(response);
     }
 
     rememberClarifiedReference(target, choice) {
-      const keys = clarificationMemoryKeys(target);
-      if (!keys.length || !choice?.type || !choice?.id) return;
-      for (const key of keys) {
-        this.clarifiedReferences[key] = {
-          type: choice.type,
-          id: choice.id,
-          name: choice.name,
-          rememberedTurn: Number(this.turnCount) || 0,
-        };
-      }
+      return this.clarifier.rememberClarifiedReference(target, choice);
     }
 
     recallClarifiedReference(target, choices = []) {
-      this.pruneClarifiedReferences();
-      const key = clarificationMemoryKey(target);
-      if (!key) return null;
-      const remembered = this.clarifiedReferences?.[key];
-      if (!remembered) return null;
-      return choices.find((choice) => sameChoice(choice, remembered)) || null;
+      return this.clarifier.recallClarifiedReference(target, choices);
     }
 
     pruneClarifiedReferences() {
-      const currentTurn = Number(this.turnCount) || 0;
-      for (const [key, remembered] of Object.entries(this.clarifiedReferences || {})) {
-        const rememberedTurn = Number(remembered?.rememberedTurn);
-        if (!Number.isFinite(rememberedTurn) || currentTurn - rememberedTurn >= CLARIFICATION_MEMORY_TURNS) {
-          delete this.clarifiedReferences[key];
-        }
-      }
+      return this.clarifier.pruneClarifiedReferences();
     }
 
     take(objectName) {
-      if (!objectName) return this.print("What would you like to take?");
-      if (objectName.includes("door")) return this.print(`You cannot take the ${objectName}.`);
-      const outOfMatch = normalize(objectName).match(/^(.+?)\s+out\s+of\s+(.+)$/);
-      if (outOfMatch) {
-        const itemName = outOfMatch[1].trim();
-        const container = this.visibleSearch(outOfMatch[2].trim(), { closedContainers: true })?.item;
-        if (!container || !container.container) return this.print("I don't see that here.");
-        if (!container.open && !container.noLid) return this.print(`The ${container.name} is closed.`);
-        const nested = this.findItemInsideContainer(container, itemName);
-        if (!nested) return this.print("I don't see that here.");
-        const item = nested.item;
-        if (item.weight > this.player.strength * 5) return this.print(`The ${item.name} is too heavy to take.`);
-        if (!this.canCarryAdditionalWeight(item.weight || 0)) return this.print(this.carryTooMuchMessage(item));
-        this.detachItem(item.id);
-        item.location = { type: "character", id: this.player.id };
-        this.player.inventory.push(item.id);
-        if (matches(item.name, "treasure")) this.flags.treasuretaken = true;
-        return this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "take")} the ${item.name} from the ${container.name}.`);
-      }
-      const fromMatch = objectName.split(" from ");
-      const request = parseAllTarget(fromMatch[0]);
-      const targetName = normalize(request.target);
-      if (request.all) return this.takeAll(targetName);
-      if (fromMatch.length === 2) {
-        const character = this.resolveCharacterTarget(fromMatch[1]);
-        if (character) return this.takeItemFromCharacter(character, targetName);
-        const container = this.visibleSearch(fromMatch[1], { closedContainers: true })?.item;
-        if (container?.container) {
-          if (!container.open && !container.noLid) return this.print(`The ${container.name} is closed.`);
-          const nested = this.findItemInsideContainer(container, targetName);
-          if (!nested) return this.print("I don't see that here.");
-          const item = nested.item;
-          if (item.weight > this.player.strength * 5) return this.print(`The ${item.name} is too heavy to take.`);
-          if (!this.canCarryAdditionalWeight(item.weight || 0)) return this.print(this.carryTooMuchMessage(item));
-          this.detachItem(item.id);
-          item.location = { type: "character", id: this.player.id };
-          this.player.inventory.push(item.id);
-          if (matches(item.name, "treasure")) this.flags.treasuretaken = true;
-          return this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "take")} the ${item.name} from the ${container.name}.`);
-        }
-      }
-      const found = this.visibleSearch(targetName);
-      if (!found) {
-        const character = this.peopleInRoom().find((candidate) => candidate.id !== this.player.id && candidate.visible && matches(candidate.name, targetName));
-        if (character) return this.carryCharacter(character);
-        const carried = this.findInInventory(targetName);
-        if (carried) return this.print(`${actorSubject(this.player, true)} ${this.player.name === "You" ? "are" : "is"} already carrying the ${carried.name}.`);
-        const heldMessage = this.heldItemMessage(targetName);
-        if (heldMessage) return this.print(heldMessage);
-        return this.print("I don't see that here.");
-      }
-      const item = found.item;
-      if (item.location?.type === "character" && item.location.id === this.player.id) {
-        return this.print(`${actorSubject(this.player, true)} ${this.player.name === "You" ? "are" : "is"} already carrying the ${item.name}.`);
-      }
-      if (matches(item.name, "treasure") && this.liveDragon() && this.player.noticeable !== false) {
-        return this.print("The dragon guards the treasure too closely. You need the ring's cover or Bard's help.");
-      }
-      if (!item.portable) return this.print(`The ${item.name} can't be taken.`);
-      if (item.weight > this.player.strength * 5) return this.print(`The ${item.name} is too heavy to take.`);
-      if (!this.canCarryAdditionalWeight(item.weight || 0)) return this.print(this.carryTooMuchMessage(item));
-      this.detachItem(item.id);
-      item.location = { type: "character", id: this.player.id };
-      this.player.inventory.push(item.id);
-      if (matches(item.name, "treasure")) this.flags.treasuretaken = true;
-      const source = found.parent?.id ? ` from the ${found.parent.name}` : "";
-      this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "take")} the ${item.name}${source}.`);
+      return this.interactions.take(objectName);
     }
 
     carryCharacter(character) {
-      if (!matches(character.name, "bard") && !matches(character.name, "thorin")) {
-        return this.print(`${character.name} will not let you pick them up.`);
-      }
-      if (character.carriedBy === this.player.id) return this.print(`${character.name} is already with you.`);
-      character.carriedBy = this.player.id;
-      character.position = this.currentRoom;
-      character.followingPlayer = false;
-      character.justEntered = false;
-      this.print(actorizeSecondPerson(this.player, `You pick up ${character.name}.`));
+      return this.interactions.carryCharacter(character);
     }
 
     characterCannotFollowVertical(character, direction) {
-      return matches(character?.name, "bard") && ["up", "down"].includes(normalize(direction));
+      return this.interactions.characterCannotFollowVertical(character, direction);
     }
 
     releaseCarriedCharacter(character, { follow = false, message = "" } = {}) {
-      if (!character) return;
-      character.carriedBy = null;
-      character.position = this.currentRoom;
-      character.justEntered = false;
-      if (follow) {
-        character.movementMode = "follow";
-        character.followingPlayer = true;
-      }
-      if (message) this.print(message);
+      return this.interactions.releaseCarriedCharacter(character, { follow, message });
     }
 
     takeAll(objectName) {
-      const foundItems = this.visibleSearchAll(objectName, { includeInventory: false })
-        .filter(({ item }) => item.portable && item.weight <= this.player.strength * 5);
-      if (foundItems.some(({ item }) => matches(item.name, "treasure")) && this.liveDragon() && this.player.noticeable !== false) {
-        return this.print("The dragon guards the treasure too closely. You need the ring's cover or Bard's help.");
-      }
-      if (!foundItems.length) return this.print("I don't see anything like that here that can be taken.");
-      const taken = [];
-      const leftBehind = [];
-      for (const { item } of foundItems) {
-        if (!this.canCarryAdditionalWeight(item.weight || 0)) {
-          leftBehind.push(item.name);
-          continue;
-        }
-        this.detachItem(item.id);
-        item.location = { type: "character", id: this.player.id };
-        this.player.inventory.push(item.id);
-        if (matches(item.name, "treasure")) this.flags.treasuretaken = true;
-        taken.push(item.name);
-      }
-      if (taken.length) {
-        this.print(actorizeSecondPerson(this.player, `You take the ${joinNames(taken)}.`));
-        if (leftBehind.length) this.print(actorizeSecondPerson(this.player, `You leave behind ${joinNames(leftBehind)} because carrying more would exceed your limit.`));
-        return;
-      }
-      this.print(leftBehind.length
-        ? actorizeSecondPerson(this.player, `You cannot carry the ${joinNames(leftBehind)} because carrying more would exceed your limit.`)
-        : actorizeSecondPerson(this.player, "You cannot carry any more."));
+      return this.interactions.takeAll(objectName);
     }
 
     drop(objectName) {
-      if (!objectName) return this.print("What would you like to leave?");
-      const placement = this.parsePlacementCommand(objectName);
-      const inParts = objectName.split(" in ");
-      const itemName = placement?.itemName || inParts[0].trim();
-      const carriedCharacter = Object.values(this.characters).find((character) => {
-        return character.carriedBy === this.player.id && matches(character.name, normalize(itemName));
-      });
-      if (carriedCharacter && inParts.length === 1) return this.dropCharacter(carriedCharacter);
-      const item = this.findInInventory(itemName);
-      if (!item) return this.print(this.heldItemMessage(itemName) || actorizeSecondPerson(this.player, `You don't have the ${itemName}.`));
-      if (placement) {
-        const container = this.visibleSearch(placement.targetName)?.item;
-        if (!container || !container.container) {
-          this.detachItem(item.id);
-          item.location = { type: "room", id: this.currentRoom };
-          return this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "place")} the ${item.name} ${placement.relation} the ${placement.targetName}.`);
-        }
-        if (!container.open && !container.noLid) return this.print(`The ${container.name} is closed.`);
-        if (container.id === item.id || this.isInside(item.id, container.id)) return this.print(actorizeSecondPerson(this.player, `You cannot put the ${item.name} in itself.`));
-        if ((item.weight || 0) >= (container.weight || 0)) return this.print(`The ${item.name} is too big for the ${container.name}.`);
-        this.detachItem(item.id);
-        item.location = { type: "item", id: container.id };
-        container.contents.push(item.id);
-        this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "put")} the ${item.name} ${placement.relation} the ${container.name}.`);
-        this.checkVictory(item, container);
-        return;
-      }
-      this.detachItem(item.id);
-      item.location = { type: "room", id: this.currentRoom };
-      this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "leave")} the ${item.name}.`);
+      return this.interactions.drop(objectName);
     }
 
     parsePlacementCommand(objectName) {
-      return parsePlacementTargetText(objectName);
+      return this.interactions.parsePlacementCommand(objectName);
     }
 
     dropCharacter(character) {
-      this.releaseCarriedCharacter(character, {
-        message: actorizeSecondPerson(this.player, `You put ${character.name} down.`),
-      });
+      return this.interactions.dropCharacter(character);
     }
 
     checkVictory(item, container) {
-      if (this.currentRoom !== "hobbit_hole") return;
-      if (!matches(item?.name, "treasure")) return;
-      if (!matches(container?.name, "heavy wooden chest")) return;
-      if (this.liveDragon()) {
-        this.print("The treasure is safely home, but Smaug still lives.");
-        return;
-      }
-      this.winGame("Congratulations. You have killed Smaug and found the treasure - a real thief!");
+      return this.interactions.checkVictory(item, container);
     }
 
     isInside(containerId, itemId) {
-      const container = this.items[containerId];
-      if (!container?.contents?.length) return false;
-      if (container.contents.includes(itemId)) return true;
-      return container.contents.some((childId) => this.isInside(childId, itemId));
+      return this.interactions.isInside(containerId, itemId);
     }
 
     open(objectName) {
-      const request = parseAllTarget(objectName);
-      if (request.all) return this.openAll(request.target);
-      const doorFound = this.findDoor(objectName);
-      if (doorFound) {
-        const { door } = doorFound;
-        if (door.open) return this.print(`The ${door.name} is already open.`);
-        if (matches(door.name, "secret door") && !this.flags.secretdoorsun) return this.print("The rock face shows no door yet.");
-        if (door.locked) {
-          const key = this.keyFor(door);
-          if (!key) return this.print(`The ${door.name} is locked.`);
-          door.locked = false;
-        }
-        door.open = true;
-        this.setFlag(`${compact(door.name)}open`, true);
-        return this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "open")} the ${door.name}.`);
-      }
-      const item = this.visibleSearch(objectName)?.item;
-      if (!item) return this.print(this.heldItemMessage(objectName) || "I don't see that here.");
-      if (!item.container && this.openNonContainerItem(item)) return;
-      if (!item.container) return this.print(`The ${item.name} cannot be opened.`);
-      if (item.noLid) return this.print(`The ${item.name} has no lid and is always open.`);
-      if (item.open) return this.print(`The ${item.name} is already open.`);
-      if (item.locked) {
-        const key = this.keyFor(item);
-        if (!key) return this.print(`The ${item.name} is locked.`);
-        item.locked = false;
-      }
-      item.open = true;
-      this.setFlag(`${compact(item.name)}open`, true);
-      this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "open")} the ${item.name}.`);
+      return this.interactions.open(objectName);
     }
 
     openAll(objectName) {
-      const items = this.visibleSearchAll(objectName)
-        .map(({ item }) => item)
-        .filter((item, index, list) => list.findIndex((other) => other.id === item.id) === index);
-      const messages = [];
-      for (const item of items) {
-        if (!item.container || item.noLid || item.open) continue;
-        if (item.locked) {
-          const key = this.keyFor(item);
-          if (!key) {
-            messages.push(`The ${item.name} is locked.`);
-            continue;
-          }
-          item.locked = false;
-        }
-        item.open = true;
-        this.setFlag(`${compact(item.name)}open`, true);
-        messages.push(`${actorSubject(this.player, true)} ${actorVerb(this.player, "open")} the ${item.name}.`);
-      }
-      this.print(messages.length ? messages.join(" ") : "I don't see anything like that here that can be opened.");
+      return this.interactions.openAll(objectName);
     }
 
     openNonContainerItem(item) {
-      if (matches(item.name, "curious map")) {
-        if (item.broken) {
-          this.print(actorizeSecondPerson(this.player, "You try to unfold the broken curious map, but it only separates into useless fragments."));
-          return true;
-        }
-        if (item.open) {
-          this.print("The curious map is already unfolded.");
-          return true;
-        }
-        item.open = true;
-        if (item.mended) {
-          this.print(actorizeSecondPerson(this.player, "You carefully unfold the mended curious map. The strange markings are readable again, though the joins are still visible."));
-          return true;
-        }
-        this.print(actorizeSecondPerson(this.player, "You unfold the curious map. You see a map with strange markings."));
-        return true;
-      }
-      if (matches(item.name, "elegant lamp")) {
-        return this.lightItem(item);
-      }
-      if (matches(item.name, "dark glass inkwell")) {
-        if (item.open) return this.print("The dark glass inkwell is already open.");
-        item.open = true;
-        this.print(actorizeSecondPerson(this.player, "You unstopper the dark glass inkwell."));
-        return true;
-      }
-      return false;
+      return this.interactions.openNonContainerItem(item);
     }
 
     close(objectName) {
-      const request = parseAllTarget(objectName);
-      if (request.all) return this.closeAll(request.target);
-      const doorFound = this.findDoor(objectName);
-      if (doorFound) {
-        doorFound.door.open = false;
-        this.setFlag(`${compact(doorFound.door.name)}open`, false);
-        return this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "close")} the ${doorFound.door.name}.`);
-      }
-      const item = this.visibleSearch(objectName)?.item;
-      if (!item) return this.print(this.heldItemMessage(objectName) || "I don't see that here.");
-      if (!item.container && this.closeNonContainerItem(item)) return;
-      if (!item.container) return this.print(`The ${item.name} cannot be closed.`);
-      if (item.noLid) return this.print(`The ${item.name} has no lid.`);
-      item.open = false;
-      this.setFlag(`${compact(item.name)}open`, false);
-      this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "close")} the ${item.name}.`);
+      return this.interactions.close(objectName);
     }
 
     closeAll(objectName) {
-      const items = this.visibleSearchAll(objectName)
-        .map(({ item }) => item)
-        .filter((item, index, list) => list.findIndex((other) => other.id === item.id) === index);
-      const closed = [];
-      for (const item of items) {
-        if (!item.container || item.noLid || !item.open) continue;
-        item.open = false;
-        this.setFlag(`${compact(item.name)}open`, false);
-        closed.push(item.name);
-      }
-      this.print(closed.length ? `${actorSubject(this.player, true)} ${actorVerb(this.player, "close")} the ${joinNames(closed)}.` : "I don't see anything like that here that can be closed.");
+      return this.interactions.closeAll(objectName);
     }
 
     closeNonContainerItem(item) {
-      if (matches(item.name, "curious map")) {
-        if (item.broken) {
-          this.print("The broken curious map cannot be folded neatly.");
-          return true;
-        }
-        if (!item.open) {
-          this.print("The curious map is already folded.");
-          return true;
-        }
-        item.open = false;
-        if (item.mended) {
-          this.print(actorizeSecondPerson(this.player, "You carefully fold the mended curious map, keeping the repaired joins aligned."));
-          return true;
-        }
-        this.print(actorizeSecondPerson(this.player, "You fold the curious map."));
-        return true;
-      }
-      if (matches(item.name, "elegant lamp")) {
-        if (!item.open) return this.print("The elegant lamp is already unlit.");
-        item.open = false;
-        this.print(actorizeSecondPerson(this.player, "You turn off the elegant lamp."));
-        return true;
-      }
-      if (matches(item.name, "dark glass inkwell")) {
-        if (!item.open) return this.print("The dark glass inkwell is already closed.");
-        item.open = false;
-        this.print(actorizeSecondPerson(this.player, "You stopper the dark glass inkwell."));
-        return true;
-      }
-      return false;
+      return this.interactions.closeNonContainerItem(item);
     }
 
     unlock(objectName) {
-      const withTarget = this.parseWithReference(objectName);
-      const cleanName = withTarget?.targetName || objectName.split(" with ")[0].trim();
-      const target = this.findDoor(cleanName)?.door || this.visibleSearch(cleanName)?.item;
-      if (!target) return this.print(this.heldItemMessage(cleanName) || "I don't see that here.");
-      if (matches(target.name, "secret door") && !this.flags.secretdoorsun) return this.print("The rock face shows no door yet.");
-      if (!target.locked) return this.print(`The ${target.name} is already unlocked.`);
-      const namedKey = withTarget?.itemName ? this.findInInventory(withTarget.itemName) : null;
-      if (withTarget?.itemName && !namedKey) {
-        return this.print(this.heldItemMessage(withTarget.itemName) || `You do not have the ${withTarget.itemName}.`);
-      }
-      const key = namedKey || this.keyFor(target);
-      if (!key) return this.print(this.heldItemMessage(target.requiredKey || "key") || `You do not have the required key for the ${target.name}.`);
-      if (!this.keyMatchesTarget(key, target)) return this.print(`The ${key.name} does not unlock the ${target.name}.`);
-      target.locked = false;
-      this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "unlock")} the ${target.name} with the ${key.name}.`);
+      return this.interactions.unlock(objectName);
     }
 
     lock(objectName) {
-      const withTarget = this.parseWithReference(objectName);
-      const cleanName = withTarget?.targetName || objectName.split(" with ")[0].trim();
-      const target = this.findDoor(cleanName)?.door || this.visibleSearch(cleanName)?.item;
-      if (!target) return this.print(this.heldItemMessage(cleanName) || "I don't see that here.");
-      const namedKey = withTarget?.itemName ? this.findInInventory(withTarget.itemName) : null;
-      if (withTarget?.itemName && !namedKey) {
-        return this.print(this.heldItemMessage(withTarget.itemName) || `You do not have the ${withTarget.itemName}.`);
-      }
-      const key = namedKey || this.keyFor(target);
-      if (!key) return this.print(this.heldItemMessage(target.requiredKey || "key") || `You do not have the required key for the ${target.name}.`);
-      if (!this.keyMatchesTarget(key, target)) return this.print(`The ${key.name} does not lock the ${target.name}.`);
-      target.locked = true;
-      target.open = false;
-      this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "lock")} the ${target.name} with the ${key.name}.`);
+      return this.interactions.lock(objectName);
     }
 
     keyFor(target) {
-      const required = normalize(target.requiredKey || "");
-      return this.player.inventory.map((id) => this.items[id]).find((item) => {
-        return this.keyMatchesTarget(item, target);
-      });
+      return this.interactions.keyFor(target);
     }
 
     keyMatchesTarget(item, target) {
-      const required = normalize(target?.requiredKey || "");
-      return matches(item?.name, required) || matches(item?.description, required) || matches(item?.keyFor, normalize(target?.name));
+      return this.interactions.keyMatchesTarget(item, target);
     }
 
     look(objectName = "") {
-      const text = normalize(objectName).replace(/^(?:around\s+)?for\s+/, "").replace(/^around\s+/, "");
-      if (!text || ["around", "room", "place", "area", "here", "surroundings"].includes(text)) {
-        return this.describeRoom({ full: true });
-      }
-      const direction = text.match(/^(across|at|in|inside|into|under|behind|through|over|around)\s+(.+)$/);
-      if (direction) {
-        const relation = direction[1];
-        const target = direction[2];
-        if (relation === "at") return this.examine(target);
-        if (["in", "inside", "into"].includes(relation)) return this.examine(target);
-        return this.inspectEnvironment("look", target, relation);
-      }
-      return this.examine(text);
+      return this.exploration.look(objectName);
     }
 
     examine(objectName = "") {
-      const text = normalize(objectName).replace(/^(?:around\s+)?for\s+/, "").replace(/^around\s+/, "");
-      if (!text || ["around", "room", "place", "area", "here", "surroundings"].includes(text)) {
-        return this.inspectEnvironment("search", "area");
-      }
-      const door = this.findDoor(text)?.door;
-      const subject = actorSubject(this.player, true);
-      if (door) return this.print(`${subject} ${actorVerb(this.player, "see")} the ${door.name}. It is ${door.open ? "open" : "closed"}.`);
-      const character = this.resolveCharacterTarget(text);
-      if (character) return this.examineCharacter(character);
-      const scopedCharacter = this.findKnownCharacter(text.replace(/\s+(?:in|inside|into|at|under|behind|near|around|through|over|on)\s+.+$/, ""));
-      const knownCharacter = scopedCharacter || this.findKnownCharacter(text);
-      if (knownCharacter) return this.print(`There is no one named ${knownCharacter.name} here.`);
-      const item = this.visibleSearch(text)?.item;
-      if (!item) {
-        const heldMessage = this.heldItemMessage(text);
-        if (heldMessage) return this.print(heldMessage);
-        const knownItem = this.findKnownItem(text);
-        if (knownItem?.portable) {
-          return this.print(`${subject} ${actorVerb(this.player, "do")} not have the ${knownItem.name}.`);
-        }
-        return this.inspectEnvironment("examine", text);
-      }
-      let description = item.description;
-      if (item.broken) {
-        const ruin = this.brokenItemDescription(item);
-        return this.print(`${subject} ${actorVerb(this.player, "see")} ${ruin}.`);
-      }
-      if (item.mended) description = this.mendedItemDescription(item);
-      if (item.container && item.open && item.contents.length) {
-        const visible = item.contents.map((id) => this.items[id]).filter((child) => child?.visible);
-        if (visible.length) description += `; inside there is: ${visible.map((child) => this.describeItemShort(child)).join(", ")}`;
-      }
-      this.revealFromSpecial("examine", text);
-      if (item.location?.type === "character" && item.location.id === this.player.id && this.player.name !== "You") {
-        return this.print(`${subject} ${actorVerb(this.player, "examine")} the ${item.name} in ${displayCharacterName(this.player)}'s possession. ${subject} ${actorVerb(this.player, "see")} ${description}.`);
-      }
-      this.print(`${subject} ${actorVerb(this.player, "see")} ${description}.`);
+      return this.exploration.examine(objectName);
     }
 
     read(objectName = "") {
-      const text = normalize(objectName);
-      if (!text) return this.print("Read what?");
-      const item = this.visibleSearch(objectName)?.item;
-      if (!item) {
-        const heldMessage = this.heldItemMessage(objectName);
-        if (heldMessage) return this.print(heldMessage);
-        return this.print("I don't see that here.");
-      }
-      if (item.broken) {
-        const subject = actorSubject(this.player, true);
-        return this.print(`${subject} ${actorVerb(this.player, "try")} to read the broken ${item.name}, but its markings are torn into useless fragments.`);
-      }
-      if (item.mended && matches(item.name, "curious map")) {
-        const subject = actorSubject(this.player, true);
-        return this.print(`${subject} ${actorVerb(this.player, "read")} the carefully mended ${item.name}. ${subject} ${actorVerb(this.player, "see")} a map with strange markings, its torn lines pieced back together.`);
-      }
-      return this.examine(objectName);
+      return this.exploration.read(objectName);
     }
 
     brokenItemDescription(item) {
@@ -4326,141 +6768,27 @@
     }
 
     sense(verb, objectName = "") {
-      const text = normalize(objectName);
-      if (text) {
-        const item = this.visibleSearch(text)?.item;
-        if (item) {
-          const subject = actorSubject(this.player, true);
-          if (verb === "listen") return this.print(`${subject} ${actorVerb(this.player, "listen")} to the ${item.name}, but hear${this.player.name === "You" ? "" : "s"} nothing useful.`);
-          if (verb === "smell") return this.print(`${subject} ${actorVerb(this.player, "smell")} the ${item.name}, but learn${this.player.name === "You" ? "" : "s"} nothing new.`);
-          if (verb === "watch") return this.print(`${subject} ${actorVerb(this.player, "watch")} the ${item.name} for a while, but it does not change.`);
-          return this.print(`${subject} ${actorVerb(this.player, "study")} the ${item.name}, but discover${this.player.name === "You" ? "" : "s"} nothing new.`);
-        }
-        const door = this.findDoor(text)?.door;
-        if (door) {
-          const subject = actorSubject(this.player, true);
-          if (verb === "listen") return this.print(`${subject} ${actorVerb(this.player, "listen")} at the ${door.name}, but hear${this.player.name === "You" ? "" : "s"} nothing clear beyond it.`);
-          if (verb === "watch") return this.print(`${subject} ${actorVerb(this.player, "watch")} the ${door.name}. It remains ${door.open ? "open" : "closed"}.`);
-          return this.print(`${subject} ${actorVerb(this.player, "notice")} nothing unusual about the ${door.name}.`);
-        }
-        const heldMessage = this.heldItemMessage(text);
-        if (heldMessage) return this.print(heldMessage);
-      }
-      this.inspectEnvironment(verb, text || (verb === "smell" ? "air" : "area"));
+      return this.exploration.sense(verb, objectName);
     }
 
     touch(verb, objectName = "") {
-      const text = normalize(objectName);
-      if (!text) return this.inspectEnvironment(verb, "area");
-      const item = this.visibleSearch(text)?.item;
-      if (item) {
-        if (verb === "knock") {
-          return this.print(item.container || item.strength > 8
-            ? actorizeSecondPerson(this.player, `You knock on the ${item.name}. It sounds solid.`)
-            : actorizeSecondPerson(this.player, `You knock on the ${item.name}, but nothing happens.`));
-        }
-        return this.print(actorizeSecondPerson(this.player, `You ${verb} the ${item.name}, but discover nothing new.`));
-      }
-      const door = this.findDoor(text)?.door;
-      if (door) {
-        if (verb === "knock") return this.print(actorizeSecondPerson(this.player, `You knock on the ${door.name}, but no one answers.`));
-        return this.print(actorizeSecondPerson(this.player, `You ${verb} the ${door.name}. It is ${door.open ? "open" : "closed"}.`));
-      }
-      const heldMessage = this.heldItemMessage(text);
-      if (heldMessage) return this.print(heldMessage);
-      this.inspectEnvironment(verb, text);
+      return this.exploration.touch(verb, objectName);
     }
 
     inspectEnvironment(verb, target = "", relation = "") {
-      const room = this.room();
-      const text = normalize(target);
-      const description = room?.description || "";
-      const lower = normalize(description);
-      const sample = this.descriptionSentenceFor(text);
-      const subject = actorSubject(this.player, true);
-      const suffix = sample ? ` ${sample}` : "";
-
-      if (!text || ["area", "room", "place", "here", "surroundings"].includes(text)) {
-        if (["search", "examine", "look"].includes(verb)) {
-          return this.print(`${subject} search${subject === "You" ? "" : "es"} the area carefully.${suffix || " Nothing else is revealed."}`);
-        }
-        if (verb === "listen") return this.print(actorizeSecondPerson(this.player, this.ambientSoundMessage(lower)));
-        if (verb === "smell") return this.print(actorizeSecondPerson(this.player, this.ambientSmellMessage(lower)));
-      }
-
-      if (["air", "smell", "scent", "odor", "odour"].includes(text)) return this.print(actorizeSecondPerson(this.player, this.ambientSmellMessage(lower)));
-      if (["sound", "sounds", "noise", "noises", "silence", "music"].includes(text)) return this.print(actorizeSecondPerson(this.player, this.ambientSoundMessage(lower)));
-
-      if (matchesAny(text, ["ground", "floor", "earth", "path", "trail", "road", "footprints"])) {
-        if (lower.includes("footprint") || lower.includes("imprint")) return this.print("The ground bears heavy marks, worth remembering but not something you can pick up.");
-        if (lower.includes("drop") || lower.includes("cliff")) return this.print("The footing is dangerous. One careless step would be a poor idea.");
-        if (lower.includes("moss")) return this.print("The ground is soft with moss and earth.");
-        return this.print(`${subject} ${actorVerb(this.player, "study")} the ${text}. It shows no hidden passage or useful object.`);
-      }
-
-      if (matchesAny(text, ["wall", "walls", "rock", "rocks", "stone", "stones", "ceiling", "crack", "cracks"])) {
-        if (lower.includes("cave") || lower.includes("cavern") || lower.includes("passage")) return this.print(`The stone is cold and rough. ${subject} ${actorVerb(this.player, "find")} no loose block or hidden catch.`);
-        if (lower.includes("secret door") || lower.includes("rock face")) return this.print("The rock face gives away nothing yet.");
-        return this.print(`${subject} ${actorVerb(this.player, "inspect")} the ${text}. Nothing moves.`);
-      }
-
-      if (matchesAny(text, ["tree", "trees", "branch", "branches", "forest", "vines", "roots"])) {
-        if (lower.includes("forest") || lower.includes("tree") || lower.includes("branch") || lower.includes("root")) {
-          return this.print(`${subject} ${actorVerb(this.player, "study")} the trees and roots. They are part of the landscape, not an object you can use here.`);
-        }
-        return this.print("There are no useful trees or branches here.");
-      }
-
-      if (matchesAny(text, ["river", "water", "stream", "lake", "boat", "shore", "bank"])) {
-        if (lower.includes("river") || lower.includes("water") || lower.includes("stream") || lower.includes("lake") || lower.includes("bank")) {
-          return this.print(`${subject} ${actorVerb(this.player, "examine")} the water and its banks. The current looks important, but ${this.player.name === "You" ? "you find" : `${this.player.name} finds`} nothing loose.`);
-        }
-        return this.print("There is no useful water here.");
-      }
-
-      if (matchesAny(text, ["fire", "embers", "pit", "ashes", "smoke"])) {
-        if (lower.includes("fire") || lower.includes("ember") || lower.includes("smoke")) return this.print("The remains of fire tell you someone has been here, but there is nothing useful to take.");
-        return this.print("There is no fire here.");
-      }
-
-      if (matchesAny(text, ["shadow", "shadows", "dark", "darkness", "mist", "mists"])) {
-        return this.print(`${subject} ${actorVerb(this.player, "peer")} into the gloom, but it keeps its secrets.`);
-      }
-
-      if (relation === "under" || relation === "behind") {
-        return this.print(`${subject} ${actorVerb(this.player, "look")} ${relation} the ${text}, but find${this.player.name === "You" ? "" : "s"} nothing hidden.`);
-      }
-      if (verb === "listen") return this.print(actorizeSecondPerson(this.player, this.ambientSoundMessage(lower)));
-      if (verb === "smell") return this.print(actorizeSecondPerson(this.player, this.ambientSmellMessage(lower)));
-      if (verb === "knock") return this.print(`${subject} ${actorVerb(this.player, "knock")} on the ${text}, but nothing answers.`);
-      if (verb === "touch" || verb === "feel") return this.print(`${subject} ${actorVerb(this.player, verb)} the ${text}, but learn${this.player.name === "You" ? "" : "s"} nothing useful.`);
-      this.print(`${subject} ${actorVerb(this.player, "find")} nothing special about the ${text}.`);
+      return this.exploration.inspectEnvironment(verb, target, relation);
     }
 
     descriptionSentenceFor(target) {
-      const text = normalize(target);
-      if (!text || ["area", "room", "place", "here", "surroundings"].includes(text)) return "";
-      const sentences = (this.room()?.description || "").match(/[^.?!]+[.?!]/g) || [];
-      return sentences.find((sentence) => normalize(sentence).includes(text))?.trim() || "";
+      return this.exploration.descriptionSentenceFor(target);
     }
 
     ambientSoundMessage(description) {
-      const subject = actorSubject(this.player, true);
-      if (description.includes("music")) return `${subject} ${actorVerb(this.player, "listen")}. Music and distant voices drift through the air.`;
-      if (description.includes("dripping") || description.includes("drips")) return `${subject} ${actorVerb(this.player, "listen")}. Water drips somewhere in the dark.`;
-      if (description.includes("wind") || description.includes("howl")) return `${subject} ${actorVerb(this.player, "listen")}. The wind moves restlessly around you.`;
-      if (description.includes("river") || description.includes("stream") || description.includes("water")) return `${subject} ${actorVerb(this.player, "listen")}. Water murmurs nearby.`;
-      if (description.includes("silence")) return `${subject} ${actorVerb(this.player, "listen")}. The silence feels heavy.`;
-      return `${subject} ${actorVerb(this.player, "listen")} carefully, but hear${this.player.name === "You" ? "" : "s"} nothing useful.`;
+      return this.exploration.ambientSoundMessage(description);
     }
 
     ambientSmellMessage(description) {
-      if (description.includes("damp") || description.includes("moss") || description.includes("mold")) return "The air smells damp, earthy, and old.";
-      if (description.includes("forest") || description.includes("foliage") || description.includes("pine")) return "The air smells of leaves, bark, and wild earth.";
-      if (description.includes("fire") || description.includes("ember") || description.includes("smoke")) return "The air carries a faint smoky smell.";
-      if (description.includes("food") || description.includes("meal") || description.includes("wine")) return "There is a homely smell of food and drink.";
-      if (description.includes("dragon") || description.includes("smaug")) return "The air smells hot, dry, and dangerous.";
-      return `${actorSubject(this.player, true)} ${actorVerb(this.player, "smell")} the air, but notice${this.player.name === "You" ? "" : "s"} nothing useful.`;
+      return this.exploration.ambientSmellMessage(description);
     }
 
     roomAtmosphericNarrative() {
@@ -4476,14 +6804,11 @@
     }
 
     gollumRoomNarrative() {
-      const gollum = this.currentGollum();
-      if (!gollum || gollum.position !== "deep_dark_lake" || gollum.visible === false) return "";
-      if (!this.gollumState?.met) return "The black water gives back no light, and some patient thing beyond it seems to be listening.";
-      return GOLLUM_ACTIVITY_LINES[this.gollumState?.activityIndex || 0] || GOLLUM_ACTIVITY_LINES[0];
+      return this.encounters.gollumRoomNarrative();
     }
 
     smaugRoomNarrative() {
-      return SMAUG_STATE_DESCRIPTIONS[this.currentSmaugState()] || SMAUG_STATE_DESCRIPTIONS.sleeping;
+      return this.encounters.smaugRoomNarrative();
     }
 
     atmosphereRegionKey(roomId = this.currentRoom) {
@@ -4558,61 +6883,19 @@
     }
 
     advanceGollumActivity() {
-      if (this.currentRoom !== "deep_dark_lake" || !this.gollumState) return;
-      const gollum = this.currentGollum();
-      if (!gollum || gollum.visible === false) return;
-      this.gollumState.activityCooldown = Math.max(0, (this.gollumState.activityCooldown || 0) - 1);
-      if (this.gollumState.activityCooldown > 0) return;
-      const nextIndex = Math.abs(hashString(`${this.storySeed}:gollum-activity:${this.turnCount}`)) % GOLLUM_ACTIVITY_LINES.length;
-      this.gollumState.activityIndex = nextIndex;
-      this.gollumState.activityCooldown = 2 + (nextIndex % 2);
-      if (this.gollumState.met && !this.gollumState.awaitingAnswer && !this.gollumState.awaitingPlayerRiddle && !this.gollumState.pocketQuestionAsked && this.turnCount % 3 === 0) {
-        this.print(GOLLUM_ACTIVITY_LINES[nextIndex]);
-      }
+      return this.encounters.advanceGollumActivity();
     }
 
     currentSmaugState() {
-      return this.flags.smaugstate || "sleeping";
+      return this.encounters.currentSmaugState();
     }
 
     setSmaugState(state, announce = false) {
-      const normalized = SMAUG_STATE_DESCRIPTIONS[state] ? state : "sleeping";
-      const previous = this.currentSmaugState();
-      this.flags.smaugstate = normalized;
-      if (announce && previous !== normalized && IMMERSION_EREBOR_INNER_ROOMS.has(this.currentRoom)) {
-        const lines = {
-          curious: "Smaug stirs, one vast lid lifting over a watchful eye.",
-          suspicious: "Smaug's voice rolls through the hall, soft and terrible, as he begins to suspect an intruder.",
-          searching: "Smaug rises from the treasure and begins to search the hall in deadly earnest.",
-          enraged: "Smaug's patience breaks. Rage shakes the treasure as the dragon lashes the chamber with tail and voice.",
-          sleeping: "At last the dragon settles again upon the gold, though not peacefully.",
-        };
-        this.print(lines[normalized] || SMAUG_STATE_DESCRIPTIONS[normalized]);
-      }
+      return this.encounters.setSmaugState(state, announce);
     }
 
     advanceSmaugAwareness() {
-      const dragon = Object.values(this.characters).find((character) => matches(character.name, "dragon") && character.visible !== false);
-      if (!dragon) return;
-      if (!(IMMERSION_EREBOR_INNER_ROOMS.has(this.currentRoom) || IMMERSION_EREBOR_OUTER_ROOMS.has(this.currentRoom) || this.flags.treasuretaken)) {
-        this.setSmaugState("sleeping");
-        return;
-      }
-      let state = "sleeping";
-      if (this.flags.treasuretaken) state = "enraged";
-      else if (IMMERSION_EREBOR_INNER_ROOMS.has(this.currentRoom) && this.player.noticeable !== false) {
-        const tempo = (this.turnCount + (this.flags.smaugSuspicion || 0)) % 6;
-        state = tempo <= 1 ? "curious" : tempo <= 3 ? "suspicious" : "searching";
-      } else if (IMMERSION_EREBOR_INNER_ROOMS.has(this.currentRoom)) {
-        state = "suspicious";
-      } else if (IMMERSION_EREBOR_OUTER_ROOMS.has(this.currentRoom)) {
-        state = "curious";
-      }
-      if (state === "searching" && this.player.noticeable !== false && this.turnCount % 5 === 0) {
-        state = "enraged";
-      }
-      this.flags.smaugSuspicion = (this.flags.smaugSuspicion || 0) + (IMMERSION_EREBOR_INNER_ROOMS.has(this.currentRoom) ? 1 : 0);
-      this.setSmaugState(state, true);
+      return this.encounters.advanceSmaugAwareness();
     }
 
     inventory() {
@@ -4691,24 +6974,15 @@
     }
 
     save(name) {
-      if (!name) return this.print("Error: You must specify a filename to save.");
-      localStorage.setItem(SAVE_PREFIX + name, JSON.stringify(this.createSnapshot()));
-      this.print(`Game saved as "${name}".`);
+      return this.storage.save(name);
     }
 
     load(name) {
-      if (!name) return this.print("Error: You must specify a filename to load.");
-      const raw = localStorage.getItem(SAVE_PREFIX + name);
-      if (!raw) return this.print(`No saved game named "${name}" was found.`);
-      const save = JSON.parse(raw);
-      this.restoreSnapshot(save);
-      this.print(`Game "${name}" loaded.`);
-      this.describeRoom({ full: true });
+      return this.storage.load(name);
     }
 
     listSaves() {
-      const saves = Object.keys(localStorage).filter((key) => key.startsWith(SAVE_PREFIX)).map((key) => key.slice(SAVE_PREFIX.length));
-      this.print(saves.length ? `Saved games:\n${saves.join("\n")}` : "No saved games found.");
+      return this.storage.listSaves();
     }
 
     quit() {
@@ -4716,99 +6990,23 @@
     }
 
     createSnapshot() {
-      return clone({
-        items: this.items,
-        doors: this.doors,
-        characters: this.characters,
-        currentRoom: this.currentRoom,
-        storySeed: this.storySeed,
-        storyRunCount: this.storyRunCount,
-        flags: this.flags,
-        visitedRooms: [...this.visitedRooms],
-        clarifiedReferences: this.clarifiedReferences,
-        visitedTrollsClearing: this.visitedTrollsClearing,
-        waitCounter: this.waitCounter,
-        secretDoorWaitCounter: this.secretDoorWaitCounter,
-        trollsTransformed: this.trollsTransformed,
-        trollsDefeated: this.trollsDefeated,
-        spiderEyesState: this.spiderEyesState,
-        gollumState: this.gollumState,
-        turnCount: this.turnCount,
-        endgame: this.endgame,
-        unexpectedParty: this.unexpectedParty?.serialize(),
-      });
+      return this.storage.createSnapshot();
     }
 
     restoreSnapshot(save) {
-      this.clearArrivalNoticeTimers();
-      this.stopAutoplay();
-      this.items = save.items;
-      this.doors = save.doors;
-      this.characters = save.characters;
-      this.currentRoom = save.currentRoom;
-      this.storySeed = Number(save.storySeed) || this.nextStorySeed();
-      this.storyRunCount = Number(save.storyRunCount) || this.storyRunCount;
-      this.flags = save.flags || {};
-      this.visitedRooms = new Set(save.visitedRooms || [this.currentRoom]);
-      this.clarifiedReferences = save.clarifiedReferences || {};
-      this.visitedTrollsClearing = Boolean(save.visitedTrollsClearing);
-      this.waitCounter = save.waitCounter || 0;
-      this.secretDoorWaitCounter = save.secretDoorWaitCounter || 0;
-      this.trollsTransformed = Boolean(save.trollsTransformed);
-      this.trollsDefeated = Boolean(save.trollsDefeated);
-      this.spiderEyesState = save.spiderEyesState || null;
-      this.gollumState = this.restoreGollumState(save.gollumState);
-      this.turnCount = Number(save.turnCount) || 0;
-      this.endgame = false;
-      this.endgameRestartArmed = false;
-      this.pendingEndgameChoice = null;
-      this.player = this.characters[this.data.player];
-      this.normalizeCharacterMovementModes();
-      this.normalizeLanternState();
-      this.addZXFinaleState();
-      this.unexpectedParty?.load(save.unexpectedParty || null);
-      this.companionDirector?.sync();
-      output.replaceChildren();
-      output.classList.remove("end-screen");
-      input.value = "";
-      input.focus();
-      this.render();
+      return this.storage.restoreSnapshot(save);
     }
 
     recordAutosave(label, options = {}) {
-      if (this.endgame) return false;
-      const key = options.key || `${this.currentRoom}:${label}`;
-      const turnCount = Number(this.turnCount) || 0;
-      const previous = this.autosaveMeta;
-      if (!options.force && previous?.key === key && previous?.turnCount === turnCount) return false;
-      this.autosaveSnapshot = this.createSnapshot();
-      this.autosaveCounter += 1;
-      this.autosaveMeta = {
-        id: this.autosaveCounter,
-        key,
-        label,
-        roomId: this.currentRoom,
-        roomName: this.room()?.name || this.currentRoom,
-        turnCount,
-      };
-      this.print(`Autosave: ${label}.`, "system");
-      return true;
+      return this.storage.recordAutosave(label, options);
     }
 
     resumeFromAutosave() {
-      if (!this.autosaveSnapshot) {
-        this.print("There is no autosave available.", "system");
-        return false;
-      }
-      this.restoreSnapshot(clone(this.autosaveSnapshot));
-      this.print(`Resumed from autosave${this.autosaveMeta?.label ? `: ${this.autosaveMeta.label}` : ""}.`, "system");
-      this.describeRoom({ full: true });
-      return true;
+      return this.storage.resumeFromAutosave();
     }
 
     showMap() {
-      const exits = this.roomConnections().map((c) => `${c.direction}: ${this.rooms[c.to]?.name || c.to}`).join("\n");
-      this.print(exits ? `From here:\n${exits}` : "No exits are visible from here.");
+      return this.exploration.showMap();
     }
 
     handleMusicCommand(object) {
@@ -4832,394 +7030,67 @@
     }
 
     autoplay(object = "") {
-      const mode = normalize(object);
-      if (mode === "stop" || mode === "off") return this.stopAutoplay("Autoplay stopped.");
-      if (this.autoplayRunning) return this.print("Autoplay is already running. Type 'stop autoplay' or 'autoplay stop' to stop it.", "system");
-      this.autoplayMode = mode === "fast" ? "fast" : "slow";
-      this.autoplayDelay = this.autoplayMode === "fast" ? 450 : 2700;
-      this.autoplayRunning = true;
-      this.autoplayWaits = 0;
-      this.autoplayRunId += 1;
-      this.print(`Autoplay ${this.autoplayMode} started. Type 'stop autoplay' or 'autoplay stop' to stop it.`, "system");
-      this.scheduleAutoplayStep();
+      return this.flow.autoplay(object);
     }
 
     scheduleAutoplayStep(delay = this.autoplayDelay) {
-      if (!this.autoplayRunning) return;
-      const runId = this.autoplayRunId;
-      clearTimeout(this.autoplayTimer);
-      this.autoplayTimer = setTimeout(() => this.runAutoplayStep(runId), delay);
+      return this.flow.scheduleAutoplayStep(delay);
     }
 
     runAutoplayStep(runId = this.autoplayRunId) {
-      if (!this.autoplayRunning || runId !== this.autoplayRunId) return;
-      if (this.endgame) return this.stopAutoplay("Autoplay finished.");
-      const command = this.nextAutoplayCommand();
-      if (!command) return this.stopAutoplay("Autoplay stopped: no safe next command was found.");
-      this.typeAutoplayCommand(command, runId);
+      return this.flow.runAutoplayStep(runId);
     }
 
     typeAutoplayCommand(command, runId) {
-      clearTimeout(this.autoplayTypingTimer);
-      input.value = "";
-      input.focus();
-      let index = 0;
-      const typeDelay = this.autoplayMode === "slow" ? 42 : 6;
-      const submitDelay = this.autoplayMode === "slow" ? 180 : 20;
-      const typeNext = () => {
-        if (!this.autoplayRunning || runId !== this.autoplayRunId) return;
-        input.value = command.slice(0, index);
-        if (index >= command.length) {
-          this.autoplayTypingTimer = setTimeout(() => this.executeAutoplayCommand(command, runId), submitDelay);
-          return;
-        }
-        index += 1;
-        this.autoplayTypingTimer = setTimeout(typeNext, typeDelay);
-      };
-      typeNext();
+      return this.flow.typeAutoplayCommand(command, runId);
     }
 
     executeAutoplayCommand(command, runId) {
-      if (!this.autoplayRunning || runId !== this.autoplayRunId) return;
-      input.value = "";
-      this.print(`> ${command}`, "command");
-      this.autoplayCapturedText = "";
-      this.autoplayCapturingOutput = true;
-      try {
-        this.execute(command);
-      } finally {
-        this.autoplayCapturingOutput = false;
-      }
-      if (!this.autoplayRunning || runId !== this.autoplayRunId) return;
-      if (this.endgame) return this.stopAutoplay("Autoplay finished.");
-      this.scheduleAutoplayStep(this.autoplayDelayForText(this.autoplayCapturedText));
+      return this.flow.executeAutoplayCommand(command, runId);
     }
 
     stopAutoplay(message) {
-      clearTimeout(this.autoplayTimer);
-      clearTimeout(this.autoplayTypingTimer);
-      this.autoplayTimer = null;
-      this.autoplayTypingTimer = null;
-      this.autoplayRunning = false;
-      this.autoplayRunId += 1;
-      input.value = "";
-      if (message) this.print(message, "system");
+      return this.flow.stopAutoplay(message);
     }
 
     autoplayDelayForText(text) {
-      if (this.autoplayMode !== "slow") return this.autoplayDelay;
-      const cleaned = String(text || "").replace(/\s+/g, " ").trim();
-      if (!cleaned) return this.autoplayDelay;
-      const words = cleaned.split(/\s+/).filter(Boolean).length;
-      const sentencePauses = (cleaned.match(/[.!?]/g) || []).length;
-      const readingDelay = 1050 + words * 248 + sentencePauses * 338;
-      return Math.max(this.autoplayDelay, Math.min(readingDelay, 16500));
+      return this.flow.autoplayDelayForText(text);
     }
 
     autoplayShouldLightLantern() {
-      if (this.hasActiveLantern()) return false;
-      if (this.currentRoom === "deep_dark_lake" && this.gollumState?.pocketQuestionAsked && this.player.noticeable !== false) return false;
-      if (this.roomNeedsLantern(this.currentRoom)) return true;
-      if (this.currentRoom === "green_dragon_inn" && !this.flags.seenpony) return true;
-      return false;
+      return this.flow.autoplayShouldLightLantern();
     }
 
     nextAutoplayCommand() {
-      const beforeDragonDefeat = !this.flags.dragondefeated;
-
-      if (this.spiderEyesState?.active && this.currentRoom === this.spiderEyesState.room) {
-        if ((this.spiderEyesState.waits || 0) < 2) return "wait";
-        return this.spiderEyesState.safeDirections?.[0] || null;
-      }
-
-      if (this.currentRoom === "lower_halls" && this.liveDragon() && this.flags.bardreadiedarrow) {
-        return "say to bard \"shoot dragon\"";
-      }
-
-      if (beforeDragonDefeat && !this.autoplayHas("small key")) {
-        if (this.currentRoom !== "hobbit_hole") return this.autoplayRouteCommandTo("hobbit_hole");
-        if (!this.visibleSearch("small key")) return "lift carpet";
-        return "take small key";
-      }
-
-      if (beforeDragonDefeat && !this.autoplayHas("firestone")) {
-        if (this.currentRoom !== "bag_end_guest_room") return this.autoplayRouteCommandTo("bag_end_guest_room");
-        const guestTrunk = this.items.guest_room_trunk;
-        const ornateBox = this.items.ornate_box;
-        if (guestTrunk && !guestTrunk.open) return "open guest trunk";
-        if (!this.flags.autoplayexaminedguesttrunk) return this.autoplayOnce("autoplayexaminedguesttrunk", "examine guest trunk");
-        if (ornateBox && !this.player.inventory.includes(ornateBox.id)) return "take ornate box";
-        if (ornateBox && !ornateBox.open) return "open ornate box";
-        if (!this.flags.autoplayexaminedornatebox) return this.autoplayOnce("autoplayexaminedornatebox", "examine ornate box");
-        return "take firestone";
-      }
-
-      if (beforeDragonDefeat && !this.autoplayHas("sturdy key")) {
-        if (this.currentRoom !== "hobbit_hole") return this.autoplayRouteCommandTo("hobbit_hole");
-        const bottomDrawer = this.items.bottom_drawer;
-        if (bottomDrawer && !bottomDrawer.open) return "open bottom drawer";
-        if (!this.flags.autoplayexaminedbottomdrawer) return this.autoplayOnce("autoplayexaminedbottomdrawer", "examine bottom drawer");
-        return "take sturdy key";
-      }
-
-      if (beforeDragonDefeat && !this.autoplayHas("brass lantern")) {
-        if (this.currentRoom !== "bilbos_garden") return this.autoplayRouteCommandTo("bilbos_garden");
-        const shed = this.items.garden_shed;
-        if (shed?.locked) return "unlock garden shed";
-        if (shed && !shed.open) return "open garden shed";
-        if (!this.flags.autoplayexaminedgardenshed) return this.autoplayOnce("autoplayexaminedgardenshed", "examine garden shed");
-        return "take lantern";
-      }
-
-      if (beforeDragonDefeat && this.autoplayShouldLightLantern()) return "light lantern";
-
-      if (beforeDragonDefeat && !this.flags.seenpony) {
-        if (!this.bagEndQuestHasBegun()) return "wait";
-        const thorin = Object.values(this.characters).find((character) => matches(character.name, "thorin"));
-        if (this.currentRoom !== "green_dragon_inn") return this.autoplayRouteCommandTo("green_dragon_inn");
-        if (thorin?.position !== this.currentRoom) thorin.position = this.currentRoom;
-        return "say to thorin \"look through window\"";
-      }
-
-      if (beforeDragonDefeat && !this.visitedRooms.has("dreary") && this.currentRoom !== "dreary") {
-        if (this.currentRoom !== "green_dragon_inn_outside") return this.autoplayRouteCommandTo("green_dragon_inn_outside");
-        if (!this.items.low_branch?.visible) return "examine oak tree";
-        return "climb branch";
-      }
-
-      if (beforeDragonDefeat && !this.autoplayHas("large key")) {
-        if (!this.visitedTrollsClearing) return this.autoplayRouteCommandTo("trolls_clearing");
-        if (this.currentRoom !== "trolls_clearing") return this.autoplayRouteCommandTo("trolls_clearing");
-        if (!this.trollsTransformed) return "carefully take large key and south west";
-        return "take large key";
-      }
-
-      if (beforeDragonDefeat && !this.autoplayHas("majestic sword")) {
-        if (this.currentRoom !== "trolls_cave") return this.autoplayRouteCommandTo("trolls_cave");
-        const chest = this.items.arcane_chest;
-        if (!chest.visible) return this.hasActiveLantern() ? "examine discarded armor" : "carefully examine discarded armor";
-        if (!chest.open) return "open arcane chest";
-        if (!this.flags.autoplayexaminedarcanechest) return this.autoplayOnce("autoplayexaminedarcanechest", "examine arcane chest");
-        const prepSwordLoad = this.autoplayRequiredPickupPrepCommand("majestic sword");
-        if (prepSwordLoad) return prepSwordLoad;
-        return "take sword";
-      }
-
-      if (beforeDragonDefeat && !this.autoplayHas("sturdy rope")) {
-        if (this.currentRoom !== "trolls_cave") return this.autoplayRouteCommandTo("trolls_cave");
-        const prepRopeLoad = this.autoplayRequiredPickupPrepCommand("sturdy rope");
-        if (prepRopeLoad) return prepRopeLoad;
-        return "take rope";
-      }
-
-      if (beforeDragonDefeat && this.currentRoom === "deep_dark_lake" && !this.gollumState?.pocketQuestionAsked) {
-        if (!this.gollumState?.met) return "look";
-        if (this.gollumState?.awaitingAnswer) {
-          const riddle = this.currentGollumRiddle();
-          if (riddle?.answers?.[0]) return `answer ${riddle.answers[0]}`;
-          return "ask gollum a riddle";
-        }
-        if (this.gollumState?.awaitingPlayerRiddle) return "say to gollum \"what have i got in my pocket\"";
-        return "ask gollum a riddle";
-      }
-
-      if (beforeDragonDefeat && this.currentRoom === "deep_dark_lake" && this.gollumState?.pocketQuestionAsked) {
-        if (this.player.noticeable !== false) return "wear ring";
-        return "north";
-      }
-
-      const hostile = this.peopleInRoom().find((character) => {
-        return character.visible && character.friendly === false && !matches(character.name, "dragon");
-      });
-      if (beforeDragonDefeat && hostile && this.autoplayHas("majestic sword")) return `kill ${hostile.name} with sword`;
-
-      if (beforeDragonDefeat && this.visitedTrollsClearing && this.autoplayHas("large key") && !this.trollsTransformed && this.currentRoom !== "trolls_clearing") return "wait";
-
-      if (beforeDragonDefeat && !this.autoplayHas("golden ring")) {
-        if (this.currentRoom === "deep_dark_lake") {
-          if (!this.gollumState?.met) return "look";
-          if (this.gollumState?.awaitingAnswer) {
-            const riddle = this.currentGollumRiddle();
-            if (riddle?.answers?.[0]) return `answer ${riddle.answers[0]}`;
-            return "ask gollum a riddle";
-          }
-          if (this.gollumState?.awaitingPlayerRiddle) return "say to gollum \"what have i got in my pocket\"";
-          if (this.gollumState?.pocketQuestionAsked && this.player.noticeable !== false) return "wear ring";
-          if (this.gollumState?.pocketQuestionAsked && this.player.noticeable === false) return "north";
-          return "ask gollum a riddle";
-        }
-        return this.autoplayRouteCommandTo("deep_dark_lake");
-      }
-
-      if (beforeDragonDefeat && (this.player.strength || 1) < 6) {
-        if (this.currentRoom !== "beorns_house") return this.autoplayRouteCommandTo("beorns_house");
-        if (this.autoplayHas("meal")) return "eat meal";
-        const curtain = this.items.curtain;
-        const cupboard = this.items.cupboard;
-        if (curtain && !curtain.open) return "open curtain";
-        if (cupboard && !cupboard.open) return "open cupboard";
-        if (!this.flags.autoplayexaminedcupboard) return this.autoplayOnce("autoplayexaminedcupboard", "examine cupboard");
-        return "take meal";
-      }
-
-      if (this.currentRoom === "west_bank") {
-        if (!this.flags.seenboat) return "look across river";
-        if (!this.flags.ropeinboat) return "throw rope across river";
-        if (!this.flags.boatiswest) return "pull rope";
-        return "climb into boat";
-      }
-
-      if (this.currentRoom === "dark_dungeon") {
-        const redDoor = this.doors.porta_dark_dungeon_cellar;
-        if (redDoor && !redDoor.open) return this.autoplayHas("majestic sword") ? "break red door with sword" : "wait";
-        return "south west";
-      }
-
-      if (this.currentRoom === "cellar") {
-        const trapDoor = this.doors.porta_cellar_long_lake;
-        if (trapDoor && !trapDoor.open) return "open trap door";
-        return "down";
-      }
-
-      const bard = Object.values(this.characters).find((character) => matches(character.name, "bard"));
-      if (!this.flags.dragondefeated) {
-        const bardWithPlayer = bard?.carriedBy === this.player.id
-          || (bard?.movementMode === "follow" && bard?.position === this.currentRoom && bard.visible);
-        if (!bardWithPlayer) {
-          if (bard?.position === this.currentRoom && bard.visible) return "pick up bard";
-          const bardCorridor = {
-            elvish_clearing: "north east",
-            elvenkings_halls: "south",
-            cellar: this.doors.porta_cellar_long_lake?.open ? "down" : "open trap door",
-            long_lake: "east",
-          };
-          if (bardCorridor[this.currentRoom]) return bardCorridor[this.currentRoom];
-          const commandToBard = this.autoplayRouteCommandTo(bard?.position || "wooden_town");
-          if (commandToBard) return commandToBard;
-          return this.autoplayRouteCommandTo("west_bank");
-        }
-
-        if (!this.flags.bardreadiedarrow) return "say to bard \"get strong arrow from quiver\"";
-      }
-
-      if (this.currentRoom === "lower_halls" && !this.autoplayHas("treasure")) {
-        if (this.liveDragon()) {
-          return "say to bard \"shoot dragon\"";
-        }
-        const prepTreasureLoad = this.autoplayTreasurePickupPrepCommand();
-        if (prepTreasureLoad) return prepTreasureLoad;
-        return "take treasure";
-      }
-
-      if (!this.autoplayHas("treasure")) return this.autoplayRouteCommandTo("lower_halls");
-
-      if (this.autoplayHas("treasure") && this.currentRoom !== "hobbit_hole") return this.autoplayRouteCommandTo("hobbit_hole");
-
-      if (this.autoplayHas("treasure") && this.currentRoom === "hobbit_hole") {
-        const chest = this.items.heavy_wooden_chest;
-        if (chest.locked) return "unlock chest";
-        if (!chest.open) return "open chest";
-        return "put treasure in chest";
-      }
-
-      return null;
+      return this.flow.nextAutoplayCommand();
     }
 
     autoplayHas(name) {
-      return [...this.player.inventory, ...(this.player.worn || [])].some((itemId) => matches(this.items[itemId]?.name, name));
+      return this.flow.autoplayHas(name);
     }
 
     autoplayTreasurePickupPrepCommand() {
-      if (this.autoplayHas("treasure")) return null;
-      if (!["front_gate", "lower_halls"].includes(this.currentRoom)) return null;
-      const treasure = this.items.treasure;
-      if (!treasure) return null;
-      const spareCapacity = this.carryCapacity() - this.currentCarryWeight();
-      if (spareCapacity >= (treasure.weight || 0)) return null;
-      const expendable = [
-        "golden ring",
-        "firestone",
-        "sturdy key",
-        "brass lantern",
-        "sturdy rope",
-        "majestic sword",
-        "large key",
-        "small key",
-      ];
-      for (const name of expendable) {
-        if (this.autoplayHas(name)) return `drop ${name}`;
-      }
-      return null;
+      return this.flow.autoplayTreasurePickupPrepCommand();
     }
 
     autoplayRequiredPickupPrepCommand(itemName) {
-      const item = this.findKnownItem(itemName);
-      if (!item) return null;
-      const spareCapacity = this.carryCapacity() - this.currentCarryWeight();
-      if (spareCapacity >= (item.weight || 0)) return null;
-      const expendableByNeed = {
-        "majestic sword": ["ornate box", "small key", "sturdy key"],
-        "sturdy rope": ["ornate box", "small key", "sturdy key", "firestone", "brass lantern"],
-        "golden ring": ["ornate box"],
-      };
-      const expendable = expendableByNeed[item.name] || [];
-      for (const name of expendable) {
-        if (this.autoplayHas(name)) return `drop ${name}`;
-      }
-      return null;
+      return this.flow.autoplayRequiredPickupPrepCommand(itemName);
     }
 
     autoplayOnce(flag, command) {
-      this.flags[flag] = true;
-      return command;
+      return this.flow.autoplayOnce(flag, command);
     }
 
     autoplayRouteCommandTo(destination) {
-      const path = this.autoplayPathTo(destination);
-      if (!path?.length) return null;
-      const connection = path[0];
-      const visibleConnection = this.roomConnections().find((candidate) => candidate.direction === connection.direction);
-      const actualConnection = visibleConnection || connection;
-      const web = this.blockingWebFor(connection);
-      if (web && !web.broken) return "smash web";
-      const woodElf = Object.values(this.characters).find((character) => matches(character.name, "wood elf") && character.visible);
-      if (woodElf?.position === connection.to && this.autoplayHas("golden ring") && this.player.noticeable !== false) return "wear ring";
-      const door = actualConnection.door && this.doors[actualConnection.door];
-      if (door && !door.open && !door.broken) {
-        if (door.locked && this.keyFor(door)) return `unlock ${door.name}`;
-        if (door.locked && this.autoplayHas("majestic sword")) return `break ${door.name} with sword`;
-        return `open ${door.name}`;
-      }
-      if (!this.hasActiveLantern() && this.autoplayHas("brass lantern") && this.roomNeedsLantern(connection.to)) {
-        return "light lantern";
-      }
-      return connection.direction;
+      return this.flow.autoplayRouteCommandTo(destination);
     }
 
     autoplayPathTo(destination) {
-      if (!destination || this.currentRoom === destination) return [];
-      const queue = [{ room: this.currentRoom, path: [] }];
-      const seen = new Set([this.currentRoom]);
-      while (queue.length) {
-        const current = queue.shift();
-        for (const connection of this.connectionsFromVisible(current.room)) {
-          if (seen.has(connection.to) || !this.autoplayCanPlanConnection(connection)) continue;
-          const path = [...current.path, connection];
-          if (connection.to === destination) return path;
-          seen.add(connection.to);
-          queue.push({ room: connection.to, path });
-        }
-      }
-      return null;
+      return this.flow.autoplayPathTo(destination);
     }
 
     autoplayCanPlanConnection(connection) {
-      if (this.narrativeTravelBlock(connection)) return false;
-      const door = connection.door && this.doors[connection.door];
-      if (!door || door.broken) return true;
-      if (matches(door.name, "secret door") && !this.flags.secretdoorsun) return false;
-      if (door.locked && !this.keyFor(door) && !this.autoplayHas("majestic sword")) return false;
-      return true;
+      return this.flow.autoplayCanPlanConnection(connection);
     }
 
     startMusic() {
@@ -5310,306 +7181,87 @@
     }
 
     give(command) {
-      const parsed = this.parseGiveCommand(command);
-      if (!parsed) return this.print("Use: give [item] to [character].");
-      const item = this.findInInventory(parsed.itemName);
-      const target = this.resolveCharacterTarget(parsed.targetName);
-      if (!item) return this.print(this.heldItemMessage(parsed.itemName) || `${this.player.name} does not have the ${parsed.itemName}.`);
-      if (!target) return this.print(`There is no one named ${parsed.targetName} here.`);
-      if (this.unexpectedParty?.blocksDirectInteraction(target, "gift")) return;
-      if (target.id === this.player.id) return this.print(`${this.player.name} already has the ${item.name}.`);
-      this.detachItem(item.id);
-      item.location = { type: "character", id: target.id };
-      target.inventory.push(item.id);
-      this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "give")} the ${item.name} to ${target.name}.`);
-      this.reactToGift(target, item);
+      return this.social.give(command);
     }
 
     show(command) {
-      const parsed = this.parseGiveCommand(command);
-      if (!parsed) return this.print("Use: show [item] to [character].");
-      const item = this.findInInventory(parsed.itemName);
-      const target = this.resolveCharacterTarget(parsed.targetName);
-      if (!item) return this.print(this.heldItemMessage(parsed.itemName) || `${this.player.name} does not have the ${parsed.itemName}.`);
-      if (!target) return this.print(`There is no one named ${parsed.targetName} here.`);
-      if (this.unexpectedParty?.blocksDirectInteraction(target, "gift")) return;
-      this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "show")} the ${item.name} to ${target.name}.`);
-      this.reactToShownItem(target, item);
+      return this.social.show(command);
     }
 
     reactToShownItem(character, item) {
-      if ((matches(character.name, "gandalf") || matches(character.name, "elrond")) && matches(item.name, "curious map")) {
-        return this.print(`${character.name} studies the ${item.name} carefully.`);
-      }
-      this.print(`${character.name} looks at the ${item.name}, but says nothing useful.`);
+      return this.social.reactToShownItem(character, item);
     }
 
     askFor(command) {
-      const conversation = this.parseAskConversationCommand(command);
-      const delegated = conversation ? null : this.parseAskToCommand(command);
-      const parsed = this.parseAskForCommand(command);
-      const resolved = conversation || delegated || parsed;
-      if (!resolved) return this.print("Use: ask [character] for [item], or ask [character] to [command].");
-      if (resolved.topic) return this.askCharacterAbout(resolved.characterName, resolved.topic);
-      if (resolved.order) return this.askCharacterTo(resolved.characterName, resolved.order);
-      return this.askCharacterForItem(resolved.characterName, resolved.itemName);
+      return this.social.askFor(command);
     }
 
     askCharacterForItem(characterName, itemName) {
-      const character = this.resolveAskForCharacterTarget(characterName, itemName);
-      if (!character) return this.print(`There is no one named ${characterName} here.`);
-      if (this.unexpectedParty?.blocksDirectInteraction(character, "item")) return;
-      const special = this.specialAskForResponse(character, itemName);
-      if (special) return this.print(special);
-      const requestedCharacter = this.findKnownCharacter(itemName);
-      if (requestedCharacter) {
-        this.rememberConversationCharacter(character);
-        this.rememberReferencedCharacter(requestedCharacter);
-        return this.askCharacterAbout(character.name, `where ${requestedCharacter.name} is`);
-      }
-      return this.receiveItemFromCharacter(character, itemName);
+      return this.social.askCharacterForItem(characterName, itemName);
     }
 
     specialAskForResponse(character, itemName) {
-      const text = normalize(itemName);
-      if (matches(character.name, "beorn") && matchesAny(text, ["food", "meal", "supper", "breakfast", "shelter", "rest"])) {
-        return "Beorn says 'There is food and a roof for honest guests. Help yourself, but do not mistake hospitality for weakness.'";
-      }
-      if (matches(character.name, "elrond") && matchesAny(text, ["advice", "help", "counsel", "map"])) {
-        return "Elrond says 'What aid I may offer is best received in thought, and not in haste.'";
-      }
-      return "";
+      return this.social.specialAskForResponse(character, itemName);
     }
 
     resolveAskForCharacterTarget(characterName, itemName) {
-      const directTarget = this.resolveCharacterTarget(characterName);
-      if (directTarget) return directTarget;
-      const pronoun = normalize(characterName);
-      if (!["him", "her", "them"].includes(pronoun)) return null;
-      const visibleHolder = this.findVisibleCharacterHolding(itemName)?.character;
-      if (visibleHolder) return visibleHolder;
-      const lastConversation = this.lastConversationCharacter();
-      if (lastConversation?.position === this.currentRoom && lastConversation.visible) return lastConversation;
-      const lastReferenced = this.lastReferencedCharacter();
-      if (lastReferenced?.position === this.currentRoom && lastReferenced.visible) return lastReferenced;
-      return null;
+      return this.social.resolveAskForCharacterTarget(characterName, itemName);
     }
 
     receiveItemFromCharacter(character, itemName) {
-      if (character.friendly === false) return this.respondToTalk(character);
-      if (this.player.name === "You" && this.player.noticeable === false) return this.print(`${character.name} says 'who's talking?'`);
-      const held = this.findCharacterItem(character, itemName);
-      if (!held) return this.print(`${character.name} does not have the ${itemName}.`);
-      if (held.worn) return this.print(`${character.name} is wearing the ${held.item.name}.`);
-      if (!this.canCarryAdditionalWeight(held.item.weight || 0)) return this.print(this.carryTooMuchMessage(held.item));
-      this.detachItem(held.item.id);
-      held.item.location = { type: "character", id: this.player.id };
-      this.player.inventory.push(held.item.id);
-      this.print(`${character.name} gives you the ${held.item.name}.`);
+      return this.social.receiveItemFromCharacter(character, itemName);
     }
 
     takeItemFromCharacter(character, itemName) {
-      if (character.friendly === false) return this.respondToTalk(character);
-      const held = this.findCharacterItem(character, itemName);
-      if (!held) return this.print(`${character.name} does not have the ${itemName}.`);
-      if (held.worn) return this.print(`${character.name} is wearing the ${held.item.name}.`);
-      if (!this.canCarryAdditionalWeight(held.item.weight || 0)) return this.print(this.carryTooMuchMessage(held.item));
-      this.detachItem(held.item.id);
-      held.item.location = { type: "character", id: this.player.id };
-      this.player.inventory.push(held.item.id);
-      this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "take")} the ${held.item.name} from ${character.name}.`);
+      return this.social.takeItemFromCharacter(character, itemName);
     }
 
     askCharacterTo(characterName, order) {
-      const character = this.resolveCharacterTarget(characterName);
-      if (!character) return this.print(`There is no one named ${characterName} here.`);
-      if (character.friendly === false) return this.respondToTalk(character);
-      if (this.player.name === "You" && this.player.noticeable === false) return this.print(`${character.name} says 'who's talking?'`);
-      if (this.unexpectedParty?.blocksDirectInteraction(character, "order")) return;
-      this.rememberConversationCharacter(character);
-      this.rememberReferencedCharacter(order);
-      if (this.handleBardDragonCommand(character, order)) return;
-      this.delegateCharacterOrder(character, order);
+      return this.social.askCharacterTo(characterName, order);
     }
 
     delegateCharacterOrder(character, order) {
-      this.rememberConversationCharacter(character);
-      this.rememberReferencedCharacter(order);
-      const delegatedSplitter = this.delegatedSplitterFor(character);
-      this.seedDelegatedSplitter(delegatedSplitter);
-      for (const action of delegatedSplitter.split(order)) {
-        const interpreted = this.interpretFriendlyOrder(character, action);
-        if (interpreted.message) this.print(interpreted.message);
-        if (!interpreted.action) continue;
-        const moved = this.processCommand(interpreted.action, character);
-        if (moved) break;
-      }
-      this.rememberDelegatedSplitter(delegatedSplitter);
+      return this.social.delegateCharacterOrder(character, order);
     }
 
     delegatedSplitterFor(character) {
-      if (!character?.id) return new CommandSplitter(this.data);
-      if (!this.delegatedSplitters.has(character.id)) {
-        this.delegatedSplitters.set(character.id, new CommandSplitter(this.data));
-      }
-      return this.delegatedSplitters.get(character.id);
+      return this.social.delegatedSplitterFor(character);
     }
 
     seedDelegatedSplitter(splitter) {
-      if (!splitter) return;
-      splitter.lastObject ||= this.sharedDelegatedContext.lastObject;
-      splitter.lastDirectObject ||= this.sharedDelegatedContext.lastDirectObject;
-      splitter.lastTargetObject ||= this.sharedDelegatedContext.lastTargetObject;
+      return this.social.seedDelegatedSplitter(splitter);
     }
 
     rememberDelegatedSplitter(splitter) {
-      if (!splitter) return;
-      this.sharedDelegatedContext = {
-        lastObject: splitter.lastObject || this.sharedDelegatedContext.lastObject,
-        lastDirectObject: splitter.lastDirectObject || this.sharedDelegatedContext.lastDirectObject,
-        lastTargetObject: splitter.lastTargetObject || this.sharedDelegatedContext.lastTargetObject,
-      };
+      return this.social.rememberDelegatedSplitter(splitter);
     }
 
     interpretFriendlyOrder(character, action) {
-      const text = normalize(action);
-      const [verb, ...restWords] = text.split(/\s+/);
-      const object = restWords.join(" ").trim();
-
-      const progressive = this.progressiveFriendlyOrder(character, verb, object, text);
-      if (progressive) return progressive;
-
-      if (verb === "wait" && /\b(?:until|till)\b/.test(object)) {
-        return {
-          message: `${character.name} says 'I will wait a while, but not forever.'`,
-          action: "wait",
-        };
-      }
-
-      const protectedMessage = this.protectedOrderRefusal(character, verb, object);
-      if (protectedMessage) return { message: protectedMessage, action: "" };
-
-      return { message: "", action };
+      return this.social.interpretFriendlyOrder(character, action);
     }
 
     progressiveFriendlyOrder(character, verb, object, action) {
-      const guardedVerbs = new Set(["give", "hand", "pass", "send", "deliver", "return"]);
-      if (!guardedVerbs.has(verb) || !matches(character.name, "gandalf")) return null;
-
-      const parsed = this.parseGiveCommand(object);
-      const itemName = parsed?.itemName || object.split(" to ")[0]?.trim() || object;
-      const item = this.findCharacterItem(character, itemName)?.item;
-      const actualName = item?.name || itemName;
-      if (!matches(actualName, "curious map")) return null;
-
-      const key = "gandalf_map_transfer_requests";
-      const count = (this.flags[key] || 0) + 1;
-      this.flags[key] = count;
-
-      if (count === 1) {
-        return {
-          message: "Gandalf says 'I think the curious map is safer in my hands for now.'",
-          action: "",
-        };
-      }
-      if (count === 2) {
-        return {
-          message: "Gandalf says 'You may have it soon, but let me keep it a little longer.'",
-          action: "",
-        };
-      }
-      return {
-        message: "Gandalf sighs and says 'Very well. Take it, and use it wisely.'",
-        action,
-      };
+      return this.social.progressiveFriendlyOrder(character, verb, object, action);
     }
 
     protectedOrderRefusal(character, verb, object) {
-      const guardedVerbs = new Set(["drop", "leave", "give", "hand", "pass", "send", "deliver", "return"]);
-      if (!guardedVerbs.has(verb)) return "";
-
-      let itemName = object;
-      if (verb === "give" || ["hand", "pass", "send", "deliver", "return"].includes(verb)) {
-        const parsed = this.parseGiveCommand(object);
-        itemName = parsed?.itemName || object.split(" to ")[0]?.trim() || object;
-      }
-      const item = this.findCharacterItem(character, itemName)?.item;
-      const actualName = item?.name || itemName;
-
-      if (matches(character.name, "gandalf") && matches(actualName, "curious map")) {
-        return "Gandalf says 'I think the curious map is safer in my hands for now.'";
-      }
-      if (matches(character.name, "thorin") && (matches(actualName, "curious key") || matches(actualName, "treasure") || matches(actualName, "arkenstone"))) {
-        return "Thorin says 'That is not something I mean to part with lightly.'";
-      }
-      if (matches(character.name, "bilbo") && matches(actualName, "golden ring")) {
-        return "Bilbo says 'I would rather keep the ring to myself just now.'";
-      }
-      return "";
+      return this.social.protectedOrderRefusal(character, verb, object);
     }
 
     askCharacterAbout(characterName, topic) {
-      const character = this.resolveCharacterTarget(characterName);
-      if (!character) return this.print(`There is no one named ${characterName} here.`);
-      if (matches(character.name, "dragon")) {
-        const special = this.specialConversationResponse(character, topic) || this.specialTalkResponse(character);
-        return this.print(special);
-      }
-      if (character.friendly === false) return this.respondToTalk(character);
-      if (this.player.name === "You" && this.player.noticeable === false) return this.print(`${character.name} says 'who's talking?'`);
-      if (this.unexpectedParty?.blocksDirectInteraction(character, "ask")) return;
-      this.rememberConversationCharacter(character);
-      this.rememberReferencedCharacter(topic);
-      const special = this.specialConversationResponse(character, topic);
-      if (special) return this.print(special);
-      this.print(`${character.name} considers ${this.formatConversationTopic(topic)}, but gives no clear answer.`);
+      return this.social.askCharacterAbout(characterName, topic);
     }
 
     parseAskForCommand(command) {
-      const text = normalize(command);
-      if (!text) return null;
-      const polite = text.replace(/^(?:please\s+)?/, "").replace(/\s+please$/, "").trim();
-      const match = polite.match(/^(.+?)\s+for\s+(.+)$/);
-      if (match) return { characterName: match[1].trim(), itemName: match[2].trim() };
-      const fromMatch = polite.match(/^(.+?)\s+from\s+(.+)$/);
-      if (fromMatch) return { characterName: fromMatch[2].trim(), itemName: fromMatch[1].trim() };
-      return null;
+      return this.social.parseAskForCommand(command);
     }
 
     parseAskConversationCommand(command) {
-      const text = normalize(command);
-      if (!text) return null;
-      const aboutMatch = text.match(/^(.+?)\s+about\s+(.+)$/);
-      if (aboutMatch) return { characterName: aboutMatch[1].trim(), topic: aboutMatch[2].trim() };
-      const match = text.match(/^(.+?)\s+(where|whether|if|what|why|how|that)\s+(.+)$/);
-      if (match) {
-        return {
-          characterName: match[1].trim(),
-          topic: this.normalizeConversationTopic(match[2], match[3]),
-        };
-      }
-      const riddle = text.match(/^(.+?)\s+(?:a\s+)?riddle$/);
-      if (riddle) return { characterName: riddle[1].trim(), topic: "a riddle" };
-      return null;
+      return this.social.parseAskConversationCommand(command);
     }
 
     parseAskToCommand(command) {
-      const text = normalize(command);
-      if (!text) return null;
-      if (/^.+?\s+(?:where|whether|if|what|why|how|that)\b/.test(text)) return null;
-      const match = text.match(/^(.+?)\s+to\s+(.+)$/);
-      if (match) return { characterName: match[1].trim(), order: match[2].trim() };
-      if (/^.+?\s+(?:for|about|where|whether|if|what|why|how|that)\b/.test(text)) return null;
-      const people = this.peopleInRoom()
-        .filter((character) => character.id !== this.player.id && character.visible)
-        .sort((a, b) => b.name.length - a.name.length);
-      for (const character of people) {
-        const name = normalize(character.name);
-        if (text.startsWith(`${name} `)) {
-          return { characterName: name, order: text.slice(name.length).trim() };
-        }
-      }
-      return null;
+      return this.social.parseAskToCommand(command);
     }
 
     normalizeConversationTopic(keyword, remainder) {
@@ -5631,188 +7283,43 @@
     }
 
     specialTalkResponse(character) {
-      if (this.unexpectedParty?.isAmbientDwarf(character)) {
-        return this.unexpectedParty.dwarfProfile(character).talk;
-      }
-      if (matches(character.name, "elrond") && this.currentRoom === "rivendell") {
-        return "Elrond folds his hands and says 'Speak without haste. In Rivendell, even quiet words may be worth the hearing.'";
-      }
-      if (matches(character.name, "beorn") && this.currentRoom === "beorns_house") {
-        return "Beorn studies you in silence for a moment and says 'Say what you mean, little one, and spare me needless words.'";
-      }
-      if (matches(character.name, "gollum")) {
-        if (!this.gollumState?.contestStarted) {
-          return this.pick([
-            "Gollum rocks softly on the black water and whispers 'Riddles, yes, riddles. Ask Gollum a riddle, and we shall see who goes and who is eaten.'",
-            "Gollum tilts his head and rasps 'Riddles first, yes. Ask Gollum a riddle, and then we shall see what becomes of Baggins.'",
-            "Gollum grins in the dark. 'A riddle-game, precious. That will tell whether Baggins goes free or feeds us.'",
-          ], hashString(`${this.storySeed}:gollum-talk-intro`));
-        }
-        if (this.gollumState.awaitingAnswer) return "Gollum hisses 'Answer first, precious.'";
-        if (this.gollumState.awaitingPlayerRiddle) return "Gollum licks his lips. 'Now Baggins asks, yes. Ask it, precious, ask it.'";
-        if (this.gollumState.pocketQuestionAsked) return "Gollum is past speech now. He hunts only for his precious.";
-      }
-      if (matches(character.name, "dragon")) {
-        const lines = {
-          sleeping: "A deep rumble answers you. Whether it is speech or dreaming, it contains very little reassurance.",
-          curious: "Smaug says 'A courteous little voice in my halls? Come nearer, and let us see what sort of thief has learned manners.'",
-          suspicious: "Smaug says 'You smell of doorways, moonlight, and secrets. Tell me, little trespasser, who taught you to walk so softly?'",
-          searching: "Smaug says 'Come out, come out, thief in the dark. I know now that I am not alone.'",
-          enraged: "Smaug's answer is a furnace-breath growl: 'When I find you, I shall know your taste as well as your scent.'",
-        };
-        return lines[this.currentSmaugState()] || lines.sleeping;
-      }
-      return "";
+      return this.encounters.specialTalkResponse(character);
     }
 
     specialConversationResponse(character, topic) {
-      const text = normalize(topic);
-      if (this.unexpectedParty?.isAmbientDwarf(character)) {
-        if (matchesAny(text, ["food", "supper", "tea", "ale", "beer", "pantry"])) return this.unexpectedParty.dwarfProfile(character).ask;
-        if (matchesAny(text, ["quest", "road", "journey", "mountain", "thorin"])) return `${character.name} says 'We have not come merely to enjoy your excellent housekeeping, though I mean to do my best with it while it lasts.'`;
-        return this.unexpectedParty.dwarfProfile(character).ask;
-      }
-      if (matches(character.name, "gollum")) {
-        if (text === "a riddle" || text === "riddle") return this.beginGollumRiddleContest();
-        if (text.includes("pocket")) return this.resolveGollumPocketQuestion();
-        if (text.includes("exit") || text.includes("way out")) {
-          return this.gollumState?.pocketQuestionAsked
-            ? "Gollum rasps from the dark 'North, yes. But not for thieves. Not for Baggins, no.'"
-            : "Gollum bares his teeth. 'Win first, then ask of ways out, precious.'";
-        }
-      }
-      if (matches(character.name, "elrond")) {
-        if (matchesAny(text, ["map", "moon letters", "moon-letters", "markings"])) {
-          return "Elrond says 'Such maps do not speak plainly to hasty eyes. Patience, and the right light, reveal more than force ever could.'";
-        }
-        if (matchesAny(text, ["secret door", "door", "key"])) {
-          return "Elrond says 'Many doors in the elder tales were meant to be found at their proper hour, and not before.'";
-        }
-      }
-      if (matches(character.name, "beorn")) {
-        if (matchesAny(text, ["mirkwood", "forest", "wood"])) {
-          return "Beorn says 'The forest ahead is black with old hunger. Keep to the path, and trust no feast that waits for you in silence.'";
-        }
-        if (matchesAny(text, ["goblins", "wargs", "wolves"])) {
-          return "Beorn snorts. 'Goblins breed mischief as marshes breed flies, and wargs are seldom far behind them.'";
-        }
-        if (matchesAny(text, ["food", "meal", "shelter", "night", "rest"])) {
-          return "Beorn says 'There is food and a roof here for decent guests. Take both with thanks, and do not abuse either.'";
-        }
-      }
-      if (matches(character.name, "dragon")) {
-        if (matchesAny(text, ["treasure", "gold", "cup", "hoard"])) return "Smaug says 'My armour is like tenfold shields, my teeth are swords, my claws are spears, and this wealth is mine by fire and fear.'";
-        if (matchesAny(text, ["thorin", "dwarves", "company"])) return "Smaug says 'Ah, the dwarves. Greed remembers old tunnels better than wisdom does.'";
-        if (matchesAny(text, ["door", "entrance", "way in", "secret"])) return "Smaug gives a low pleased rumble. 'You ask many careful questions for so small a guest. That interests me.'";
-      }
-      return "";
+      return this.encounters.specialConversationResponse(character, topic);
     }
 
     currentGollum() {
-      return this.characters.gollum || Object.values(this.characters).find((character) => matches(character.name, "gollum")) || null;
+      return this.encounters.currentGollum();
     }
 
     isGollumPresentInLake() {
-      const gollum = this.currentGollum();
-      return Boolean(gollum && gollum.visible !== false && gollum.position === "deep_dark_lake");
+      return this.encounters.isGollumPresentInLake();
     }
 
     ensureLakeRingInPocket() {
-      const ring = this.items.golden_ring;
-      if (!ring) return false;
-      if (this.player.inventory.includes(ring.id) || this.player.worn.includes(ring.id)) return false;
-      this.detachItem(ring.id);
-      ring.visible = true;
-      ring.location = { type: "character", id: this.player.id };
-      this.player.inventory.push(ring.id);
-      return true;
+      return this.encounters.ensureLakeRingInPocket();
     }
 
     beginGollumRiddleContest() {
-      const gollum = this.currentGollum();
-      if (!gollum || gollum.position !== this.currentRoom) return "";
-      this.ensureLakeRingInPocket();
-      if (!this.gollumState) this.gollumState = this.createGollumState();
-      if (this.gollumState.pocketQuestionAsked) return "Gollum is done with riddles. He wants only his precious now, yes.";
-      if (this.gollumState.awaitingAnswer) return "Gollum hisses 'Answer first, precious.'";
-      if (this.gollumState.awaitingPlayerRiddle) return "Gollum curls his fingers over the boat's edge. 'Baggins asks now. Speak the riddle, then.'";
-      this.gollumState.contestStarted = true;
-      this.gollumState.awaitingAnswer = true;
-      gollum.friendly = "neutral";
-      const riddle = this.currentGollumRiddle();
-      if (!riddle) return "Gollum watches you in tense silence from the dark water.";
-      return `${this.gollumContestOpener()} ${riddle.question}`;
+      return this.encounters.beginGollumRiddleContest();
     }
 
     gollumAnswerMatches(input, answers) {
-      const normalized = normalize(input).replace(/^(?:it is|it's|its|the answer is)\s+/, "").trim();
-      if (!normalized) return false;
-      return answers.some((answer) => {
-        const expected = normalize(answer);
-        return normalized === expected || normalized.endsWith(` ${expected}`);
-      });
+      return this.encounters.gollumAnswerMatches(input, answers);
     }
 
     handleGollumAnswer(answerText = "") {
-      if (!this.gollumState?.awaitingAnswer || this.currentRoom !== "deep_dark_lake") return false;
-      const riddles = this.activeGollumRiddles();
-      const riddle = riddles[this.gollumState.currentRiddleIndex];
-      if (!riddle) return false;
-      if (!this.gollumAnswerMatches(answerText, riddle.answers)) {
-        const outcome = this.gollumWrongAnswerOutcome();
-        this.print(outcome.attack, "danger");
-        this.endGame(outcome.ending, { fatal: true });
-        return true;
-      }
-
-      if (this.gollumState.currentRiddleIndex < riddles.length - 1) {
-        this.gollumState.currentRiddleIndex += 1;
-        const nextRiddle = riddles[this.gollumState.currentRiddleIndex];
-        this.print(`Gollum nods reluctantly. 'Right, precious. Right.' ${nextRiddle.question}`);
-        return true;
-      }
-
-      this.gollumState.awaitingAnswer = false;
-      this.gollumState.awaitingPlayerRiddle = true;
-      this.print("Gollum narrows his pale eyes. 'Baggins has answered. Now Baggins asks, yes. Ask it, precious, ask it.'");
-      return true;
+      return this.encounters.handleGollumAnswer(answerText);
     }
 
     resolveGollumPocketQuestion() {
-      if (this.currentRoom !== "deep_dark_lake") return "";
-      if (!this.gollumState?.awaitingPlayerRiddle) {
-        return this.gollumState?.awaitingAnswer
-          ? "Gollum taps the side of the boat impatiently. 'First Baggins answers. Then Baggins asks.'"
-          : "Gollum blinks in the dark, waiting for a proper riddle-game to begin.";
-      }
-      this.ensureLakeRingInPocket();
-      const gollum = this.currentGollum();
-      if (gollum) {
-        gollum.friendly = false;
-        gollum.attackFlag = 0;
-      }
-      this.gollumState.awaitingPlayerRiddle = false;
-      this.gollumState.pocketQuestionAsked = true;
-      this.gollumState.enraged = true;
-      return "You ask 'What have I got in my pocket?' Gollum freezes, then hisses wild guesses: 'Knife? String? Handses?' At last he slips away to fetch what he meant to give you, only to discover that his ring is gone. He returns shrieking for his precious, and the little ring in your pocket suddenly feels heavier than gold.";
+      return this.encounters.resolveGollumPocketQuestion();
     }
 
     handleGollumSpeech(text) {
-      const normalized = normalize(text);
-      if (!normalized) return false;
-      if (normalized.includes("pocket")) {
-        this.print(this.resolveGollumPocketQuestion());
-        return true;
-      }
-      if (normalized.includes("riddle")) {
-        this.print(this.beginGollumRiddleContest());
-        return true;
-      }
-      if (this.gollumState?.awaitingPlayerRiddle) {
-        this.print("Gollum scowls. 'That is no fair riddle. Ask properly, precious, ask properly.'");
-        return true;
-      }
-      return false;
+      return this.encounters.handleGollumSpeech(text);
     }
 
     findCharacterItem(character, itemName) {
@@ -5861,72 +7368,35 @@
     }
 
     parseGiveCommand(command) {
-      const text = normalize(command);
-      if (!text) return null;
-      if (text.startsWith("me ")) {
-        return { itemName: text.slice(3).trim(), targetName: "me" };
-      }
-      const giveMeNatural = text.match(/^(.+?)\s+(?:to\s+)?me$/);
-      if (giveMeNatural) return { itemName: giveMeNatural[1].trim(), targetName: "me" };
-      const giveMeMatch = text.match(/^(.+)\s+to\s+(me|you)$/);
-      if (giveMeMatch) return { itemName: giveMeMatch[1].trim(), targetName: giveMeMatch[2] };
-      const parts = text.split(/\s+(?:to|at|into)\s+/);
-      if (parts.length !== 2) return null;
-      return { itemName: parts[0].trim(), targetName: parts[1].trim() };
+      return this.social.parseGiveCommand(command);
     }
 
     resolveCharacterTarget(targetName) {
-      const name = this.normalizeCharacterAlias(targetName);
-      if (["me", "you"].includes(name) && this.commandIssuer) {
-        return this.peopleInRoom().find((p) => p.id === this.commandIssuer.id) || null;
-      }
-      return this.peopleInRoom().find((p) => p.id !== this.player.id && matches(p.name, name)) || null;
+      return this.social.resolveCharacterTarget(targetName);
     }
 
     findKnownCharacter(targetName) {
-      const name = this.normalizeCharacterAlias(targetName);
-      if (!name || ["me", "you"].includes(name)) return null;
-      return Object.values(this.characters).find((character) => character.id !== this.player.id && matches(character.name, name)) || null;
+      return this.social.findKnownCharacter(targetName);
     }
 
     lastConversationCharacter() {
-      return this.lastConversationCharacterId ? this.characters[this.lastConversationCharacterId] || null : null;
+      return this.social.lastConversationCharacter();
     }
 
     lastReferencedCharacter() {
-      return this.lastReferencedCharacterId ? this.characters[this.lastReferencedCharacterId] || null : null;
+      return this.social.lastReferencedCharacter();
     }
 
     rememberConversationCharacter(character) {
-      if (!character?.id) return;
-      this.lastConversationCharacterId = character.id;
+      return this.social.rememberConversationCharacter(character);
     }
 
     rememberReferencedCharacter(textOrCharacter) {
-      if (!textOrCharacter) return;
-      if (typeof textOrCharacter === "object" && textOrCharacter.id) {
-        if (textOrCharacter.id !== this.player.id) this.lastReferencedCharacterId = textOrCharacter.id;
-        return;
-      }
-      const text = normalize(textOrCharacter);
-      if (!text) return;
-      const candidates = Object.values(this.characters)
-        .filter((character) => character.id !== this.player.id)
-        .sort((a, b) => b.name.length - a.name.length);
-      const found = candidates.find((character) => matches(character.name, text) || wordInCommand(text, character.name));
-      if (found) this.lastReferencedCharacterId = found.id;
+      return this.social.rememberReferencedCharacter(textOrCharacter);
     }
 
     normalizeCharacterAlias(targetName) {
-      const name = normalize(targetName);
-      const aliases = {
-        smaug: "dragon",
-        elves: "wood elf",
-        elf: "wood elf",
-        dwarves: "thorin",
-        dwarf: "thorin",
-      };
-      return aliases[name] || name;
+      return this.social.normalizeCharacterAlias(targetName);
     }
 
     attack(command) {
@@ -6476,14 +7946,7 @@
     }
 
     gollumBlocksDirection(direction) {
-      if (this.currentRoom !== "deep_dark_lake" || direction !== "north") return "";
-      if (!this.gollumState?.met) return "";
-      if (!this.isGollumPresentInLake()) return "";
-      if (!this.gollumState.pocketQuestionAsked) {
-        return "Gollum crouches between you and the northern passage. You will have to get through the riddle-game first.";
-      }
-      if (this.player.noticeable === false) return "";
-      return "Gollum is waiting by the way north, clawing at the stones and hunting for his precious. You will need better concealment to slip past him.";
+      return this.encounters.gollumBlocksDirection(direction);
     }
 
     move(direction) {
@@ -7096,269 +8559,63 @@
     }
 
     endGame(message, options = {}) {
-      this.stopAutoplay();
-      this.clearArrivalNoticeTimers();
-      output.replaceChildren();
-      output.classList.add("end-screen");
-      this.endgame = true;
-      this.endgameRestartArmed = true;
-      this.pendingEndgameChoice = options.fatal ? "death" : null;
-      const totalRooms = Math.max(Object.keys(this.rooms).length, 1);
-      const percentage = (this.visitedRooms.size / totalRooms) * 100;
-      const endMessage = message ? `${message.replace(/[.!?]*$/, "")}. ` : "";
-      this.print(`${endMessage}You have mastered ${percentage.toFixed(2)}% of this adventure.`, "danger");
-      if (options.fatal && this.autosaveSnapshot) {
-        const roomText = this.autosaveMeta?.roomName ? ` at ${this.autosaveMeta.roomName.replace(/_/g, " ")}` : "";
-        this.print(`Type 'autosave' to continue from the last checkpoint${roomText}, or 'restart' to begin again.`, "system");
-      } else if (options.fatal) {
-        this.print("Type 'restart' to begin again.", "system");
-      } else {
-        this.print("Press any key or click to restart.", "system");
-      }
+      return this.flow.endGame(message, options);
     }
 
     winGame(message) {
-      this.stopAutoplay();
-      this.clearArrivalNoticeTimers();
-      output.replaceChildren();
-      output.classList.add("end-screen");
-      this.endgame = true;
-      this.endgameRestartArmed = true;
-      this.pendingEndgameChoice = null;
-      const totalRooms = Math.max(Object.keys(this.rooms).length, 1);
-      const percentage = (this.visitedRooms.size / totalRooms) * 100;
-      const endMessage = message ? `${message.replace(/[.!?]*$/, "")}. ` : "";
-      this.print(`${endMessage}You have mastered ${percentage.toFixed(2)}% of this adventure.`, "success");
-      this.print("Press any key or click to restart.", "system");
+      return this.flow.winGame(message);
     }
 
     restartGame() {
-      this.stopAutoplay();
-      this.clearArrivalNoticeTimers();
-      this.rooms = clone(this.data.rooms);
-      this.items = clone(this.data.items);
-      this.doors = clone(this.data.doors);
-      this.characters = clone(this.data.characters);
-      this.connections = this.normalizeConnections(clone(this.data.connections));
-      this.currentRoom = this.data.startRoom;
-      this.flags = {};
-      this.endgame = false;
-      this.endgameRestartArmed = false;
-      this.pendingEndgameChoice = null;
-      this.visitedTrollsClearing = false;
-      this.waitCounter = 0;
-      this.secretDoorWaitCounter = 0;
-      this.trollsTransformed = false;
-      this.trollsDefeated = false;
-      this.visitedRooms = new Set();
-      this.tipsEnabled = false;
-      this.tipIndex = 0;
-      this.autoplayDelay = 450;
-      this.autoplayMode = "normal";
-      this.autoplayWaits = 0;
-      this.autoplayTypingTimer = null;
-      this.autoplayCapturedText = "";
-      this.autoplayCapturingOutput = false;
-      this.pendingClarification = null;
-      this.forcedChoice = null;
-      this.clarifiedReferences = {};
-      this.commandIssuer = null;
-      this.lastConversationCharacterId = null;
-      this.lastReferencedCharacterId = null;
-      this.splitter = new CommandSplitter(this.data);
-      this.delegatedSplitters = new Map();
-      this.sharedDelegatedContext = { lastObject: null, lastDirectObject: null, lastTargetObject: null };
-      output.replaceChildren();
-      output.classList.remove("end-screen");
-      this.initState();
-      this.describeRoom(true);
-      input.value = "";
-      input.focus();
+      return this.flow.restartGame();
     }
 
     handleTimedSpecials() {
-      if (this.currentRoom !== "trolls_clearing" && this.visitedTrollsClearing && !this.trollsTransformed) {
-        this.waitCounter += 1;
-        if (this.waitCounter >= 3) {
-          this.print("Day dawns.");
-          this.transformTrolls();
-          this.waitCounter = 0;
-        }
-      }
-      if (this.currentRoom === "dark_dungeon") this.toggleDoorByName("red door", "Someone opens the red door.", "Someone closes the red door.");
-      if (this.currentRoom === "large_dry_cave") this.toggleDoorByName("small hidden crevice", "A small hidden crevice is revealed.", "The small hidden crevice disappears.");
-      if (["front_gate", "stoe_of_ravenhill", "little_steep_bay", "lonely_mountain"].includes(this.currentRoom) && !this.flags.secretdoorsun) {
-        this.secretDoorWaitCounter += 1;
-        if (this.secretDoorWaitCounter >= 1) {
-          this.flags.secretdoorsun = true;
-          this.print("The sun shines on the rock and reveals a secret door.");
-        }
-      }
-      if (this.flags.treasuretaken && this.currentRoom === "lonely_mountain" && this.liveDragon()) {
-        this.print("A shadow passes over the mountain. Smaug is searching for the thief.");
-      }
+      return this.hazards.handleTimedSpecials();
     }
 
     triggerSpiderEyesEncounter(previousRoom, currentRoom, direction) {
-      if (!this.flags.dragondefeated) return;
-      const trigger = this.spiderEyesTriggerFor(previousRoom, currentRoom, direction);
-      if (!trigger) return;
-      if (this.flags[this.spiderEyesResolvedFlag(currentRoom)]) return;
-      this.recordAutosave(`before the spider ambush near ${this.rooms[currentRoom]?.name?.replace(/_/g, " ") || currentRoom}`, {
-        key: `hazard:spider-eyes:${currentRoom}`,
-      });
-      this.spiderEyesState = {
-        active: true,
-        room: currentRoom,
-        waits: 0,
-        safeDirections: trigger.safeDirections,
-        safeDestination: trigger.safeDestination,
-      };
-      this.print("You see some pale bulbous eyes.");
+      return this.hazards.triggerSpiderEyesEncounter(previousRoom, currentRoom, direction);
     }
 
     handleSpiderEyesCommand(command) {
-      const state = this.spiderEyesState;
-      if (!state?.active || this.currentRoom !== state.room) return false;
-      const text = normalize(command);
-      if (text === "wait") return false;
-      const direction = this.isDirection(command)
-        ? this.normalizeDirection(command)
-        : command.startsWith("go ")
-          ? this.normalizeDirection(command.slice(3).trim())
-          : "";
-      if (state.waits === 2 && direction && (state.safeDirections || []).includes(direction)) {
-        this.flags[this.spiderEyesResolvedFlag(state.room)] = true;
-        const destination = state.safeDestination || null;
-        this.spiderEyesState = null;
-        if (destination) {
-          const previousRoom = this.currentRoom;
-          this.currentRoom = destination;
-          this.player.position = destination;
-          this.moveFollowers(previousRoom, destination, direction);
-          this.describeRoom();
-          this.checkSpecialSituations();
-          return true;
-        }
-        return false;
-      }
-      this.killBySpiderEyes();
-      return true;
+      return this.hazards.handleSpiderEyesCommand(command);
     }
 
     spiderEyesTriggerFor(previousRoom, currentRoom, direction) {
-      if (currentRoom === "forest_road_2" && ["waterfall", "forest", "running_river"].includes(previousRoom) && direction === "west") {
-        return { safeDirections: ["west"], safeDestination: null };
-      }
-      if (currentRoom === "forest_road" && previousRoom === "forest_road_2" && direction === "west") {
-        return { safeDirections: ["west"], safeDestination: "beorns_house" };
-      }
-      return null;
+      return this.hazards.spiderEyesTriggerFor(previousRoom, currentRoom, direction);
     }
 
     spiderEyesResolvedFlag(roomId) {
-      return `spidereyesresolved_${roomId}`;
+      return this.hazards.spiderEyesResolvedFlag(roomId);
     }
 
     killBySpiderEyes() {
-      this.endGame("Something stings. You are dead.", { fatal: true });
+      return this.hazards.killBySpiderEyes();
     }
 
     checkSpecialSituations() {
-      this.checkGollumEncounter();
-      this.checkKidnapping();
-      this.checkTrollsClearing();
+      return this.hazards.checkSpecialSituations();
     }
 
     checkGollumEncounter() {
-      if (this.currentRoom !== "deep_dark_lake") return;
-      if (!this.gollumState) this.gollumState = this.createGollumState();
-      const gollum = this.currentGollum();
-      if (!gollum || !gollum.visible) return;
-
-      if (!this.gollumState.met) {
-        this.recordAutosave("before meeting Gollum", { key: "hazard:gollum:room" });
-        this.gollumState.met = true;
-        gollum.friendly = "neutral";
-        if (this.ensureLakeRingInPocket()) {
-          this.print("Groping beside the water in the dark, your fingers close around a small cold ring. Almost without thinking, you slip it into your pocket.");
-        }
-        for (const line of this.gollumRevealLines()) this.print(line);
-        return;
-      }
-
-      if (this.gollumState.pocketQuestionAsked && this.player.noticeable !== false) {
-        this.print("Gollum prowls between you and the northern passage, sniffing for the ring.");
-      }
+      return this.hazards.checkGollumEncounter();
     }
 
     checkTrollsClearing() {
-      if (this.currentRoom !== "trolls_clearing") return;
-      if (!this.visitedTrollsClearing) {
-        this.recordAutosave("before facing the trolls", { key: "hazard:trolls:room" });
-        this.visitedTrollsClearing = true;
-        this.waitCounter = 0;
-        this.print("You crouch low behind a mossy boulder, heart pounding, as the trolls argue by the flickering campfire in the moonlit clearing.");
-        this.print("What shall us do with him?");
-        this.print("Roast him!");
-        this.print("He wouldn't make above a mouthful.");
-        this.print("P'raps there are more like him round about.");
-        return;
-      }
-      if (this.trollsTransformed) {
-        this.trollsDefeated = true;
-        this.print("You see the stone remains of the trolls.");
-        return;
-      }
-      const liveTroll = this.peopleInRoom().find((p) => ["hideous troll", "vicious troll"].includes(normalize(p.name)) && p.visible);
-      if (liveTroll && !this.trollsDefeated) {
-        this.print("The hideous troll eats you. You are dead.", "danger");
-        this.endGame("You are dead.", { fatal: true });
-      }
+      return this.hazards.checkTrollsClearing();
     }
 
     maybeAutosaveForRoom(roomId = this.currentRoom) {
-      const hazardMap = {
-        deep_dark_lake: { label: "before meeting Gollum", key: "hazard:gollum:room" },
-        trolls_clearing: { label: "before facing the trolls", key: "hazard:trolls:room" },
-        west_bank: { label: "before testing the fast river", key: "hazard:river:west-bank" },
-        cellar: { label: "before the barrel escape", key: "hazard:river:cellar" },
-        forest_road_2: { label: "before crossing the spider-haunted road", key: "hazard:spiders:forest-road-2" },
-        forest_road: { label: "before the second spider-haunted crossing", key: "hazard:spiders:forest-road" },
-      };
-      const hazard = hazardMap[roomId];
-      if (!hazard) return false;
-      return this.recordAutosave(hazard.label, { key: hazard.key });
+      return this.hazards.maybeAutosaveForRoom(roomId);
     }
 
     transformTrolls() {
-      if (this.trollsTransformed) return;
-      for (const character of Object.values(this.characters)) {
-        if (!["hideous troll", "vicious troll"].includes(normalize(character.name))) continue;
-        this.dropInventory(character);
-        character.visible = false;
-        character.position = "trolls_clearing";
-      }
-      this.trollsTransformed = true;
-      const room = this.rooms.trolls_clearing;
-      if (room?.transformedImage) room.image = room.transformedImage;
-      if (this.currentRoom === "trolls_clearing") this.print("You see the stone remains of the trolls.");
+      return this.hazards.transformTrolls();
     }
 
     checkKidnapping() {
-      const woodElf = Object.values(this.characters).find((p) => normalize(p.name) === "wood elf" && p.visible);
-      if (!woodElf || woodElf.position !== this.player.position) return;
-      if (this.player.wearingRing && this.player.noticeable === false) {
-        this.print("The wood elf cannot see you because you are wearing the ring.");
-        return;
-      }
-      const dungeon = this.rooms.dark_dungeon;
-      if (!dungeon) return;
-      this.print("The wood elf captures you");
-      this.player.position = "dark_dungeon";
-      this.currentRoom = "dark_dungeon";
-      woodElf.position = this.rooms.beorns_house ? "beorns_house" : woodElf.position;
-      this.describeRoom();
+      return this.hazards.checkKidnapping();
     }
 
     toggleDoorByName(name, openMessage, closeMessage) {
@@ -7379,319 +8636,83 @@
     }
 
     handleTalk(command) {
-      const parsed = this.parseTalkCommand(command);
-      if (!parsed) return this.print("You speak, but only silence meets your words.");
-      const character = this.resolveCharacterTarget(parsed.characterName);
-      if (!character) return this.print("You speak, but only silence meets your words.");
-      if (character.friendly === false) return this.respondToTalk(character);
-      if (this.player.name === "You" && this.player.noticeable === false) return this.print(`${character.name} says 'who's talking?'`);
-      if (this.unexpectedParty?.blocksDirectInteraction(character, parsed.order ? "order" : "talk")) return;
-      if (matches(character.name, "gollum") && parsed.order && this.handleGollumSpeech(parsed.order)) return;
-      if (parsed.order) {
-        this.rememberConversationCharacter(character);
-        this.rememberReferencedCharacter(parsed.order);
-        if (this.handleBardDragonCommand(character, parsed.order)) return;
-        this.delegateCharacterOrder(character, parsed.order);
-        return;
-      }
-      this.rememberConversationCharacter(character);
-      const special = this.specialTalkResponse(character);
-      if (special) return this.print(special);
-      this.print(`${character.name} listens intently, expecting your words.`);
+      return this.social.handleTalk(command);
     }
 
     parseTalkCommand(command) {
-      let text = normalize(command).replace(/^(say|talk|speak|whisper|yell)\s+/, "").trim();
-      text = text.replace(/^(to|with)\s+/, "").trim();
-      if (!text) return null;
-      const quoted = text.match(/^(.+?)\s+"(.+)"$/);
-      if (quoted) return { characterName: quoted[1].trim(), order: quoted[2].trim() };
-      const people = this.peopleInRoom()
-        .filter((character) => character.id !== this.player.id && character.visible)
-        .sort((a, b) => b.name.length - a.name.length);
-      for (const character of people) {
-        const name = normalize(character.name);
-        if (text === name) return { characterName: name, order: "" };
-        if (text.startsWith(`${name} `)) return { characterName: name, order: text.slice(name.length).trim().replace(/^to\s+/, "") };
-      }
-      return { characterName: text, order: "" };
+      return this.social.parseTalkCommand(command);
     }
 
     respondToTalk(character) {
-      if (matches(character.name, "gollum") && this.currentRoom === "deep_dark_lake") {
-        if (this.gollumState?.pocketQuestionAsked) return this.print("Gollum is no longer listening. He is hunting for his precious.");
-        const line = this.beginGollumRiddleContest() || "Gollum watches you in silence from the dark water.";
-        return this.print(line);
-      }
-      if (matches(character.name, "dragon")) {
-        const line = this.specialTalkResponse(character) || `${character.name} watches and waits.`;
-        return this.print(line);
-      }
-      this.print(`${character.name} glares at you, unimpressed.`);
+      return this.social.respondToTalk(character);
     }
 
     handleBardDragonCommand(character, command) {
-      if (!matches(character.name, "bard")) return false;
-      const text = normalizeWords(command);
-      if (/\bget\b/.test(text) && /\barrow\b/.test(text) && /\bquiver\b/.test(text)) {
-        const hasArrow = character.inventory.some((itemId) => matches(this.items[itemId]?.name, "arrow"));
-        if (hasArrow) this.flags.bardreadiedarrow = true;
-        this.print(hasArrow ? "Bard readies the strong arrow from his quiver." : "Bard searches his quiver, but finds no arrow.");
-        return true;
-      }
-      const dragon = Object.values(this.characters).find((candidate) => matches(candidate.name, "dragon"));
-      const liveDragonVisible = Boolean(dragon && dragon.visible !== false);
-      const asksToAttack = /\b(kill|attack|shoot|slay|fire)\b/.test(text)
-        || /\btake\b.*\bshot\b/.test(text)
-        || (/\bloose\b/.test(text) && /\barrow\b/.test(text));
-      const targetsDragon = /\bdragon\b/.test(text) || (liveDragonVisible && (/\btake\b.*\bshot\b/.test(text) || /\bloose\b/.test(text)));
-      if (!asksToAttack || !targetsDragon) return false;
-
-      const hasBow = character.inventory.some((itemId) => matches(this.items[itemId]?.name, "bow"));
-      const hasArrow = character.inventory.some((itemId) => matches(this.items[itemId]?.name, "arrow"));
-      if (!hasBow || !hasArrow) {
-        this.print("Bard checks his gear, but he lacks the bow and arrow needed to face the dragon.");
-        return true;
-      }
-
-      if (!dragon || dragon.visible === false) {
-        this.print("Bard says the dragon has already been slain.");
-        return true;
-      }
-
-      dragon.visible = false;
-      dragon.attackFlag = 0;
-      this.flags.dragondefeated = true;
-      this.print("Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky.");
-      return true;
+      return this.social.handleBardDragonCommand(character, command);
     }
 
     trySpecialAction(verb, objectText) {
-      const roomName = this.room().name;
-      const adverb = this.splitter.lastAdverb;
-      for (const action of this.data.specialActions) {
-        if (action.verb !== verb) continue;
-        if (action.location && action.location !== roomName) continue;
-        if (action.special_char && !matches(this.player.name, normalize(action.special_char))) continue;
-        if (!this.matchesSpecialActionObjects(action, objectText, adverb)) continue;
-        if (this.isPonyWindowAction(action) && this.flags.ponysequencecompleted) {
-          if (action.desc1) this.print(actorActionSentence(this.player, action.desc1));
-          this.print(this.flags.lanternon
-            ? "He peers through the window, but the stable stands empty now."
-            : "He peers through the window, his eyes narrowing, but it's too dark to see anything.");
-          return true;
-        }
-        if (this.isPonySequenceAction(action) && this.flags.ponysequencecompleted) continue;
-        const unavailable = this.specialActionUnavailable(action);
-        if (unavailable) {
-          this.print(unavailable);
-          return true;
-        }
-        if (!this.flagIn1Allowed(action.flag_in1)) continue;
-        if (!this.flagIn2Allowed(action.flag_in2)) {
-          const flagName = String(action.flag_in2 || "").replace("*", "");
-          if (flagName && this.flags[flagName]) {
-            const revealed = action.reveals ? this.findRevealedItem(action.reveals) : null;
-            if (revealed?.location?.type === "room" && revealed.location.id === this.currentRoom) {
-              if (action.desc2) this.print(action.desc2);
-            } else if (revealed?.location?.type === "character" && revealed.location.id === this.player.id) {
-              this.print(this.alreadyDidMessage(action));
-            } else {
-              this.print(this.alreadyDidMessage(action));
-            }
-            if (revealed) revealed.visible = true;
-            return true;
-          }
-          continue;
-        }
-        if (this.isLanternLightAction(action)) {
-          return this.igniteLantern(actorActionSentence(this.player, action.desc1));
-        }
-        if (String(action.destination || "").includes("endgame")) {
-          const roomLabel = this.room()?.name?.replace(/_/g, " ") || "this place";
-          this.recordAutosave(`before a dangerous action in ${roomLabel}`, {
-            key: `special:${this.currentRoom}:${action.verb}:${action.obj1 || ""}:${action.obj2 || ""}:${action.destination}`,
-          });
-        }
-        if (action.desc1) this.print(actorActionSentence(this.player, action.desc1));
-        if (action.desc2) this.print(action.desc2, action.destination?.includes("endgame") ? "danger" : "");
-        this.performSpecialActionTransfer(action);
-        if (action.flag_out) this.setFlag(action.flag_out.replace("*", ""), true);
-        if (action.reveals) this.reveal(action.reveals);
-        if (this.isPonySequenceAction(action)) {
-          this.flags.ponysequencecompleted = true;
-          this.flags.ponypassageopen = true;
-          if (this.items.calm_pony) this.items.calm_pony.visible = false;
-        }
-        if (action.destination) {
-          if (action.destination.includes("endgame")) {
-            this.endGame("The adventure ends.", { fatal: true });
-          } else if (this.roomByName(action.destination)) {
-            this.currentRoom = this.roomByName(action.destination).id;
-            this.player.position = this.currentRoom;
-            this.describeRoom();
-            this.maybeAutosaveForRoom(this.currentRoom);
-            this.checkSpecialSituations();
-          }
-        }
-        return Boolean(action.desc1 || action.desc2 || action.reveals || action.destination);
-      }
-      return false;
+      return this.specialActions.trySpecialAction(verb, objectText);
     }
 
     performSpecialActionTransfer(action) {
-      if (!["take", "steal"].includes(action.verb)) return false;
-      const targetName = String(action.obj1 || "").trim();
-      if (!targetName.startsWith("*")) return false;
-
-      const held = this.findVisibleCharacterHolding(targetName.replace(/^\*/, ""));
-      if (!held?.item || held.worn || !held.item.portable) return false;
-      if (held.item.weight > this.player.strength * 5) {
-        this.print(`The ${held.item.name} is too heavy to take.`);
-        return true;
-      }
-      if (!this.canCarryAdditionalWeight(held.item.weight || 0)) {
-        this.print(this.carryTooMuchMessage(held.item));
-        return true;
-      }
-
-      this.detachItem(held.item.id);
-      held.item.location = { type: "character", id: this.player.id };
-      this.player.inventory.push(held.item.id);
-      if (matches(held.item.name, "treasure")) this.flags.treasuretaken = true;
-      this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "take")} the ${held.item.name}.`);
-      return true;
+      return this.specialActions.performSpecialActionTransfer(action);
     }
 
     isPonySequenceAction(action) {
-      return action.location === "Green Dragon Inn Outside"
-        && action.verb === "climb"
-        && ["on", "onto"].includes(action.adverb)
-        && action.obj2 === "low branch"
-        && action.destination === "Dreary"
-        && action.flag_in1 === "seenpony";
+      return this.specialActions.isPonySequenceAction(action);
     }
 
     isPonyWindowAction(action) {
-      return action.location === "Green Dragon Inn"
-        && action.verb === "look"
-        && action.special_char === "Thorin"
-        && action.obj2 === "window";
+      return this.specialActions.isPonyWindowAction(action);
     }
 
     isLanternLightAction(action) {
-      return action.verb === "light"
-        && matches(action.obj1 || "", "brass lantern")
-        && matches(action.obj2 || "", "firestone");
+      return this.specialActions.isLanternLightAction(action);
     }
 
     matchesSpecialActionObjects(action, objectText, adverb) {
-      const text = normalizeWords(objectText);
-      const requiredAdverb = String(action.adverb || "").trim();
-      if (this.currentRoom === "trolls_cave" && action.reveals === "arcane chest") {
-        const obj1Matches = !action.obj1 || commandObjectMatches(text, action.obj1);
-        if (!obj1Matches) return false;
-        if (this.hasActiveLantern()) return true;
-        return requiredAdverb === adverb || wordInCommand(text, requiredAdverb);
-      }
-      const adverbMatches = !requiredAdverb || requiredAdverb === adverb || wordInCommand(text, requiredAdverb);
-      const obj1Matches = !action.obj1 || commandObjectMatches(text, action.obj1);
-      let obj2Matches = !action.obj2 || commandObjectMatches(text, action.obj2);
-
-      if (!obj2Matches && requiredAdverb === "with") {
-        obj2Matches = this.hasInventoryMatch(action.obj2);
-      }
-
-      if (!obj1Matches || !obj2Matches) return false;
-      if (adverbMatches) return true;
-
-      const mentionedPrimary = action.obj1 && commandObjectMatches(text, action.obj1);
-      const mentionedSecondary = action.obj2 && commandObjectMatches(text, action.obj2);
-      return Boolean(mentionedPrimary || mentionedSecondary);
+      return this.specialActions.matchesSpecialActionObjects(action, objectText, adverb);
     }
 
     hasInventoryMatch(name) {
-      const query = normalize(String(name || "").replace("*", ""));
-      if (!query) return false;
-      return this.player.inventory.some((itemId) => matches(this.items[itemId]?.name, query));
+      return this.specialActions.hasInventoryMatch(name);
     }
 
     specialActionUnavailable(action) {
-      const canUseVisiblePortable = new Set(["climb", "jump", "swim"]);
-      for (const objectName of [action.obj1, action.obj2].filter(Boolean)) {
-        if (String(objectName).includes("*")) continue;
-        const query = normalize(String(objectName).replace("*", ""));
-        const inventoryItem = this.player.inventory.map((id) => this.items[id]).find((item) => matches(item?.name, query));
-        if (inventoryItem) continue;
-        const roomItem = this.visibleSearch(query, { includeInventory: false })?.item;
-        if (roomItem && canUseVisiblePortable.has(action.verb)) continue;
-        if (roomItem?.portable) return `${actorSubject(this.player, true)} ${actorVerb(this.player, "do")} not have the ${roomItem.name}.`;
-        if (roomItem) continue;
-        if (this.findDoor(query)) continue;
-        const heldMessage = this.heldItemMessage(query);
-        if (heldMessage) return heldMessage;
-        const knownPortable = Object.values(this.items).find((item) => item.portable && matches(item.name, query));
-        if (knownPortable) return `${actorSubject(this.player, true)} ${actorVerb(this.player, "do")} not have the ${knownPortable.name}.`;
-        return "I do not see that here.";
-      }
-      return "";
+      return this.specialActions.specialActionUnavailable(action);
     }
 
     revealFromSpecial(verb, objectName) {
-      for (const action of this.data.specialActions) {
-        if (action.verb === verb && action.location === this.room().name && action.reveals && objectName.includes((action.obj1 || action.obj2 || "").replace("*", ""))) {
-          this.reveal(action.reveals);
-        }
-      }
+      return this.specialActions.revealFromSpecial(verb, objectName);
     }
 
     reveal(name) {
-      const room = this.roomByName(name);
-      if (room) return;
-      const item = this.findRevealedItem(name);
-      if (item) item.visible = true;
+      return this.specialActions.reveal(name);
     }
 
     findRevealedItem(name) {
-      return Object.values(this.items).find((candidate) => matches(candidate.name, normalize(name))) || null;
+      return this.specialActions.findRevealedItem(name);
     }
 
     alreadyDidMessage(action) {
-      const target = action.obj1 || action.obj2;
-      const verb = pastTense(action.verb);
-      return target ? actorizeSecondPerson(this.player, `You have already ${verb} the ${target.replace("*", "")}.`) : "That has already been done.";
+      return this.specialActions.alreadyDidMessage(action);
     }
 
     flagIn1Allowed(flag) {
-      if (!flag) return true;
-      const inverted = String(flag).startsWith("*");
-      const name = String(flag).replace("*", "");
-      const value = this.getFlag(name);
-      return inverted ? !value : value;
+      return this.specialActions.flagIn1Allowed(flag);
     }
 
     flagIn2Allowed(flag) {
-      if (!flag) return true;
-      const inverted = String(flag).startsWith("*");
-      const name = String(flag).replace("*", "");
-      const value = this.getFlag(name);
-      return inverted ? value : !value;
+      return this.specialActions.flagIn2Allowed(flag);
     }
 
     getFlag(name) {
-      const normalizedName = String(name || "").replace("*", "");
-      const builtIns = {
-        trolls_transformed: this.trollsTransformed,
-        trolls_defeated: this.trollsDefeated,
-        visited_trolls_clearing: this.visitedTrollsClearing,
-      };
-      if (Object.prototype.hasOwnProperty.call(builtIns, normalizedName)) return Boolean(builtIns[normalizedName]);
-      return Boolean(this.flags[normalizedName]);
+      return this.specialActions.getFlag(name);
     }
 
     setFlag(name, value) {
-      this.flags[name] = value;
-      if (name.endsWith("open")) this.flags[name.replace(/open$/, "closed")] = !value;
+      return this.specialActions.setFlag(name, value);
     }
 
     lanternTurnsRemaining() {
