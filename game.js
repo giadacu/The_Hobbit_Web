@@ -705,6 +705,17 @@
     {
       roomIds: ["trolls_clearing"],
       when: ({ game }) => game.trollsTransformed,
+      text: ({ game }) => (
+        game.items.the_large_key?.visible
+        && game.items.the_large_key?.location?.type === "room"
+        && game.items.the_large_key?.location?.id === "trolls_clearing"
+      )
+        ? "Near the feet of one stone troll lies a large key, dropped in the last confusion before dawn."
+        : "",
+    },
+    {
+      roomIds: ["trolls_clearing"],
+      when: ({ game }) => game.trollsTransformed,
       text: "Morning has reduced menace to silence; the stone trolls keep their quarrel forever without coming any nearer.",
     },
     {
@@ -3573,11 +3584,7 @@
         const { door } = doorFound;
         if (door.open) return game.print(`The ${door.name} is already open.`);
         if (matches(door.name, "secret door") && !game.flags.secretdoorsun) return game.print("The rock face shows no door yet.");
-        if (door.locked) {
-          const key = this.keyFor(door);
-          if (!key) return game.print(`The ${door.name} is locked.`);
-          door.locked = false;
-        }
+        if (door.locked) return game.print(`The ${door.name} is locked.`);
         door.open = true;
         game.setFlag(`${compact(door.name)}open`, true);
         return game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "open")} the ${door.name}.`);
@@ -4334,7 +4341,7 @@
       this.renderSceneMap();
       const visibleConnections = game.roomConnections();
       fillList(inventoryList, game.player.inventory.map((id) => game.inventorySidebarLabel(game.items[id])).filter(Boolean), "nothing");
-      if (inventoryStatus) inventoryStatus.textContent = `Weight ${game.currentCarryWeight()}/${game.carryCapacity()}`;
+      if (inventoryStatus) inventoryStatus.textContent = game.carryLoadStatusText();
       fillList(exitsList, visibleConnections.map((c) => c.direction), "none");
       fillList(peopleList, game.visiblePeopleInRoom().filter((p) => p.name !== "You" && p.visible).map((p) => p.name), "none");
       this.renderSceneCompass(visibleConnections);
@@ -4741,6 +4748,7 @@
       game.player = game.characters[game.data.player];
       game.normalizeCharacterMovementModes();
       game.normalizeLanternState();
+      game.ensureTrollKeyRecovered();
       game.addZXFinaleState();
       game.unexpectedParty?.load(save.unexpectedParty || null);
       game.companionDirector?.sync();
@@ -5206,6 +5214,21 @@
       this.game = game;
     }
 
+    advanceOffscreenTurnTimers() {
+      const game = this.game;
+      if (game.currentRoom !== "trolls_clearing"
+        && game.visitedTrollsClearing
+        && !game.trollsTransformed
+        && game.flags.trollkeytaken) {
+        game.waitCounter += 1;
+        if (game.waitCounter >= 3) {
+          game.print("Day dawns.");
+          this.transformTrolls();
+          game.waitCounter = 0;
+        }
+      }
+    }
+
     handleTimedSpecials() {
       const game = this.game;
       if (game.currentRoom !== "trolls_clearing" && game.visitedTrollsClearing && !game.trollsTransformed) {
@@ -5330,6 +5353,7 @@
       const game = this.game;
       if (game.currentRoom !== "trolls_clearing") return;
       if (game.trollsTransformed) {
+        game.ensureTrollKeyRecovered();
         game.visitedTrollsClearing = true;
         game.trollsDefeated = true;
         game.print("You see the stone remains of the trolls.");
@@ -5379,6 +5403,8 @@
         character.position = "trolls_clearing";
       }
       game.trollsTransformed = true;
+      game.flags.trollkeytaken = false;
+      game.ensureTrollKeyRecovered();
       const room = game.rooms.trolls_clearing;
       if (room?.transformedImage) room.image = room.transformedImage;
       if (game.currentRoom === "trolls_clearing") game.print("You see the stone remains of the trolls.");
@@ -6207,6 +6233,7 @@
         if (action.desc1) game.print(actorActionSentence(game.player, action.desc1));
         if (action.desc2 && !actionEndsGame) game.print(action.desc2);
         this.performSpecialActionTransfer(action);
+        this.applySpecialActionAftereffects(action);
         if (action.flag_out) this.setFlag(action.flag_out.replace("*", ""), true);
         if (action.reveals) this.reveal(action.reveals);
         if (this.isPonySequenceAction(action)) {
@@ -6251,6 +6278,22 @@
       if (matches(held.item.name, "treasure")) game.flags.treasuretaken = true;
       game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "take")} the ${held.item.name}.`);
       return true;
+    }
+
+    applySpecialActionAftereffects(action) {
+      const game = this.game;
+      const targetName = normalize(String(action.obj1 || "").replace(/^\*/, ""));
+      const adverb = normalize(String(game.splitter.lastAdverb || ""));
+      const carefulLargeKeyTheft = ["take", "steal"].includes(action.verb)
+        && targetName === "large key"
+        && game.currentRoom === "trolls_clearing"
+        && ["carefully", "slowly"].includes(adverb)
+        && !game.trollsTransformed;
+      if (!carefulLargeKeyTheft) return;
+      game.flags.trollkeytaken = true;
+      for (const character of game.peopleInRoom()) {
+        if (["hideous troll", "vicious troll"].includes(normalize(character.name))) character.attackFlag = 0;
+      }
     }
 
     isPonySequenceAction(action) {
@@ -6446,6 +6489,7 @@
       this.idleWaitMs = IDLE_WAIT_MS;
       this.outputScrollFrame = null;
       this.outputScrollTarget = 0;
+      this.pendingInitialCommandFocus = true;
       this.currentImageSrc = roomImage.getAttribute("src") || "";
       this.imageTransitionCycle = 0;
       this.audio = musicPlayer;
@@ -6461,7 +6505,7 @@
       this.bind();
       this.describeRoom(true);
       this.scheduleIdleAdvance();
-      this.focusCommandInput({ defer: true });
+      this.scheduleInitialCommandFocus();
     }
 
     initState() {
@@ -6700,6 +6744,7 @@
         });
         layoutSwitch.addEventListener("focusout", () => this.scheduleLayoutSwitchHide(900));
         input?.addEventListener("focus", () => {
+          this.pendingInitialCommandFocus = false;
           this.hideLayoutSwitch();
           this.scheduleIdleAdvance();
         });
@@ -6717,23 +6762,48 @@
         layoutDivider.addEventListener("mouseleave", () => this.scheduleLayoutSwitchHide(900));
       }
       if (typeof window.addEventListener === "function") {
+        window.addEventListener("focus", () => {
+          if (this.pendingInitialCommandFocus) this.scheduleInitialCommandFocus();
+        });
+        window.addEventListener("pageshow", () => {
+          if (this.pendingInitialCommandFocus) this.scheduleInitialCommandFocus();
+        });
         window.addEventListener("resize", () => this.applyLayout2SceneWidth(this.layout2SceneWidth, { persist: false }));
       }
     }
 
     focusCommandInput(options = {}) {
-      const { defer = false } = options;
+      const { defer = false, force = false } = options;
       const applyFocus = () => {
         if (!input) return;
         const activeElement = document.activeElement;
-        if (activeElement && activeElement !== document.body && activeElement !== input) return;
+        if (!force && activeElement && activeElement !== document.body && activeElement !== input) return;
         input.focus({ preventScroll: true });
+        if (document.activeElement === input) this.pendingInitialCommandFocus = false;
       };
       if (defer && typeof window.requestAnimationFrame === "function") {
         window.requestAnimationFrame(applyFocus);
         return;
       }
       applyFocus();
+    }
+
+    scheduleInitialCommandFocus() {
+      if (!input || !this.pendingInitialCommandFocus) return;
+      const attemptFocus = (attempt = 0) => {
+        if (!this.pendingInitialCommandFocus) return;
+        this.focusCommandInput({ force: true });
+        if (document.activeElement === input) return;
+        if (attempt >= 5) return;
+        window.setTimeout(() => {
+          if (typeof window.requestAnimationFrame === "function") {
+            window.requestAnimationFrame(() => attemptFocus(attempt + 1));
+            return;
+          }
+          attemptFocus(attempt + 1);
+        }, 80 * (attempt + 1));
+      };
+      attemptFocus();
     }
 
     cancelOutputScrollAnimation(options = {}) {
@@ -7133,6 +7203,7 @@
       this.companionDirector?.sync();
       const room = this.room();
       if (!room) return;
+      if (this.currentRoom === "trolls_clearing" && this.trollsTransformed) this.ensureTrollKeyRecovered();
       const wasVisited = this.visitedRooms.has(this.currentRoom);
       this.visitedRooms.add(this.currentRoom);
       this.revealLanternDiscoveries({ silent: true });
@@ -7153,7 +7224,7 @@
         .filter((c) => c.door && this.doors[c.door])
         .map((c) => `${this.directionLead(c.direction)} there is the ${this.doors[c.door].name}. The ${this.doors[c.door].name} is ${this.doors[c.door].open ? "open" : "closed"}.`)
         .join(" ");
-      const objects = this.itemsInRoom(this.currentRoom).filter((item) => item.visible && item.listed !== false);
+      const objects = this.itemsInRoom(this.currentRoom).filter((item) => item.visible && this.shouldListRoomItem(item));
       const objectText = objects.length ? `You see: ${objects.map((item) => this.describeItemShort(item)).join(", ")}.` : "";
       const people = this.visiblePeopleInRoom().filter((p) => p.name !== "You" && p.visible);
       const arrivingPeople = people.filter((p) => p.justEntered);
@@ -7184,6 +7255,12 @@
       if (!trimmed) return "";
       const match = trimmed.match(/^.*?[.?!](?=\s|$)/);
       return match ? match[0].trim() : trimmed;
+    }
+
+    shouldListRoomItem(item, roomId = this.currentRoom) {
+      if (!item || item.listed === false) return false;
+      if (roomId === "trolls_clearing" && this.trollsTransformed && item.id === "the_large_key") return false;
+      return true;
     }
 
     directionLead(direction = "") {
@@ -7733,12 +7810,12 @@
 
     inventory() {
       const carriedCharacters = Object.values(this.characters).filter((character) => character.carriedBy === this.player.id);
-      const weightText = ` Carry weight: ${this.currentCarryWeight()}/${this.carryCapacity()}.`;
-      if (!this.player.inventory.length && !carriedCharacters.length) return this.print(actorizeSecondPerson(this.player, `You are carrying: nothing.${weightText}`));
+      const loadText = ` ${this.carryLoadSummary()}`;
+      if (!this.player.inventory.length && !carriedCharacters.length) return this.print(actorizeSecondPerson(this.player, `You are carrying: nothing.${loadText}`));
       const items = this.player.inventory.map((id) => this.inventoryItemLabel(this.items[id]));
       const companionsText = carriedCharacters.length ? ` With you: ${carriedCharacters.map((character) => character.name).join(", ")}.` : "";
       const worn = this.player.worn?.length ? ` You are wearing: ${this.player.worn.map((id) => this.inventoryItemLabel(this.items[id])).join(", ")}.` : "";
-      this.print(actorizeSecondPerson(this.player, `You are carrying: ${items.join(", ")}.${companionsText}${worn}${weightText}`));
+      this.print(actorizeSecondPerson(this.player, `You are carrying: ${items.join(", ")}.${companionsText}${worn}${loadText}`));
     }
 
     wait() {
@@ -9174,6 +9251,7 @@
       this.turnCount += 1;
       this.updateRingTimers();
       this.updateLanternTimer();
+      if (!forceMove) this.advanceOffscreenTurnTimers();
       for (const character of this.peopleInRoom()) {
         if (character.id !== this.player.id) character.attackFlag = (character.attackFlag || 0) + 1;
       }
@@ -9570,6 +9648,30 @@
       character.noticeable = true;
     }
 
+    ensureTrollKeyRecovered() {
+      if (!this.trollsTransformed) return;
+      const key = this.items.the_large_key;
+      if (!key) return;
+      if (this.player?.inventory?.includes(key.id)) {
+        key.visible = true;
+        key.worn = false;
+        return;
+      }
+      if (key.location?.type === "room" && key.location.id === "trolls_clearing") {
+        key.visible = true;
+        key.worn = false;
+        return;
+      }
+      const holder = key.location?.type === "character" ? this.characters[key.location.id] : null;
+      const heldByTroll = holder && ["hideous troll", "vicious troll"].includes(normalize(holder.name));
+      if (!key.location || heldByTroll) {
+        this.detachItem(key.id);
+        key.worn = false;
+        key.visible = true;
+        key.location = { type: "room", id: "trolls_clearing" };
+      }
+    }
+
     endGame(message, options = {}) {
       return this.flow.endGame(message, options);
     }
@@ -9584,6 +9686,10 @@
 
     handleTimedSpecials() {
       return this.hazards.handleTimedSpecials();
+    }
+
+    advanceOffscreenTurnTimers() {
+      return this.hazards.advanceOffscreenTurnTimers();
     }
 
     triggerSpiderEyesEncounter(previousRoom, currentRoom, direction) {
@@ -9815,6 +9921,41 @@
       return baseCapacity + (character?.id === this.data.player ? PLAYER_CARRY_BONUS : 0);
     }
 
+    carryLoadTier(character = this.player) {
+      const capacity = Math.max(this.carryCapacity(character), 1);
+      const ratio = this.currentCarryWeight(character) / capacity;
+      if (ratio <= 0) return "unburdened";
+      if (ratio < 0.2) return "light";
+      if (ratio < 0.45) return "manageable";
+      if (ratio < 0.7) return "noticeable";
+      if (ratio < 0.9) return "heavy";
+      return "near_limit";
+    }
+
+    carryLoadSummary(character = this.player) {
+      switch (this.carryLoadTier(character)) {
+        case "unburdened": return "Overall it is no burden at all.";
+        case "light": return "Overall it is a light load.";
+        case "manageable": return "Overall it is a manageable load.";
+        case "noticeable": return "Overall it is a noticeable load.";
+        case "heavy": return "Overall it is a heavy load.";
+        case "near_limit": return "Overall it is nearly too much to carry comfortably.";
+        default: return "Overall it is a manageable load.";
+      }
+    }
+
+    carryLoadStatusText(character = this.player) {
+      switch (this.carryLoadTier(character)) {
+        case "unburdened": return "Unburdened";
+        case "light": return "Light load";
+        case "manageable": return "Manageable load";
+        case "noticeable": return "Noticeable load";
+        case "heavy": return "Heavy load";
+        case "near_limit": return "Near carrying limit";
+        default: return "Manageable load";
+      }
+    }
+
     canCarryAdditionalWeight(weight, { character = this.player, removedWeight = 0 } = {}) {
       const nextWeight = this.currentCarryWeight(character) - removedWeight + (weight || 0);
       return nextWeight <= this.carryCapacity(character);
@@ -9827,14 +9968,18 @@
 
     inventoryItemLabel(item) {
       if (!item) return "";
-      return `${this.describeItemShort(item)} (${item.weight || 0})`;
+      return this.inlineListLabel(this.describeItemShort(item));
     }
 
     inventorySidebarLabel(item) {
       if (!item) return "";
       const flags = this.itemStateFlags(item);
       const state = flags.length ? ` [${flags.join(", ")}]` : "";
-      return `${item.name}${state} (${item.weight || 0})`;
+      return `${item.name}${state}`;
+    }
+
+    inlineListLabel(text = "") {
+      return String(text || "").trim().replace(/[.?!]+$/, "");
     }
 
     itemStateFlags(item) {
@@ -10686,6 +10831,7 @@
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         document.body.classList.remove("booting");
+        window.hobbitGame?.scheduleInitialCommandFocus?.();
         window.hobbitGame?.refreshLayout?.();
         requestAnimationFrame(() => window.hobbitGame?.refreshLayout?.());
       });

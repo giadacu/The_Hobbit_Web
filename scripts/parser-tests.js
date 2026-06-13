@@ -1015,13 +1015,15 @@ const gameCases = [
     inputs: ["ask gandalf to location", "ask gandalf to inventory", "ask gandalf to smell air"],
     expectedIncluded: [
       "Gandalf is now in Hobbit Hole.",
-      "Gandalf is carrying: a map with strange markings (5). Carry weight: 5/35.",
+      "Gandalf is carrying: a map with strange markings. Overall it is a light load.",
       "Gandalf smells the air, but notices nothing useful.",
     ],
     notExpectedIncluded: [
       "You are now in Hobbit Hole.",
-      "You are carrying: a map with strange markings (5). Carry weight: 5/35.",
+      "You are carrying: a map with strange markings. Overall it is a light load.",
       "You smell the air, but notice nothing useful.",
+      "Carry weight:",
+      /\(\d+\)/,
     ],
   },
   {
@@ -1656,6 +1658,45 @@ const gameCases = [
     notExpectedIncluded: ["I don't see that here."],
   },
   {
+    name: "returning to petrified trolls recovers large key from stale state",
+    setup(game) {
+      game.currentRoom = "trolls_clearing";
+      game.player.position = "trolls_clearing";
+      game.trollsTransformed = true;
+      game.trollsDefeated = true;
+      game.visitedTrollsClearing = true;
+      game.characters.hideous_troll.visible = false;
+      game.characters.vicious_troll.visible = false;
+      game.items.the_large_key.location = { type: "character", id: "hideous_troll" };
+      game.characters.hideous_troll.inventory = ["the_large_key"];
+    },
+    inputs: ["look", "take large key"],
+    expectedIncluded: [
+      "Near the feet of one stone troll lies a large key, dropped in the last confusion before dawn.",
+      "You take the large key.",
+    ],
+    notExpectedIncluded: ["I don't see that here."],
+  },
+  {
+    name: "troll key narrative disappears after taking the key",
+    setup(game) {
+      game.currentRoom = "trolls_clearing";
+      game.player.position = "trolls_clearing";
+      game.transformTrolls();
+    },
+    drive(game) {
+      game.execute("look");
+      game.execute("take large key");
+      game.execute("look");
+      const keyHintCount = outputLines.filter((line) => line.includes("Near the feet of one stone troll lies a large key")).length;
+      game.print(`Troll key hint count: ${keyHintCount}`);
+    },
+    expectedIncluded: [
+      "You take the large key.",
+      "Troll key hint count: 1",
+    ],
+  },
+  {
     name: "carefully taking large key works while trolls are alive",
     setup(game) {
       game.currentRoom = "trolls_clearing";
@@ -1676,6 +1717,27 @@ const gameCases = [
     notExpectedIncluded: ["The hideous troll eats you. You are dead."],
   },
   {
+    name: "carefully stealing large key alone does not trigger immediate troll death",
+    setup(game) {
+      game.currentRoom = "trolls_clearing";
+      game.player.position = "trolls_clearing";
+      game.visitedTrollsClearing = true;
+    },
+    drive(game) {
+      game.execute("carefully steal key");
+      if (!game.player.inventory.includes("the_large_key")) throw new Error("Expected player to steal the large key.");
+      if (game.endgame) throw new Error("Expected the careful theft to avoid immediate death.");
+    },
+    expectedIncluded: [
+      "You carefully approach the troll, eyes fixed on the gleaming key.",
+      "You take the large key.",
+    ],
+    notExpectedIncluded: [
+      "Hideous troll attacks you.",
+      "lays you low.",
+    ],
+  },
+  {
     name: "player can carry sword and rope together",
     setup(game) {
       game.player.strength = 5;
@@ -1692,7 +1754,28 @@ const gameCases = [
     expectedIncluded: [
       "You take the majestic sword.",
       "You take the sturdy rope.",
-      "You are carrying: a majestic sword, ancient and luminous (12), a sturdy rope (8). Carry weight: 20/52.",
+      "You are carrying: a majestic sword, ancient and luminous, a sturdy rope. Overall it is a manageable load.",
+    ],
+    notExpectedIncluded: [
+      "Carry weight:",
+      /\(\d+\)/,
+    ],
+  },
+  {
+    name: "inventory list strips trailing punctuation from item descriptions",
+    setup(game) {
+      game.player.inventory = ["curious_map", "curious_key", "smoking_pipe", "brass_lantern", "the_large_key"];
+      game.player.worn = [];
+      for (const itemId of game.player.inventory) {
+        game.items[itemId].location = { type: "character", id: game.player.id };
+      }
+    },
+    inputs: ["inventory"],
+    expectedIncluded: [
+      "You are carrying: a map with strange markings, a curious key with a strange shape, a curved wooden pipe with a long stem and bowl, a brass lantern with metal handle, wick, and oil, a large key.",
+    ],
+    notExpectedIncluded: [
+      "oil., a large key",
     ],
   },
   {
@@ -2041,6 +2124,41 @@ const gameCases = [
     ],
   },
   {
+    name: "ordinary turns do not advance troll dawn unless the key was stolen",
+    drive(game) {
+      game.execute("jump trolls");
+      game.execute("south east");
+      game.execute("look");
+      game.execute("inventory");
+      game.execute("exits");
+      game.print(`Trolls transformed after ordinary turns without theft: ${game.trollsTransformed ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Jumped to Trolls Clearing.",
+      "Trolls transformed after ordinary turns without theft: no",
+    ],
+    notExpectedIncluded: [
+      "Day dawns.",
+    ],
+  },
+  {
+    name: "ordinary turns advance troll dawn after stealing the key and leaving",
+    drive(game) {
+      game.execute("jump trolls");
+      game.execute("carefully take large key and south west");
+      game.execute("look");
+      game.execute("inventory");
+      game.execute("exits");
+      game.print(`Trolls transformed after ordinary turns with theft: ${game.trollsTransformed ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Jumped to Trolls Clearing.",
+      "You take the large key.",
+      "Day dawns.",
+      "Trolls transformed after ordinary turns with theft: yes",
+    ],
+  },
+  {
     name: "jump trolls starts at the opening troll argument",
     drive(game) {
       game.execute("jump trolls");
@@ -2283,6 +2401,23 @@ const gameCases = [
     ],
     notExpectedIncluded: [
       "You unlock the shed with the sturdy key.",
+    ],
+  },
+  {
+    name: "locked heavy rock door requires explicit unlock before opening",
+    setup(game) {
+      game.currentRoom = "hidden_path";
+      game.player.position = "hidden_path";
+      if (!game.player.inventory.includes("the_large_key")) game.player.inventory.push("the_large_key");
+      game.items.the_large_key.location = { type: "character", id: game.player.id };
+      game.doors.porta_hidden_path_trolls_cave.open = false;
+      game.doors.porta_hidden_path_trolls_cave.locked = true;
+    },
+    inputs: ["open door", "unlock door with large key", "open door"],
+    expectedIncluded: [
+      "The heavy rock door is locked.",
+      "You unlock the heavy rock door with the large key.",
+      "You open the heavy rock door.",
     ],
   },
   {
