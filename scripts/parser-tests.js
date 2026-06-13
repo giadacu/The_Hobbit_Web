@@ -963,12 +963,12 @@ const gameCases = [
   {
     name: "go outside alias uses visible exit",
     inputs: ["open the door", "go outside", "location"],
-    expectedIncluded: ["You are currently in Bilbos garden."],
+    expectedIncluded: ["You are now in Bilbos Garden."],
   },
   {
     name: "go back inside alias returns indoors",
     inputs: ["open the door", "go outside", "go back inside", "location"],
-    expectedIncluded: ["You are currently in Hobbit hole."],
+    expectedIncluded: ["You are now in Hobbit Hole."],
   },
   {
     name: "delegated special action keeps npc subject",
@@ -999,14 +999,39 @@ const gameCases = [
     },
     inputs: ["ask gandalf to location", "ask gandalf to inventory", "ask gandalf to smell air"],
     expectedIncluded: [
-      "Gandalf is currently in Hobbit hole.",
+      "Gandalf is now in Hobbit Hole.",
       "Gandalf is carrying: a map with strange markings (5). Carry weight: 5/35.",
       "Gandalf smells the air, but notices nothing useful.",
     ],
     notExpectedIncluded: [
-      "You are currently in Hobbit hole.",
+      "You are now in Hobbit Hole.",
       "You are carrying: a map with strange markings (5). Carry weight: 5/35.",
       "You smell the air, but notice nothing useful.",
+    ],
+  },
+  {
+    name: "go to visited room uses narrative travel text",
+    drive(game) {
+      game.currentRoom = "bag_end_guest_room";
+      game.player.position = "bag_end_guest_room";
+      game.visitedRooms.add("bag_end_pantry");
+      game.execute("go to pantry");
+      game.execute("location");
+    },
+    expectedIncluded: [
+      "The road to Pantry is known to you, and before long you arrive there again.",
+      "You are now in Pantry.",
+    ],
+  },
+  {
+    name: "go to unvisited room uses cleaned room name",
+    inputs: ["go to guest room"],
+    expectedIncluded: [
+      "You have not yet been to Guest Room, so you cannot go there directly.",
+    ],
+    notExpectedIncluded: [
+      "bag_end_guest_room",
+      "Guest_room",
     ],
   },
   {
@@ -1217,7 +1242,7 @@ const gameCases = [
       game.execute("east");
       game.execute("location");
     },
-    expectedIncluded: ["You are currently in Green Dragon Inn Outside."],
+    expectedIncluded: ["You are now in Green Dragon Inn Outside."],
     notExpectedIncluded: ['Gandalf lifts a hand. "Not yet, Bilbo. There is more company yet to come."'],
   },
   {
@@ -1651,13 +1676,24 @@ const gameCases = [
       game.execute("open drawer");
       game.execute("top");
       game.execute("examine drawer");
-      const clarificationCount = outputLines.filter((line) => line.includes("Do you mean the top drawer, the middle drawer, or the bottom drawer?")).length;
+      const clarificationCount = outputLines.filter((line) => line.includes("Do you mean") && line.includes("drawer")).length;
       game.print(`Drawer clarification count: ${clarificationCount}`);
     },
     expectedIncluded: [
       "You open the top drawer.",
       "You see the top drawer; inside there is: a neatly folded linen sheet.",
       "Drawer clarification count: 1",
+    ],
+  },
+  {
+    name: "hall little drawer participates in drawer clarification",
+    drive(game) {
+      game.execute("open drawer");
+      game.execute("discreet little drawer");
+    },
+    expectedIncluded: [
+      "Do you mean the top drawer, the middle drawer, the bottom drawer, or the discreet little drawer?",
+      "You open the discreet little drawer.",
     ],
   },
   {
@@ -1686,7 +1722,7 @@ const gameCases = [
       game.execute("inventory");
       game.execute("wait");
       game.execute("examine drawer");
-      const clarificationCount = outputLines.filter((line) => line.includes("Do you mean the top drawer, the middle drawer, or the bottom drawer?")).length;
+      const clarificationCount = outputLines.filter((line) => line.includes("Do you mean") && line.includes("drawer")).length;
       game.print(`Drawer clarification count after expiry: ${clarificationCount}`);
     },
     expectedIncluded: [
@@ -1702,7 +1738,7 @@ const gameCases = [
       game.execute("look");
       game.execute("inventory");
       game.execute("close drawer");
-      const clarificationCount = outputLines.filter((line) => line.includes("Do you mean the top drawer, the middle drawer, or the bottom drawer?")).length;
+      const clarificationCount = outputLines.filter((line) => line.includes("Do you mean") && line.includes("drawer")).length;
       game.print(`Drawer clarification count before expiry: ${clarificationCount}`);
     },
     expectedIncluded: [
@@ -1720,7 +1756,7 @@ const gameCases = [
       game.execute("open bottom drawer");
       game.load("clarification-memory");
       game.execute("close drawer");
-      const clarificationCount = outputLines.filter((line) => line.includes("Do you mean the top drawer, the middle drawer, or the bottom drawer?")).length;
+      const clarificationCount = outputLines.filter((line) => line.includes("Do you mean") && line.includes("drawer")).length;
       game.print(`Drawer clarification count across save load: ${clarificationCount}`);
     },
     expectedIncluded: [
@@ -1754,8 +1790,158 @@ const gameCases = [
       game.execute("top");
     },
     expectedIncluded: [
-      "Do you mean the top drawer, the middle drawer, or the bottom drawer?",
+      "Do you mean the top drawer, the middle drawer, the bottom drawer, or the discreet little drawer?",
       "You put the brass key in the top drawer.",
+    ],
+  },
+  {
+    name: "bag end hall descriptions react after the quest begins",
+    drive(game) {
+      game.unexpectedParty.state.arrived = game.unexpectedParty.roster.map((entry) => entry.id);
+      game.unexpectedParty.state.arrivalIndex = game.unexpectedParty.roster.length;
+      game.unexpectedParty.state.currentArrival = null;
+      game.unexpectedParty.state.thorinArrived = true;
+      game.unexpectedParty.state.questBriefingDone = true;
+      game.unexpectedParty.reconcileCharacters();
+      game.companionDirector.sync();
+      game.print(`Hall pegs after briefing: ${game.describeItemShort(game.items.hall_coat_pegs)}`);
+      game.print(`Gandalf after briefing: ${game.companionDirector.companionPose(game.characters.gandalf, "hobbit_hole", 0)}`);
+    },
+    expectedIncluded: [
+      "Hall pegs after briefing: a regiment of polished pegs standing tidy once more now that the dwarf-cloaks have gone abroad",
+      "Gandalf after briefing: keeps the curious map close at hand, watching you over the edge of his pipe-smoke",
+    ],
+    notExpectedIncluded: [
+      "threatened by an oncoming invasion",
+      "has claimed a chair and half the available table-space",
+    ],
+  },
+  {
+    name: "companion narrative does not duplicate companion presence line",
+    drive(game) {
+      game.describeRoom({ full: true });
+    },
+    expectedIncluded: [
+      "Gandalf waits by the round green door as though measuring the evening by expected knocks.",
+      "He is carrying a curious map.",
+    ],
+    notExpectedIncluded: [
+      "Gandalf is here.",
+    ],
+  },
+  {
+    name: "map command uses narrative room names",
+    drive(game) {
+      game.currentRoom = "bag_end_guest_room";
+      game.execute("map");
+    },
+    expectedIncluded: [
+      "From here, to the north lies Parlour.",
+    ],
+    notExpectedIncluded: [
+      "From here:",
+      "Hobbit_hole",
+      "bag_end_parlour",
+    ],
+  },
+  {
+    name: "idle advance behaves like wait when input is empty",
+    drive(game) {
+      const beforeTurn = game.turnCount;
+      game.executeIdleWait();
+      game.print(`Turn delta after idle wait: ${game.turnCount - beforeTurn}`);
+    },
+    expectedIncluded: [
+      "Time passes...",
+      "You wait.",
+      "Turn delta after idle wait: 1",
+    ],
+  },
+  {
+    name: "idle advance is suspended while the player is typing",
+    drive(game) {
+      document.getElementById("command-input").value = "open dr";
+      const beforeTurn = game.turnCount;
+      game.executeIdleWait();
+      game.print(`Turn delta while typing: ${game.turnCount - beforeTurn}`);
+      document.getElementById("command-input").value = "";
+    },
+    expectedIncluded: [
+      "Turn delta while typing: 0",
+    ],
+    notExpectedIncluded: [
+      "You wait.",
+    ],
+  },
+  {
+    name: "contextual room descriptions react to transformed and post-dragon states",
+    drive(game) {
+      game.trollsTransformed = true;
+      game.flags.dragondefeated = true;
+      const dragon = Object.values(game.characters).find((character) => /dragon/i.test(character.name));
+      if (dragon) dragon.visible = false;
+      game.print(`Trolls clearing after dawn: ${game.contextualRoomDescription(game.rooms.trolls_clearing)}`);
+      game.print(`Treasure approach after dragon: ${game.contextualRoomDescription(game.rooms.erebor_treasure_approach)}`);
+      game.print(`Lower halls after dragon: ${game.contextualRoomDescription(game.rooms.lower_halls)}`);
+      game.print(`Wooden Town after dragon: ${game.contextualRoomDescription(game.rooms.wooden_town)}`);
+    },
+    expectedIncluded: [
+      "Trolls clearing after dawn: You are in the trolls' clearing. Dawn has ended the quarrel forever",
+      "Treasure approach after dragon: Gold-dust still glitters in the cracks ahead, but the held-breath stillness has broken.",
+      "Lower halls after dragon: You enter the lower halls of Erebor",
+      "Wooden Town after dragon: You are in Lake-town, where hammers, shouted orders, and relieved exhaustion travel the plankways together",
+    ],
+    notExpectedIncluded: [
+      "occupied by something too mighty to disturb lightly",
+    ],
+  },
+  {
+    name: "contextual companion poses react in later chapters",
+    drive(game) {
+      game.flags.dragondefeated = true;
+      const dragon = Object.values(game.characters).find((character) => /dragon/i.test(character.name));
+      if (dragon) dragon.visible = false;
+      game.unexpectedParty.state.thorinArrived = true;
+      game.unexpectedParty.state.questBriefingDone = true;
+      game.print(`Thorin in Bag End after briefing: ${game.companionDirector.companionPose(game.characters.thorin, "hobbit_hole", 0)}`);
+      game.print(`Thorin in Erebor after dragon: ${game.companionDirector.companionPose(game.characters.thorin, "lower_halls", 0)}`);
+      game.print(`Bard in Lake-town after dragon: ${game.companionDirector.companionPose(game.characters.bard, "wooden_town", 0)}`);
+    },
+    expectedIncluded: [
+      "Thorin in Bag End after briefing: wears his impatience like armor, as though comfort itself were now an obstacle",
+      "Thorin in Erebor after dragon: moves through the reclaimed halls with a hunger that has turned almost to reverence",
+      "Bard in Lake-town after dragon: watches the rebuilding with the guarded relief of a man who knows survival is only the first labor",
+    ],
+  },
+  {
+    name: "companion pose regions avoid house or town phrasing in peripheral rooms",
+    drive(game) {
+      game.print(`Great River pose: ${game.companionDirector.companionPose(game.characters.thorin, "great_river", 0)}`);
+      game.print(`Ravenhill pose: ${game.companionDirector.companionPose(game.characters.thorin, "stoe_of_ravenhill", 0)}`);
+    },
+    expectedIncluded: [
+      "Great River pose:",
+      "Ravenhill pose:",
+    ],
+    notExpectedIncluded: [
+      "strength of the house",
+      "sound of human trade and labor",
+    ],
+  },
+  {
+    name: "contextual companion comments react in later chapters",
+    drive(game) {
+      game.flags.dragondefeated = true;
+      const dragon = Object.values(game.characters).find((character) => /dragon/i.test(character.name));
+      if (dragon) dragon.visible = false;
+      game.player.position = "lower_halls";
+      game.currentRoom = "lower_halls";
+      game.characters.bard.position = "lower_halls";
+      game.flags.companion_comment_cooldown = 0;
+      game.companionDirector.maybeComment();
+    },
+    expectedIncluded: [
+      "Bard says 'A dead dragon leaves work behind him almost as large as the fear he kept alive.'",
     ],
   },
   {
@@ -1776,7 +1962,7 @@ const gameCases = [
     },
     expectedIncluded: [
       "Do you mean the brass key or the sturdy key?",
-      "Do you mean the top drawer, the middle drawer, or the bottom drawer?",
+      "Do you mean the top drawer, the middle drawer, the bottom drawer, or the discreet little drawer?",
       "You put the brass key in the top drawer.",
     ],
     notExpectedIncluded: [
@@ -2220,6 +2406,7 @@ const gameCases = [
     expectedIncluded: [
       "Death choice: death",
       "Autosave room: deep_dark_lake",
+      "Type 'autosave' to return to the last safe moment in Deep Dark Lake, or 'restart' to begin the tale again.",
     ],
   },
   {
@@ -2237,7 +2424,7 @@ const gameCases = [
       game.print(`Resume endgame: ${game.endgame ? "yes" : "no"}`);
     },
     expectedIncluded: [
-      "Resumed from autosave: before meeting Gollum.",
+      "You take up the thread again: before meeting Gollum.",
       "Resume room: deep_dark_lake",
       "Resume endgame: no",
     ],
@@ -2275,6 +2462,22 @@ const gameCases = [
     expectedIncluded: [
       "River autosave room: west_bank",
       "River death choice: death",
+      "Type 'autosave' to return to the last safe moment in West Bank, or 'restart' to begin the tale again.",
+    ],
+  },
+  {
+    name: "autosave without a marked safe moment reports clearly",
+    drive(game) {
+      game.endgame = true;
+      game.pendingEndgameChoice = "death";
+      game.autosaveSnapshot = null;
+      game.execute("autosave");
+    },
+    expectedIncluded: [
+      "No safe moment has been marked for your return.",
+    ],
+    notExpectedIncluded: [
+      "There is no autosave available.",
     ],
   },
   {
@@ -2315,7 +2518,7 @@ const gameCases = [
       game.execute("examine seed cakes");
     },
     expectedIncluded: [
-      "You are currently in Parlour.",
+      "You are now in Parlour.",
       "You see a plate of fragrant seed-cakes, cut small enough to vanish at a dwarf's convenience.",
     ],
   },

@@ -37,6 +37,7 @@
   const LAYOUT_MOUSE_ACTIVITY_THRESHOLD = 28;
   const LAYOUT_SPLIT_PREF_KEY = "hobbit-web-layout-2-scene-width";
   const DEFAULT_LAYOUT_2_SCENE_WIDTH = 54;
+  const IDLE_WAIT_MS = 30000;
 
   const commandsWithoutObject = new Set([
     "look", "wait", "inventory", "i", "save", "load", "quit", "verbs",
@@ -465,6 +466,171 @@
     },
   };
 
+  const CONTEXTUAL_ITEM_DESCRIPTION_RULES = {
+    hall_coat_pegs: [
+      {
+        when: ({ game }) => game.bagEndPartyPhase() === "quiet",
+        text: "a regiment of polished pegs still enjoying a last quiet hour of order",
+      },
+      {
+        when: ({ game }) => game.bagEndPartyPhase() === "arrivals" || game.bagEndPartyPhase() === "briefing",
+        text: "a regiment of polished pegs now threatened by an oncoming invasion of dwarf-cloaks",
+      },
+      {
+        when: ({ game }) => game.bagEndPartyPhase() === "after_briefing",
+        text: "a regiment of polished pegs standing tidy once more now that the dwarf-cloaks have gone abroad",
+      },
+    ],
+  };
+
+  const CONTEXTUAL_ROOM_DESCRIPTION_RULES = {
+    trolls_clearing: [
+      {
+        when: ({ game }) => game.trollsTransformed,
+        text: "You are in the trolls' clearing. Dawn has ended the quarrel forever: three trolls stand fixed in stone about the dead fire, and the place feels more like a warning than a camp.",
+      },
+    ],
+    wooden_town: [
+      {
+        when: ({ game }) => game.flags.dragondefeated,
+        text: "You are in Lake-town, where hammers, shouted orders, and relieved exhaustion travel the plankways together above the dark water. Boats still knock at their moorings, but the talk is of rebuilding, losses, and what may yet come from the Mountain.",
+      },
+    ],
+    erebor_treasure_approach: [
+      {
+        when: ({ game }) => !game.liveDragon(),
+        text: "Gold-dust still glitters in the cracks ahead, but the held-breath stillness has broken. The way into the deeper halls feels dangerous now less for a living guardian than for the long weight of what has happened here.",
+      },
+    ],
+    lower_halls: [
+      {
+        when: ({ game }) => !game.liveDragon(),
+        text: "You enter the lower halls of Erebor, a mighty chamber of pillars, carvings, and treasure under the Mountain's ancient stone. The air is still warm and close, but the dragon-smoke is fading, leaving a heavy silence in which triumph and unease are not yet sorted.",
+      },
+    ],
+  };
+
+  const CONTEXTUAL_ROOM_NARRATIVE_RULES = [
+    {
+      roomIds: ["deep_dark_lake"],
+      text: ({ game }) => game.gollumRoomNarrative(),
+    },
+    {
+      when: ({ game, roomId }) => (IMMERSION_EREBOR_OUTER_ROOMS.has(roomId) || IMMERSION_EREBOR_INNER_ROOMS.has(roomId) || roomId === "front_gate") && game.liveDragon(),
+      text: ({ game }) => game.smaugRoomNarrative(),
+    },
+    {
+      when: ({ roomId }) => IMMERSION_MIRKWOOD_ROOMS.has(roomId) && roomId !== "place_of_black_spiders",
+      text: "Hunger, weariness, and the sameness of the trees make it hard to believe in straight roads.",
+    },
+    {
+      roomIds: ["trolls_clearing"],
+      when: ({ game }) => game.trollsTransformed,
+      text: "Morning has reduced menace to silence; the stone trolls keep their quarrel forever without coming any nearer.",
+    },
+    {
+      roomIds: ["wooden_town"],
+      when: ({ game }) => game.flags.dragondefeated,
+      text: "Relief and rebuilding move together through the town; every hammer-blow sounds like work snatched back from disaster.",
+    },
+  ];
+
+  const CONTEXTUAL_COMPANION_POSE_RULES = [
+    {
+      characterIds: ["gandalf"],
+      chapters: ["bag_end"],
+      text: ({ game, roomId }) => {
+        const party = game.unexpectedParty;
+        const state = party?.state || {};
+        const arrivalsUnderway = (state.arrivalIndex || 0) < (party?.roster?.length || 0) || Boolean(state.currentArrival);
+        const hasMap = game.characterHas(game.characters.gandalf, "curious map");
+        const phase = game.bagEndPartyPhase();
+        if (phase === "quiet") return "waits by the round green door as though measuring the evening by expected knocks";
+        if (arrivalsUnderway && !state.thorinArrived) {
+          return roomId === "hobbit_hole"
+            ? "keeps to the hall, listening for the next knock and shepherding the evening along"
+            : "moves through Bag End with the calm efficiency of someone who expected precisely this much disruption";
+        }
+        if (phase === "briefing") {
+          return hasMap
+            ? "has claimed a chair and the nearest stretch of table broad enough for the curious map"
+            : "has claimed a chair and the nearest stretch of table broad enough for serious talk";
+        }
+        if (hasMap) return "keeps the curious map close at hand, watching you over the edge of his pipe-smoke";
+        return "lingers with the look of someone waiting to see whether you will choose comfort or the road";
+      },
+    },
+    {
+      characterIds: ["thorin"],
+      chapters: ["bag_end"],
+      when: ({ game }) => game.unexpectedParty?.state?.thorinArrived && !game.bagEndQuestHasBegun(),
+      text: "stands as though the room has ceased to be a parlour and become a council chamber",
+    },
+    {
+      characterIds: ["thorin"],
+      chapters: ["bag_end"],
+      when: ({ game }) => game.bagEndQuestHasBegun(),
+      text: "wears his impatience like armor, as though comfort itself were now an obstacle",
+    },
+    {
+      characterIds: ["thorin"],
+      chapters: ["erebor_inner"],
+      when: ({ game }) => game.liveDragon(),
+      text: "remains outside the treasure halls, unwilling to risk the whole company at once",
+    },
+    {
+      characterIds: ["thorin"],
+      chapters: ["erebor_inner"],
+      when: ({ game }) => !game.liveDragon(),
+      text: "moves through the reclaimed halls with a hunger that has turned almost to reverence",
+    },
+    {
+      characterIds: ["bard"],
+      chapters: ["laketown"],
+      when: ({ game }) => !game.flags.dragondefeated,
+      text: "keeps his bow near and listens for bad news over the water",
+    },
+    {
+      characterIds: ["bard"],
+      chapters: ["laketown"],
+      when: ({ game }) => game.flags.dragondefeated,
+      text: "watches the rebuilding with the guarded relief of a man who knows survival is only the first labor",
+    },
+    {
+      characterIds: ["bard"],
+      chapters: ["erebor_outer", "erebor_inner"],
+      when: ({ game }) => game.flags.dragondefeated,
+      text: "walks the halls like a wary guest inside somebody else's hard-won ending",
+    },
+  ];
+
+  const CONTEXTUAL_COMPANION_COMMENT_RULES = [
+    {
+      onceFlag: "stingremarked",
+      when: ({ game }) => game.player.inventory.some((itemId) => matches(game.items[itemId]?.name, "short strong dagger")),
+      text: "Balin glances at your elvish blade and says 'A better knife than any pantry would usually require, Master Baggins.'",
+    },
+    {
+      chapters: ["mirkwood"],
+      text: "Bofur says 'This wood could make a hungry dwarf long for plain honest rain and an open sky.'",
+    },
+    {
+      chapters: ["journey"],
+      when: ({ game }) => game.turnCount > 10,
+      text: "Dwalin says 'We keep moving, or the road will begin to think us ornamental.'",
+    },
+    {
+      chapters: ["laketown"],
+      when: ({ game }) => game.flags.dragondefeated,
+      text: "Balin says 'Better the sound of hammers and market-calls than dragon-fire over a town.'",
+    },
+    {
+      chapters: ["erebor_outer", "erebor_inner"],
+      when: ({ game }) => game.flags.dragondefeated,
+      text: "Bard says 'A dead dragon leaves work behind him almost as large as the fear he kept alive.'",
+    },
+  ];
+
   function applyImmersionExpansion(data) {
     if (!data || data.__immersionExpansionApplied) return data;
     data.__immersionExpansionApplied = true;
@@ -500,6 +666,7 @@
         name: config.name,
         description: config.description,
         container: Boolean(config.container),
+        listed: config.listed !== false,
         keyFor: null,
         portable: Boolean(config.portable),
         weight: config.weight ?? (config.portable ? 1 : 100),
@@ -674,6 +841,7 @@
       ["hall_coat_pegs", "coat pegs", "a regiment of polished pegs now threatened by an oncoming invasion of dwarf-cloaks"],
       ["hall_umbrella_stand", "umbrella stand", "a ceramic stand painted with little green leaves"],
       ["hall_console_table", "console table", "a narrow console table with a polished top and a discreet little drawer", { container: true }],
+      ["hall_little_drawer", "discreet little drawer", "the discreet little drawer", { container: true, listed: false }],
       ["hall_letter_tray", "letter tray", "a brass tray meant for cards, notes, and other civilized arrivals"],
       ["parlour_hearth", "parlour hearth", "a welcoming hearth laid to cheer guests who know how to appreciate one"],
       ["parlour_sideboard", "sideboard", "a handsome sideboard with cupboards for cups, plates, and comforting reserves", { container: true }],
@@ -827,6 +995,7 @@
     ].forEach(([room, item]) => placeItem(room, item));
 
     placeItemInContainer("hall_console_table", "hall_letter_tray");
+    placeItem("hobbit_hole", "hall_little_drawer");
     placeItemInContainer("parlour_sideboard", "parlour_biscuit_tin");
     placeItemInContainer("guest_room_trunk", "guest_quilt");
     placeItemInContainer("guest_cedar_chest", "guest_linen_bundle");
@@ -2071,6 +2240,14 @@
         .filter((character) => character && character.visible !== false && character.position === roomId);
     }
 
+    companionPoseRegion(roomId = this.game.currentRoom) {
+      if (roomId === "beorns_house") return "beorn_house";
+      if (["treeless_opening", "great_river"].includes(roomId)) return "beorn_wild";
+      if (roomId === "wooden_town") return "laketown_town";
+      if (["long_lake", "stoe_of_ravenhill", "ruins_of_the_town_of_dale", "bleak_barren_land"].includes(roomId)) return "laketown_outlands";
+      return this.chapterForRoom(roomId);
+    }
+
     companionPose(character, roomId, index = 0) {
       const posesByRoom = {
         bilbos_garden: [
@@ -2093,20 +2270,30 @@
         const roomSeed = hashString(`${this.game.storySeed}:${character.id}:${roomId}:${index}`);
         return posesByRoom[roomId][Math.abs(roomSeed) % posesByRoom[roomId].length];
       }
+      const contextualPose = this.game.resolveNarrativeText(
+        CONTEXTUAL_COMPANION_POSE_RULES,
+        this.game.narrativeContext({ character, roomId, chapter: this.chapterForRoom(roomId), index }),
+        "",
+      );
+      if (contextualPose) {
+        return contextualPose;
+      }
       const posesByRegion = {
         bag_end: ["stands near the hearth", "has claimed a chair and half the available table-space", "keeps one eye on the kitchen"],
         green_dragon: ["waits like a traveller between one decision and the next", "keeps an eye on doors, windows, and whoever might be listening", "looks as though the inn is only a pause in a longer business"],
         journey: ["studies the road ahead", "rests with pack still within arm's reach", "keeps a wary eye on the country round about"],
         rivendell: ["looks more rested here than on the open road", "studies the elvish work with open respect", "listens in spite of himself for distant song"],
-        beorn: ["glances often toward the yard and its disciplined beasts", "seems impressed by the strength of the house", "watches the door with road-bred caution"],
+        beorn_house: ["glances often toward the yard and its disciplined beasts", "seems impressed by the strength of the house", "watches the door with road-bred caution"],
+        beorn_wild: ["watches the river and the banks with a traveller's respect", "seems relieved to be in open country again", "keeps an eye on the wild land round about as though expecting movement"],
         goblins: ["waits tensely in the dark", "listens for any stir ahead", "keeps close to the wall, breathing carefully"],
         mirkwood: ["looks worn by hunger and bad light", "watches the branches overhead with undisguised mistrust", "moves like someone afraid the trees may be listening"],
         elves: ["keeps quiet under the eyes of the Elvenking's folk", "studies the halls as though measuring chances of escape", "waits with dwarf patience and dwarf resentment"],
-        laketown: ["watches the water and the people with equal suspicion", "seems steadier for the sound of human trade and labor", "keeps his cloak close in the lake-wind"],
+        laketown_town: ["watches the water and the people with equal suspicion", "seems steadier for the sound of human trade and labor", "keeps his cloak close in the lake-wind"],
+        laketown_outlands: ["studies the lake and distant town with a wary, measuring look", "keeps his cloak close against the open wind off the water", "looks as though the nearness of the Mountain matters more than the town below"],
         erebor_outer: ["stares toward the Mountain's depths with a hunger older than the journey", "has little attention left for anything but the halls ahead", "runs a hand absently over old stone as if greeting kin"],
         erebor_inner: ["remains outside the treasure halls, unwilling to risk the whole company at once", "waits beyond the deeper passages, watching and listening", "holds himself near the threshold, torn between caution and longing"],
       };
-      const region = this.chapterForRoom(roomId);
+      const region = this.companionPoseRegion(roomId);
       const poses = posesByRegion[region] || posesByRegion.journey;
       const seed = hashString(`${this.game.storySeed}:${character.id}:${roomId}:${index}`);
       return poses[Math.abs(seed) % poses.length];
@@ -2125,31 +2312,32 @@
       return `${highlights.join(". ")}.${overflow}`;
     }
 
+    narratedCompanionIds(roomId = this.game.currentRoom) {
+      return new Set(this.visibleCompanions(roomId).slice(0, 3).map((character) => character.id));
+    }
+
     maybeComment() {
       const companions = this.visibleCompanions().filter((character) => character.id !== "thorin");
       if (!companions.length || this.game.player.noticeable === false) return false;
       const cooldownKey = "companion_comment_cooldown";
       if ((this.game.flags[cooldownKey] || 0) > this.game.turnCount) return false;
 
-      const comments = [];
-      if (!this.game.flags.stingremarked && this.game.player.inventory.some((itemId) => matches(this.game.items[itemId]?.name, "short strong dagger"))) {
-        comments.push("Balin glances at your elvish blade and says 'A better knife than any pantry would usually require, Master Baggins.'");
-        this.game.flags.stingremarked = true;
-      }
-      if (this.chapterForRoom() === "mirkwood") {
-        comments.push("Bofur says 'This wood could make a hungry dwarf long for plain honest rain and an open sky.'");
-      }
-      if (this.chapterForRoom() === "journey" && this.game.turnCount > 10) {
-        comments.push("Dwalin says 'We keep moving, or the road will begin to think us ornamental.'");
-      }
-      if (this.chapterForRoom() === "laketown" && this.game.flags.dragondefeated) {
-        comments.push("Balin says 'Better the sound of hammers and market-calls than dragon-fire over a town.'");
-      }
-      if (!comments.length) return false;
+      const context = this.game.narrativeContext({
+        companions,
+        chapter: this.chapterForRoom(),
+      });
+      const candidates = this.game.matchingNarrativeRules(CONTEXTUAL_COMPANION_COMMENT_RULES, context)
+        .filter((rule) => !rule.onceFlag || !this.game.flags[rule.onceFlag])
+        .map((rule) => ({ rule, texts: narrativeRuleTexts(rule, context) }))
+        .filter(({ texts }) => texts.length);
+      if (!candidates.length) return false;
 
-      const seed = hashString(`${this.game.storySeed}:companion-comment:${this.game.turnCount}:${comments.length}`);
+      const flattened = candidates.flatMap(({ rule, texts }) => texts.map((text) => ({ rule, text })));
+      const seed = hashString(`${this.game.storySeed}:companion-comment:${this.game.turnCount}:${flattened.length}`);
       this.game.flags[cooldownKey] = this.game.turnCount + 6 + (Math.abs(seed) % 4);
-      this.game.print(comments[Math.abs(seed) % comments.length]);
+      const chosen = flattened[Math.abs(seed) % flattened.length];
+      if (chosen.rule.onceFlag) this.game.flags[chosen.rule.onceFlag] = true;
+      this.game.print(chosen.text);
       return true;
     }
   }
@@ -2716,7 +2904,7 @@
         load: () => game.load(object),
         quit: () => game.quit(),
         map: () => game.showMap(),
-        location: () => game.print(actorizeSecondPerson(game.player, `You are currently in ${game.room().name.replace(/_/g, " ")}.`)),
+        location: () => game.print(actorizeSecondPerson(game.player, `You are now in ${roomDisplayName(game.room())}.`)),
         music: () => game.handleMusicCommand(object),
         autoplay: () => game.autoplay(object),
         wear: () => game.wear(object),
@@ -4140,18 +4328,18 @@
         roomName: game.room()?.name || game.currentRoom,
         turnCount,
       };
-      game.print(`Autosave: ${label}.`, "system");
+      game.print(autosaveMarkedText(label), "system");
       return true;
     }
 
     resumeFromAutosave() {
       const game = this.game;
       if (!game.autosaveSnapshot) {
-        game.print("There is no autosave available.", "system");
+        game.print(noAutosaveText(), "system");
         return false;
       }
       this.restoreSnapshot(clone(game.autosaveSnapshot));
-      game.print(`Resumed from autosave${game.autosaveMeta?.label ? `: ${game.autosaveMeta.label}` : ""}.`, "system");
+      game.print(autosaveResumedText(game.autosaveMeta?.label), "system");
       game.describeRoom({ full: true });
       return true;
     }
@@ -4602,7 +4790,7 @@
       const trigger = this.spiderEyesTriggerFor(previousRoom, currentRoom, direction);
       if (!trigger) return;
       if (game.flags[this.spiderEyesResolvedFlag(currentRoom)]) return;
-      game.recordAutosave(`before the spider ambush near ${game.rooms[currentRoom]?.name?.replace(/_/g, " ") || currentRoom}`, {
+      game.recordAutosave(`before the spider ambush near ${roomDisplayName(game.rooms[currentRoom] || currentRoom)}`, {
         key: `hazard:spider-eyes:${currentRoom}`,
       });
       game.spiderEyesState = {
@@ -4793,6 +4981,7 @@
       const mode = normalize(object);
       if (mode === "stop" || mode === "off") return this.stopAutoplay("Autoplay stopped.");
       if (game.autoplayRunning) return game.print("Autoplay is already running. Type 'stop autoplay' or 'autoplay stop' to stop it.", "system");
+      game.clearIdleAdvanceTimer();
       game.autoplayMode = mode === "fast" ? "fast" : "slow";
       game.autoplayDelay = game.autoplayMode === "fast" ? 450 : 2700;
       game.autoplayRunning = true;
@@ -4867,6 +5056,7 @@
       game.autoplayRunId += 1;
       input.value = "";
       if (message) game.print(message, "system");
+      game.scheduleIdleAdvance();
     }
 
     autoplayDelayForText(text) {
@@ -5182,6 +5372,7 @@
     endGame(message, options = {}) {
       const game = this.game;
       this.stopAutoplay();
+      game.clearIdleAdvanceTimer();
       game.clearArrivalNoticeTimers();
       output.replaceChildren();
       output.classList.add("end-screen");
@@ -5193,18 +5384,18 @@
       const endMessage = message ? `${message.replace(/[.!?]*$/, "")}. ` : "";
       game.print(`${endMessage}You have mastered ${percentage.toFixed(2)}% of this adventure.`, "danger");
       if (options.fatal && game.autosaveSnapshot) {
-        const roomText = game.autosaveMeta?.roomName ? ` at ${game.autosaveMeta.roomName.replace(/_/g, " ")}` : "";
-        game.print(`Type 'autosave' to continue from the last checkpoint${roomText}, or 'restart' to begin again.`, "system");
+        game.print(autosaveChoiceText(game.autosaveMeta?.roomName), "system");
       } else if (options.fatal) {
-        game.print("Type 'restart' to begin again.", "system");
+        game.print(restartChoiceText(), "system");
       } else {
-        game.print("Press any key or click to restart.", "system");
+        game.print(restartAnyKeyText(), "system");
       }
     }
 
     winGame(message) {
       const game = this.game;
       this.stopAutoplay();
+      game.clearIdleAdvanceTimer();
       game.clearArrivalNoticeTimers();
       output.replaceChildren();
       output.classList.add("end-screen");
@@ -5215,12 +5406,13 @@
       const percentage = (game.visitedRooms.size / totalRooms) * 100;
       const endMessage = message ? `${message.replace(/[.!?]*$/, "")}. ` : "";
       game.print(`${endMessage}You have mastered ${percentage.toFixed(2)}% of this adventure.`, "success");
-      game.print("Press any key or click to restart.", "system");
+      game.print(restartAnyKeyText(), "system");
     }
 
     restartGame() {
       const game = this.game;
       this.stopAutoplay();
+      game.clearIdleAdvanceTimer();
       game.clearArrivalNoticeTimers();
       game.rooms = clone(game.data.rooms);
       game.items = clone(game.data.items);
@@ -5254,6 +5446,7 @@
       output.classList.remove("end-screen");
       game.initState();
       game.describeRoom(true);
+      game.scheduleIdleAdvance();
       input.value = "";
       input.focus();
     }
@@ -5303,7 +5496,7 @@
         if (knownItem?.portable) return game.print(`${subject} ${actorVerb(game.player, "do")} not have the ${knownItem.name}.`);
         return this.inspectEnvironment("examine", text);
       }
-      let description = item.description;
+      let description = game.contextualItemDescription(item);
       if (item.broken) {
         const ruin = game.brokenItemDescription(item);
         return game.print(`${subject} ${actorVerb(game.player, "see")} ${ruin}.`);
@@ -5393,7 +5586,7 @@
       const game = this.game;
       const room = game.room();
       const text = normalize(target);
-      const description = room?.description || "";
+      const description = game.contextualRoomDescription(room);
       const lower = normalize(description);
       const sample = this.descriptionSentenceFor(text);
       const subject = actorSubject(game.player, true);
@@ -5460,7 +5653,7 @@
       const game = this.game;
       const text = normalize(target);
       if (!text || ["area", "room", "place", "here", "surroundings"].includes(text)) return "";
-      const sentences = (game.room()?.description || "").match(/[^.?!]+[.?!]/g) || [];
+      const sentences = game.contextualRoomDescription(game.room()).match(/[^.?!]+[.?!]/g) || [];
       return sentences.find((sentence) => normalize(sentence).includes(text))?.trim() || "";
     }
 
@@ -5487,8 +5680,14 @@
 
     showMap() {
       const game = this.game;
-      const exits = game.roomConnections().map((c) => `${c.direction}: ${game.rooms[c.to]?.name || c.to}`).join("\n");
-      game.print(exits ? `From here:\n${exits}` : "No exits are visible from here.");
+      const exits = game.roomConnections().map((connection) => {
+        const destination = roomDisplayName(game.rooms[connection.to] || connection.to);
+        const direction = normalize(connection.direction);
+        if (direction === "up") return `above lies ${destination}`;
+        if (direction === "down") return `below lies ${destination}`;
+        return `to the ${connection.direction} lies ${destination}`;
+      });
+      game.print(exits.length ? `From here, ${joinNames(exits)}.` : "No exits are visible from here.");
     }
   }
 
@@ -5538,7 +5737,7 @@
           return game.igniteLantern(actorActionSentence(game.player, action.desc1));
         }
         if (String(action.destination || "").includes("endgame")) {
-          const roomLabel = game.room()?.name?.replace(/_/g, " ") || "this place";
+          const roomLabel = game.room() ? roomDisplayName(game.room()) : "this place";
           game.recordAutosave(`before a dangerous action in ${roomLabel}`, {
             key: `special:${game.currentRoom}:${action.verb}:${action.obj1 || ""}:${action.obj2 || ""}:${action.destination}`,
           });
@@ -5780,6 +5979,8 @@
       this.storyRunCount = 0;
       this.storySeed = 0;
       this.imageTransitionTimer = null;
+      this.idleAdvanceTimer = null;
+      this.idleWaitMs = IDLE_WAIT_MS;
       this.currentImageSrc = roomImage.getAttribute("src") || "";
       this.imageTransitionCycle = 0;
       this.audio = musicPlayer;
@@ -5794,6 +5995,7 @@
       this.initState();
       this.bind();
       this.describeRoom(true);
+      this.scheduleIdleAdvance();
     }
 
     initState() {
@@ -5972,10 +6174,12 @@
         event.preventDefault();
         const command = input.value.trim();
         if (!command) {
+          this.scheduleIdleAdvance();
           this.print("I am not sure I understood, can you please repeat?", "system");
           return;
         }
         input.value = "";
+        this.clearIdleAdvanceTimer();
         this.print(`> ${command}`, "command");
         this.execute(command);
       });
@@ -6029,12 +6233,19 @@
           this.cancelLayoutSwitchHide();
         });
         layoutSwitch.addEventListener("focusout", () => this.scheduleLayoutSwitchHide(900));
-        input?.addEventListener("focus", () => this.hideLayoutSwitch());
-        input?.addEventListener("input", () => this.hideLayoutSwitch());
+        input?.addEventListener("focus", () => {
+          this.hideLayoutSwitch();
+          this.scheduleIdleAdvance();
+        });
+        input?.addEventListener("input", () => {
+          this.hideLayoutSwitch();
+          this.scheduleIdleAdvance();
+        });
         document.addEventListener("keydown", () => {
           if (document.activeElement === input) this.hideLayoutSwitch();
         });
       }
+      input?.addEventListener("blur", () => this.scheduleIdleAdvance());
       if (this.layoutSwitchAutoHide && layoutDivider) {
         layoutDivider.addEventListener("mouseenter", () => this.cancelLayoutSwitchHide());
         layoutDivider.addEventListener("mouseleave", () => this.scheduleLayoutSwitchHide(900));
@@ -6045,76 +6256,81 @@
     }
 
     execute(rawCommand) {
-      const lower = rawCommand.toLowerCase();
-      if (this.endgame) {
-        const normalizedEndgame = normalize(lower);
-        if (this.pendingEndgameChoice) {
-          if (["autosave", "resume", "continue", "checkpoint", "load autosave"].includes(normalizedEndgame)) {
-            this.resumeFromAutosave();
+      this.clearIdleAdvanceTimer();
+      try {
+        const lower = rawCommand.toLowerCase();
+        if (this.endgame) {
+          const normalizedEndgame = normalize(lower);
+          if (this.pendingEndgameChoice) {
+            if (["autosave", "resume", "continue", "checkpoint", "load autosave"].includes(normalizedEndgame)) {
+              this.resumeFromAutosave();
+              return;
+            }
+            if (["restart", "start again", "from beginning", "beginning"].includes(normalizedEndgame)) {
+              this.restartGame();
+              return;
+            }
+            this.print(this.autosaveSnapshot
+              ? autosaveChoiceText(this.autosaveMeta?.roomName)
+              : `${noAutosaveText()} ${restartChoiceText()}`, "system");
             return;
           }
-          if (["restart", "start again", "from beginning", "beginning"].includes(normalizedEndgame)) {
+          if (normalizedEndgame === "restart") {
             this.restartGame();
             return;
           }
-          this.print(this.autosaveSnapshot
-            ? "Type 'autosave' to resume from the last checkpoint or 'restart' to begin again."
-            : "There is no autosave available. Type 'restart' to begin again.", "system");
+          this.print(adventureEndedText(), "system");
           return;
         }
-        if (normalizedEndgame === "restart") {
-          this.restartGame();
+        if (normalize(lower) === "stop autoplay") {
+          this.stopAutoplay("Autoplay stopped.");
+          this.render();
           return;
         }
-        this.print("The adventure has ended. Press any key or type 'restart' to begin again.", "system");
-        return;
-      }
-      if (normalize(lower) === "stop autoplay") {
-        this.stopAutoplay("Autoplay stopped.");
-        this.render();
-        return;
-      }
-      if (this.respondToCanonicalDialogue(rawCommand)) {
-        this.render();
-        return;
-      }
-      rawCommand = this.normalizeConversationalQuestion(rawCommand);
-      const normalizedCommand = normalizeNaturalCommand(rawCommand.toLowerCase());
-      if (this.isUnsupportedConditional(normalizedCommand)) {
-        this.print("Conditional commands are not supported yet. Try the action when the condition is true.", "system");
-        return;
-      }
-      if (this.isUnsupportedQuestion(normalizedCommand)) {
-        this.print("Questions are not supported as commands yet. Try a direct command, such as 'ask Gandalf to examine map'.", "system");
-        return;
-      }
-      if (this.pendingClarification && this.isClarificationAnswer(rawCommand)) {
-        this.handleClarification(rawCommand);
-        this.render();
-        return;
-      }
-      this.pendingClarification = null;
-      if (lower === "white") {
-        document.documentElement.style.colorScheme = "light";
-        document.body.style.filter = "invert(1) hue-rotate(180deg)";
-        this.print("Changed to white background with black text.");
-        return;
-      }
-      if (lower === "black") {
-        document.body.style.filter = "";
-        this.print("Changed to black background with white text.");
-        return;
-      }
+        if (this.respondToCanonicalDialogue(rawCommand)) {
+          this.render();
+          return;
+        }
+        rawCommand = this.normalizeConversationalQuestion(rawCommand);
+        const normalizedCommand = normalizeNaturalCommand(rawCommand.toLowerCase());
+        if (this.isUnsupportedConditional(normalizedCommand)) {
+          this.print("Conditional commands are not supported yet. Try the action when the condition is true.", "system");
+          return;
+        }
+        if (this.isUnsupportedQuestion(normalizedCommand)) {
+          this.print("Questions are not supported as commands yet. Try a direct command, such as 'ask Gandalf to examine map'.", "system");
+          return;
+        }
+        if (this.pendingClarification && this.isClarificationAnswer(rawCommand)) {
+          this.handleClarification(rawCommand);
+          this.render();
+          return;
+        }
+        this.pendingClarification = null;
+        if (lower === "white") {
+          document.documentElement.style.colorScheme = "light";
+          document.body.style.filter = "invert(1) hue-rotate(180deg)";
+          this.print("Changed to white background with black text.");
+          return;
+        }
+        if (lower === "black") {
+          document.body.style.filter = "";
+          this.print("Changed to black background with white text.");
+          return;
+        }
 
-      const commands = this.splitter.split(rawCommand);
-      let forceNpcMovement = false;
-      for (const command of commands) {
-        if (normalize(command) === "wait") forceNpcMovement = true;
-        const moved = this.processCommand(command);
-        if (moved || this.pendingClarification) break;
+        const commands = this.splitter.split(rawCommand);
+        let forceNpcMovement = false;
+        for (const command of commands) {
+          if (normalize(command) === "wait") forceNpcMovement = true;
+          const moved = this.processCommand(command);
+          if (moved || this.pendingClarification) break;
+        }
+        if (!this.endgame && !this.pendingClarification) this.advanceCharacterTurn({ forceMove: forceNpcMovement });
+        this.render();
+      } finally {
+        this.scheduleIdleAdvance();
       }
-      if (!this.endgame && !this.pendingClarification) this.advanceCharacterTurn({ forceMove: forceNpcMovement });
-      this.render();
     }
 
     processCommand(command, actor = this.player) {
@@ -6236,6 +6452,80 @@
       return this.rooms[this.currentRoom];
     }
 
+    bagEndPartyPhase() {
+      const party = this.unexpectedParty;
+      if (!party) return "quiet";
+      const state = party.state || {};
+      if (!this.bagEndPartyHasEnteredHouse()) return "quiet";
+      const arrivalsUnderway = (state.arrivalIndex || 0) < (party.roster?.length || 0) || Boolean(state.currentArrival);
+      if (arrivalsUnderway && !state.thorinArrived) return "arrivals";
+      if (!state.questBriefingDone) return "briefing";
+      return "after_briefing";
+    }
+
+    narrativeContext(extra = {}) {
+      return {
+        game: this,
+        room: this.room(),
+        roomId: this.currentRoom,
+        chapter: this.companionDirector?.chapterForRoom(extra.roomId || this.currentRoom) || "",
+        ...extra,
+      };
+    }
+
+    matchingNarrativeRules(rules = [], context = {}) {
+      return rules.filter((rule) => narrativeRuleMatches(rule, context));
+    }
+
+    resolveNarrativeText(rules = [], context = {}, fallback = "") {
+      for (const rule of this.matchingNarrativeRules(rules, context)) {
+        const values = narrativeRuleTexts(rule, context);
+        if (values.length) return values[0];
+      }
+      return fallback;
+    }
+
+    collectNarrativeTexts(rules = [], context = {}) {
+      return this.matchingNarrativeRules(rules, context).flatMap((rule) => narrativeRuleTexts(rule, context));
+    }
+
+    contextualRoomDescription(room = this.room()) {
+      if (!room) return "";
+      return this.resolveNarrativeText(
+        CONTEXTUAL_ROOM_DESCRIPTION_RULES[room.id] || [],
+        this.narrativeContext({ room, roomId: room.id, chapter: this.companionDirector?.chapterForRoom(room.id) || "" }),
+        room.description || "",
+      );
+    }
+
+    clearIdleAdvanceTimer() {
+      clearTimeout(this.idleAdvanceTimer);
+      this.idleAdvanceTimer = null;
+    }
+
+    idleAdvanceSuspended() {
+      return this.endgame || this.autoplayRunning || this.pendingClarification || Boolean(String(input?.value || "").trim());
+    }
+
+    scheduleIdleAdvance(delay = this.idleWaitMs) {
+      this.clearIdleAdvanceTimer();
+      if (this.idleAdvanceSuspended()) return;
+      this.idleAdvanceTimer = setTimeout(() => {
+        this.idleAdvanceTimer = null;
+        if (this.idleAdvanceSuspended()) {
+          this.scheduleIdleAdvance();
+          return;
+        }
+        this.executeIdleWait();
+      }, delay);
+    }
+
+    executeIdleWait() {
+      if (this.idleAdvanceSuspended()) return;
+      this.print("Time passes...", "system");
+      this.execute("wait");
+    }
+
     roomLightMode(roomId = this.currentRoom) {
       if (!roomId) return "normal";
       if (roomId === "trolls_cave") return "dim";
@@ -6314,19 +6604,25 @@
         return;
       }
       const showFullDetails = config.full || !wasVisited;
-      const baseRoomText = showFullDetails ? room.description : this.firstSentence(room.description);
+      const roomDescription = this.contextualRoomDescription(room);
+      const baseRoomText = showFullDetails ? roomDescription : this.firstSentence(roomDescription);
       const dimPrefix = this.roomIsDim() ? "The cave lies in a murky penumbra. You can make out the larger shapes, but fine details are easily missed." : "";
       const roomText = [dimPrefix, baseRoomText].filter(Boolean).join(" ");
       const doorText = this.roomConnections()
         .filter((c) => c.door && this.doors[c.door])
         .map((c) => `${this.directionLead(c.direction)} there is the ${this.doors[c.door].name}. The ${this.doors[c.door].name} is ${this.doors[c.door].open ? "open" : "closed"}.`)
         .join(" ");
-      const objects = this.itemsInRoom(this.currentRoom).filter((item) => item.visible);
+      const objects = this.itemsInRoom(this.currentRoom).filter((item) => item.visible && item.listed !== false);
       const objectText = objects.length ? `You see: ${objects.map((item) => this.describeItemShort(item)).join(", ")}.` : "";
       const people = this.visiblePeopleInRoom().filter((p) => p.name !== "You" && p.visible);
       const arrivingPeople = people.filter((p) => p.justEntered);
-      const peopleText = people.filter((p) => !p.justEntered).map((p) => this.characterPresence(p)).join(" ");
       const companionNarrative = this.companionDirector?.roomCompanionNarrative(this.currentRoom) || "";
+      const narratedCompanionIds = this.companionDirector?.narratedCompanionIds(this.currentRoom) || new Set();
+      const peopleText = people
+        .filter((p) => !p.justEntered)
+        .map((p) => this.characterPresence(p, { omitBase: narratedCompanionIds.has(p.id) }))
+        .filter(Boolean)
+        .join(" ");
       const atmosphericNarrative = this.roomAtmosphericNarrative();
       const detailsText = showFullDetails
         ? [doorText, objectText, companionNarrative, atmosphericNarrative, peopleText].filter(Boolean).join(" ")
@@ -6487,8 +6783,8 @@
       return this.world.peopleInRoom(roomId);
     }
 
-    characterPresence(character) {
-      const base = character.justEntered ? this.characterArrivalMessage(character) : this.characterHereMessage(character);
+    characterPresence(character, options = {}) {
+      const base = options.omitBase ? "" : (character.justEntered ? this.characterArrivalMessage(character) : this.characterHereMessage(character));
       const loadout = this.characterLoadoutText(character);
       return [base, loadout].filter(Boolean).join(" ");
     }
@@ -6792,15 +7088,7 @@
     }
 
     roomAtmosphericNarrative() {
-      const details = [];
-      if (this.currentRoom === "deep_dark_lake") details.push(this.gollumRoomNarrative());
-      if ((IMMERSION_EREBOR_OUTER_ROOMS.has(this.currentRoom) || IMMERSION_EREBOR_INNER_ROOMS.has(this.currentRoom) || this.currentRoom === "front_gate") && this.liveDragon()) {
-        details.push(this.smaugRoomNarrative());
-      }
-      if (IMMERSION_MIRKWOOD_ROOMS.has(this.currentRoom) && this.currentRoom !== "place_of_black_spiders") {
-        details.push("Hunger, weariness, and the sameness of the trees make it hard to believe in straight roads.");
-      }
-      return details.filter(Boolean).join(" ");
+      return this.collectNarrativeTexts(CONTEXTUAL_ROOM_NARRATIVE_RULES, this.narrativeContext()).filter(Boolean).join(" ");
     }
 
     gollumRoomNarrative() {
@@ -7850,7 +8138,7 @@
         const connection = this.roomConnections().find((c) => c.to === target.id);
         if (connection) return this.move(connection.direction);
         if (!this.visitedRooms.has(target.id)) {
-          this.print(actorizeSecondPerson(this.player, `You haven't visited ${target.name.replace(/_/g, " ")} yet, so you cannot go there directly.`));
+          this.print(actorizeSecondPerson(this.player, `You have not yet been to ${roomDisplayName(target)}, so you cannot go there directly.`));
           return false;
         }
         return this.goDirectlyTo(target.id);
@@ -7885,18 +8173,18 @@
         return false;
       }
       const distance = this.findTravelDistance(this.currentRoom, roomId);
-      const name = this.rooms[roomId].name.replace(/_/g, " ");
+      const name = roomDisplayName(this.rooms[roomId] || roomId);
       if (distance >= 99) {
         this.print(`You cannot find an open route to ${name} from here.`);
         return false;
       }
       const delegated = Boolean(this.commandIssuer);
       if (!delegated) {
-        if (distance <= 1) this.print(actorizeSecondPerson(this.player, `You remember the way to ${name} clearly, reaching it in just a few steps.`));
-        else if (distance <= 3) this.print(actorizeSecondPerson(this.player, `You recall the route to ${name} well, covering a short but steady walk.`));
-        else if (distance <= 5) this.print(actorizeSecondPerson(this.player, `The path to ${name} is still familiar to you, and after a solid journey, you arrive.`));
-        else if (distance <= 9) this.print(actorizeSecondPerson(this.player, `The way to ${name} spans quite a distance, but your memory guides you to your destination.`));
-        else this.print(actorizeSecondPerson(this.player, `The route to ${name} is long and winding, yet your memory leads you through every turn until you arrive.`));
+        if (distance <= 1) this.print(actorizeSecondPerson(this.player, `You know the way to ${name} well, and reach it in only a few steps.`));
+        else if (distance <= 3) this.print(actorizeSecondPerson(this.player, `You take the familiar way to ${name} and arrive after a short, steady walk.`));
+        else if (distance <= 5) this.print(actorizeSecondPerson(this.player, `The road to ${name} is known to you, and before long you arrive there again.`));
+        else if (distance <= 9) this.print(actorizeSecondPerson(this.player, `You follow a remembered route across some distance until ${name} rises before you once more.`));
+        else this.print(actorizeSecondPerson(this.player, `The way to ${name} is long and winding, but memory carries you through every turn until at last you arrive.`));
       }
       this.currentRoom = roomId;
       this.player.position = roomId;
@@ -8835,8 +9123,18 @@
       return flags;
     }
 
+    contextualItemDescription(item) {
+      if (!item) return "";
+      if (item.contextualDescription) return item.contextualDescription;
+      return this.resolveNarrativeText(
+        CONTEXTUAL_ITEM_DESCRIPTION_RULES[item.id] || [],
+        this.narrativeContext({ item }),
+        item.description || item.name,
+      );
+    }
+
     describeItemShort(item) {
-      return this.insertFlagsIntoDescription(item.description || item.name, this.itemStateFlags(item));
+      return this.insertFlagsIntoDescription(this.contextualItemDescription(item), this.itemStateFlags(item));
     }
 
     insertFlagsIntoDescription(text, flags = []) {
@@ -9234,6 +9532,45 @@
     return text ? text[0].toUpperCase() + text.slice(1) : text;
   }
 
+  function roomDisplayName(room) {
+    const raw = typeof room === "string" ? room : (room?.name || room?.id || "");
+    const cleaned = String(raw)
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!cleaned) return "somewhere";
+    return cleaned.split(" ").map((word) => capitalize(word)).join(" ");
+  }
+
+  function autosaveMarkedText(label = "") {
+    return label ? `A safe moment is marked here: ${label}.` : "A safe moment is marked here.";
+  }
+
+  function autosaveResumedText(label = "") {
+    return label ? `You take up the thread again: ${label}.` : "You take up the thread again.";
+  }
+
+  function noAutosaveText() {
+    return "No safe moment has been marked for your return.";
+  }
+
+  function autosaveChoiceText(roomName = "") {
+    const roomText = roomName ? ` in ${roomDisplayName(roomName)}` : "";
+    return `Type 'autosave' to return to the last safe moment${roomText}, or 'restart' to begin the tale again.`;
+  }
+
+  function restartChoiceText() {
+    return "Type 'restart' to begin the tale again.";
+  }
+
+  function restartAnyKeyText() {
+    return "Press any key or click to begin the tale again.";
+  }
+
+  function adventureEndedText() {
+    return "The adventure is over. Press any key or type 'restart' to begin the tale again.";
+  }
+
   function characterPresence(character) {
     if (character.justEntered) {
       return characterArrivalMessage(character);
@@ -9438,6 +9775,21 @@
 
   function compact(text) {
     return normalize(text).replace(/\s+/g, "");
+  }
+
+  function narrativeRuleMatches(rule = {}, context = {}) {
+    if (rule.roomIds && !rule.roomIds.includes(context.roomId || context.room?.id)) return false;
+    if (rule.characterIds && !rule.characterIds.includes(context.character?.id)) return false;
+    if (rule.chapters && !rule.chapters.includes(context.chapter)) return false;
+    if (rule.when && !rule.when(context)) return false;
+    return true;
+  }
+
+  function narrativeRuleTexts(rule = {}, context = {}) {
+    const resolved = typeof rule.text === "function" ? rule.text(context) : rule.text;
+    if (Array.isArray(resolved)) return resolved.flatMap((entry) => narrativeRuleTexts({ text: entry }, context));
+    if (!resolved) return [];
+    return [String(resolved)];
   }
 
   function escapeRegExp(text) {
