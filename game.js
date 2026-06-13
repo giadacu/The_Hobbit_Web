@@ -41,7 +41,8 @@
 
   const commandsWithoutObject = new Set([
     "look", "wait", "inventory", "i", "save", "load", "quit", "verbs",
-    "mysaves", "hello", "tips", "map", "location", "music", "autoplay",
+    "mysaves", "hello", "tips", "map", "location", "music", "autoplay", "jumps",
+    "teleport", "warp",
     "jump", "sit", "stand", "sleep", "rest", "run", "wake", "crawl", "leap",
     "dive", "swim", "lie", "listen", "smell", "sniff", "search", "explore",
     "investigate", "examine", "inspect", "watch", "eavesdrop", "scout",
@@ -66,6 +67,140 @@
     "help", "explain", "negotiate", "print", "call", "wash", "check",
     "start", "refill", "inform", "review", "mend", "repair", "fix",
     "write", "lie", "pick", "trim", "fill", "water", "plant", "rake",
+    "teleport", "warp", "jumps",
+  ];
+
+  const DEBUG_JUMP_PRESETS = [
+    {
+      key: "green_dragon",
+      label: "Green Dragon Inn",
+      description: "After Bag End, before the pony sequence at the inn.",
+      aliases: ["green dragon", "green dragon inn", "inn", "green_dragon"],
+      apply(game) {
+        game.debugCompleteUnexpectedParty();
+        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true });
+        game.debugMovePlayer("green_dragon_inn");
+      },
+    },
+    {
+      key: "trolls",
+      label: "Trolls Clearing",
+      description: "Past the pony sequence, on the road to the trolls.",
+      aliases: ["trolls", "troll clearing", "trolls clearing", "clearing"],
+      apply(game) {
+        game.debugCompleteUnexpectedParty();
+        game.debugMarkPonyProgress();
+        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true });
+        game.flags.seenpony = true;
+        game.debugMovePlayer("trolls_clearing");
+      },
+    },
+    {
+      key: "rivendell",
+      label: "Rivendell",
+      description: "After the trolls, ready to continue from Rivendell.",
+      aliases: ["rivendell", "elrond"],
+      apply(game) {
+        game.debugCompleteUnexpectedParty();
+        game.debugMarkPonyProgress();
+        game.transformTrolls();
+        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true });
+        game.debugMovePlayer("rivendell");
+        game.debugSetCharacterRoom("elrond", "rivendell");
+      },
+    },
+    {
+      key: "gollum",
+      label: "Deep Dark Lake",
+      description: "Just before the Gollum encounter and riddle contest.",
+      aliases: ["gollum", "lake", "deep dark lake", "deep_dark_lake"],
+      apply(game) {
+        game.debugCompleteUnexpectedParty();
+        game.debugMarkPonyProgress();
+        game.transformTrolls();
+        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true });
+        game.debugMovePlayer("deep_dark_lake");
+        game.debugSetCharacterRoom("gollum", "deep_dark_lake");
+      },
+    },
+    {
+      key: "beorn",
+      label: "Beorn's House",
+      description: "After the goblins and Gollum, with the ring already found.",
+      aliases: ["beorn", "beorns house", "beorn house", "house"],
+      apply(game) {
+        game.debugCompleteUnexpectedParty();
+        game.debugMarkPonyProgress();
+        game.transformTrolls();
+        game.flags.mapread = true;
+        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true, ring: true });
+        game.debugMovePlayer("beorns_house");
+        game.debugSetCharacterRoom("beorn", "beorns_house");
+      },
+    },
+    {
+      key: "mirkwood",
+      label: "Mirkwood",
+      description: "At the forest path after Beorn, with core adventure gear.",
+      aliases: ["mirkwood", "forest", "forest path", "mirkwood forest path"],
+      apply(game) {
+        game.debugCompleteUnexpectedParty();
+        game.debugMarkPonyProgress();
+        game.transformTrolls();
+        game.flags.mapread = true;
+        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true, ring: true });
+        game.debugMovePlayer("mirkwood_forest_path");
+      },
+    },
+    {
+      key: "laketown",
+      label: "Lake-town",
+      description: "After the elves, ready to continue from Lake-town.",
+      aliases: ["laketown", "lake town", "wooden town", "town"],
+      apply(game) {
+        game.debugCompleteUnexpectedParty();
+        game.debugMarkPonyProgress();
+        game.transformTrolls();
+        game.flags.mapread = true;
+        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true, ring: true });
+        game.debugMovePlayer("wooden_town");
+        game.debugSetCharacterRoom("bard", "wooden_town");
+      },
+    },
+    {
+      key: "front_gate",
+      label: "Front Gate",
+      description: "At the Lonely Mountain, with the key and map already in hand.",
+      aliases: ["front gate", "gate", "erebor", "lonely mountain"],
+      apply(game) {
+        game.debugCompleteUnexpectedParty();
+        game.debugMarkPonyProgress();
+        game.transformTrolls();
+        game.flags.mapread = true;
+        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true, ring: true });
+        game.debugMovePlayer("front_gate");
+        game.debugSetCharacterRoom("bard", "front_gate");
+      },
+    },
+    {
+      key: "smaug",
+      label: "Smaug",
+      description: "In Erebor with Bard present, ready for the dragon endgame.",
+      aliases: ["smaug", "dragon", "lower halls", "lower_halls"],
+      apply(game) {
+        game.debugCompleteUnexpectedParty();
+        game.debugMarkPonyProgress();
+        game.transformTrolls();
+        game.flags.mapread = true;
+        game.flags.secretdoorsun = true;
+        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true, ring: true });
+        game.debugMovePlayer("lower_halls");
+        game.debugSetCharacterRoom("bard", "lower_halls");
+        game.debugGiveCharacterItem("bow", "bard");
+        game.debugGiveCharacterItem("strong arrow", "bard");
+        game.debugSetCharacterRoom("dragon", "lower_halls");
+      },
+    },
   ];
 
   const CANONICAL_DIALOGUES = [
@@ -776,9 +911,9 @@
       ["bag_end_kitchen", "Kitchen", "The kitchen is warm, bright, and busily practical: copper pans hang in order, a kettle mutters on the hob, and the table is marked by generations of competent chopping, kneading, and tea-making. If Bag End has a heart, it beats here.", "bag_end_kitchen.jpeg", "relaxed"],
       ["bag_end_guest_room", "Guest Room", "A carefully prepared guest room waits here with a turned-down bed, a wash-stand, and curtains that give the place a surprising air of ceremony. It was not furnished with dwarves in mind, yet it is doing its quiet best.", "bag_end_guest_room.jpeg", "relaxed"],
       ["bag_end_cellar_room", "Cellar", "The cellar is cool, dry, and heavily provisioned. Barrels rest in shadow, preserves gleam in neat rows, and a prudent abundance of ale, potatoes, and stored comforts makes plain that Bag End expected hard winters long before it expected adventures.", "bag_end_cellar_room.jpeg", "relaxed"],
-      ["lane_beneath_hill", "Lane Beneath the Hill", "The road winds gently down from the Hill, bordered on either side by neat hedges and well-kept gardens. Bright flowers nod in the breeze, and beyond the fences lie green fields where sheep graze contentedly. The air is sweet with fresh earth and the agreeable rumor of baking from somewhere farther in the village. A robin sings from a hawthorn bush with complete indifference to the concerns of larger folk, while little paths stray off now and then toward snug hobbit-holes tucked into the hillside. The main road keeps on toward Hobbiton proper and the inns beyond.", "Bilbosgarden.jpeg", "relaxed"],
-      ["party_field", "Party Field", "A broad stretch of green turf opens beside the road beneath a cluster of ancient trees. Here the hobbits hold their fairs, feasts, and merrymakings when the weather is kind. Wooden tables stand stacked beneath a canvas awning, and colored lanterns hang from the lower branches awaiting some future evening's importance. The grass is soft underfoot, bright with wildflowers, and the laughter of children at play goes pleasantly to and fro upon the air. It is a place made for comfort rather than enterprise, and all the better for it.", "Bilbosgarden.jpeg", "relaxed"],
-      ["bywater_bridge", "Bywater Bridge", "The road crosses a small stone bridge over a clear-running stream. Beneath it the water chatters over smooth pebbles and slips away among reeds and watercress. On the far bank stands a little mill with a turning wheel, its steady creak mingling with the murmur of the water in a way that suggests useful work done without hurry. Ducks paddle lazily in the shallows, smoke rises from chimneys beyond the trees, and ahead, not far now, the Green Dragon's sign may sometimes be glimpsed through the branches when the sun catches it just so.", "Green_dragon.jpeg", "relaxed"],
+      ["lane_beneath_hill", "Lane Beneath the Hill", "The road winds gently down from the Hill, bordered on either side by neat hedges and well-kept gardens. Bright flowers nod in the breeze, and beyond the fences lie green fields where sheep graze contentedly. The air is sweet with fresh earth and the agreeable rumor of baking from somewhere farther in the village. A robin sings from a hawthorn bush with complete indifference to the concerns of larger folk, while little paths stray off now and then toward snug hobbit-holes tucked into the hillside. The main road keeps on toward Hobbiton proper and the inns beyond.", "road_winding_gently.png", "relaxed"],
+      ["party_field", "Party Field", "A broad stretch of green turf opens beside the road beneath a cluster of ancient trees. Here the hobbits hold their fairs, feasts, and merrymakings when the weather is kind. Wooden tables stand stacked beneath a canvas awning, and colored lanterns hang from the lower branches awaiting some future evening's importance. The grass is soft underfoot, bright with wildflowers, and the laughter of children at play goes pleasantly to and fro upon the air. It is a place made for comfort rather than enterprise, and all the better for it.", "broad_stretch_turf.png", "relaxed"],
+      ["bywater_bridge", "Bywater Bridge", "The road crosses a small stone bridge over a clear-running stream. Beneath it the water chatters over smooth pebbles and slips away among reeds and watercress. On the far bank stands a little mill with a turning wheel, its steady creak mingling with the murmur of the water in a way that suggests useful work done without hurry. Ducks paddle lazily in the shallows, smoke rises from chimneys beyond the trees, and ahead, not far now, the Green Dragon's sign may sometimes be glimpsed through the branches when the sun catches it just so.", "stone_bridge.png", "relaxed"],
       ["rivendell_courtyard", "Courtyard", "White stone and living ivy share this quiet courtyard, where the sound of falling water softens every footstep. Benches stand in sun and shade alike, inviting weary travelers to believe that peace may yet be a practical thing.", "Rivendell.jpeg", "relaxed"],
       ["rivendell_library", "Library", "Tall shelves and carved ladders fill the library with the hush of well-kept wisdom. Scrolls, red-bound volumes, maps, and forgotten songs wait here with the patience of things certain they will outlast haste.", "map.jpeg", "relaxed"],
       ["rivendell_hall_of_fire", "Hall of Fire", "Firelight and song belong equally to this hall. Cushioned seats ring the hearth, the rafters hold echoes of ancient music, and any tale told here seems at once older and truer than it did outside.", "Rivendell.jpeg", "relaxed"],
@@ -2420,7 +2555,7 @@
       return this.chapterForRoom(roomId);
     }
 
-    companionPose(character, roomId, index = 0) {
+    companionPoseOptions(character, roomId, index = 0) {
       const posesByRoom = {
         bilbos_garden: [
           "stands among the flowers with the air of a guest surprised by so much gardening",
@@ -2463,7 +2598,7 @@
         "",
       );
       if (contextualPose) {
-        return contextualPose;
+        return [contextualPose];
       }
       const posesByRegion = {
         bag_end: ["stands near the hearth", "has claimed a chair and half the available table-space", "keeps one eye on the kitchen"],
@@ -2482,9 +2617,23 @@
         erebor_inner: ["remains outside the treasure halls, unwilling to risk the whole company at once", "waits beyond the deeper passages, watching and listening", "holds himself near the threshold, torn between caution and longing"],
       };
       const region = this.companionPoseRegion(roomId);
-      const poses = posesByRegion[region] || posesByRegion.journey;
+      return posesByRoom[roomId] || posesByRegion[region] || posesByRegion.journey;
+    }
+
+    pickCompanionPoseText(character, roomId, index = 0, usedPoses = new Set()) {
+      const poses = this.companionPoseOptions(character, roomId, index);
+      if (!poses.length) return "";
       const seed = hashString(`${this.game.storySeed}:${character.id}:${roomId}:${index}`);
-      return poses[Math.abs(seed) % poses.length];
+      const start = Math.abs(seed) % poses.length;
+      for (let offset = 0; offset < poses.length; offset += 1) {
+        const pose = poses[(start + offset) % poses.length];
+        if (!usedPoses.has(pose)) return pose;
+      }
+      return poses[start];
+    }
+
+    companionPose(character, roomId, index = 0) {
+      return this.pickCompanionPoseText(character, roomId, index);
     }
 
     roomCompanionNarrative(roomId = this.game.currentRoom) {
@@ -2495,7 +2644,12 @@
         }
         return "";
       }
-      const highlights = companions.slice(0, 3).map((character, index) => `${character.name} ${this.companionPose(character, roomId, index)}`);
+      const usedPoses = new Set();
+      const highlights = companions.slice(0, 3).map((character, index) => {
+        const pose = this.pickCompanionPoseText(character, roomId, index, usedPoses);
+        usedPoses.add(pose);
+        return `${character.name} ${pose}`;
+      });
       const overflow = companions.length > highlights.length ? ` Others of the company are nearby as well.` : "";
       return `${highlights.join(". ")}.${overflow}`;
     }
@@ -2599,7 +2753,7 @@
       if (!held) return "";
       const verb = held.worn ? "wearing" : "carrying";
       if (held.character.name === "You") return `You are ${verb} the ${held.item.name}.`;
-      return `${held.character.name} is ${verb} the ${held.item.name}.`;
+      return `${sentenceDisplayCharacterName(held.character)} is ${verb} the ${held.item.name}.`;
     }
 
     findItemInsideContainer(container, itemName) {
@@ -3087,6 +3241,7 @@
         hello: () => game.hello(),
         tips: () => game.tips(object),
         verbs: () => game.verbs(),
+        jumps: () => game.listJumpCheckpoints(),
         mysaves: () => game.listSaves(),
         save: () => game.save(object),
         load: () => game.load(object),
@@ -3095,6 +3250,8 @@
         location: () => game.print(actorizeSecondPerson(game.player, `You are now ${roomLocationPhrase(game.room())}.`)),
         music: () => game.handleMusicCommand(object),
         autoplay: () => game.autoplay(object),
+        teleport: () => game.handleJumpCommand(object),
+        warp: () => game.handleJumpCommand(object),
         wear: () => game.wear(object),
         remove: () => game.remove(object),
         give: () => game.give(object),
@@ -3162,7 +3319,7 @@
         climb: () => game.climb(object),
         eat: () => game.eat(object),
         drink: () => game.drink(object),
-        jump: () => game.physicalAction("jump", object),
+        jump: () => game.handleJumpCommand(object) || game.physicalAction("jump", object),
         sit: () => game.physicalAction("sit", object),
         lie: () => game.physicalAction("lie", object),
         stand: () => game.physicalAction("stand", object),
@@ -3267,14 +3424,14 @@
     carryCharacter(character) {
       const game = this.game;
       if (!matches(character.name, "bard") && !matches(character.name, "thorin")) {
-        return game.print(`${character.name} will not let you pick them up.`);
+        return game.print(`${sentenceDisplayCharacterName(character)} will not let you pick them up.`);
       }
-      if (character.carriedBy === game.player.id) return game.print(`${character.name} is already with you.`);
+      if (character.carriedBy === game.player.id) return game.print(`${sentenceDisplayCharacterName(character)} is already with you.`);
       character.carriedBy = game.player.id;
       character.position = game.currentRoom;
       character.followingPlayer = false;
       character.justEntered = false;
-      game.print(actorizeSecondPerson(game.player, `You pick up ${character.name}.`));
+      game.print(actorizeSecondPerson(game.player, `You pick up ${displayCharacterName(character)}.`));
     }
 
     characterCannotFollowVertical(character, direction) {
@@ -3609,7 +3766,7 @@
         const name = normalize(character.name);
         if (command === name) {
           if (game.unexpectedParty?.blocksDirectInteraction(character, "talk")) return true;
-          game.print(`${character.name} listens intently, expecting your words.`);
+          game.print(`${sentenceDisplayCharacterName(character)} listens intently, expecting your words.`);
           return true;
         }
         if (!command.startsWith(`${name} `)) continue;
@@ -3639,7 +3796,7 @@
       game.detachItem(item.id);
       item.location = { type: "character", id: target.id };
       target.inventory.push(item.id);
-      game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "give")} the ${item.name} to ${target.name}.`);
+      game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "give")} the ${item.name} to ${displayCharacterName(target)}.`);
       game.reactToGift(target, item);
     }
 
@@ -3652,16 +3809,16 @@
       if (!item) return game.print(game.heldItemMessage(parsed.itemName) || `${game.player.name} does not have the ${parsed.itemName}.`);
       if (!target) return game.print(`There is no one named ${parsed.targetName} here.`);
       if (game.unexpectedParty?.blocksDirectInteraction(target, "gift")) return;
-      game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "show")} the ${item.name} to ${target.name}.`);
+      game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "show")} the ${item.name} to ${displayCharacterName(target)}.`);
       this.reactToShownItem(target, item);
     }
 
     reactToShownItem(character, item) {
       const game = this.game;
       if ((matches(character.name, "gandalf") || matches(character.name, "elrond")) && matches(item.name, "curious map")) {
-        return game.print(`${character.name} studies the ${item.name} carefully.`);
+        return game.print(`${sentenceDisplayCharacterName(character)} studies the ${item.name} carefully.`);
       }
-      game.print(`${character.name} looks at the ${item.name}, but says nothing useful.`);
+      game.print(`${sentenceDisplayCharacterName(character)} looks at the ${item.name}, but says nothing useful.`);
     }
 
     askFor(command) {
@@ -3721,28 +3878,28 @@
     receiveItemFromCharacter(character, itemName) {
       const game = this.game;
       if (character.friendly === false) return this.respondToTalk(character);
-      if (game.player.name === "You" && game.player.noticeable === false) return game.print(`${character.name} says 'who's talking?'`);
+      if (game.player.name === "You" && game.player.noticeable === false) return game.print(`${sentenceDisplayCharacterName(character)} says 'who's talking?'`);
       const held = game.findCharacterItem(character, itemName);
-      if (!held) return game.print(`${character.name} does not have the ${itemName}.`);
-      if (held.worn) return game.print(`${character.name} is wearing the ${held.item.name}.`);
+      if (!held) return game.print(`${sentenceDisplayCharacterName(character)} does not have the ${itemName}.`);
+      if (held.worn) return game.print(`${sentenceDisplayCharacterName(character)} is wearing the ${held.item.name}.`);
       if (!game.canCarryAdditionalWeight(held.item.weight || 0)) return game.print(game.carryTooMuchMessage(held.item));
       game.detachItem(held.item.id);
       held.item.location = { type: "character", id: game.player.id };
       game.player.inventory.push(held.item.id);
-      game.print(`${character.name} gives you the ${held.item.name}.`);
+      game.print(`${sentenceDisplayCharacterName(character)} gives you the ${held.item.name}.`);
     }
 
     takeItemFromCharacter(character, itemName) {
       const game = this.game;
       if (character.friendly === false) return this.respondToTalk(character);
       const held = game.findCharacterItem(character, itemName);
-      if (!held) return game.print(`${character.name} does not have the ${itemName}.`);
-      if (held.worn) return game.print(`${character.name} is wearing the ${held.item.name}.`);
+      if (!held) return game.print(`${sentenceDisplayCharacterName(character)} does not have the ${itemName}.`);
+      if (held.worn) return game.print(`${sentenceDisplayCharacterName(character)} is wearing the ${held.item.name}.`);
       if (!game.canCarryAdditionalWeight(held.item.weight || 0)) return game.print(game.carryTooMuchMessage(held.item));
       game.detachItem(held.item.id);
       held.item.location = { type: "character", id: game.player.id };
       game.player.inventory.push(held.item.id);
-      game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "take")} the ${held.item.name} from ${character.name}.`);
+      game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "take")} the ${held.item.name} from ${displayCharacterName(character)}.`);
     }
 
     askCharacterTo(characterName, order) {
@@ -3750,7 +3907,7 @@
       const character = this.resolveCharacterTarget(characterName);
       if (!character) return game.print(`There is no one named ${characterName} here.`);
       if (character.friendly === false) return this.respondToTalk(character);
-      if (game.player.name === "You" && game.player.noticeable === false) return game.print(`${character.name} says 'who's talking?'`);
+      if (game.player.name === "You" && game.player.noticeable === false) return game.print(`${sentenceDisplayCharacterName(character)} says 'who's talking?'`);
       if (game.unexpectedParty?.blocksDirectInteraction(character, "order")) return;
       this.rememberConversationCharacter(character);
       this.rememberReferencedCharacter(order);
@@ -3811,7 +3968,7 @@
 
       if (verb === "wait" && /\b(?:until|till)\b/.test(object)) {
         return {
-          message: `${character.name} says 'I will wait a while, but not forever.'`,
+          message: `${sentenceDisplayCharacterName(character)} says 'I will wait a while, but not forever.'`,
           action: "wait",
         };
       }
@@ -3889,13 +4046,13 @@
         return game.print(special);
       }
       if (character.friendly === false) return this.respondToTalk(character);
-      if (game.player.name === "You" && game.player.noticeable === false) return game.print(`${character.name} says 'who's talking?'`);
+      if (game.player.name === "You" && game.player.noticeable === false) return game.print(`${sentenceDisplayCharacterName(character)} says 'who's talking?'`);
       if (game.unexpectedParty?.blocksDirectInteraction(character, "ask")) return;
       this.rememberConversationCharacter(character);
       this.rememberReferencedCharacter(topic);
       const special = game.specialConversationResponse(character, topic);
       if (special) return game.print(special);
-      game.print(`${character.name} considers ${game.formatConversationTopic(topic)}, but gives no clear answer.`);
+      game.print(`${sentenceDisplayCharacterName(character)} considers ${game.formatConversationTopic(topic)}, but gives no clear answer.`);
     }
 
     parseAskForCommand(command) {
@@ -4028,7 +4185,7 @@
       const character = this.resolveCharacterTarget(parsed.characterName);
       if (!character) return game.print("You speak, but only silence meets your words.");
       if (character.friendly === false) return this.respondToTalk(character);
-      if (game.player.name === "You" && game.player.noticeable === false) return game.print(`${character.name} says 'who's talking?'`);
+      if (game.player.name === "You" && game.player.noticeable === false) return game.print(`${sentenceDisplayCharacterName(character)} says 'who's talking?'`);
       if (game.unexpectedParty?.blocksDirectInteraction(character, parsed.order ? "order" : "talk")) return;
       if (matches(character.name, "gollum") && parsed.order && game.handleGollumSpeech(parsed.order)) return;
       if (parsed.order) {
@@ -4041,7 +4198,7 @@
       this.rememberConversationCharacter(character);
       const special = game.specialTalkResponse(character);
       if (special) return game.print(special);
-      game.print(`${character.name} listens intently, expecting your words.`);
+      game.print(`${sentenceDisplayCharacterName(character)} listens intently, expecting your words.`);
     }
 
     parseTalkCommand(command) {
@@ -4070,10 +4227,10 @@
         return game.print(line);
       }
       if (matches(character.name, "dragon")) {
-        const line = game.specialTalkResponse(character) || `${character.name} watches and waits.`;
+        const line = game.specialTalkResponse(character) || `${sentenceDisplayCharacterName(character)} watches and waits.`;
         return game.print(line);
       }
-      game.print(`${character.name} glares at you, unimpressed.`);
+      game.print(`${sentenceDisplayCharacterName(character)} glares at you, unimpressed.`);
     }
 
     handleBardDragonCommand(character, command) {
@@ -4784,7 +4941,7 @@
       if (configuredResponse) return configuredResponse;
       if (game.unexpectedParty?.isAmbientDwarf(character)) {
         if (matchesAny(text, ["food", "supper", "tea", "ale", "beer", "pantry"])) return game.unexpectedParty.dwarfProfile(character).ask;
-        if (matchesAny(text, ["quest", "road", "journey", "mountain", "thorin"])) return `${character.name} says 'We have not come merely to enjoy your excellent housekeeping, though I mean to do my best with it while it lasts.'`;
+        if (matchesAny(text, ["quest", "road", "journey", "mountain", "thorin"])) return `${sentenceDisplayCharacterName(character)} says 'We have not come merely to enjoy your excellent housekeeping, though I mean to do my best with it while it lasts.'`;
         return game.unexpectedParty.dwarfProfile(character).ask;
       }
       if (matches(character.name, "gollum")) {
@@ -5080,6 +5237,7 @@
         game.visitedTrollsClearing = true;
         game.waitCounter = 0;
         game.print("You crouch low behind a mossy boulder, heart pounding, as the trolls argue by the flickering campfire in the moonlit clearing.");
+        game.print("Only then do you make out the cause of the quarrel: one of the trolls has already caught a dwarf and is brandishing him like the beginning of supper.");
         game.print("What shall us do with him?");
         game.print("Roast him!");
         game.print("He wouldn't make above a mouthful.");
@@ -7267,7 +7425,7 @@
       const companionSummary = this.unexpectedParty?.isAmbientDwarf(character) ? this.unexpectedParty.describeCharacter(character) : "";
       const gollumSummary = matches(character.name, "gollum") ? this.gollumRoomNarrative() : "";
       const smaugSummary = matches(character.name, "dragon") ? this.smaugRoomNarrative() : "";
-      this.print([actorizeSecondPerson(this.player, `You examine ${character.name}.`), customSummary, companionSummary, gollumSummary, smaugSummary, loadout, temperament].filter(Boolean).join(" "));
+      this.print([actorizeSecondPerson(this.player, `You examine ${displayCharacterName(character)}.`), customSummary, companionSummary, gollumSummary, smaugSummary, loadout, temperament].filter(Boolean).join(" "));
     }
 
     sense(verb, objectName = "") {
@@ -7466,6 +7624,7 @@
         touch: 1, feel: 1, knock: 1, watch: 1, search: 1,
         push: 1, pull: 1, wear: 1, remove: 1, hello: 1, combine: 1, autoplay: 1,
         map: 1, tips: 1, music: 1, mend: 1, repair: 1, fix: 1,
+        jumps: 1, teleport: 1, warp: 1,
       });
       const special = this.data.specialActions.map((action) => action.verb);
       this.print("Allowed verbs are: " + [...new Set([...base, ...special])].sort().join(", "));
@@ -7481,6 +7640,173 @@
 
     listSaves() {
       return this.storage.listSaves();
+    }
+
+    listJumpCheckpoints() {
+      const lines = DEBUG_JUMP_PRESETS.map((preset) => `${preset.key}: ${preset.description}`);
+      this.print(`Jump checkpoints: ${lines.join(" ")}`, "system");
+    }
+
+    handleJumpCommand(target = "") {
+      const normalizedTarget = normalize(String(target || "").replace(/^(?:to|into)\s+/, ""));
+      if (!normalizedTarget) {
+        this.listJumpCheckpoints();
+        return true;
+      }
+      const preset = DEBUG_JUMP_PRESETS.find((entry) => [entry.key, ...(entry.aliases || [])]
+        .map((alias) => normalize(alias))
+        .includes(normalizedTarget));
+      if (!preset) {
+        this.print(`Unknown jump target "${target}". Type "jumps" to see the available checkpoints.`, "system");
+        return false;
+      }
+      this.prepareJumpState();
+      preset.apply(this);
+      this.pendingClarification = null;
+      this.forcedChoice = null;
+      this.pendingEndgameChoice = null;
+      this.endgame = false;
+      this.endgameRestartArmed = false;
+      this.normalizeCharacterMovementModes();
+      this.normalizeLanternState();
+      this.companionDirector?.sync();
+      this.visitedRooms = new Set([this.currentRoom, ...(this.visitedRooms || [])]);
+      this.print(`Jumped to ${preset.label}.`, "system");
+      this.describeRoom({ full: true });
+      return true;
+    }
+
+    prepareJumpState() {
+      this.stopAutoplay();
+      this.clearIdleAdvanceTimer();
+      this.clearArrivalNoticeTimers();
+      this.rooms = clone(this.data.rooms);
+      this.items = clone(this.data.items);
+      this.doors = clone(this.data.doors);
+      this.characters = clone(this.data.characters);
+      this.connections = this.normalizeConnections(clone(this.data.connections));
+      this.currentRoom = this.data.startRoom;
+      this.flags = {};
+      this.endgame = false;
+      this.endgameRestartArmed = false;
+      this.pendingEndgameChoice = null;
+      this.visitedTrollsClearing = false;
+      this.waitCounter = 0;
+      this.secretDoorWaitCounter = 0;
+      this.trollsTransformed = false;
+      this.trollsDefeated = false;
+      this.visitedRooms = new Set();
+      this.tipsEnabled = false;
+      this.tipIndex = 0;
+      this.pendingClarification = null;
+      this.forcedChoice = null;
+      this.clarifiedReferences = {};
+      this.commandIssuer = null;
+      this.lastConversationCharacterId = null;
+      this.lastReferencedCharacterId = null;
+      this.splitter = new CommandSplitter(this.data);
+      this.delegatedSplitters = new Map();
+      this.sharedDelegatedContext = { lastObject: null, lastDirectObject: null, lastTargetObject: null };
+      this.autosaveSnapshot = null;
+      this.autosaveMeta = null;
+      output.classList.remove("end-screen");
+      this.initState();
+      input.value = "";
+    }
+
+    debugFindCharacter(characterNameOrId) {
+      if (!characterNameOrId) return null;
+      return this.characters[characterNameOrId]
+        || Object.values(this.characters).find((character) => matches(character.name, characterNameOrId))
+        || null;
+    }
+
+    debugFindItem(itemNameOrId) {
+      if (!itemNameOrId) return null;
+      return this.items[itemNameOrId]
+        || Object.values(this.items).find((item) => matches(item.name, itemNameOrId))
+        || null;
+    }
+
+    debugMovePlayer(roomId) {
+      if (!this.rooms[roomId]) return false;
+      this.currentRoom = roomId;
+      this.player.position = roomId;
+      this.visitedRooms.add(roomId);
+      return true;
+    }
+
+    debugSetCharacterRoom(characterNameOrId, roomId, options = {}) {
+      const character = this.debugFindCharacter(characterNameOrId);
+      if (!character) return false;
+      character.position = roomId;
+      character.visible = options.visible !== false;
+      character.followingPlayer = Boolean(options.followingPlayer);
+      character.movementMode = options.movementMode || "never";
+      character.justEntered = false;
+      character.carriedBy = null;
+      return true;
+    }
+
+    debugGiveCharacterItem(itemNameOrId, characterNameOrId, options = {}) {
+      const item = this.debugFindItem(itemNameOrId);
+      const character = this.debugFindCharacter(characterNameOrId);
+      if (!item || !character) return false;
+      this.detachItem(item.id);
+      item.visible = options.visible !== false;
+      item.location = { type: "character", id: character.id };
+      if (options.worn) {
+        character.worn = [...(character.worn || []), item.id];
+        item.worn = true;
+      } else {
+        character.inventory = [...(character.inventory || []), item.id];
+        item.worn = false;
+      }
+      return true;
+    }
+
+    debugGivePlayerItem(itemNameOrId, options = {}) {
+      return this.debugGiveCharacterItem(itemNameOrId, this.player.id, options);
+    }
+
+    debugCompleteUnexpectedParty() {
+      const party = this.unexpectedParty;
+      if (!party) return;
+      party.state.arrived = party.roster.map((entry) => entry.id);
+      party.state.arrivalIndex = party.roster.length;
+      party.state.currentArrival = null;
+      party.state.thorinStage = 6;
+      party.state.thorinArrived = true;
+      party.state.questBriefingDone = true;
+      party.state.fullHouseAnnounced = true;
+      party.reconcileCharacters();
+    }
+
+    debugMarkPonyProgress() {
+      this.flags.seenpony = true;
+      this.flags.ponysequencecompleted = true;
+      this.flags.ponypassageopen = true;
+      if (this.items.calm_pony) this.items.calm_pony.visible = false;
+    }
+
+    debugGiveStandardLoadout(options = {}) {
+      const config = {
+        map: true,
+        key: true,
+        pipe: false,
+        lantern: false,
+        sword: false,
+        rope: false,
+        ring: false,
+        ...options,
+      };
+      if (config.map) this.debugGivePlayerItem("curious map");
+      if (config.key) this.debugGivePlayerItem("curious key");
+      if (config.pipe) this.debugGivePlayerItem("smoking pipe");
+      if (config.lantern) this.debugGivePlayerItem("brass lantern");
+      if (config.sword) this.debugGivePlayerItem("short strong dagger");
+      if (config.rope) this.debugGivePlayerItem("sturdy rope");
+      if (config.ring) this.debugGivePlayerItem("golden ring");
     }
 
     quit() {
@@ -7833,9 +8159,9 @@
       if (this.unexpectedParty?.isAmbientDwarf(character)) {
         const profile = this.unexpectedParty.dwarfProfile(character);
         if (matchesAny(item.name, ["seed cakes", "cheese", "ale", "meal", "cold chicken", "pickles", "wine"])) {
-          return this.print(`${character.name} brightens at once. '${profile.gift}'`);
+          return this.print(`${sentenceDisplayCharacterName(character)} brightens at once. '${profile.gift}'`);
         }
-        return this.print(`${character.name} accepts the ${item.name}. '${profile.gift}'`);
+        return this.print(`${sentenceDisplayCharacterName(character)} accepts the ${item.name}. '${profile.gift}'`);
       }
       if (matches(character.name, "gandalf")) {
         if (matches(item.name, "curious map")) {
@@ -8549,7 +8875,7 @@
         if (this.characterCannotFollowVertical(character, direction)) {
           this.releaseCarriedCharacter(character, {
             follow: true,
-            message: `${character.name} climbs down from your shoulders and follows you.`,
+            message: `${sentenceDisplayCharacterName(character)} climbs down from your shoulders and follows you.`,
           });
         }
       }
@@ -8688,7 +9014,7 @@
         const flag = `initiative_${character.id}_unseen`;
         if (this.flags[flag]) return false;
         this.flags[flag] = true;
-        this.print(`${character.name} looks around, puzzled, unable to see who is there.`);
+        this.print(`${sentenceDisplayCharacterName(character)} looks around, puzzled, unable to see who is there.`);
         return true;
       }
       const action = this.characterInitiative(character);
@@ -8735,7 +9061,7 @@
       const seed = hashString(`${character.id}:${this.turnCount}:${this.currentRoom}`);
       const line = lines[Math.abs(seed) % lines.length];
       this.flags[cooldownKey] = this.turnCount + 4 + (Math.abs(seed) % 3);
-      this.print(`${character.name} says '${line}'`);
+      this.print(`${sentenceDisplayCharacterName(character)} says '${line}'`);
       return true;
     }
 
@@ -8942,7 +9268,7 @@
           this.items[ringId].location = { type: "character", id: character.id };
           if (!character.inventory.includes(ringId)) character.inventory.push(ringId);
         }
-        this.print(character.id === this.data.player ? "The golden ring slips off you finger and falls in your pocket." : `The golden ring slips off ${character.name}'s finger and falls in ${character.name}'s pocket.`);
+        this.print(character.id === this.data.player ? "The golden ring slips off you finger and falls in your pocket." : `The golden ring slips off ${characterPossessiveName(character)} finger and falls in ${characterPossessiveName(character)} pocket.`);
       }
     }
 
@@ -8993,7 +9319,7 @@
       character.attackFlag = 0;
       character.justEntered = toRoom === this.currentRoom;
       if (options.silent) return;
-      if (fromRoom === this.currentRoom) this.print(`${character.name} goes ${direction}.`);
+      if (fromRoom === this.currentRoom) this.print(`${sentenceDisplayCharacterName(character)} goes ${direction}.`);
       if (toRoom === this.currentRoom) {
         this.scheduleCharacterArrivalNotice(character);
         character.justEntered = false;
@@ -9597,7 +9923,7 @@
   function displayDialogueName(name) {
     const normalized = normalizeWords(name);
     const entry = CANONICAL_DIALOGUES.find((dialogue) => dialogueKeyPart(dialogue[1]) === normalized);
-    return entry?.[1] || capitalize(name);
+    return capitalize(clarificationLabel(entry?.[1] || name));
   }
 
   function normalizeVocativeCommand(command, verbs) {
@@ -9684,6 +10010,16 @@
   function displayCharacterName(character) {
     if (character.id === "you" || character.name === "You") return "you";
     return isProperName(character.name) ? character.name : `the ${character.name}`;
+  }
+
+  function sentenceDisplayCharacterName(character) {
+    return capitalize(displayCharacterName(character));
+  }
+
+  function characterPossessiveName(character) {
+    if (character.id === "you" || character.name === "You") return "your";
+    const name = displayCharacterName(character);
+    return /s$/i.test(name) ? `${name}'` : `${name}'s`;
   }
 
   function actorSubject(character, capital = false) {

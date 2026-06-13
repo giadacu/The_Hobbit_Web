@@ -830,7 +830,7 @@ const gameCases = [
       "Gandalf says 'I think the curious map is safer in my hands for now.'",
       "Gandalf says 'You may have it soon, but let me keep it a little longer.'",
       "Gandalf sighs and says 'Very well. Take it, and use it wisely.'",
-      "Gandalf gives the curious map to You.",
+      "Gandalf gives the curious map to you.",
     ],
   },
   {
@@ -1297,6 +1297,19 @@ const gameCases = [
     ],
   },
   {
+    name: "generic ambient npc speech keeps a definite article",
+    drive(game) {
+      game.currentRoom = "party_field";
+      game.player.position = "party_field";
+      placeCharacterWithPlayer(game, "party_hobbit");
+      game.turnCount = 0;
+      game.maybeAmbientCharacterSpeech(game.characters.party_hobbit);
+    },
+    expectedIncluded: [
+      /The hobbit decorator says '(If this weather holds, we shall have lanterns up by supper-time and no trouble at all\.|Mind the ribbons there; they behave like cats when a breeze gets among them\.)'/,
+    ],
+  },
+  {
     name: "shire atmospheric events add pastoral life",
     drive(game) {
       game.currentRoom = "party_field";
@@ -1442,7 +1455,7 @@ const gameCases = [
     inputs: ["Gandalf, give the small key to Thorin", "Thorin, give it to me"],
     expectedIncluded: [
       "Gandalf gives the small key to Thorin.",
-      "Thorin gives the small key to You.",
+      "Thorin gives the small key to you.",
     ],
     notExpectedIncluded: [
       "There is no one named thorin here.",
@@ -1544,6 +1557,25 @@ const gameCases = [
     ],
   },
   {
+    name: "garden companion narrative avoids repeated poses",
+    setup(game) {
+      game.currentRoom = "bilbos_garden";
+      game.player.position = "bilbos_garden";
+      placeCharacterWithPlayer(game, "unexpected_party_gloin");
+      placeCharacterWithPlayer(game, "unexpected_party_bifur");
+    },
+    drive(game) {
+      game.print(game.companionDirector.roomCompanionNarrative("bilbos_garden"));
+    },
+    expectedIncluded: [
+      "Gloin",
+      "Bifur",
+    ],
+    notExpectedIncluded: [
+      "Gloin stands among the flowers with the air of a guest surprised by so much gardening. Bifur stands among the flowers with the air of a guest surprised by so much gardening.",
+    ],
+  },
+  {
     name: "delegated push climb social and combine actions keep npc subject",
     setup(game) {
       placeCharacterWithPlayer(game, "gandalf");
@@ -1588,6 +1620,7 @@ const gameCases = [
     inputs: [],
     expectedIncluded: [
       "You crouch low behind a mossy boulder, heart pounding, as the trolls argue by the flickering campfire in the moonlit clearing.",
+      "one of the trolls has already caught a dwarf",
       "What shall us do with him?",
       "Roast him!",
       "He wouldn't make above a mouthful.",
@@ -1911,6 +1944,52 @@ const gameCases = [
       "From here:",
       "Hobbit_hole",
       "bag_end_parlour",
+    ],
+  },
+  {
+    name: "jump command lists available checkpoints",
+    drive(game) {
+      game.execute("jumps");
+    },
+    expectedIncluded: [
+      "Jump checkpoints:",
+      "green_dragon",
+      "smaug",
+    ],
+  },
+  {
+    name: "jump rivendell applies a coherent milestone state",
+    drive(game) {
+      game.execute("jump rivendell");
+      game.print(`Jump room: ${game.currentRoom}`);
+      game.print(`Has map: ${game.findInInventory("curious map") ? "yes" : "no"}`);
+      game.print(`Has key: ${game.findInInventory("curious key") ? "yes" : "no"}`);
+      game.print(`Trolls transformed: ${game.trollsTransformed ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Jumped to Rivendell.",
+      "Jump room: rivendell",
+      "Has map: yes",
+      "Has key: yes",
+      "Trolls transformed: yes",
+    ],
+  },
+  {
+    name: "jump smaug sets up the dragon endgame",
+    drive(game) {
+      game.execute("jump smaug");
+      const bard = Object.values(game.characters).find((character) => /bard/i.test(character.name));
+      game.print(`Jump room: ${game.currentRoom}`);
+      game.print(`Bard here: ${bard?.position === game.currentRoom ? "yes" : "no"}`);
+      game.print(`Arrow with Bard: ${bard?.inventory?.some((itemId) => /arrow/i.test(game.items[itemId]?.name || "")) ? "yes" : "no"}`);
+      game.print(`Dragon alive: ${game.liveDragon() ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Jumped to Smaug.",
+      "Jump room: lower_halls",
+      "Bard here: yes",
+      "Arrow with Bard: yes",
+      "Dragon alive: yes",
     ],
   },
   {
