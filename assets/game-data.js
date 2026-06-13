@@ -4876,7 +4876,7 @@ window.HOBBIT_DATA = {
     {
       "verb": "jump",
       "desc1": "jump through the large trap door.",
-      "desc2": "The river's current grows too strong, and soon, one vanishes beneath the churning waters.2",
+      "desc2": "The black water seizes you at once.2 One moment you fight for breath, and the next the current drags you under the churning dark.2",
       "adverb": "through",
       "obj2": "large trap door",
       "location": "Cellar",
@@ -4985,7 +4985,7 @@ window.HOBBIT_DATA = {
     {
       "verb": "jump",
       "desc1": "jump into the river.2",
-      "desc2": "The river's current grows too strong, and soon, one vanishes beneath the churning waters.2",
+      "desc2": "The river takes you at once, spinning you among the rocks before any hand can save you.2",
       "adverb": "into",
       "obj2": "river",
       "location": "West bank",
@@ -4995,7 +4995,7 @@ window.HOBBIT_DATA = {
     {
       "verb": "swim",
       "desc1": "swim in the river.2",
-      "desc2": "The river's current grows too strong, and soon, one vanishes beneath the churning waters.2",
+      "desc2": "The river takes you at once, spinning you among the rocks before any hand can save you.2",
       "adverb": "in ",
       "obj2": "river",
       "location": "West bank",
@@ -5055,7 +5055,7 @@ window.HOBBIT_DATA = {
     {
       "verb": "steal",
       "desc1": "",
-      "desc2": "You clumsily approach the troll, eyeing the large, shiny key.2 The hideous troll notices you, snarls, grabs you, and devours you whole.2",
+      "desc2": "You creep toward the gleaming key, but a yellow eye snaps open.2 The hideous troll lunges, catches you in one huge fist, and makes an end of you beside the fire.2",
       "obj1": "*large key",
       "location": "Trolls clearing",
       "flag_in2": "trolls_transformed",
@@ -5065,7 +5065,7 @@ window.HOBBIT_DATA = {
     {
       "verb": "take",
       "desc1": "",
-      "desc2": "You emerge from your concealed refuge, reaching for the large key.2 With a guttural roar, the loathsome troll pounces, devouring you whole in a single, dreadful gulp.2",
+      "desc2": "You emerge from hiding and reach for the large key.2 With a guttural roar the troll pounces, and your adventure ends in its grasp before the others even stop laughing.2",
       "obj1": "*large key",
       "location": "Trolls clearing",
       "flag_in2": "trolls_transformed",
@@ -5075,7 +5075,7 @@ window.HOBBIT_DATA = {
     {
       "verb": "kill",
       "desc1": "",
-      "desc2": "You summon your courage, and attack the monstrous troll with your bare hands.2 With a malevolent gleam in its eye, the creature lunges forward, silencing you forever in a grisly feast.3",
+      "desc2": "You rush the monstrous troll with desperate courage.2 It only laughs, sweeps you off your feet, and leaves no more of the struggle than scattered embers and a broken cry.3",
       "obj1": "*troll",
       "location": "Trolls clearing",
       "flag_in2": "trolls_transformed",
@@ -5213,7 +5213,7 @@ window.HOBBIT_DATA = {
     {
       "verb": "talk",
       "desc1": "",
-      "desc2": "The dragon grows tired of your presence and, with a roar, breathes fire, incinerating you instantly.4",
+      "desc2": "Smaug grows weary of your voice.2 With a sudden roar he floods the chamber with fire, and all your brave words are ashes in a breath.4",
       "adverb": "to",
       "special_char": "Red golden dragon",
       "destination": "*endgame"
@@ -5221,7 +5221,7 @@ window.HOBBIT_DATA = {
     {
       "verb": "talk",
       "desc1": "",
-      "desc2": "The goblin, irritated by your words, orders other goblins to attack.3 They overwhelm and capture you.2",
+      "desc2": "The nasty goblin sneers at your words and shrills for its fellows.2 You are dragged down beneath a rain of blows before you can break free.3",
       "adverb": "to",
       "special_char": "Nasty goblin",
       "destination": "*endgame"
@@ -5257,7 +5257,7 @@ window.HOBBIT_DATA = {
     {
       "verb": "talk",
       "desc1": "",
-      "desc2": "The warg listens briefly, then attacks ferociously, tearing you apart.4",
+      "desc2": "The warg lowers its head, listens a moment, then springs.2 Fangs close, and the forest spins away.4",
       "adverb": "to",
       "special_char": "Vicious warg",
       "destination": "*endgame"
@@ -5265,7 +5265,7 @@ window.HOBBIT_DATA = {
     {
       "verb": "talk",
       "desc1": "",
-      "desc2": "Gollum's paranoia intensifies, and he suddenly attacks, seeking to silence you forever.4",
+      "desc2": "Gollum's whisper curdles into a hiss.2 In a heartbeat he is on you, and the dark water hears the end of the struggle.4",
       "adverb": "to",
       "special_char": "Gollum",
       "destination": "*endgame"
@@ -5273,7 +5273,7 @@ window.HOBBIT_DATA = {
     {
       "verb": "talk",
       "desc1": "",
-      "desc2": "The goblin, amused by your attempt, attacks you for sport, calling in reinforcements.4",
+      "desc2": "The goblin cackles at your attempt and calls its fellows.2 Steel flashes in the torchlight, and there is no road out.4",
       "adverb": "to",
       "special_char": "Hideous goblin",
       "destination": "*endgame"
@@ -5288,7 +5288,7 @@ window.HOBBIT_DATA = {
     {
       "verb": "talk",
       "desc1": "",
-      "desc2": "The troll, frustrated by your words, grabs you and makes a meal of you.4",
+      "desc2": "The troll only grins at your words, reaches down, and makes a meal of you before the fire.4",
       "adverb": "to",
       "special_char": "Hideous troll",
       "destination": "*endgame"
@@ -5296,7 +5296,7 @@ window.HOBBIT_DATA = {
     {
       "verb": "talk",
       "desc1": "",
-      "desc2": "The troll, uninterested in conversation, swiftly grabs and devours you.4",
+      "desc2": "The vicious troll has no ear for talk.2 It seizes you at once, and the clearing knows you no more.4",
       "adverb": "to",
       "special_char": "Vicious troll",
       "destination": "*endgame"
@@ -5304,7 +5304,7 @@ window.HOBBIT_DATA = {
     {
       "verb": "talk",
       "desc1": "",
-      "desc2": "The goblin, eager to inflict pain, attacks with its cronies, leaving you no chance to escape.4",
+      "desc2": "The horrible goblin bares its teeth and whistles up its cronies.2 They swarm over you before you can break away.4",
       "adverb": "to",
       "special_char": "Horrible goblin",
       "destination": "*endgame"
@@ -5312,7 +5312,7 @@ window.HOBBIT_DATA = {
     {
       "verb": "talk",
       "desc1": "",
-      "desc2": "The goblin sneers and orders an immediate attack, robbing and killing you.4",
+      "desc2": "The mean goblin sneers, barks an order, and strips you of any chance of escape.2 The torches wheel, the blows fall, and the tale ends there.4",
       "adverb": "to",
       "special_char": "Mean goblin",
       "destination": "*endgame"
@@ -5320,7 +5320,7 @@ window.HOBBIT_DATA = {
     {
       "verb": "talk",
       "desc1": "",
-      "desc2": "The goblin signals others to ambush and trap you, showing no mercy.4",
+      "desc2": "The vicious goblin snaps a command, and the passage fills with enemies.2 You are trapped and cut off from escape.4",
       "adverb": "to",
       "special_char": "Vicious goblin",
       "destination": "*endgame"
@@ -5328,7 +5328,7 @@ window.HOBBIT_DATA = {
     {
       "verb": "talk",
       "desc1": "",
-      "desc2": "The goblin, disgusted by your presence, throws you into a pit to suffer before leaving.4",
+      "desc2": "The disgusting goblin recoils from your presence, hurls you into a black pit, and leaves your cries to the dark.4",
       "adverb": "to",
       "special_char": "Disgusting goblin",
       "destination": "*endgame"

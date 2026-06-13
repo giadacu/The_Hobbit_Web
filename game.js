@@ -15,7 +15,14 @@
   const imageReveal = $("image-reveal");
   const imageRevealOutline = $("image-reveal-outline");
   const imageRevealFill = $("image-reveal-fill");
+  const sceneMapOverlay = $("scene-map-overlay");
+  const sceneMapImage = $("scene-map-image");
   const musicPlayer = $("music-player");
+  const sceneCompass = $("scene-compass");
+  const sceneCompassRose = $("scene-compass-rose");
+  const sceneCompassVertical = $("scene-compass-vertical");
+  const sceneCompassUp = $("scene-compass-up");
+  const sceneCompassDown = $("scene-compass-down");
   const inventoryList = $("inventory-list");
   const inventoryStatus = $("inventory-status");
   const exitsList = $("exits-list");
@@ -24,6 +31,16 @@
   const layoutDivider = $("layout-divider");
   const layoutMode1Button = $("layout-mode-1");
   const layoutMode2Button = $("layout-mode-2");
+  const SCENE_COMPASS_POINTS = {
+    "north": $("scene-compass-north"),
+    "north east": $("scene-compass-north-east"),
+    "east": $("scene-compass-east"),
+    "south east": $("scene-compass-south-east"),
+    "south": $("scene-compass-south"),
+    "south west": $("scene-compass-south-west"),
+    "west": $("scene-compass-west"),
+    "north west": $("scene-compass-north-west"),
+  };
   const BASE_CARRY_CAPACITY = 5;
   const CARRY_CAPACITY_PER_STRENGTH = 3;
   const PLAYER_CARRY_BONUS = 32;
@@ -38,10 +55,11 @@
   const LAYOUT_SPLIT_PREF_KEY = "hobbit-web-layout-2-scene-width";
   const DEFAULT_LAYOUT_2_SCENE_WIDTH = 54;
   const IDLE_WAIT_MS = 30000;
+  const OUTPUT_SCROLL_EASING = 0.16;
 
   const commandsWithoutObject = new Set([
     "look", "wait", "inventory", "i", "save", "load", "quit", "verbs",
-    "mysaves", "hello", "tips", "map", "location", "music", "autoplay", "jumps",
+    "mysaves", "hello", "tips", "map", "exits", "exit", "location", "music", "autoplay", "jumps",
     "teleport", "warp",
     "jump", "sit", "stand", "sleep", "rest", "run", "wake", "crawl", "leap",
     "dive", "swim", "lie", "listen", "smell", "sniff", "search", "explore",
@@ -93,6 +111,7 @@
         game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true });
         game.flags.seenpony = true;
         game.debugMovePlayer("trolls_clearing");
+        game.waitCounter = 0;
       },
     },
     {
@@ -3238,6 +3257,8 @@
         inventory: () => game.inventory(),
         i: () => game.inventory(),
         wait: () => game.wait(),
+        exits: () => game.showExits(),
+        exit: () => game.showExits(),
         hello: () => game.hello(),
         tips: () => game.tips(object),
         verbs: () => game.verbs(),
@@ -4310,10 +4331,77 @@
         roomImage.removeAttribute("src");
         roomImage.alt = "";
       }
+      this.renderSceneMap();
+      const visibleConnections = game.roomConnections();
       fillList(inventoryList, game.player.inventory.map((id) => game.inventorySidebarLabel(game.items[id])).filter(Boolean), "nothing");
       if (inventoryStatus) inventoryStatus.textContent = `Weight ${game.currentCarryWeight()}/${game.carryCapacity()}`;
-      fillList(exitsList, game.roomConnections().map((c) => c.direction), "none");
+      fillList(exitsList, visibleConnections.map((c) => c.direction), "none");
       fillList(peopleList, game.visiblePeopleInRoom().filter((p) => p.name !== "You" && p.visible).map((p) => p.name), "none");
+      this.renderSceneCompass(visibleConnections);
+    }
+
+    renderSceneCompass(connections = []) {
+      if (!sceneCompass) return;
+      if (this.game.sceneMapVisible) {
+        sceneCompass.setAttribute("hidden", "hidden");
+        return;
+      }
+      const isLayout2 = this.game.layoutMode === "2";
+      const visibleDirections = new Set(connections.map((connection) => compassDirectionKey(connection.direction)).filter(Boolean));
+      const hasRoseDirection = Object.keys(SCENE_COMPASS_POINTS).some((direction) => visibleDirections.has(direction));
+      const showUp = visibleDirections.has("up");
+      const showDown = visibleDirections.has("down");
+      const shouldShow = isLayout2 && (hasRoseDirection || showUp || showDown);
+
+      if (!shouldShow) {
+        sceneCompass.setAttribute("hidden", "hidden");
+        sceneCompassRose?.removeAttribute("hidden");
+        sceneCompassVertical?.setAttribute("hidden", "hidden");
+        for (const point of Object.values(SCENE_COMPASS_POINTS)) {
+          point?.setAttribute("data-active", "false");
+        }
+        sceneCompassUp?.setAttribute("hidden", "hidden");
+        sceneCompassDown?.setAttribute("hidden", "hidden");
+        if (sceneCompassUp) sceneCompassUp.setAttribute("data-active", "false");
+        if (sceneCompassDown) sceneCompassDown.setAttribute("data-active", "false");
+        return;
+      }
+
+      sceneCompass.removeAttribute("hidden");
+      if (!this.game.layoutSwitchAutoHide || layoutSwitch?.classList?.contains("is-visible")) sceneCompass.classList.add("is-visible");
+      else sceneCompass.classList.remove("is-visible");
+      if (hasRoseDirection) sceneCompassRose?.removeAttribute("hidden");
+      else sceneCompassRose?.setAttribute("hidden", "hidden");
+
+      for (const [direction, point] of Object.entries(SCENE_COMPASS_POINTS)) {
+        point?.setAttribute("data-active", visibleDirections.has(direction) ? "true" : "false");
+      }
+
+      if (showUp || showDown) sceneCompassVertical?.removeAttribute("hidden");
+      else sceneCompassVertical?.setAttribute("hidden", "hidden");
+
+      if (sceneCompassUp) {
+        sceneCompassUp.setAttribute("data-active", showUp ? "true" : "false");
+        if (showUp) sceneCompassUp.removeAttribute("hidden");
+        else sceneCompassUp.setAttribute("hidden", "hidden");
+      }
+      if (sceneCompassDown) {
+        sceneCompassDown.setAttribute("data-active", showDown ? "true" : "false");
+        if (showDown) sceneCompassDown.removeAttribute("hidden");
+        else sceneCompassDown.setAttribute("hidden", "hidden");
+      }
+    }
+
+    renderSceneMap() {
+      const game = this.game;
+      if (!sceneMapOverlay || !sceneMapImage) return;
+      if (!game.sceneMapVisible) {
+        sceneMapOverlay.setAttribute("hidden", "hidden");
+        sceneMapImage.removeAttribute("src");
+        return;
+      }
+      sceneMapImage.src = assetUrl(IMAGE_ROOT, "map.jpeg");
+      sceneMapOverlay.removeAttribute("hidden");
     }
 
     swapRoomImage(scene, nextSrc) {
@@ -4387,12 +4475,16 @@
         layoutSwitch.classList.remove("is-visible");
         layoutDivider?.classList?.remove("layout-divider--auto-hide");
         layoutDivider?.classList?.remove("is-visible");
+        sceneCompass?.classList?.remove("scene-compass--auto-hide");
+        sceneCompass?.classList?.remove("is-visible");
         return;
       }
       layoutSwitch.classList.add("layout-switch--auto-hide");
       layoutSwitch.classList.remove("is-visible");
       layoutDivider?.classList?.add("layout-divider--auto-hide");
       layoutDivider?.classList?.remove("is-visible");
+      sceneCompass?.classList?.add("scene-compass--auto-hide");
+      sceneCompass?.classList?.remove("is-visible");
     }
 
     showLayoutSwitch() {
@@ -4400,6 +4492,7 @@
       if (!game.layoutSwitchAutoHide) return;
       layoutSwitch?.classList?.add("is-visible");
       if (game.layoutMode === "2") layoutDivider?.classList?.add("is-visible");
+      if (game.layoutMode === "2" && !sceneCompass?.hasAttribute?.("hidden")) sceneCompass?.classList?.add("is-visible");
     }
 
     hideLayoutSwitch() {
@@ -4408,6 +4501,7 @@
       this.cancelLayoutSwitchHide();
       layoutSwitch?.classList?.remove("is-visible");
       layoutDivider?.classList?.remove("is-visible");
+      sceneCompass?.classList?.remove("is-visible");
     }
 
     cancelLayoutSwitchHide() {
@@ -4637,6 +4731,7 @@
       game.secretDoorWaitCounter = save.secretDoorWaitCounter || 0;
       game.trollsTransformed = Boolean(save.trollsTransformed);
       game.trollsDefeated = Boolean(save.trollsDefeated);
+      game.sceneMapVisible = false;
       game.spiderEyesState = save.spiderEyesState || null;
       game.gollumState = game.restoreGollumState(save.gollumState);
       game.turnCount = Number(save.turnCount) || 0;
@@ -4649,10 +4744,11 @@
       game.addZXFinaleState();
       game.unexpectedParty?.load(save.unexpectedParty || null);
       game.companionDirector?.sync();
+      game.cancelOutputScrollAnimation({ jumpToTarget: false });
       output.replaceChildren();
       output.classList.remove("end-screen");
       input.value = "";
-      input.focus();
+      game.focusCommandInput();
       game.render();
     }
 
@@ -4686,6 +4782,7 @@
       this.restoreSnapshot(clone(game.autosaveSnapshot));
       game.print(autosaveResumedText(game.autosaveMeta?.label), "system");
       game.describeRoom({ full: true });
+      game.checkSpecialSituations();
       return true;
     }
   }
@@ -5197,7 +5294,7 @@
     }
 
     killBySpiderEyes() {
-      this.game.endGame("Something stings. You are dead.", { fatal: true });
+      this.game.endGame("Something small and venomous strikes from the dark. Cold fire runs through your limbs, and the forest takes you before you can cry out.", { fatal: true });
     }
 
     checkSpecialSituations() {
@@ -5232,6 +5329,12 @@
     checkTrollsClearing() {
       const game = this.game;
       if (game.currentRoom !== "trolls_clearing") return;
+      if (game.trollsTransformed) {
+        game.visitedTrollsClearing = true;
+        game.trollsDefeated = true;
+        game.print("You see the stone remains of the trolls.");
+        return;
+      }
       if (!game.visitedTrollsClearing) {
         game.recordAutosave("before facing the trolls", { key: "hazard:trolls:room" });
         game.visitedTrollsClearing = true;
@@ -5244,20 +5347,15 @@
         game.print("P'raps there are more like him round about.");
         return;
       }
-      if (game.trollsTransformed) {
-        game.trollsDefeated = true;
-        game.print("You see the stone remains of the trolls.");
-        return;
-      }
       const liveTroll = game.peopleInRoom().find((p) => ["hideous troll", "vicious troll"].includes(normalize(p.name)) && p.visible);
       if (liveTroll && !game.trollsDefeated) {
-        game.print("The hideous troll eats you. You are dead.", "danger");
-        game.endGame("You are dead.", { fatal: true });
+        game.endGame("The hideous troll stoops, snatches you up before you can slip away, and makes an end of you beside the dying fire.", { fatal: true });
       }
     }
 
     maybeAutosaveForRoom(roomId = this.game.currentRoom) {
       const game = this.game;
+      if (roomId === "trolls_clearing" && game.trollsTransformed) return false;
       const hazardMap = {
         deep_dark_lake: { label: "before meeting Gollum", key: "hazard:gollum:room" },
         trolls_clearing: { label: "before facing the trolls", key: "hazard:trolls:room" },
@@ -5362,7 +5460,7 @@
       const game = this.game;
       clearTimeout(game.autoplayTypingTimer);
       input.value = "";
-      input.focus();
+      game.focusCommandInput();
       let index = 0;
       const typeDelay = game.autoplayMode === "slow" ? 42 : 6;
       const submitDelay = game.autoplayMode === "slow" ? 180 : 20;
@@ -5724,22 +5822,22 @@
       this.stopAutoplay();
       game.clearIdleAdvanceTimer();
       game.clearArrivalNoticeTimers();
-      output.replaceChildren();
-      output.classList.add("end-screen");
       game.endgame = true;
-      game.endgameRestartArmed = true;
+      game.endgameRestartArmed = false;
       game.pendingEndgameChoice = options.fatal ? "death" : null;
       const totalRooms = Math.max(Object.keys(game.rooms).length, 1);
       const percentage = (game.visitedRooms.size / totalRooms) * 100;
-      const endMessage = message ? `${message.replace(/[.!?]*$/, "")}. ` : "";
-      game.print(`${endMessage}You have mastered ${percentage.toFixed(2)}% of this adventure.`, "danger");
+      const endMessage = message ? message.replace(/[.!?]*$/, ".") : "Your road ends here.";
+      game.print(endMessage, "danger");
+      game.print(`So ends this thread of the tale. You have mastered ${percentage.toFixed(2)}% of this adventure.`, "system");
       if (options.fatal && game.autosaveSnapshot) {
         game.print(autosaveChoiceText(game.autosaveMeta?.roomName), "system");
       } else if (options.fatal) {
         game.print(restartChoiceText(), "system");
       } else {
-        game.print(restartAnyKeyText(), "system");
+        game.print(restartChoiceText(), "system");
       }
+      game.focusCommandInput({ defer: true });
     }
 
     winGame(message) {
@@ -5747,16 +5845,16 @@
       this.stopAutoplay();
       game.clearIdleAdvanceTimer();
       game.clearArrivalNoticeTimers();
-      output.replaceChildren();
-      output.classList.add("end-screen");
       game.endgame = true;
-      game.endgameRestartArmed = true;
+      game.endgameRestartArmed = false;
       game.pendingEndgameChoice = null;
       const totalRooms = Math.max(Object.keys(game.rooms).length, 1);
       const percentage = (game.visitedRooms.size / totalRooms) * 100;
-      const endMessage = message ? `${message.replace(/[.!?]*$/, "")}. ` : "";
-      game.print(`${endMessage}You have mastered ${percentage.toFixed(2)}% of this adventure.`, "success");
-      game.print(restartAnyKeyText(), "system");
+      const endMessage = message ? message.replace(/[.!?]*$/, ".") : "The tale reaches its proper end.";
+      game.print(endMessage, "success");
+      game.print(`So the tale is brought to its close. You have mastered ${percentage.toFixed(2)}% of this adventure.`, "system");
+      game.print(restartChoiceText(), "system");
+      game.focusCommandInput({ defer: true });
     }
 
     restartGame() {
@@ -5779,6 +5877,7 @@
       game.secretDoorWaitCounter = 0;
       game.trollsTransformed = false;
       game.trollsDefeated = false;
+      game.sceneMapVisible = false;
       game.visitedRooms = new Set();
       game.tipsEnabled = false;
       game.tipIndex = 0;
@@ -5792,13 +5891,14 @@
       game.splitter = new CommandSplitter(game.data);
       game.delegatedSplitters = new Map();
       game.sharedDelegatedContext = { lastObject: null, lastDirectObject: null, lastTargetObject: null };
+      game.cancelOutputScrollAnimation({ jumpToTarget: false });
       output.replaceChildren();
       output.classList.remove("end-screen");
       game.initState();
       game.describeRoom(true);
       game.scheduleIdleAdvance();
       input.value = "";
-      input.focus();
+      game.focusCommandInput();
     }
   }
 
@@ -6030,6 +6130,17 @@
 
     showMap() {
       const game = this.game;
+      if (!game.visitedRooms?.size) {
+        game.print("No location has been visited yet. The map cannot be displayed.");
+        return;
+      }
+      game.sceneMapVisible = true;
+      game.print("You study the map of Wilderland.");
+      game.render();
+    }
+
+    showExits() {
+      const game = this.game;
       const exits = game.roomConnections().map((connection, index) => {
         const destination = roomDisplayName(game.rooms[connection.to] || connection.to, { article: true });
         const direction = mapDirectionLabel(connection.direction);
@@ -6092,8 +6203,9 @@
             key: `special:${game.currentRoom}:${action.verb}:${action.obj1 || ""}:${action.obj2 || ""}:${action.destination}`,
           });
         }
+        const actionEndsGame = String(action.destination || "").includes("endgame");
         if (action.desc1) game.print(actorActionSentence(game.player, action.desc1));
-        if (action.desc2) game.print(action.desc2, action.destination?.includes("endgame") ? "danger" : "");
+        if (action.desc2 && !actionEndsGame) game.print(action.desc2);
         this.performSpecialActionTransfer(action);
         if (action.flag_out) this.setFlag(action.flag_out.replace("*", ""), true);
         if (action.reveals) this.reveal(action.reveals);
@@ -6103,8 +6215,8 @@
           if (game.items.calm_pony) game.items.calm_pony.visible = false;
         }
         if (action.destination) {
-          if (action.destination.includes("endgame")) {
-            game.endGame("The adventure ends.", { fatal: true });
+          if (actionEndsGame) {
+            game.endGame(action.desc2 || "The tale goes no farther from here.", { fatal: true });
           } else if (game.roomByName(action.destination)) {
             game.currentRoom = game.roomByName(action.destination).id;
             game.player.position = game.currentRoom;
@@ -6306,6 +6418,7 @@
       this.secretDoorWaitCounter = 0;
       this.trollsTransformed = false;
       this.trollsDefeated = false;
+      this.sceneMapVisible = false;
       this.visitedRooms = new Set();
       this.tipsEnabled = false;
       this.tipIndex = 0;
@@ -6331,6 +6444,8 @@
       this.imageTransitionTimer = null;
       this.idleAdvanceTimer = null;
       this.idleWaitMs = IDLE_WAIT_MS;
+      this.outputScrollFrame = null;
+      this.outputScrollTarget = 0;
       this.currentImageSrc = roomImage.getAttribute("src") || "";
       this.imageTransitionCycle = 0;
       this.audio = musicPlayer;
@@ -6346,6 +6461,7 @@
       this.bind();
       this.describeRoom(true);
       this.scheduleIdleAdvance();
+      this.focusCommandInput({ defer: true });
     }
 
     initState() {
@@ -6605,6 +6721,66 @@
       }
     }
 
+    focusCommandInput(options = {}) {
+      const { defer = false } = options;
+      const applyFocus = () => {
+        if (!input) return;
+        const activeElement = document.activeElement;
+        if (activeElement && activeElement !== document.body && activeElement !== input) return;
+        input.focus({ preventScroll: true });
+      };
+      if (defer && typeof window.requestAnimationFrame === "function") {
+        window.requestAnimationFrame(applyFocus);
+        return;
+      }
+      applyFocus();
+    }
+
+    cancelOutputScrollAnimation(options = {}) {
+      const { jumpToTarget = true } = options;
+      if (this.outputScrollFrame && typeof window.cancelAnimationFrame === "function") {
+        window.cancelAnimationFrame(this.outputScrollFrame);
+      } else if (this.outputScrollFrame) {
+        clearTimeout(this.outputScrollFrame);
+      }
+      this.outputScrollFrame = null;
+      if (jumpToTarget && output) output.scrollTop = this.outputScrollTarget || 0;
+    }
+
+    scheduleOutputScroll() {
+      if (!output) return;
+      const scrollHeight = Number(output.scrollHeight) || 0;
+      const viewportHeight = Number(output.clientHeight || output.offsetHeight) || 0;
+      this.outputScrollTarget = Math.max(0, scrollHeight - viewportHeight);
+      if (Math.abs((Number(output.scrollTop) || 0) - this.outputScrollTarget) < 1) {
+        output.scrollTop = this.outputScrollTarget;
+        return;
+      }
+      if (this.outputScrollFrame) return;
+
+      const step = () => {
+        const currentTop = Number(output.scrollTop) || 0;
+        const delta = this.outputScrollTarget - currentTop;
+        if (Math.abs(delta) < 1) {
+          output.scrollTop = this.outputScrollTarget;
+          this.outputScrollFrame = null;
+          return;
+        }
+        output.scrollTop = currentTop + (delta * OUTPUT_SCROLL_EASING);
+        if (typeof window.requestAnimationFrame === "function") {
+          this.outputScrollFrame = window.requestAnimationFrame(step);
+        } else {
+          this.outputScrollFrame = setTimeout(step, 16);
+        }
+      };
+
+      if (typeof window.requestAnimationFrame === "function") {
+        this.outputScrollFrame = window.requestAnimationFrame(step);
+      } else {
+        this.outputScrollFrame = setTimeout(step, 16);
+      }
+    }
+
     execute(rawCommand) {
       this.clearIdleAdvanceTimer();
       try {
@@ -6643,6 +6819,7 @@
         }
         rawCommand = this.normalizeConversationalQuestion(rawCommand);
         const normalizedCommand = normalizeNaturalCommand(rawCommand.toLowerCase());
+        if (normalizedCommand !== "map") this.sceneMapVisible = false;
         if (this.isUnsupportedConditional(normalizedCommand)) {
           this.print("Conditional commands are not supported yet. Try the action when the condition is true.", "system");
           return;
@@ -7136,7 +7313,7 @@
         line.textContent = part.trim();
         output.append(line);
       }
-      output.scrollTop = output.scrollHeight;
+      this.scheduleOutputScroll();
     }
 
     itemsInRoom(roomId) {
@@ -7673,6 +7850,9 @@
       this.visitedRooms = new Set([this.currentRoom, ...(this.visitedRooms || [])]);
       this.print(`Jumped to ${preset.label}.`, "system");
       this.describeRoom({ full: true });
+      if (this.currentRoom === "trolls_clearing" && !this.visitedTrollsClearing && !this.trollsTransformed) {
+        this.checkSpecialSituations();
+      }
       return true;
     }
 
@@ -7709,6 +7889,7 @@
       this.sharedDelegatedContext = { lastObject: null, lastDirectObject: null, lastTargetObject: null };
       this.autosaveSnapshot = null;
       this.autosaveMeta = null;
+      this.cancelOutputScrollAnimation({ jumpToTarget: false });
       output.classList.remove("end-screen");
       this.initState();
       input.value = "";
@@ -7831,6 +8012,10 @@
 
     showMap() {
       return this.exploration.showMap();
+    }
+
+    showExits() {
+      return this.exploration.showExits();
     }
 
     handleMusicCommand(object) {
@@ -8856,7 +9041,7 @@
       this.player.strength = Math.max(0, (this.player.strength || 0) - outcome.damage);
       this.print(`${outcome.message} Strength: ${this.player.strength}.`, "danger");
       if (this.player.strength <= 0) {
-        this.endGame("Your strength fails you in the dark.", { fatal: true });
+        this.endGame("At last your strength deserts you in the blind dark, and there the road goes out beneath your feet.", { fatal: true });
         return true;
       }
       return false;
@@ -9346,18 +9531,18 @@
       if (attacker.id === this.data.player) {
         message = `You attack ${targetName}${weaponText}.`;
         message += successful
-          ? ` ${capitalize(targetName)} counters, but you strike again and ${targetName} is dead.`
-          : ` ${capitalize(targetName)} counters at once and you are dead.`;
+          ? ` ${capitalize(targetName)} counters, but you strike again and ${targetName} falls.`
+          : ` ${capitalize(targetName)} counters at once, and the fight is over almost before it begins.`;
       } else if (target.id === this.data.player) {
         message = `${attackerName} attacks you${weaponText}.`;
         message += successful
-          ? ` You strike back, but ${attackerName} attacks again and you are dead.`
-          : ` You counterattack and ${attackerName} is dead.`;
+          ? ` You strike back, but ${attackerName} comes on again and lays you low.`
+          : ` You counterattack and ${attackerName} falls.`;
       } else {
         message = `${attackerName} attacks ${targetName}${weaponText}.`;
         message += successful
-          ? ` ${capitalize(targetName)} strikes back, but ${attackerName} attacks again and ${targetName} falls dead.`
-          : ` ${capitalize(targetName)} counters and ${attackerName} is dead.`;
+          ? ` ${capitalize(targetName)} strikes back, but ${attackerName} attacks again and ${targetName} falls.`
+          : ` ${capitalize(targetName)} counters and ${attackerName} falls.`;
       }
 
       this.dropInventory(fallen);
@@ -9835,6 +10020,10 @@
       .replace(/\bgive\s+(.+?)\s+back\s+to\b/g, "give $1 to")
       .replace(/\bgive\s+me\s+(.+?)\s+back\b/g, "give $1 to me")
       .replace(/\bloose\s+(?:the\s+)?arrow\b/g, "take shot")
+      .replace(/^(?:show|list)(?:\s+me)?\s+(?:the\s+)?(?:(?:available|visible)\s+)?exits$/i, "exits")
+      .replace(/^(?:available|visible)\s+exits$/i, "exits")
+      .replace(/^(?:what|which)\s+(?:(?:are|is)\s+)?(?:the\s+)?(?:(?:available|visible)\s+)?exits(?:\s+(?:are\s+there|from\s+here))?$/i, "exits")
+      .replace(/^where\s+can\s+(?:i|we)\s+go$/i, "exits")
       .replace(/\s+for\s+(?:me|us)\s*$/g, "")
       .replace(/\bturn\s+off\b/g, "close")
       .replace(/\bturn\s+on\b/g, "open")
@@ -10195,7 +10384,7 @@
 
   function autosaveChoiceText(roomName = "") {
     const roomText = roomName ? ` in ${roomDisplayName(roomName)}` : "";
-    return `Type 'autosave' to return to the last safe moment${roomText}, or 'restart' to begin the tale again.`;
+    return `Type 'load autosave' to return to the last safe moment${roomText}, or 'restart' to begin the tale again.`;
   }
 
   function restartChoiceText() {
@@ -10203,11 +10392,11 @@
   }
 
   function restartAnyKeyText() {
-    return "Press any key or click to begin the tale again.";
+    return "Type 'restart' to begin the tale again.";
   }
 
   function adventureEndedText() {
-    return "The adventure is over. Press any key or type 'restart' to begin the tale again.";
+    return "The adventure is over. Type 'restart' to begin the tale again.";
   }
 
   function characterPresence(character) {
@@ -10476,6 +10665,19 @@
 
   function assetUrl(root, file) {
     return `${root}${String(file).split("/").map(encodeURIComponent).join("/")}?v=${ASSET_VERSION}`;
+  }
+
+  function compassDirectionKey(direction) {
+    const normalized = normalize(String(direction || ""))
+      .replace(/[\-_]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!normalized) return "";
+    if (normalized === "northeast") return "north east";
+    if (normalized === "northwest") return "north west";
+    if (normalized === "southeast") return "south east";
+    if (normalized === "southwest") return "south west";
+    return normalized;
   }
 
   window.hobbitGame = new HobbitGame(DATA);

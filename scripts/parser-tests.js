@@ -54,6 +54,21 @@ function bootGame() {
     "image-reveal",
     "image-reveal-outline",
     "image-reveal-fill",
+    "scene-map-overlay",
+    "scene-map-image",
+    "scene-compass",
+    "scene-compass-rose",
+    "scene-compass-vertical",
+    "scene-compass-north",
+    "scene-compass-north-east",
+    "scene-compass-east",
+    "scene-compass-south-east",
+    "scene-compass-south",
+    "scene-compass-south-west",
+    "scene-compass-west",
+    "scene-compass-north-west",
+    "scene-compass-up",
+    "scene-compass-down",
     "music-player",
     "inventory-list",
     "exits-list",
@@ -1702,7 +1717,11 @@ const gameCases = [
         throw new Error(`Expected autoplay victory message. Commands: ${issued.slice(-12).join(" | ")}`);
       }
     },
-    expectedIncluded: [/Congratulations\. You have killed Smaug and found the treasure - a real thief\. You have mastered \d+\.\d+% of this adventure\./],
+    expectedIncluded: [
+      "Congratulations. You have killed Smaug and found the treasure - a real thief.",
+      /So the tale is brought to its close\. You have mastered \d+\.\d+% of this adventure\./,
+      "Type 'restart' to begin the tale again.",
+    ],
     notExpectedIncluded: ["You leave the", "You drop the"],
   },
   {
@@ -1932,10 +1951,10 @@ const gameCases = [
     ],
   },
   {
-    name: "map command uses narrative room names",
+    name: "exits command uses narrative room names",
     drive(game) {
       game.currentRoom = "bag_end_guest_room";
-      game.execute("map");
+      game.execute("exits");
     },
     expectedIncluded: [
       "From here, north leads to the parlour.",
@@ -1944,6 +1963,37 @@ const gameCases = [
       "From here:",
       "Hobbit_hole",
       "bag_end_parlour",
+    ],
+  },
+  {
+    name: "natural exits phrasing maps to exits command",
+    drive(game) {
+      game.currentRoom = "bag_end_guest_room";
+      game.execute("show me the available exits");
+    },
+    expectedIncluded: [
+      "From here, north leads to the parlour.",
+    ],
+  },
+  {
+    name: "map command shows the game map overlay",
+    drive(game) {
+      const overlay = document.getElementById("scene-map-overlay");
+      const image = document.getElementById("scene-map-image");
+      game.execute("map");
+      const visible = Object.prototype.hasOwnProperty.call(overlay.attributes, "hidden") ? "no" : "yes";
+      const src = image.getAttribute("src") || "";
+      game.print(`Map overlay visible: ${visible}`);
+      game.print(`Map image loaded: ${src.includes("map.jpeg") ? "yes" : "no"}`);
+      game.execute("exits");
+      const hiddenAfter = Object.prototype.hasOwnProperty.call(overlay.attributes, "hidden") ? "yes" : "no";
+      game.print(`Map overlay hidden after exits: ${hiddenAfter}`);
+    },
+    expectedIncluded: [
+      "You study the map of Wilderland.",
+      "Map overlay visible: yes",
+      "Map image loaded: yes",
+      "Map overlay hidden after exits: yes",
     ],
   },
   {
@@ -1972,6 +2022,72 @@ const gameCases = [
       "Has map: yes",
       "Has key: yes",
       "Trolls transformed: yes",
+    ],
+  },
+  {
+    name: "jump trolls preserves offscreen dawn progression after leaving the clearing",
+    drive(game) {
+      game.execute("jump trolls");
+      game.execute("south east");
+      game.execute("wait");
+      game.execute("wait");
+      game.execute("wait");
+      game.print(`Trolls transformed after waits: ${game.trollsTransformed ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Jumped to Trolls Clearing.",
+      "Day dawns.",
+      "Trolls transformed after waits: yes",
+    ],
+  },
+  {
+    name: "jump trolls starts at the opening troll argument",
+    drive(game) {
+      game.execute("jump trolls");
+    },
+    expectedIncluded: [
+      "Jumped to Trolls Clearing.",
+      "You crouch low behind a mossy boulder, heart pounding, as the trolls argue by the flickering campfire in the moonlit clearing.",
+      "What shall us do with him?",
+      "Roast him!",
+    ],
+  },
+  {
+    name: "stone trolls do not mark a pre-battle autosave",
+    drive(game) {
+      game.execute("jump rivendell");
+      game.execute("west");
+      game.print(`Stone trolls autosave: ${game.autosaveMeta?.label || "none"}`);
+    },
+    expectedIncluded: [
+      "Jumped to Rivendell.",
+      "Morning has reduced menace to silence; the stone trolls keep their quarrel forever without coming any nearer.",
+      "Stone trolls autosave: none",
+    ],
+    notExpectedIncluded: [
+      "A safe moment is marked here: before facing the trolls.",
+    ],
+  },
+  {
+    name: "layout 2 compass follows visible exits and hides in darkness",
+    drive(game) {
+      game.setLayoutMode("2");
+      game.execute("jump rivendell");
+      const compass = document.getElementById("scene-compass");
+      const east = document.getElementById("scene-compass-east").getAttribute("data-active") || "false";
+      const west = document.getElementById("scene-compass-west").getAttribute("data-active") || "false";
+      const north = document.getElementById("scene-compass-north").getAttribute("data-active") || "false";
+      const visible = Object.prototype.hasOwnProperty.call(compass.attributes, "hidden") ? "no" : "yes";
+      game.print(`Compass Rivendell: east=${east} west=${west} north=${north} visible=${visible}`);
+      game.currentRoom = "deep_dark_lake";
+      game.player.position = "deep_dark_lake";
+      game.render();
+      const hiddenInDark = Object.prototype.hasOwnProperty.call(compass.attributes, "hidden") ? "yes" : "no";
+      game.print(`Compass dark hidden: ${hiddenInDark}`);
+    },
+    expectedIncluded: [
+      "Compass Rivendell: east=true west=true north=true visible=yes",
+      "Compass dark hidden: yes",
     ],
   },
   {
@@ -2552,9 +2668,10 @@ const gameCases = [
       game.print(`Autosave room: ${game.autosaveMeta?.roomId || "none"}`);
     },
     expectedIncluded: [
+      /Gollum.*(Wrong|False|dark|water|stones)/,
       "Death choice: death",
       "Autosave room: deep_dark_lake",
-      "Type 'autosave' to return to the last safe moment in Deep Dark Lake, or 'restart' to begin the tale again.",
+      "Type 'load autosave' to return to the last safe moment in Deep Dark Lake, or 'restart' to begin the tale again.",
     ],
   },
   {
@@ -2575,6 +2692,22 @@ const gameCases = [
       "You take up the thread again: before meeting Gollum.",
       "Resume room: deep_dark_lake",
       "Resume endgame: no",
+    ],
+  },
+  {
+    name: "load autosave after troll death restores the troll scene opening",
+    drive(game) {
+      game.execute("jump trolls");
+      outputLines.length = 0;
+      game.execute("take large key");
+      game.execute("load autosave");
+    },
+    expectedIncluded: [
+      "You take up the thread again: before facing the trolls.",
+      "You are in the trolls' clearing.",
+      "You crouch low behind a mossy boulder, heart pounding, as the trolls argue by the flickering campfire in the moonlit clearing.",
+      "What shall us do with him?",
+      "Roast him!",
     ],
   },
   {
@@ -2610,7 +2743,26 @@ const gameCases = [
     expectedIncluded: [
       "River autosave room: west_bank",
       "River death choice: death",
-      "Type 'autosave' to return to the last safe moment in West Bank, or 'restart' to begin the tale again.",
+      "Type 'load autosave' to return to the last safe moment in West Bank, or 'restart' to begin the tale again.",
+    ],
+  },
+  {
+    name: "fatal river action keeps scripted narration inline",
+    setup(game) {
+      game.currentRoom = "west_bank";
+      game.player.position = "west_bank";
+    },
+    drive(game) {
+      game.execute("jump into river");
+    },
+    expectedIncluded: [
+      "You jump into the river.",
+      "The river takes you at once, spinning you among the rocks before any hand can save you.",
+      /So ends this thread of the tale\. You have mastered \d+\.\d+% of this adventure\./,
+      "Type 'load autosave' to return to the last safe moment in West Bank, or 'restart' to begin the tale again.",
+    ],
+    notExpectedIncluded: [
+      "The tale goes no farther from here.",
     ],
   },
   {

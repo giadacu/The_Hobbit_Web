@@ -41,6 +41,26 @@
           <img id="image-reveal-outline" class="image-reveal-outline" alt="">
           <img id="image-reveal-fill" class="image-reveal-fill" alt="">
         </div>
+        <div id="scene-map-overlay" class="scene-map-overlay" aria-hidden="true" hidden>
+          <img id="scene-map-image" alt="Map of the game world">
+        </div>
+        <div id="scene-compass" class="scene-compass" aria-hidden="true" hidden>
+          <div id="scene-compass-rose" class="scene-compass__rose">
+            <span id="scene-compass-north" class="scene-compass__point scene-compass__point--north" data-active="false">N</span>
+            <span id="scene-compass-north-east" class="scene-compass__point scene-compass__point--north-east" data-active="false">NE</span>
+            <span id="scene-compass-east" class="scene-compass__point scene-compass__point--east" data-active="false">E</span>
+            <span id="scene-compass-south-east" class="scene-compass__point scene-compass__point--south-east" data-active="false">SE</span>
+            <span id="scene-compass-south" class="scene-compass__point scene-compass__point--south" data-active="false">S</span>
+            <span id="scene-compass-south-west" class="scene-compass__point scene-compass__point--south-west" data-active="false">SW</span>
+            <span id="scene-compass-west" class="scene-compass__point scene-compass__point--west" data-active="false">W</span>
+            <span id="scene-compass-north-west" class="scene-compass__point scene-compass__point--north-west" data-active="false">NW</span>
+            <span class="scene-compass__center" aria-hidden="true"></span>
+          </div>
+          <div id="scene-compass-vertical" class="scene-compass__vertical" hidden>
+            <span id="scene-compass-up" class="scene-compass__vertical-label" data-active="false" hidden>Up</span>
+            <span id="scene-compass-down" class="scene-compass__vertical-label" data-active="false" hidden>Dn</span>
+          </div>
+        </div>
         <audio id="music-player" preload="none"></audio>
       </section>
 
@@ -50,7 +70,7 @@
         <div id="output" class="output" aria-live="polite"></div>
         <form id="command-form" class="command-form">
           <label for="command-input">&gt;</label>
-          <input id="command-input" name="command" autocomplete="off" spellcheck="false">
+          <input id="command-input" name="command" autocomplete="off" spellcheck="false" autofocus>
         </form>
       </section>
 
