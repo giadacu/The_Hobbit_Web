@@ -56,11 +56,15 @@
   const DEFAULT_LAYOUT_2_SCENE_WIDTH = 54;
   const IDLE_WAIT_MS = 30000;
   const OUTPUT_SCROLL_EASING = 0.16;
+  const PROFANITY_OUTBURST_RE = /\b(?:fuck(?:ing)?|fuckin|shit|bullshit|damn(?:ed)?|asshole|bastard|cazzo|merda|vaffanculo|fanculo|stronz[oaie]?)\b/i;
+  const PROFANITY_FILLER_RE = /\b(?:fuck(?:ing)?|fuckin|shit|bullshit|damn(?:ed)?|bloody|bastard(?:s)?|asshole(?:s)?|cazzo|merda|vaffanculo|fanculo|stronz[oaie]?|maledett[oaie]?)\b/gi;
 
   const commandsWithoutObject = new Set([
-    "look", "wait", "inventory", "i", "save", "load", "quit", "verbs",
+    "look", "wait", "inventory", "inv", "i", "save", "load", "quit", "verbs",
     "mysaves", "hello", "tips", "map", "exits", "exit", "location", "music", "autoplay", "jumps",
     "teleport", "warp",
+    "help", "hint", "status", "restart", "autosave", "undo", "pause",
+    "hide", "escape", "talk",
     "jump", "sit", "stand", "sleep", "rest", "run", "wake", "crawl", "leap",
     "dive", "swim", "lie", "listen", "smell", "sniff", "search", "explore",
     "investigate", "examine", "inspect", "watch", "eavesdrop", "scout",
@@ -85,10 +89,34 @@
     "help", "explain", "negotiate", "print", "call", "wash", "check",
     "start", "refill", "inform", "review", "mend", "repair", "fix",
     "write", "lie", "pick", "trim", "fill", "water", "plant", "rake",
+    "tie", "untie", "press", "rotate", "smash", "sharpen", "clean",
+    "bandage", "dodge", "block", "swing", "wave", "shake", "hug", "gather",
+    "shoot", "fire",
     "teleport", "warp", "jumps",
   ];
+  const ACTIONABLE_COMMAND_STARTERS = new Set([
+    ...commandsWithoutObject,
+    ...NATURAL_VERBS,
+    "ask", "attack", "break", "buy", "carry", "close", "combine", "deliver", "drop",
+    "enter", "examine", "explore", "fight", "find", "follow", "get", "give", "go",
+    "inspect", "inventory", "kill", "leave", "light", "lock", "look", "move", "open",
+    "pick", "place", "pull", "push", "read", "repair", "request", "search", "sell",
+    "show", "shoot", "sneak", "speak", "take", "talk", "tell", "throw", "turn",
+    "unlock", "use", "walk", "wear",
+  ]);
 
   const DEBUG_JUMP_PRESETS = [
+    {
+      key: "before_green_dragon",
+      label: "Before Green Dragon",
+      description: "On the road outside the inn, just before entering the Green Dragon for the first time.",
+      aliases: ["before green dragon", "green dragon outside", "outside green dragon", "before_green_dragon"],
+      apply(game) {
+        game.debugCompleteUnexpectedParty();
+        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true });
+        game.debugMovePlayer("green_dragon_inn_outside");
+      },
+    },
     {
       key: "green_dragon",
       label: "Green Dragon Inn",
@@ -123,9 +151,24 @@
         game.debugCompleteUnexpectedParty();
         game.debugMarkPonyProgress();
         game.transformTrolls();
-        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true });
+        game.flags.rivendellropesecured = true;
+        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true });
         game.debugMovePlayer("rivendell");
         game.debugSetCharacterRoom("elrond", "rivendell");
+      },
+    },
+    {
+      key: "after_trolls_cave",
+      label: "After Trolls Cave",
+      description: "After looting the trolls' cave, on the road toward Rivendell.",
+      aliases: ["after trolls cave", "trolls cave", "after_trolls_cave", "post trolls cave"],
+      apply(game) {
+        game.debugCompleteUnexpectedParty();
+        game.debugMarkPonyProgress();
+        game.transformTrolls();
+        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true });
+        game.debugGivePlayerItem("large key");
+        game.debugMovePlayer("trollshaws_road");
       },
     },
     {
@@ -137,7 +180,8 @@
         game.debugCompleteUnexpectedParty();
         game.debugMarkPonyProgress();
         game.transformTrolls();
-        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true });
+        game.flags.rivendellropesecured = true;
+        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true });
         game.debugMovePlayer("deep_dark_lake");
         game.debugSetCharacterRoom("gollum", "deep_dark_lake");
       },
@@ -152,6 +196,7 @@
         game.debugMarkPonyProgress();
         game.transformTrolls();
         game.flags.mapread = true;
+        game.flags.rivendellropesecured = true;
         game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true, ring: true });
         game.debugMovePlayer("beorns_house");
         game.debugSetCharacterRoom("beorn", "beorns_house");
@@ -167,6 +212,7 @@
         game.debugMarkPonyProgress();
         game.transformTrolls();
         game.flags.mapread = true;
+        game.flags.rivendellropesecured = true;
         game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true, ring: true });
         game.debugMovePlayer("mirkwood_forest_path");
       },
@@ -181,6 +227,7 @@
         game.debugMarkPonyProgress();
         game.transformTrolls();
         game.flags.mapread = true;
+        game.flags.rivendellropesecured = true;
         game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true, ring: true });
         game.debugMovePlayer("wooden_town");
         game.debugSetCharacterRoom("bard", "wooden_town");
@@ -196,6 +243,7 @@
         game.debugMarkPonyProgress();
         game.transformTrolls();
         game.flags.mapread = true;
+        game.flags.rivendellropesecured = true;
         game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true, ring: true });
         game.debugMovePlayer("front_gate");
         game.debugSetCharacterRoom("bard", "front_gate");
@@ -212,6 +260,7 @@
         game.transformTrolls();
         game.flags.mapread = true;
         game.flags.secretdoorsun = true;
+        game.flags.rivendellropesecured = true;
         game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true, ring: true });
         game.debugMovePlayer("lower_halls");
         game.debugSetCharacterRoom("bard", "lower_halls");
@@ -509,6 +558,8 @@
     "misty_mountain",
     "narrow_place",
     "large_dry_cave",
+    "trollshaws_road",
+    "hidden_valley_path",
     "narrow_ledge",
     "mountain_lookout",
     "storm_shelter",
@@ -554,6 +605,11 @@
       "The mill-wheel turns with patient steadiness, and the water below the bridge keeps up its bright unimportant chatter.",
       "A pair of ducks quack with deep domestic authority and drift downstream beneath the reeds.",
       "Blue smoke rises beyond the trees in easy folds, carrying the smell of supper-plans not yet urgent enough to hurry anyone.",
+    ],
+    green_dragon: [
+      "A door opens and shuts somewhere between taproom and yard, followed by the clink of cups and a scrap of laughter quickly swallowed by the evening.",
+      "From within the inn comes the homely racket of benches, tankards, and somebody beginning a story too loudly to keep it private.",
+      "Bootsteps cross the yard, pause by the stable, and pass on again while the Green Dragon keeps up its warm public murmur.",
     ],
     rivendell: [
       "A brief strain of elven song rises from elsewhere in the valley, then is gone like a bird on the wind.",
@@ -719,6 +775,21 @@
       text: "Morning has reduced menace to silence; the stone trolls keep their quarrel forever without coming any nearer.",
     },
     {
+      roomIds: ["green_dragon_inn"],
+      when: ({ game }) => game.flags.ponypreparing && !game.flags.ponyready,
+      text: "Beyond the wall you catch the small business of a yard being stirred to purpose: a latch lifted, harness shifted, and a pony giving one patient snort in the dark.",
+    },
+    {
+      roomIds: ["green_dragon_inn_outside"],
+      when: ({ game }) => game.flags.ponypreparing && !game.flags.ponyready,
+      text: "From round the side of the inn come low voices, the jingle of tack, and the sound of a pony being made ready but not yet brought under the oak.",
+    },
+    {
+      roomIds: ["green_dragon_inn_outside"],
+      when: ({ game }) => game.flags.ponyready && !game.flags.ponysequencecompleted,
+      text: "A calm pony now waits beneath the low branch, held there with the practical patience of an animal that has been put exactly where it is wanted.",
+    },
+    {
       roomIds: ["wooden_town"],
       when: ({ game }) => game.flags.dragondefeated,
       text: "Relief and rebuilding move together through the town; every hammer-blow sounds like work snatched back from disaster.",
@@ -831,6 +902,15 @@
       ),
       text: "Keeping low and clutching the stolen key, you slip away from the trolls' clearing into the gloomy empty land beyond.",
     },
+    {
+      onceFlag: "rivendellroperecoverednarrated",
+      when: ({ game, fromRoomId, toRoomId }) => (
+        fromRoomId === "hidden_valley_path"
+        && toRoomId === "rivendell"
+        && game.flags.rivendellropesecured
+      ),
+      text: "With the rope taking the worst of the drop, the company picks its way safely into the hidden valley. Once all are down, the line is worked loose and taken up again before the last short stretch into Rivendell.",
+    },
   ];
 
   function applyImmersionExpansion(data) {
@@ -860,6 +940,11 @@
       ensureConnection(a, dirA, b, distance);
       ensureConnection(b, dirB, a, distance);
     };
+
+    data.connections = data.connections.filter((connection) => !(
+      (connection.from === "trolls_clearing" && connection.to === "rivendell")
+      || (connection.from === "rivendell" && connection.to === "trolls_clearing")
+    ));
 
     const ensureItem = (id, config) => {
       if (data.items[id]) return data.items[id];
@@ -944,6 +1029,8 @@
       ["lane_beneath_hill", "Lane Beneath the Hill", "The road winds gently down from the Hill, bordered on either side by neat hedges and well-kept gardens. Bright flowers nod in the breeze, and beyond the fences lie green fields where sheep graze contentedly. The air is sweet with fresh earth and the agreeable rumor of baking from somewhere farther in the village. A robin sings from a hawthorn bush with complete indifference to the concerns of larger folk, while little paths stray off now and then toward snug hobbit-holes tucked into the hillside. The main road keeps on toward Hobbiton proper and the inns beyond.", "road_winding_gently.png", "relaxed"],
       ["party_field", "Party Field", "A broad stretch of green turf opens beside the road beneath a cluster of ancient trees. Here the hobbits hold their fairs, feasts, and merrymakings when the weather is kind. Wooden tables stand stacked beneath a canvas awning, and colored lanterns hang from the lower branches awaiting some future evening's importance. The grass is soft underfoot, bright with wildflowers, and the laughter of children at play goes pleasantly to and fro upon the air. It is a place made for comfort rather than enterprise, and all the better for it.", "broad_stretch_turf.png", "relaxed"],
       ["bywater_bridge", "Bywater Bridge", "The road crosses a small stone bridge over a clear-running stream. Beneath it the water chatters over smooth pebbles and slips away among reeds and watercress. On the far bank stands a little mill with a turning wheel, its steady creak mingling with the murmur of the water in a way that suggests useful work done without hurry. Ducks paddle lazily in the shallows, smoke rises from chimneys beyond the trees, and ahead, not far now, the Green Dragon's sign may sometimes be glimpsed through the branches when the sun catches it just so.", "stone_bridge.png", "relaxed"],
+      ["trollshaws_road", "Trollshaws Road", "The eastward road threads under beech and pine through the Trollshaws, where the land rises and falls in long uneasy folds. The air is colder here than it ought to be, and though the way is plain enough, the silence between the trees feels watchful rather than empty.", "trollshaws.png", "adventure"],
+      ["hidden_valley_path", "Hidden Valley Path", "The path narrows abruptly at the edge of a steep hidden drop, then bends away in a sharp descent toward a green valley glimpsed far below. Pine roots clutch the soil, an old iron spike juts from the rock, and the whole way looks passable only to those willing to trust a rope and one another.", "hidden_valley.png", "adventure"],
       ["rivendell_courtyard", "Courtyard", "White stone and living ivy share this quiet courtyard, where the sound of falling water softens every footstep. Benches stand in sun and shade alike, inviting weary travelers to believe that peace may yet be a practical thing.", "Rivendell.jpeg", "relaxed"],
       ["rivendell_library", "Library", "Tall shelves and carved ladders fill the library with the hush of well-kept wisdom. Scrolls, red-bound volumes, maps, and forgotten songs wait here with the patience of things certain they will outlast haste.", "map.jpeg", "relaxed"],
       ["rivendell_hall_of_fire", "Hall of Fire", "Firelight and song belong equally to this hall. Cushioned seats ring the hearth, the rafters hold echoes of ancient music, and any tale told here seems at once older and truer than it did outside.", "Rivendell.jpeg", "relaxed"],
@@ -989,6 +1076,9 @@
     ensureTwoWay("lane_beneath_hill", "east", "party_field", "west");
     ensureTwoWay("party_field", "east", "bywater_bridge", "west");
     ensureTwoWay("bywater_bridge", "east", "green_dragon_inn_outside", "west");
+    ensureTwoWay("trolls_clearing", "south east", "trollshaws_road", "north west", 2);
+    ensureTwoWay("trollshaws_road", "east", "hidden_valley_path", "west", 1);
+    ensureTwoWay("hidden_valley_path", "east", "rivendell", "west", 1);
     ensureTwoWay("hobbit_hole", "west", "bag_end_parlour");
     ensureTwoWay("hobbit_hole", "south", "bag_end_dining_room");
     ensureTwoWay("hobbit_hole", "north east", "bag_end_study", "south west");
@@ -1096,6 +1186,9 @@
       ["guest_linen_bundle", "linen bundle", "a folded bundle of fresh linen tied neatly with ribbon"],
       ["terrace_sundial", "elven sundial", "a pale sundial whose markings seem too graceful to be practical, though they plainly are"],
       ["bridge_lantern", "bridge lantern", "a silver lantern hung above the carved rail"],
+      ["descent_pine_roots", "pine roots", "thick pine roots gripping the lip of the descent like old knotted hands"],
+      ["weathered_iron_spike", "iron spike", "a weathered iron spike driven deep into the rock by some cautious traveller long ago"],
+      ["hidden_valley_drop", "drop", "a steep drop into the sheltered valley below, too awkward to trust without support"],
       ["lookout_cairn", "cairn", "a little cairn of guiding stones set by earlier mountain hands"],
       ["storm_shelter_supply_niche", "supply niche", "a dry niche in the rock where travelers might leave small stores", { container: true }],
       ["beorn_honey_crock", "honey crock", "a heavy crock of dark golden honey"],
@@ -1202,6 +1295,9 @@
       ["rivendell_guest_chambers", "guest_cedar_chest"],
       ["rivendell_terrace", "terrace_sundial"],
       ["rivendell_bridge", "bridge_lantern"],
+      ["hidden_valley_path", "descent_pine_roots"],
+      ["hidden_valley_path", "weathered_iron_spike"],
+      ["hidden_valley_path", "hidden_valley_drop"],
       ["mountain_lookout", "lookout_cairn"],
       ["storm_shelter", "storm_shelter_supply_niche"],
       ["beorn_great_hall", "beorn_honey_crock"],
@@ -1322,6 +1418,61 @@
           "The ducks are in better spirits than most folk before luncheon.",
         ],
       }],
+      ["green_dragon_innkeeper", "innkeeper", {
+        friendly: true,
+        strength: 4,
+        examineText: "A brisk middle-aged hobbit in a clean apron, polishing cups with the efficient calm of someone who can keep ale, gossip, and good order flowing all at once.",
+        talkLines: [
+          "The innkeeper gives the bar a final wipe and says 'Welcome to the Green Dragon. If you want warmth, ale, or room to listen unnoticed, you have chosen well enough.'",
+          "The innkeeper nods and says 'A respectable inn runs on clean mugs, steady hands, and knowing when not to overhear too much.'",
+        ],
+        topicResponses: [
+          { keywords: ["ale", "beer", "drink", "mug"], response: "The innkeeper says 'The ale is sound, the cider honest, and I do not water either unless the customer has plainly begun ahead of me.'" },
+          { keywords: ["food", "supper", "bread", "cheese"], response: "The innkeeper says 'There is bread, cheese, stew, and whatever else the kitchen can be persuaded into without a song about it.'" },
+          { keywords: ["road", "travellers", "east", "journey"], response: "The innkeeper says 'Road-folk come through with mud on their boots and stories on their tongues. We try not to let too much of either reach the benches.'" },
+          { keywords: ["thorin", "dwarves", "company"], response: "The innkeeper glances toward the dwarves and says 'Quiet they are not, but they pay attention to the room in a way I have learned to respect.'" },
+        ],
+        ambientLines: [
+          "Mind the tray there, if you please; mugs fall faster than they fill.",
+          "If you want another round, ask before the song grows louder than the sense in it.",
+        ],
+      }],
+      ["green_dragon_regular", "pipe-smoking farmer", {
+        friendly: true,
+        strength: 4,
+        examineText: "A weather-browned hobbit with sturdy hands, muddy boots, and a pipe that seems to have helped him think through many practical matters.",
+        talkLines: [
+          "The farmer shifts his pipe and says 'A man may do a great deal with good earth, fair weather, and time to complain properly about both.'",
+          "The pipe-smoking farmer gives you a side-look and says 'The Green Dragon is the right place for hearing news before it decides whether to be gossip.'",
+        ],
+        topicResponses: [
+          { keywords: ["weather", "rain", "fields", "harvest"], response: "The pipe-smoking farmer says 'A field wants rain one day, sun the next, and gratitude never. Much like respectable relations.'" },
+          { keywords: ["ale", "inn", "green dragon"], response: "The pipe-smoking farmer says 'Good ale, steady benches, and no fool of a landlord. That is all the excellence most inns ever need aspire to.'" },
+          { keywords: ["road", "travellers", "dwarves"], response: "The pipe-smoking farmer says 'Road-folk have been more plentiful lately. Makes the village look awake even when it would rather be digesting.'" },
+        ],
+        ambientLines: [
+          "If the wind holds fair tomorrow, the lower fields will dry nicely.",
+          "A pipe tastes better indoors when the evening is turning cool.",
+        ],
+      }],
+      ["green_dragon_traveller", "travelling tinker", {
+        friendly: "neutral",
+        strength: 3,
+        examineText: "A lean traveller with a patched coat, a clever eye, and a satchel full of small useful things that probably seemed unnecessary until exactly the wrong moment.",
+        talkLines: [
+          "The travelling tinker taps his satchel and says 'A road teaches you what breaks, and then offers to sell you the means of mending it.'",
+          "The travelling tinker smiles thinly and says 'I go where buckles fail, hinges complain, and respectable folk suddenly discover they do in fact need a little hook or pin.'",
+        ],
+        topicResponses: [
+          { keywords: ["road", "journey", "east", "travellers"], response: "The travelling tinker says 'Westward roads soften a body. Eastward ones remember every weak strap and every loose sole.'" },
+          { keywords: ["goods", "wares", "tools", "repairs"], response: "The travelling tinker says 'Pins, clasps, buckles, awls, and bits of wire. Little things, until a little thing is exactly what saves your day.'" },
+          { keywords: ["inn", "ale", "green dragon"], response: "The travelling tinker says 'An inn is best judged by its hinges, then its fire, then its ale. This one passes all three well enough.'" },
+        ],
+        ambientLines: [
+          "There is always one strap on the verge of treachery if you look closely enough.",
+          "Small repairs keep a long road from becoming a foolish one.",
+        ],
+      }],
       ["mirkwood_spider_scout", "great spider", { friendly: false, strength: 8 }],
       ["mirkwood_spider_brood", "web-spinner", { friendly: false, strength: 7 }],
     ].forEach(([id, name, options]) => ensureCharacter(id, { name, movementMode: "never", visible: true, ...options }));
@@ -1332,6 +1483,9 @@
       ["lane_beneath_hill", "lane_hobbit"],
       ["party_field", "party_hobbit"],
       ["bywater_bridge", "bridge_hobbit"],
+      ["green_dragon_inn", "green_dragon_innkeeper"],
+      ["green_dragon_inn", "green_dragon_regular"],
+      ["green_dragon_inn", "green_dragon_traveller"],
       ["beorn_stable", "beorn_horse"],
       ["beorn_animal_yard", "beorn_hound"],
       ["beorn_animal_yard", "beorn_sheep"],
@@ -1398,6 +1552,7 @@
           command = command.replace(re, "");
         }
       }
+      command = normalizeNaturalCommand(command);
       for (const [from, to] of Object.entries(this.synonyms)) {
         const re = new RegExp(`(^|(?:\\band\\b|\\bthen\\b|,)\\s+)${escapeRegExp(from)}\\b`, "gi");
         command = command.replace(re, (_match, prefix) => `${prefix}${to}`);
@@ -2468,6 +2623,31 @@
         thorin.followingPlayer = false;
         thorin.movementMode = "never";
       }
+      const focusRoom = this.game.currentRoom === "green_dragon_inn_outside" ? "green_dragon_inn_outside" : "green_dragon_inn";
+      const otherRoom = focusRoom === "green_dragon_inn" ? "green_dragon_inn_outside" : "green_dragon_inn";
+      const ambientIds = this.ambientDwarfIds().filter((id) => id !== "thorin");
+      for (const id of ambientIds) {
+        const character = this.game.characters[id];
+        if (!character) continue;
+        character.followingPlayer = false;
+        character.movementMode = "never";
+        character.visible = true;
+        character.partyBound = true;
+        character.position = null;
+      }
+      if (ambientIds.length) {
+        const rotation = Math.abs(hashString(`${this.game.storySeed}:green-dragon-roster:${this.game.turnCount}`));
+        const featured = [
+          ambientIds[rotation % ambientIds.length],
+          ambientIds[(rotation + 1) % ambientIds.length],
+          ambientIds[(rotation + 2) % ambientIds.length],
+        ].filter((id, index, list) => list.indexOf(id) === index);
+        const slots = [focusRoom, otherRoom, otherRoom];
+        featured.forEach((id, index) => {
+          const character = this.game.characters[id];
+          if (character) character.position = slots[index] || otherRoom;
+        });
+      }
       const gandalf = this.game.characters.gandalf;
       if (gandalf && !gandalf.followingPlayer && ["green_dragon_inn", "green_dragon_inn_outside"].includes(gandalf.position)) {
         gandalf.position = "hobbit_hole";
@@ -2619,8 +2799,7 @@
         ],
       };
       if (posesByRoom[roomId]?.length) {
-        const roomSeed = hashString(`${this.game.storySeed}:${character.id}:${roomId}:${index}`);
-        return posesByRoom[roomId][Math.abs(roomSeed) % posesByRoom[roomId].length];
+        return posesByRoom[roomId];
       }
       const contextualPose = this.game.resolveNarrativeText(
         CONTEXTUAL_COMPANION_POSE_RULES,
@@ -2677,9 +2856,9 @@
       const usedPoses = new Set();
       const highlights = companions.slice(0, 3).map((character, index) => {
         const pose = this.pickCompanionPoseText(character, roomId, index, usedPoses);
-        usedPoses.add(pose);
-        return `${character.name} ${pose}`;
-      });
+        if (pose) usedPoses.add(pose);
+        return pose ? `${character.name} ${pose}` : `${character.name} is nearby`;
+      }).filter(Boolean);
       const overflow = companions.length > highlights.length ? ` Others of the company are nearby as well.` : "";
       return `${highlights.join(". ")}.${overflow}`;
     }
@@ -2783,7 +2962,10 @@
       if (!held) return "";
       const verb = held.worn ? "wearing" : "carrying";
       if (held.character.name === "You") return `You are ${verb} the ${held.item.name}.`;
-      return `${sentenceDisplayCharacterName(held.character)} is ${verb} the ${held.item.name}.`;
+      const guidance = held.worn
+        ? ` Try asking ${held.character.name} about it.`
+        : ` Try "ask ${held.character.name} for ${held.item.name}" or "take ${held.item.name} from ${held.character.name}".`;
+      return `${sentenceDisplayCharacterName(held.character)} is ${verb} the ${held.item.name}.${guidance}`;
     }
 
     findItemInsideContainer(container, itemName) {
@@ -3266,20 +3448,28 @@
         feel: () => game.touch("feel", object),
         knock: () => game.touch("knock", object),
         inventory: () => game.inventory(),
+        inv: () => game.inventory(),
         i: () => game.inventory(),
         wait: () => game.wait(),
         exits: () => game.showExits(),
         exit: () => game.showExits(),
         hello: () => game.hello(),
         tips: () => game.tips(object),
+        hint: () => game.tips(object),
         verbs: () => game.verbs(),
+        commands: () => game.verbs(),
         jumps: () => game.listJumpCheckpoints(),
         mysaves: () => game.listSaves(),
         save: () => game.save(object),
         load: () => game.load(object),
+        autosave: () => game.resumeFromAutosave(),
         quit: () => game.quit(),
+        restart: () => game.restartGame(),
+        undo: () => game.undoUnavailable(),
+        pause: () => game.pauseGame(),
         map: () => game.showMap(),
         location: () => game.print(actorizeSecondPerson(game.player, `You are now ${roomLocationPhrase(game.room())}.`)),
+        status: () => game.showStatus(),
         music: () => game.handleMusicCommand(object),
         autoplay: () => game.autoplay(object),
         teleport: () => game.handleJumpCommand(object),
@@ -3302,7 +3492,7 @@
         catch: () => game.take(object),
         follow: () => game.followCharacter(object),
         guard: () => game.physicalAction("guard", object),
-        help: () => game.physicalAction("help", object),
+        help: () => (object ? game.physicalAction("help", object) : game.showHelp()),
         explain: () => game.physicalAction("explain", object),
         negotiate: () => game.physicalAction("negotiate", object),
         print: () => game.physicalAction("print", object),
@@ -3321,6 +3511,7 @@
         pick: () => game.pick(object),
         cut: () => game.cutTrim("cut", object),
         trim: () => game.cutTrim("trim", object),
+        smash: () => game.breakThing(object),
         fill: () => game.fill(object),
         water: () => game.water(object),
         plant: () => game.plant(object),
@@ -3332,6 +3523,10 @@
         push: () => game.pushPull("push", object),
         pull: () => game.pushPull("pull", object),
         move: () => game.pushPull("move", object),
+        press: () => game.touch("press", object),
+        rotate: () => game.touch("turn", object),
+        tie: () => game.physicalAction("tie", object),
+        untie: () => game.physicalAction("untie", object),
         place: () => game.drop(object),
         set: () => game.drop(object),
         store: () => game.drop(object),
@@ -3344,9 +3539,21 @@
         thank: () => game.socialAction("thank", object),
         flatter: () => game.socialAction("flatter", object),
         insult: () => game.socialAction("insult", object),
+        wave: () => (object ? game.socialAction("call", object) : game.hello()),
+        shake: () => game.physicalAction("shake", object),
+        hug: () => game.socialAction("flatter", object),
+        gather: () => game.socialAction("call", object),
         hide: () => game.physicalAction("hide", object),
         sneak: () => game.physicalAction("sneak", object),
         escape: () => game.physicalAction("escape", object),
+        dodge: () => game.physicalAction("dodge", object),
+        block: () => game.physicalAction("block", object),
+        swing: () => game.physicalAction("swing", object),
+        sharpen: () => game.physicalAction("sharpen", object),
+        clean: () => game.physicalAction("clean", object),
+        bandage: () => game.physicalAction("bandage", object),
+        shoot: () => game.physicalAction("shoot", object),
+        fire: () => game.physicalAction("fire", object),
         throw: () => game.throwItem(object),
         climb: () => game.climb(object),
         eat: () => game.eat(object),
@@ -3517,6 +3724,8 @@
     drop(objectName) {
       const game = this.game;
       if (!objectName) return game.print("What would you like to leave?");
+      const request = parseAllTarget(objectName);
+      if (request.all) return this.dropAll(request.target);
       const placement = this.parsePlacementCommand(objectName);
       const inParts = objectName.split(" in ");
       const itemName = placement?.itemName || inParts[0].trim();
@@ -3524,6 +3733,8 @@
       if (carriedCharacter && inParts.length === 1) return this.dropCharacter(carriedCharacter);
       const item = game.findInInventory(itemName);
       if (!item) return game.print(game.heldItemMessage(itemName) || actorizeSecondPerson(game.player, `You don't have the ${itemName}.`));
+      const protectedDrop = this.protectedQuestDropMessage(item);
+      if (protectedDrop) return game.print(protectedDrop);
       if (placement) {
         const container = game.visibleSearch(placement.targetName)?.item;
         if (!container || !container.container) {
@@ -3544,6 +3755,44 @@
       game.detachItem(item.id);
       item.location = { type: "room", id: game.currentRoom };
       game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "leave")} the ${item.name}.`);
+    }
+
+    dropAll(objectName = "") {
+      const game = this.game;
+      const candidates = game.player.inventory
+        .map((itemId) => game.items[itemId])
+        .filter((item) => item && (!objectName || matches(item.name, objectName)));
+      if (!candidates.length) {
+        return game.print(objectName
+          ? actorizeSecondPerson(game.player, `You do not have any ${objectName}.`)
+          : actorizeSecondPerson(game.player, "You are not carrying anything to leave."));
+      }
+      const dropped = [];
+      const protectedItems = [];
+      for (const item of candidates) {
+        const protectedDrop = this.protectedQuestDropMessage(item);
+        if (protectedDrop) {
+          protectedItems.push(item.name);
+          continue;
+        }
+        game.detachItem(item.id);
+        item.location = { type: "room", id: game.currentRoom };
+        dropped.push(item.name);
+      }
+      if (dropped.length) {
+        game.print(actorizeSecondPerson(game.player, `You leave the ${joinNames(dropped)}.`));
+      }
+      if (protectedItems.length) {
+        game.print(actorizeSecondPerson(game.player, `You keep the ${joinNames(protectedItems)} close, judging it unwise to part with it just yet.`));
+      }
+    }
+
+    protectedQuestDropMessage(item) {
+      const game = this.game;
+      if (!item || game.flags.dragondefeated) return "";
+      if (!matches(item.name, "rope")) return "";
+      if (game.visitedRooms?.has("beorns_house")) return "";
+      return "You gather the rope in your hand, then think better of it. Until the road has safely carried you as far as Beorn, that would be asking to regret thrift at exactly the wrong moment.";
     }
 
     parsePlacementCommand(objectName) {
@@ -3648,7 +3897,8 @@
         return true;
       }
       if (matches(item.name, "elegant lamp")) {
-        return game.lightItem(item);
+        game.lightItem(item);
+        return true;
       }
       if (matches(item.name, "dark glass inkwell")) {
         if (item.open) return game.print("The dark glass inkwell is already open.");
@@ -3782,7 +4032,7 @@
     }
 
     isTalkCommand(command) {
-      return /^(?:say|talk|speak|whisper|yell)\s+/.test(command);
+      return /^(?:say|talk|speak|whisper|yell)(?:\s+.*)?$/.test(command);
     }
 
     handleCharacterFirstCommand(command) {
@@ -3821,11 +4071,39 @@
       if (!target) return game.print(`There is no one named ${parsed.targetName} here.`);
       if (game.unexpectedParty?.blocksDirectInteraction(target, "gift")) return;
       if (target.id === game.player.id) return game.print(`${game.player.name} already has the ${item.name}.`);
+      const protectedReason = this.protectedQuestGearGiftMessage(target, item);
+      if (protectedReason) return game.print(protectedReason);
       game.detachItem(item.id);
       item.location = { type: "character", id: target.id };
       target.inventory.push(item.id);
       game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "give")} the ${item.name} to ${displayCharacterName(target)}.`);
       game.reactToGift(target, item);
+    }
+
+    protectedQuestGearGiftMessage(target, item) {
+      const game = this.game;
+      if (!item || game.flags.dragondefeated) return "";
+      const isRope = matches(item.name, "rope");
+      const isRoadBlade = matchesAny(item.name, ["dagger", "sword"]);
+      if (!isRope && !isRoadBlade) return "";
+      if (matches(target.name, "thorin")) {
+        return isRope
+          ? "Thorin glances at the rope and says 'Keep it, Master Baggins. We may have need of it again before this road is done.'"
+          : "Thorin eyes the blade and says 'Best keep that by you. The road ahead is not gentle enough for courtesy to leave you unarmed.'";
+      }
+      if (matches(target.name, "gandalf")) {
+        return isRope
+          ? "Gandalf shakes his head. 'Keep the rope, Bilbo. A wizard may borrow many things, but not the prudence of a traveller.'"
+          : "Gandalf says 'Keep the blade near your own hand. Wisdom is no use if the next danger reaches you first.'";
+      }
+      if (matches(target.name, "elrond")) {
+        return isRope
+          ? "Elrond smiles faintly and says 'Keep the rope. Roads beyond my house may still ask that service of you.'"
+          : "Elrond declines the blade with a courteous gesture. 'Keep it. There are paths yet before you where counsel alone will not suffice.'";
+      }
+      return isRope
+        ? `${sentenceDisplayCharacterName(target)} says 'Keep the rope. We are not finished with difficult roads yet.'`
+        : `${sentenceDisplayCharacterName(target)} says 'Best keep your blade. A traveler should not part with ready steel on an unfinished road.'`;
     }
 
     show(command) {
@@ -3867,7 +4145,11 @@
       if (!character) return game.print(`There is no one named ${characterName} here.`);
       if (game.unexpectedParty?.blocksDirectInteraction(character, "item")) return;
       const special = this.specialAskForResponse(character, itemName);
-      if (special) return game.print(special);
+      if (special) {
+        this.rememberConversationCharacter(character);
+        this.rememberReferencedCharacter(itemName);
+        return game.print(special);
+      }
       const requestedCharacter = this.findKnownCharacter(itemName);
       if (requestedCharacter) {
         this.rememberConversationCharacter(character);
@@ -3879,6 +4161,9 @@
 
     specialAskForResponse(character, itemName) {
       const text = normalize(itemName);
+      if (matches(character.name, "gandalf") && matchesAny(text, ["help", "advice", "counsel", "guidance"])) {
+        return "Gandalf says 'Begin with what lies before you. Look about, mind the exits, and do not hesitate to ask for the map when you are ready.'";
+      }
       if (matches(character.name, "beorn") && matchesAny(text, ["food", "meal", "supper", "breakfast", "shelter", "rest"])) {
         return "Beorn says 'There is food and a roof for honest guests. Help yourself, but do not mistake hospitality for weakness.'";
       }
@@ -4086,6 +4371,11 @@
     parseAskForCommand(command) {
       const text = normalize(command);
       if (!text) return null;
+      if (text.startsWith("for ")) {
+        const fallback = this.defaultConversationCharacter();
+        if (!fallback) return null;
+        return { characterName: normalize(fallback.name), itemName: text.slice(4).trim() };
+      }
       const polite = text.replace(/^(?:please\s+)?/, "").replace(/\s+please$/, "").trim();
       const match = polite.match(/^(.+?)\s+for\s+(.+)$/);
       if (match) return { characterName: match[1].trim(), itemName: match[2].trim() };
@@ -4098,6 +4388,11 @@
       const game = this.game;
       const text = normalize(command);
       if (!text) return null;
+      if (text.startsWith("about ")) {
+        const fallback = this.defaultConversationCharacter();
+        if (!fallback) return null;
+        return { characterName: normalize(fallback.name), topic: text.slice(6).trim() };
+      }
       const aboutMatch = text.match(/^(.+?)\s+about\s+(.+)$/);
       if (aboutMatch) return { characterName: aboutMatch[1].trim(), topic: aboutMatch[2].trim() };
       const match = text.match(/^(.+?)\s+(where|whether|if|what|why|how|that)\s+(.+)$/);
@@ -4153,6 +4448,14 @@
       if (["me", "you"].includes(name) && game.commandIssuer) {
         return game.peopleInRoom().find((p) => p.id === game.commandIssuer.id) || null;
       }
+      if (["him", "her", "them"].includes(name)) {
+        const lastConversation = this.lastConversationCharacter();
+        if (lastConversation?.position === game.currentRoom && lastConversation.visible) return lastConversation;
+        const lastReferenced = this.lastReferencedCharacter();
+        if (lastReferenced?.position === game.currentRoom && lastReferenced.visible) return lastReferenced;
+        const fallback = this.defaultConversationCharacter();
+        if (fallback) return fallback;
+      }
       return game.peopleInRoom().find((p) => p.id !== game.player.id && matches(p.name, name)) || null;
     }
 
@@ -4202,6 +4505,9 @@
         elf: "wood elf",
         dwarves: "thorin",
         dwarf: "thorin",
+        wizard: "gandalf",
+        "old wizard": "gandalf",
+        "that guy": "him",
       };
       return aliases[name] || name;
     }
@@ -4209,7 +4515,11 @@
     handleTalk(command) {
       const game = this.game;
       const parsed = this.parseTalkCommand(command);
-      if (!parsed) return game.print("You speak, but only silence meets your words.");
+      if (!parsed) {
+        const visiblePeople = game.peopleInRoom().filter((character) => character.id !== game.player.id && character.visible);
+        if (!visiblePeople.length) return game.print("You speak, but only silence meets your words.");
+        return game.print(`You could speak to ${joinNames(visiblePeople.map((character) => displayCharacterName(character)))}.`);
+      }
       const character = this.resolveCharacterTarget(parsed.characterName);
       if (!character) return game.print("You speak, but only silence meets your words.");
       if (character.friendly === false) return this.respondToTalk(character);
@@ -4231,9 +4541,12 @@
 
     parseTalkCommand(command) {
       const game = this.game;
-      let text = normalize(command).replace(/^(say|talk|speak|whisper|yell)\s+/, "").trim();
+      let text = normalize(command).replace(/^(say|talk|speak|whisper|yell)(?:\s+|$)/, "").trim();
       text = text.replace(/^(to|with)\s+/, "").trim();
-      if (!text) return null;
+      if (!text) {
+        const fallback = this.defaultConversationCharacter();
+        return fallback ? { characterName: normalize(fallback.name), order: "" } : null;
+      }
       const quoted = text.match(/^(.+?)\s+"(.+)"$/);
       if (quoted) return { characterName: quoted[1].trim(), order: quoted[2].trim() };
       const people = game.peopleInRoom()
@@ -4245,6 +4558,15 @@
         if (text.startsWith(`${name} `)) return { characterName: name, order: text.slice(name.length).trim().replace(/^to\s+/, "") };
       }
       return { characterName: text, order: "" };
+    }
+
+    defaultConversationCharacter() {
+      const game = this.game;
+      const lastConversation = this.lastConversationCharacter();
+      if (lastConversation?.position === game.currentRoom && lastConversation.visible) return lastConversation;
+      const visiblePeople = game.peopleInRoom()
+        .filter((character) => character.id !== game.player.id && character.visible);
+      return visiblePeople.length === 1 ? visiblePeople[0] : null;
     }
 
     respondToTalk(character) {
@@ -5363,6 +5685,8 @@
         game.recordAutosave("before facing the trolls", { key: "hazard:trolls:room" });
         game.visitedTrollsClearing = true;
         game.waitCounter = 0;
+        game.flags.trollsclearingwarningturns = 0;
+        game.flags.trollsclearingwarningturnstamp = -1;
         game.print("You crouch low behind a mossy boulder, heart pounding, as the trolls argue by the flickering campfire in the moonlit clearing.");
         game.print("Only then do you make out the cause of the quarrel: one of the trolls has already caught a dwarf and is brandishing him like the beginning of supper.");
         game.print("What shall us do with him?");
@@ -5372,9 +5696,7 @@
         return;
       }
       const liveTroll = game.peopleInRoom().find((p) => ["hideous troll", "vicious troll"].includes(normalize(p.name)) && p.visible);
-      if (liveTroll && !game.trollsDefeated) {
-        game.endGame("The hideous troll stoops, snatches you up before you can slip away, and makes an end of you beside the dying fire.", { fatal: true });
-      }
+      if (liveTroll && !game.trollsDefeated) return;
     }
 
     maybeAutosaveForRoom(roomId = this.game.currentRoom) {
@@ -5799,6 +6121,7 @@
       const connection = path[0];
       const visibleConnection = game.roomConnections().find((candidate) => candidate.direction === connection.direction);
       const actualConnection = visibleConnection || connection;
+      if (game.rivendellRopeGate(actualConnection)) return "tie rope to roots";
       const web = game.blockingWebFor(connection);
       if (web && !web.broken) return "smash web";
       const woodElf = Object.values(game.characters).find((character) => matches(character.name, "wood elf") && character.visible);
@@ -5835,6 +6158,8 @@
 
     autoplayCanPlanConnection(connection) {
       const game = this.game;
+      if (game.rivendellWeaponGate(connection)) return this.autoplayHas("majestic sword");
+      if (game.rivendellRopeGate(connection)) return this.autoplayHas("sturdy rope");
       if (game.narrativeTravelBlock(connection)) return false;
       const door = connection.door && game.doors[connection.door];
       if (!door || door.broken) return true;
@@ -6183,15 +6508,126 @@
       this.game = game;
     }
 
+    ropeCandidates(actor = this.game.player) {
+      const game = this.game;
+      return [...new Set([actor, game.commandIssuer, game.player].filter(Boolean))];
+    }
+
+    availableJourneyRope(actor = this.game.player) {
+      const game = this.game;
+      for (const candidate of this.ropeCandidates(actor)) {
+        const ropeId = (candidate.inventory || []).find((itemId) => matches(game.items[itemId]?.name || "", "rope"));
+        if (ropeId) return { item: game.items[ropeId], holder: candidate };
+      }
+      return null;
+    }
+
+    bestRopeBraceHelper(actor = this.game.player) {
+      const game = this.game;
+      if (actor && actor !== game.commandIssuer && actor !== game.player) return actor;
+      if (actor && actor.id !== game.data.player) return actor;
+      const priority = ["thorin", "gandalf", "dori", "balin", "oin", "gloin"];
+      const companions = game.peopleInRoom()
+        .filter((character) => character.id !== game.data.player && character.visible !== false && character.friendly !== false);
+      for (const id of priority) {
+        const preferred = companions.find((character) => character.id === id);
+        if (preferred) return preferred;
+      }
+      return companions[0] || null;
+    }
+
+    completeRivendellRopeSecurity(message, method) {
+      const game = this.game;
+      game.flags.rivendellropesecured = true;
+      game.flags.rivendellropesecuredby = method;
+      game.print(message);
+      return true;
+    }
+
+    tryRivendellDescentAction(verb, objectText) {
+      const game = this.game;
+      if (game.currentRoom !== "hidden_valley_path") return false;
+      const text = normalize(objectText);
+      const rope = this.availableJourneyRope();
+      if (["tie", "fasten", "attach", "secure"].includes(verb)) {
+        if (!matchesAny(text, ["rope", "roots", "root", "spike", "iron spike"])) return false;
+        if (!rope) {
+          game.print("You have no rope ready to make the descent safe.");
+          return true;
+        }
+        if (game.flags.rivendellropesecured) {
+          game.print("You have already proved out the descent here; with the way known, the company could rig the rope again in moments if needed.");
+          return true;
+        }
+        if (matchesAny(text, ["roots", "root", "pine roots"])) {
+          return this.completeRivendellRopeSecurity("You fasten the sturdy rope twice around the pine roots and test it hard. They hold, and the way down at last looks honest enough to attempt.", "roots");
+        }
+        if (matchesAny(text, ["spike", "iron spike"])) {
+          return this.completeRivendellRopeSecurity("You hitch the sturdy rope around the old iron spike, then lean back on it until the weathered metal answers with a grudging firmness. It will serve.", "spike");
+        }
+        game.print("You need to make the rope fast to something trustworthy: the pine roots or the iron spike.");
+        return true;
+      }
+      if (!["brace", "steady", "hold"].includes(verb) || !matchesAny(text, ["rope", "the rope"])) return false;
+      if (!rope) {
+        game.print("There is no rope ready to brace.");
+        return true;
+      }
+      if (game.flags.rivendellropesecured) {
+        game.print("The company already knows how to manage this descent safely from here.");
+        return true;
+      }
+      const helper = this.bestRopeBraceHelper();
+      if (!helper) {
+        game.print("You would want another steady pair of hands on the rope before trusting the descent.");
+        return true;
+      }
+      if (helper.id === game.data.player) {
+        game.print("You cannot properly brace the rope alone; one of the company should take the strain.");
+        return true;
+      }
+      const helperName = displayCharacterName(helper);
+      const leader = game.commandIssuer && game.commandIssuer.id === game.data.player ? "At your word, " : "";
+      return this.completeRivendellRopeSecurity(`${leader}${helperName} plants ${helper.id === "gandalf" ? "his staff and " : ""}boots on the rock, takes the rope in both hands, and leans back until the line goes taut. The descent looks safe enough now for the company to trust.`, `companion:${helper.id}`);
+    }
+
+    startGreenDragonPonyPreparation() {
+      const game = this.game;
+      game.flags.seenpony = true;
+      game.flags.ponypreparing = true;
+      game.flags.ponyready = false;
+      game.flags.ponyreadyannounced = false;
+      game.flags.ponyreadyturn = Math.max(Number(game.flags.ponyreadyturn || 0), game.turnCount + 3);
+      if (game.items.calm_pony) game.items.calm_pony.visible = false;
+    }
+
     trySpecialAction(verb, objectText) {
       const game = this.game;
       const roomName = game.room().name;
       const adverb = game.splitter.lastAdverb;
+      if (this.tryRivendellDescentAction(verb, objectText)) return true;
       for (const action of game.data.specialActions) {
         if (action.verb !== verb) continue;
         if (action.location && action.location !== roomName) continue;
         if (action.special_char && !matches(game.player.name, normalize(action.special_char))) continue;
         if (!this.matchesSpecialActionObjects(action, objectText, adverb)) continue;
+        if (this.isPonyWindowAction(action) && game.flags.lanternon) {
+          if (game.flags.ponysequencecompleted) {
+            game.print("Thorin peers through the window, but the yard beyond has already fallen quiet again.");
+            return true;
+          }
+          if (!game.flags.seenpony) {
+            game.print("Thorin stretches to the window and peers out into the lamplit dark. After a moment he says 'There is a pony there after all. Give them a little time and I shall have it brought round beneath the oak.'");
+            this.startGreenDragonPonyPreparation();
+            return true;
+          }
+          if (!game.flags.ponyready) {
+            game.print("Thorin peers out again and says 'They are stirring in the yard now. Let them finish their work before you trust your jump to it.'");
+            return true;
+          }
+          game.print("Thorin glances out and gives a short nod. 'There now. The pony is where it ought to be.'");
+          return true;
+        }
         if (this.isPonyWindowAction(action) && game.flags.ponysequencecompleted) {
           if (action.desc1) game.print(actorActionSentence(game.player, action.desc1));
           game.print(game.flags.lanternon
@@ -6200,6 +6636,10 @@
           return true;
         }
         if (this.isPonySequenceAction(action) && game.flags.ponysequencecompleted) continue;
+        if (this.isPonySequenceAction(action) && game.flags.seenpony && !game.flags.ponyready) {
+          game.print("You judge the branch and the yard below, but the pony has not yet been brought properly under you. Better give the innfolk another moment to settle it into place.");
+          return true;
+        }
         const unavailable = this.specialActionUnavailable(action);
         if (unavailable) {
           game.print(unavailable);
@@ -6887,6 +7327,10 @@
           this.render();
           return;
         }
+        if (this.handleProfanityOutburst(rawCommand)) {
+          this.render();
+          return;
+        }
         rawCommand = this.normalizeConversationalQuestion(rawCommand);
         const normalizedCommand = normalizeNaturalCommand(rawCommand.toLowerCase());
         if (normalizedCommand !== "map") this.sceneMapVisible = false;
@@ -6970,7 +7414,13 @@
         if (this.trySpecialAction(verb, object)) return false;
 
         if (!object && !commandsWithoutObject.has(verb)) {
-          this.print("Please specify your action and the object. For example, type 'open door' or 'climb into tree'.");
+          this.print(this.missingObjectPrompt(verb));
+          return false;
+        }
+
+        const pronounPrompt = this.unresolvedPronounPrompt(verb, object);
+        if (pronounPrompt) {
+          this.print(pronounPrompt);
           return false;
         }
 
@@ -6984,6 +7434,47 @@
       } finally {
         if (rememberedChoice && sameChoice(this.forcedChoice, rememberedChoice)) this.forcedChoice = null;
       }
+    }
+
+    missingObjectPrompt(verb) {
+      const prompts = {
+        ask: "Whom would you like to ask, and about what?",
+        attack: "Attack whom?",
+        break: "Break what?",
+        close: "Close what?",
+        climb: "Climb where?",
+        lock: "Lock what?",
+        get: "What would you like to take?",
+        give: "What would you like to give, and to whom?",
+        grab: "What would you like to take?",
+        load: "Please name the saved game you want to load, or type 'load autosave'.",
+        open: "Open what?",
+        read: "Read what?",
+        save: "Please name the saved game. For example: 'save bag-end'.",
+        take: "What would you like to take?",
+        unlock: "Unlock what?",
+        use: "What would you like to use?",
+      };
+      return prompts[verb] || "Please specify your action and the object. For example, type 'open door' or 'climb into tree'.";
+    }
+
+    unresolvedPronounPrompt(_verb, object = "") {
+      if (this.commandIssuer) return "";
+      const verb = normalize(_verb);
+      const text = normalize(object);
+      if (!text) return "";
+      const directObjectVerbs = new Set([
+        "take", "get", "open", "close", "use", "read", "drop", "leave", "give", "show",
+        "hand", "pass", "bring", "send", "return", "deliver", "unlock", "lock", "put",
+        "place", "set", "store", "combine", "throw",
+      ]);
+      const primary = primaryObjectText(verb, text);
+      if (directObjectVerbs.has(verb) && primary === "it") return 'What do you mean by "it"?';
+      const characterPronoun = text.match(/\b(him|her|them)\b/);
+      if (characterPronoun && !this.resolveCharacterTarget(characterPronoun[1])) {
+        return `I don't know who "${characterPronoun[1]}" refers to.`;
+      }
+      return "";
     }
 
     performAs(character, action) {
@@ -7019,10 +7510,17 @@
     normalizeConversationalQuestion(rawCommand) {
       const text = String(rawCommand || "").trim();
       if (!text) return rawCommand;
-      const normalized = normalizeNaturalCommand(text.toLowerCase());
-      if (!/^(who|where|what|why|how)\b/.test(normalized)) return rawCommand;
-      const listener = this.lastConversationCharacter();
+      const lowered = text.toLowerCase().replace(/[.?!]+$/g, "").trim();
+      const normalized = normalizeNaturalCommand(lowered);
+      const listener = this.lastConversationCharacter() || this.defaultQuestionListener();
       if (!listener) return rawCommand;
+      if (/^(?:who\s+are\s+you|what'?s?\s+your\s+name|what\s+is\s+your\s+name)\b/.test(lowered)) {
+        return `talk ${normalize(listener.name)}`;
+      }
+      if (/^(?:can|could|would|will)\s+you\s+help\s+(?:me|us)\b/.test(lowered)) {
+        return `ask ${normalize(listener.name)} for help`;
+      }
+      if (!/^(who|where|what|why|how)\b/.test(normalized)) return rawCommand;
 
       let question = normalized;
       const referenced = this.lastReferencedCharacter();
@@ -7034,6 +7532,64 @@
           .replace(/\bher\b/g, normalize(referenced.name));
       }
       return `ask ${normalize(listener.name)} ${question}`;
+    }
+
+    isProfanityOutburst(rawCommand) {
+      const text = String(rawCommand || "").trim();
+      if (!text || !PROFANITY_OUTBURST_RE.test(text)) return false;
+      const candidates = this.splitter.split(text);
+      if (!candidates.length) return true;
+      return !candidates.some((candidate) => {
+        const softened = normalizeNaturalCommand(String(candidate || "").toLowerCase())
+          .replace(/[.,!?]+/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (!softened) return false;
+        if (this.isDirection(softened)) return true;
+        const [verb] = softened.split(/\s+/);
+        return Boolean(verb && ACTIONABLE_COMMAND_STARTERS.has(verb));
+      });
+    }
+
+    profanityRebuke() {
+      const visiblePeople = this.peopleInRoom()
+        .filter((character) => character.id !== this.player.id && character.visible);
+      const speaker = this.lastConversationCharacter()
+        || (visiblePeople.length === 1 ? visiblePeople[0] : visiblePeople[0] || null);
+      if (!speaker) {
+        return "Your outburst echoes uselessly. A clearer command would serve you better.";
+      }
+      if (matches(speaker.name, "gandalf")) {
+        return "Gandalf raises an eyebrow. 'Steady on, Bilbo. Plain words will serve you better than that.'";
+      }
+      if (matches(speaker.name, "elrond")) {
+        return "Elrond gives you a level look. 'In Rivendell we keep our speech cleaner than that.'";
+      }
+      if (matches(speaker.name, "beorn")) {
+        return "Beorn folds his arms. 'Mind your tongue under my roof.'";
+      }
+      if (matches(speaker.name, "thorin")) {
+        return "Thorin frowns. 'Save that temper for goblins, not your companions.'";
+      }
+      if (matches(speaker.name, "gollum")) {
+        return "Gollum hisses. 'Nasty words from nasty Bagginses. Ask proper, yes, proper.'";
+      }
+      if (matches(speaker.name, "dragon")) {
+        return "Smaug's voice rolls through the dark. 'Even your insults are small. Speak sense, little thief.'";
+      }
+      return `${sentenceDisplayCharacterName(speaker)} frowns. 'Mind your tongue and say plainly what you mean.'`;
+    }
+
+    handleProfanityOutburst(rawCommand) {
+      if (!this.isProfanityOutburst(rawCommand)) return false;
+      this.print(this.profanityRebuke());
+      return true;
+    }
+
+    defaultQuestionListener() {
+      const visiblePeople = this.peopleInRoom()
+        .filter((character) => character.id !== this.player.id && character.visible);
+      return visiblePeople.length === 1 ? visiblePeople[0] : null;
     }
 
     respondToCanonicalDialogue(rawCommand) {
@@ -7723,6 +8279,7 @@
       if (roomId === "lane_beneath_hill") return "shire_lane";
       if (roomId === "party_field") return "shire_party_field";
       if (roomId === "bywater_bridge") return "shire_bridge";
+      if (["green_dragon_inn", "green_dragon_inn_outside"].includes(roomId)) return "green_dragon";
       if (IMMERSION_BAG_END_ROOMS.has(roomId)) return "bag_end_house";
       if (IMMERSION_RIVENDELL_ROOMS.has(roomId)) return "rivendell";
       if (IMMERSION_MOUNTAIN_ROOMS.has(roomId)) return "mountains";
@@ -7746,9 +8303,37 @@
       return Boolean(this.unexpectedParty?.state?.questBriefingDone);
     }
 
+    playerHasRoadWeapon() {
+      const carried = [...(this.player.inventory || []), ...(this.player.worn || [])];
+      return carried
+        .map((itemId) => this.items[itemId])
+        .some((item) => item && matchesAny(item.name, ["sword", "dagger"]));
+    }
+
+    rivendellWeaponGate(connection) {
+      if (!connection || !this.trollsTransformed || this.playerHasRoadWeapon()) return false;
+      return (
+        (connection.from === "trolls_clearing" && connection.to === "trollshaws_road")
+        || (connection.from === "trollshaws_road" && connection.to === "hidden_valley_path")
+      );
+    }
+
+    liveTrollExposureGate(connection) {
+      if (!connection || this.trollsTransformed) return false;
+      return connection.from === "trolls_clearing" && connection.to === "trollshaws_road";
+    }
+
+    rivendellRopeGate(connection) {
+      if (!connection || this.flags.rivendellropesecured) return false;
+      return connection.from === "hidden_valley_path" && connection.to === "rivendell";
+    }
+
     narrativeTravelBlock(connection) {
       if (!connection) return false;
-      return (
+      return this.liveTrollExposureGate(connection)
+        || this.rivendellWeaponGate(connection)
+        || this.rivendellRopeGate(connection)
+        || (
         connection.from === "bilbos_garden"
         && connection.direction === "east"
         && connection.to === "lane_beneath_hill"
@@ -7758,6 +8343,28 @@
 
     narrativeTravelBlockMessage(connection) {
       if (!connection) return "";
+      if (this.liveTrollExposureGate(connection)) {
+        const attempts = Number(this.flags.trollsexposureattempts || 0);
+        if (attempts <= 0) return "The road toward Rivendell lies bare in the trolls' firelight. One step farther that way and you would be plain to every brutish eye in the clearing; better keep low or fade back into deeper shadow.";
+        if (attempts === 1) return "You steal a glance toward the eastern road, but there is no cover on it at all. Even Bilbo can see that to try it now would be courage wasted on pure foolishness.";
+        return "The eastern road remains utterly exposed while the trolls bellow round their fire. Rivendell must wait for a safer moment than this.";
+      }
+      if (this.rivendellWeaponGate(connection)) {
+        const attempts = Number(this.flags.trollshawsweaponblockattempts || 0);
+        if (attempts <= 0) return "Gandalf studies the dark road ahead and says 'Not yet, Bilbo. The Trollshaws are no place for you to go unarmed. Search the trolls' hoard for a blade first.'";
+        if (attempts === 1) return "Thorin glances back toward the hidden path and says 'Those brutes robbed better travellers than themselves. We are not sending you on without so much as a dagger.'";
+        return "The road toward Rivendell has lost every harmless look it had. Until Bilbo carries a blade, the company plainly means to hold him back.";
+      }
+      if (this.rivendellRopeGate(connection)) {
+        const attempts = Number(this.flags.rivendelldescentattempts || 0);
+        if (!this.findInInventory("rope")) {
+          if (attempts <= 0) return "The descent bites steeply into the hidden valley. Gandalf says 'A rope would turn this from folly into merely hard going.'";
+          return "One look over the edge is enough: without a rope, the drop toward Rivendell is not a sensible descent at all.";
+        }
+        if (attempts <= 0) return "The path falls away too sharply to trust by balance alone. Pine roots, an old iron spike, or the steady hands of a companion could make the rope safe enough.";
+        if (attempts === 1) return "The drop still looks too treacherous. You should secure the rope first: to the roots, to the iron spike, or by setting one of the company to brace it.";
+        return "The hidden valley waits below, but not for a careless climber. The rope must be made fast before anyone goes down.";
+      }
       if (!this.narrativeTravelBlock(connection)) return "";
       const attempts = Number(this.flags.bagendexitattempts || 0);
       const thorinPresent = Boolean(this.unexpectedParty?.state?.thorinArrived);
@@ -7772,6 +8379,18 @@
     }
 
     registerNarrativeTravelBlock(connection) {
+      if (this.liveTrollExposureGate(connection)) {
+        this.flags.trollsexposureattempts = Number(this.flags.trollsexposureattempts || 0) + 1;
+        return;
+      }
+      if (this.rivendellWeaponGate(connection)) {
+        this.flags.trollshawsweaponblockattempts = Number(this.flags.trollshawsweaponblockattempts || 0) + 1;
+        return;
+      }
+      if (this.rivendellRopeGate(connection)) {
+        this.flags.rivendelldescentattempts = Number(this.flags.rivendelldescentattempts || 0) + 1;
+        return;
+      }
       if (!this.narrativeTravelBlock(connection)) return;
       this.flags.bagendexitattempts = Number(this.flags.bagendexitattempts || 0) + 1;
     }
@@ -7866,6 +8485,23 @@
       if (!tips.length) return this.print("No tips available at the moment.");
       this.print(tips[this.tipIndex % tips.length]);
       this.tipIndex += 1;
+    }
+
+    showHelp() {
+      this.print('Try simple commands such as "look", "exits", "inventory", "take map from Gandalf", or "open door".');
+      this.print('For guidance, type "tips". To see recognized verbs, type "commands" or "verbs". To save, type "save name".');
+    }
+
+    showStatus() {
+      const strength = this.player.strength || 0;
+      const condition = strength <= 5
+        ? "You are badly worn down."
+        : strength <= 10
+          ? "You feel hungry and tired."
+          : strength <= 15
+            ? "You feel a little travel-worn."
+            : "You feel fit enough for the road.";
+      this.print(`Strength: ${strength}. ${condition} ${this.carryLoadSummary()}`);
     }
 
     verbs() {
@@ -8042,8 +8678,12 @@
 
     debugMarkPonyProgress() {
       this.flags.seenpony = true;
+      this.flags.ponypreparing = false;
+      this.flags.ponyready = true;
+      this.flags.ponyreadyturn = 0;
       this.flags.ponysequencecompleted = true;
       this.flags.ponypassageopen = true;
+      this.flags.ponyreadyannounced = true;
       if (this.items.calm_pony) this.items.calm_pony.visible = false;
     }
 
@@ -8069,6 +8709,14 @@
 
     quit() {
       this.endGame(this.player.name === "You" ? "You quit" : `${this.player.name} quits`);
+    }
+
+    undoUnavailable() {
+      this.print("Undo is not available here. If you need safety, use 'save name' or 'load autosave'.", "system");
+    }
+
+    pauseGame() {
+      this.print("The tale is already waiting for your next command.", "system");
     }
 
     createSnapshot() {
@@ -8699,6 +9347,15 @@
     climb(objectName) {
       const text = normalize(objectName);
       if (!text) return this.print("Climb where?");
+      if (this.currentRoom === "hidden_valley_path" && matchesAny(text, ["down", "downward", "downwards", "descent", "drop"])) {
+        const descent = this.connectionsFrom(this.currentRoom).find((connection) => connection.to === "rivendell");
+        if (descent && this.narrativeTravelBlock(descent)) {
+          const narrativeBlock = this.narrativeTravelBlockMessage(descent);
+          this.registerNarrativeTravelBlock(descent);
+          return this.print(narrativeBlock);
+        }
+        return this.move("east");
+      }
       if (text.startsWith("into ") || text.startsWith("in ")) {
         const targetName = text.replace(/^(into|in)\s+/, "");
         const item = this.visibleSearch(targetName)?.item;
@@ -8917,8 +9574,20 @@
     }
 
     handleGo(command) {
+      const relativeIntent = this.relativeDirectionIntent(command);
       const relativeDirection = this.relativeDirectionCommand(command);
-      if (relativeDirection) return this.move(relativeDirection);
+      if (relativeDirection) return this.handleRelativeGo(command, relativeDirection);
+      if (relativeIntent) {
+        this.print(relativeIntent === "inside" ? "You are already inside." : "You are already outside.");
+        return false;
+      }
+      if (this.isAbstractTravelCommand(command)) {
+        const exits = this.roomConnections();
+        if (exits.length === 1) return this.move(exits[0].direction);
+        this.print("You'll need to choose a direction from the exits available here.");
+        this.showExits();
+        return false;
+      }
       if (command.startsWith("through ")) {
         const found = this.findDoor(command.slice(8));
         if (!found) {
@@ -8942,6 +9611,39 @@
         return this.goDirectlyTo(target.id);
       }
       return this.move(this.normalizeDirection(command));
+    }
+
+    isAbstractTravelCommand(command) {
+      const text = normalize(command);
+      return [
+        "forward", "go forward", "ahead", "go ahead", "back", "go back",
+        "walk ahead", "walk forward", "walk back", "walk down path", "walk down the path",
+      ].includes(text);
+    }
+
+    relativeDirectionIntent(command) {
+      const text = normalize(command);
+      if (["inside", "indoors", "back inside"].includes(text)) return "inside";
+      if (["outside", "outdoors", "back outside", "out"].includes(text)) return "outside";
+      return "";
+    }
+
+    handleRelativeGo(command, direction) {
+      const text = normalize(command);
+      const autoDoorTerms = new Set(["inside", "indoors", "back inside", "outside", "outdoors", "back outside", "out"]);
+      const connection = this.roomConnections().find((candidate) => candidate.direction === direction);
+      if (!connection || !autoDoorTerms.has(text)) return this.move(direction);
+      const door = connection.door ? this.doors[connection.door] : null;
+      if (door && !door.open) {
+        if (door.locked) {
+          this.print(`The ${door.name} is locked.`);
+          return false;
+        }
+        door.open = true;
+        this.setFlag(`${compact(door.name)}open`, true);
+        this.print(`${actorSubject(this.player, true)} ${actorVerb(this.player, "open")} the ${door.name}.`);
+      }
+      return this.move(direction);
     }
 
     relativeDirectionCommand(command) {
@@ -9035,9 +9737,34 @@
       return this.encounters.gollumBlocksDirection(direction);
     }
 
+    impliedNarrativeTravelBlock(direction) {
+      if (
+        this.currentRoom === "trolls_clearing"
+        && !this.trollsTransformed
+        && direction === "east"
+      ) {
+        return { from: "trolls_clearing", to: "trollshaws_road", direction: "south east" };
+      }
+      return null;
+    }
+
+    suppressTrollClearingImmediateAttack() {
+      if (this.currentRoom !== "trolls_clearing" || this.trollsTransformed) return;
+      this.flags.trollsclearingwarningturns = 0;
+      this.flags.trollsclearingwarningturnstamp = this.turnCount;
+    }
+
     move(direction) {
       const candidates = this.connectionsFrom(this.currentRoom).filter((connection) => connection.direction === direction);
       if (!candidates.length) {
+        const impliedBlock = this.impliedNarrativeTravelBlock(direction);
+        if (impliedBlock && this.narrativeTravelBlock(impliedBlock)) {
+          const narrativeBlock = this.narrativeTravelBlockMessage(impliedBlock);
+          this.registerNarrativeTravelBlock(impliedBlock);
+          this.suppressTrollClearingImmediateAttack();
+          this.print(narrativeBlock);
+          return false;
+        }
         this.print(this.isDirection(direction)
           ? "You see no exit in that direction."
           : 'That direction is not recognized. Type "go <direction>" or "go through <door name>".');
@@ -9052,6 +9779,7 @@
       if (this.narrativeTravelBlock(connection)) {
         const narrativeBlock = this.narrativeTravelBlockMessage(connection);
         this.registerNarrativeTravelBlock(connection);
+        if (this.liveTrollExposureGate(connection)) this.suppressTrollClearingImmediateAttack();
         this.print(narrativeBlock);
         return false;
       }
@@ -9251,6 +9979,7 @@
       this.turnCount += 1;
       this.updateRingTimers();
       this.updateLanternTimer();
+      this.progressGreenDragonPony();
       if (!forceMove) this.advanceOffscreenTurnTimers();
       for (const character of this.peopleInRoom()) {
         if (character.id !== this.player.id) character.attackFlag = (character.attackFlag || 0) + 1;
@@ -9268,6 +9997,22 @@
       this.advanceSmaugAwareness();
       this.maybeAtmosphericEvent();
       this.companionDirector?.maybeComment();
+    }
+
+    progressGreenDragonPony() {
+      if (!this.flags.ponypreparing || this.flags.ponyready || this.flags.ponysequencecompleted) return false;
+      const readyTurn = Number(this.flags.ponyreadyturn || 0);
+      if (!readyTurn || this.turnCount < readyTurn) return false;
+      this.flags.ponypreparing = false;
+      this.flags.ponyready = true;
+      if (this.items.calm_pony) this.items.calm_pony.visible = true;
+      if (["green_dragon_inn", "green_dragon_inn_outside"].includes(this.currentRoom) && !this.flags.ponyreadyannounced) {
+        this.flags.ponyreadyannounced = true;
+        this.print(this.currentRoom === "green_dragon_inn"
+          ? "From outside comes the jingle of settled tack and a brief stamp of hooves. By the sound of it, the pony has now been brought round beneath the oak."
+          : "A hostler leads a calm pony beneath the oak and settles it exactly under the low branch, then steps back with the satisfied air of a job properly done.");
+      }
+      return true;
     }
 
     maybeCharacterInitiative(character) {
@@ -9333,7 +10078,7 @@
       if (["hobbit_hole", "bilbos_garden"].includes(roomId)) return "bag_end";
       if (IMMERSION_SHIRE_ROOMS.has(roomId)) return "shire";
       if (["green_dragon_inn", "green_dragon_inn_outside"].includes(roomId)) return "green_dragon";
-      if (["trolls_clearing", "hidden_path", "trolls_cave"].includes(roomId)) return "trolls";
+      if (["trolls_clearing", "hidden_path", "trolls_cave", "trollshaws_road", "hidden_valley_path"].includes(roomId)) return "trolls";
       if (roomId === "rivendell") return "rivendell";
       if (
         ["misty_mountain", "narrow_place", "large_dry_cave"].includes(roomId)
@@ -9537,6 +10282,27 @@
 
     maybeAutoAttack(character) {
       if (!character.visible || character.position !== this.currentRoom) return false;
+      if (
+        this.currentRoom === "trolls_clearing"
+        && !this.trollsTransformed
+        && ["hideous troll", "vicious troll"].includes(normalize(character.name))
+      ) {
+        const warningTurns = Number(this.flags.trollsclearingwarningturns || 0);
+        const warningTurnStamp = Number(this.flags.trollsclearingwarningturnstamp || -1);
+        if (warningTurnStamp === this.turnCount) return true;
+        if (warningTurns <= 0) {
+          this.flags.trollsclearingwarningturns = 1;
+          this.flags.trollsclearingwarningturnstamp = this.turnCount;
+          this.print("A troll sniffs the air and peers into the dark beyond the fire. This is no safe place to linger: one more false move and the whole clearing may be on you.");
+          return true;
+        }
+        if (warningTurns === 1) {
+          this.flags.trollsclearingwarningturns = 2;
+          this.flags.trollsclearingwarningturnstamp = this.turnCount;
+          this.print("The quarrel is breaking down into ugly suspicion. You have had as much warning as luck is likely to give; best act now or be caught.");
+          return true;
+        }
+      }
       if (matches(character.name, "gollum") && this.currentRoom === "deep_dark_lake") {
         if (!this.gollumState?.enraged) return false;
         if (this.player.noticeable === false) return false;
@@ -9885,6 +10651,8 @@
       const aliases = {
         n: "north", s: "south", e: "east", w: "west", ne: "north east",
         nw: "north west", se: "south east", sw: "south west", u: "up", d: "down",
+        northeast: "north east", northwest: "north west", southeast: "south east", southwest: "south west",
+        "north-east": "north east", "north-west": "north west", "south-east": "south east", "south-west": "south west",
       };
       return aliases[direction] || direction;
     }
@@ -10138,8 +10906,180 @@
   }
 
   function normalizeNaturalCommand(command) {
-    return command
+    return String(command || "")
+      .trim()
       .replace(/[.?!]+$/g, "")
+      .replace(PROFANITY_FILLER_RE, " ")
+      .replace(/^inv$/i, "inventory")
+      .replace(/^hint$/i, "tips")
+      .replace(/^show\s+controls$/i, "help")
+      .replace(/^show\s+tutorial$/i, "help")
+      .replace(/^show\s+objectives$/i, "tips")
+      .replace(/^show\s+quest\s+log$/i, "tips")
+      .replace(/^open\s+journal$/i, "tips")
+      .replace(/^track\s+quest$/i, "tips")
+      .replace(/^show\s+achievements$/i, "tips")
+      .replace(/^check\s+stats$/i, "status")
+      .replace(/^character\s+sheet$/i, "status")
+      .replace(/^show\s+compass$/i, "exits")
+      .replace(/^highlight\s+interactables$/i, "look")
+      .replace(/^(?:mark|ping)\s+location$/i, "location")
+      .replace(/^pause(?:\s+game)?$/i, "pause")
+      .replace(/^open\s+settings$/i, "help")
+      .replace(/^skip\s+(?:dialogue|cutscene)$/i, "wait")
+      .replace(/^fast\s+travel$/i, "help")
+      .replace(/^what\s+do\s+i\s+see$/i, "look")
+      .replace(/^(?:what's|what is)\s+here$/i, "look")
+      .replace(/^describe\s+the\s+room$/i, "look")
+      .replace(/^look\s+around\s+carefully$/i, "look")
+      .replace(/^look\s+around\s+the\s+room$/i, "look")
+      .replace(/^look\s+at\s+everything$/i, "look")
+      .replace(/^look\s+closer$/i, "look")
+      .replace(/^examine\s+the\s+room$/i, "look")
+      .replace(/^inspect\s+the\s+area$/i, "look")
+      .replace(/^search\s+everywhere$/i, "look")
+      .replace(/^peer\s+through\s+the\s+window$/i, "look through window")
+      .replace(/^study\s+the\s+map$/i, "examine map")
+      .replace(/^pick\s+up\s+everything$/i, "take all")
+      .replace(/^pick\s+up\s+all\s+items$/i, "take all")
+      .replace(/^take\s+all\s+the\s+items$/i, "take all")
+      .replace(/^grab\s+everything$/i, "take all")
+      .replace(/^collect\s+everything$/i, "take all")
+      .replace(/^put\s+the\s+(.+?)\s+away$/i, "leave $1")
+      .replace(/^store\s+the\s+rope$/i, "leave rope")
+      .replace(/^throw\s+away\s+the\s+(.+)$/i, "leave $1")
+      .replace(/^discard\s+the\s+(.+)$/i, "leave $1")
+      .replace(/^equip\s+the\s+(.+)$/i, "take $1")
+      .replace(/^draw\s+my\s+(.+)$/i, "take $1")
+      .replace(/^sheathe\s+my\s+(.+)$/i, "leave $1")
+      .replace(/^speak\s+with\s+(.+)$/i, "talk to $1")
+      .replace(/^talk\s+with\s+(.+)$/i, "talk to $1")
+      .replace(/^speak\s+to\s+(.+?)\s+about\s+(.+)$/i, "ask $1 about $2")
+      .replace(/^talk\s+to\s+(.+?)\s+about\s+(.+)$/i, "ask $1 about $2")
+      .replace(/^ask\s+(.+?)\s+a\s+question$/i, "talk to $1")
+      .replace(/^ask\s+for\s+directions$/i, "exits")
+      .replace(/^ask\s+for\s+advice$/i, "tips")
+      .replace(/^ask\s+for\s+help$/i, "help")
+      .replace(/^(?:hi|hey|good\s+morning)$/i, "hello")
+      .replace(/^(?:thanks|thank\s+you)$/i, "thank")
+      .replace(/^tell\s+(.+?)\s+hello$/i, "hello")
+      .replace(/^introduce\s+myself$/i, "hello")
+      .replace(/^say\s+my\s+name$/i, "hello")
+      .replace(/^ask\s+his\s+name$/i, "what's your name")
+      .replace(/^ask\s+where\s+he\s+came\s+from$/i, "ask about where he came from")
+      .replace(/^ask\s+where\s+we(?:'re| are)\s+going$/i, "ask about where we are going")
+      .replace(/^ask\s+why\s+we(?:'re| are)\s+here$/i, "ask about why we are here")
+      .replace(/^tell\s+a\s+joke$/i, "talk")
+      .replace(/^apologize$/i, "talk")
+      .replace(/^wave\s+hello$/i, "hello")
+      .replace(/^shake\s+hands$/i, "hello")
+      .replace(/^greet\s+everyone$/i, "hello")
+      .replace(/^gather\s+everyone$/i, "talk")
+      .replace(/^put\s+out\s+the\s+(.+)$/i, "close $1")
+      .replace(/^take\s+a\s+rest$/i, "rest")
+      .replace(/^sleep\s+for\s+a\s+while$/i, "sleep")
+      .replace(/^sleep\s+until\s+morning$/i, "sleep")
+      .replace(/^warm\s+myself$/i, "rest")
+      .replace(/^cool\s+down$/i, "rest")
+      .replace(/^heal\s+myself$/i, "rest")
+      .replace(/^recover$/i, "rest")
+      .replace(/^bandage\s+my\s+wounds$/i, "rest")
+      .replace(/^check\s+my\s+health$/i, "status")
+      .replace(/^how\s+injured\s+am\s+i$/i, "status")
+      .replace(/^am\s+i\s+hungry$/i, "status")
+      .replace(/^am\s+i\s+tired$/i, "status")
+      .replace(/^what\s+should\s+i\s+do\s+now$/i, "tips")
+      .replace(/^i'?m\s+stuck$/i, "tips")
+      .replace(/^i\s+don'?t\s+know\s+what\s+to\s+do$/i, "tips")
+      .replace(/^give\s+me\s+a\s+hint$/i, "tips")
+      .replace(/^tell\s+me\s+what\s+to\s+do$/i, "tips")
+      .replace(/^objectives$/i, "tips")
+      .replace(/^where\s+am\s+i\s+supposed\s+to\s+go$/i, "exits")
+      .replace(/^can\s+i\s+get\s+out\s+of\s+here$/i, "exits")
+      .replace(/^how\s+do\s+i\s+get\s+out\s+of\s+here$/i, "exits")
+      .replace(/^how\s+do\s+i\s+open\s+this$/i, "help")
+      .replace(/^why\s+can'?t\s+i\s+do\s+that$/i, "tips")
+      .replace(/^is\s+this\s+important$/i, "tips")
+      .replace(/^is\s+there\s+treasure\s+nearby$/i, "tips")
+      .replace(/^is\s+there\s+a\s+hidden\s+door$/i, "tips")
+      .replace(/^is\s+anyone\s+here$/i, "look")
+      .replace(/^who'?s\s+there$/i, "look")
+      .replace(/^can\s+i\s+talk\s+to\s+him$/i, "talk to him")
+      .replace(/^can\s+i\s+take\s+this$/i, "take this")
+      .replace(/^can\s+i\s+use\s+that$/i, "use that")
+      .replace(/^can\s+i\s+leave$/i, "go out")
+      .replace(/^can\s+i\s+climb\s+this\s+tree$/i, "climb tree")
+      .replace(/^can\s+i\s+cross\s+the\s+river$/i, "cross river")
+      .replace(/^move\s+on$/i, "go forward")
+      .replace(/^move\s+(north|south|east|west|north east|north west|south east|south west|inside|outside|forward|back|up|down|uphill|downhill)$/i, "go $1")
+      .replace(/^travel\s+(north|south|east|west|north east|north west|south east|south west|inside|outside|forward|back|up|down)$/i, "go $1")
+      .replace(/^go\s+to\s+the\s+(north|south|east|west|north east|north west|south east|south west)$/i, "go $1")
+      .replace(/^proceed\s+northward$/i, "go north")
+      .replace(/^proceed\s+southward$/i, "go south")
+      .replace(/^proceed\s+eastward$/i, "go east")
+      .replace(/^proceed\s+westward$/i, "go west")
+      .replace(/^follow\s+the\s+(?:road|path)$/i, "go forward")
+      .replace(/^take\s+the\s+(?:left|right)\s+path$/i, "go forward")
+      .replace(/^cross\s+the\s+(?:stream|road|river)$/i, "go forward")
+      .replace(/^(?:continue\s+walking|keep\s+going|keep\s+moving|explore\s+further|venture\s+onward|move\s+closer|advance)$/i, "go forward")
+      .replace(/^(?:step\s+back|retreat|come\s+back\s+here)$/i, "go back")
+      .replace(/^(?:walk|wander)\s+around$/i, "look")
+      .replace(/^explore\s+the\s+area$/i, "look")
+      .replace(/^check\s+nearby$/i, "look")
+      .replace(/^enter\s+the\s+forest$/i, "go forward")
+      .replace(/^leave\s+the\s+forest$/i, "go back")
+      .replace(/^(?:return|head\s+back)\s+home$/i, "go to hobbit hole")
+      .replace(/^l$/i, "look")
+      .replace(/^x\s+(.+)$/i, "examine $1")
+      .replace(/^x$/i, "examine")
+      .replace(/^show\s+inventory$/i, "inventory")
+      .replace(/^check\s+my\s+inventory$/i, "inventory")
+      .replace(/^what\s+am\s+i\s+carrying$/i, "inventory")
+      .replace(/^(?:what's|what is)\s+in\s+here$/i, "look")
+      .replace(/^examine\s+everything$/i, "look")
+      .replace(/^take\s+a\s+closer\s+look$/i, "look")
+      .replace(/^look\s+closely\s+at\s+(.+)$/i, "examine $1")
+      .replace(/^is\s+there\s+anything\s+useful\s+here$/i, "tips")
+      .replace(/^where\s+should\s+i\s+go$/i, "exits")
+      .replace(/^can\s+i\s+talk\s+to\s+someone$/i, "talk")
+      .replace(/^greet\s+(?:the\s+)?(?:dwarves|everyone|all)$/i, "hello")
+      .replace(/^drop\s+everything$/i, "drop all")
+      .replace(/^take\s+everything$/i, "take all")
+      .replace(/^get\s+all$/i, "take all")
+      .replace(/^pick\s+everything\s+up$/i, "take all")
+      .replace(/^(?:collect|snag)\s+(.+)$/i, "take $1")
+      .replace(/^extinguish\s+(.+)$/i, "close $1")
+      .replace(/^let'?s\s+talk\s+to\s+(.+)$/i, "talk to $1")
+      .replace(/^let'?s\s+(.+)$/i, "$1")
+      .replace(/^maybe\s+i\s+should\s+(.+)$/i, "$1")
+      .replace(/^i\s+want\s+to\s+leave$/i, "go out")
+      .replace(/^i(?:\s+would|['’]d)\s+like\s+to\s+go\s+outside$/i, "go outside")
+      .replace(/^i\s+think\s+i(?:\s+will|['’]ll)\s+go\s+(.+)$/i, "go $1")
+      .replace(/^let\s+me\s+out$/i, "go out")
+      .replace(/^i\s+want\s+to\s+go\s+(.+)$/i, "go $1")
+      .replace(/^can\s+i\s+open\s+(.+)$/i, "open $1")
+      .replace(/^(?:who\s+are\s+you|what'?s\s+your\s+name)$/i, "talk")
+      .replace(/^how\s+are\s+you$/i, "talk")
+      .replace(/^can\s+you\s+help\s+me$/i, "help")
+      .replace(/^enter$/i, "go inside")
+      .replace(/^go\s+in$/i, "go inside")
+      .replace(/^enter\s+(?:the\s+)?(?:house|home|inn)$/i, "go inside")
+      .replace(/^get\s+in(?:side)?$/i, "go inside")
+      .replace(/^get\s+out$/i, "go out")
+      .replace(/^get\s+outside$/i, "go outside")
+      .replace(/^come\s+in(?:side)?$/i, "go inside")
+      .replace(/^come\s+out(?:side)?$/i, "go outside")
+      .replace(/^walk\s+in$/i, "go inside")
+      .replace(/^walk\s+out$/i, "go outside")
+      .replace(/^head\s+in(?:side)?$/i, "go inside")
+      .replace(/^head\s+out(?:side)?$/i, "go outside")
+      .replace(/^leave$/i, "go out")
+      .replace(/^walk\s+(.+)$/i, "go $1")
+      .replace(/^study\s+(.+)$/i, "examine $1")
+      .replace(/^(?:help|help me|i need help)$/i, "help")
+      .replace(/^(?:what can i do|what do i do|what should i do)$/i, "help")
+      .replace(/^(?:where am i|where are we|where are we now|what is this place)$/i, "location")
+      .replace(/^(?:leave|exit)\s+(?:the\s+)?(?:house|home|bag end|hobbit hole|garden|yard|inn|tavern|green dragon)$/i, "go out")
       .replace(/^bilbo\s+(?:gives|give)\s+/, "give ")
       .replace(/^bilbo\s+(?:takes|take)\s+/, "take ")
       .replace(/\bseek\b/g, "find")

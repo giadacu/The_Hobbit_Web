@@ -134,6 +134,7 @@ function runGameCase(testCase) {
   try {
     outputLines.length = 0;
     if (typeof testCase.setup === "function") testCase.setup(window.hobbitGame);
+    if (testCase.clearOutputAfterSetup) outputLines.length = 0;
     if (typeof testCase.drive === "function") {
       testCase.drive(window.hobbitGame);
     } else {
@@ -156,6 +157,22 @@ function lineMatches(line, pattern) {
   return line.includes(pattern);
 }
 
+function loadExternalRegressionCases() {
+  const fallback = { splitterCases: [], gameCases: [] };
+  const filePath = "scripts/parser-regressions.json";
+  if (!fs.existsSync(filePath)) return fallback;
+  try {
+    const payload = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    return {
+      splitterCases: Array.isArray(payload.splitterCases) ? payload.splitterCases : [],
+      gameCases: Array.isArray(payload.gameCases) ? payload.gameCases : [],
+    };
+  } catch (error) {
+    console.warn(`Could not load ${filePath}: ${error.message}`);
+    return fallback;
+  }
+}
+
 function placeCharacterWithPlayer(game, characterId) {
   game.characters[characterId].position = game.player.position;
 }
@@ -167,6 +184,12 @@ function giveItemToCharacter(game, itemId, characterId = "gandalf") {
   item.location = { type: "character", id: characterId };
   const inventory = game.characters[characterId].inventory;
   if (!inventory.includes(item.id)) inventory.push(item.id);
+}
+
+function movePlayerTo(game, roomId) {
+  game.currentRoom = roomId;
+  game.player.position = roomId;
+  game.visitedRooms.add(roomId);
 }
 
 const cases = [
@@ -354,6 +377,126 @@ const cases = [
     name: "head back inside alias",
     input: "Head back inside.",
     expected: ["back inside"],
+  },
+  {
+    name: "get in alias",
+    input: "Get in.",
+    expected: ["go inside"],
+  },
+  {
+    name: "get inside alias",
+    input: "Get inside.",
+    expected: ["go inside"],
+  },
+  {
+    name: "get outside alias",
+    input: "Get outside.",
+    expected: ["go outside"],
+  },
+  {
+    name: "come out alias",
+    input: "Come out.",
+    expected: ["go outside"],
+  },
+  {
+    name: "go in alias",
+    input: "Go in.",
+    expected: ["go inside"],
+  },
+  {
+    name: "walk out alias",
+    input: "Walk out.",
+    expected: ["go outside"],
+  },
+  {
+    name: "move on alias",
+    input: "Move on.",
+    expected: ["go forward"],
+  },
+  {
+    name: "head inside alias",
+    input: "Head inside.",
+    expected: ["go inside"],
+  },
+  {
+    name: "natural leave intent maps to going out",
+    input: "I want to leave.",
+    expected: ["go out"],
+  },
+  {
+    name: "id like to go outside maps to going out",
+    input: "I'd like to go outside.",
+    expected: ["go outside"],
+  },
+  {
+    name: "let me out maps to going out",
+    input: "Let me out.",
+    expected: ["go out"],
+  },
+  {
+    name: "can i leave maps to going out",
+    input: "Can I leave?",
+    expected: ["go out"],
+  },
+  {
+    name: "can i get out of here maps to exits",
+    input: "Can I get out of here?",
+    expected: ["exits"],
+  },
+  {
+    name: "i think ill go north maps to movement",
+    input: "I think I'll go north.",
+    expected: ["go north"],
+  },
+  {
+    name: "lets open chest maps to direct command",
+    input: "Let's open the chest.",
+    expected: ["open chest"],
+  },
+  {
+    name: "travel north alias",
+    input: "Travel north.",
+    expected: ["go north"],
+  },
+  {
+    name: "go to the north alias",
+    input: "Go to the north.",
+    expected: ["go north"],
+  },
+  {
+    name: "proceed northward alias",
+    input: "Proceed northward.",
+    expected: ["go north"],
+  },
+  {
+    name: "collect maps to take",
+    input: "Collect the sword.",
+    expected: ["take sword"],
+  },
+  {
+    name: "carry stays actionable",
+    input: "Carry the sword.",
+    expected: ["carry sword"],
+  },
+  {
+    name: "snag maps to take",
+    input: "Snag the sword.",
+    expected: ["take sword"],
+  },
+  {
+    name: "study maps to examine",
+    input: "Study the sword.",
+    expected: ["examine sword"],
+  },
+  {
+    name: "look closely at maps to examine",
+    input: "Look closely at the sword.",
+    expected: ["examine sword"],
+  },
+  {
+    name: "talk to character about topic maps to ask about",
+    input: "Talk to Gandalf about treasure.",
+    expected: ["ask gandalf about treasure"],
   },
   {
     name: "pick back up filler phrase",
@@ -657,6 +800,397 @@ const dialogueCases = [
 
 const gameCases = [
   {
+    name: "help gives beginner-friendly onboarding",
+    inputs: ["help"],
+    expectedIncluded: [
+      'Try simple commands such as "look", "exits", "inventory", "take map from Gandalf", or "open door".',
+      'For guidance, type "tips". To see recognized verbs, type "commands" or "verbs". To save, type "save name".',
+    ],
+    notExpectedIncluded: ["Please specify your action and the object."],
+  },
+  {
+    name: "where am i maps to location",
+    inputs: ["where am i"],
+    expectedIncluded: ["You are now in Hobbit Hole."],
+    notExpectedIncluded: ["Questions are not supported as commands yet."],
+  },
+  {
+    name: "what can i do maps to help",
+    inputs: ["what can i do"],
+    expectedIncluded: [
+      'Try simple commands such as "look", "exits", "inventory", "take map from Gandalf", or "open door".',
+    ],
+    notExpectedIncluded: ["Questions are not supported as commands yet."],
+  },
+  {
+    name: "held item guidance suggests next command",
+    inputs: ["take map"],
+    expectedIncluded: [
+      "Gandalf is carrying the curious map.",
+      'Try "ask Gandalf for curious map" or "take curious map from Gandalf".',
+    ],
+  },
+  {
+    name: "what am i carrying maps to inventory",
+    inputs: ["what am i carrying"],
+    expectedIncluded: ["You are carrying: nothing. Overall it is no burden at all."],
+    notExpectedIncluded: ["Questions are not supported as commands yet."],
+  },
+  {
+    name: "whats in here maps to look",
+    inputs: ["what's in here"],
+    expectedIncluded: ["You are in Bilbo's round front hall"],
+    notExpectedIncluded: ["Questions are not supported as commands yet."],
+  },
+  {
+    name: "where should i go maps to exits",
+    inputs: ["where should i go"],
+    expectedIncluded: ["From here, east leads to Bilbo's garden, west to the parlour, south to the dining room, and northeast to the study."],
+    notExpectedIncluded: ["Questions are not supported as commands yet."],
+  },
+  {
+    name: "talk defaults to sole visible character",
+    inputs: ["talk"],
+    expectedIncluded: ["Gandalf listens intently, expecting your words."],
+    notExpectedIncluded: ["You speak, but only silence meets your words."],
+  },
+  {
+    name: "can i talk to someone defaults to sole visible character",
+    inputs: ["can i talk to someone"],
+    expectedIncluded: ["Gandalf listens intently, expecting your words."],
+    notExpectedIncluded: ["You speak, but only silence meets your words."],
+  },
+  {
+    name: "ask about topic defaults to sole visible character",
+    inputs: ["ask about the treasure"],
+    expectedIncluded: ["Gandalf considers treasure, but gives no clear answer."],
+    notExpectedIncluded: ["Use: ask [character] for [item], or ask [character] to [command]."],
+  },
+  {
+    name: "can you help me defaults to visible guide",
+    inputs: ["can you help me"],
+    expectedIncluded: ["Gandalf says 'Begin with what lies before you. Look about, mind the exits, and do not hesitate to ask for the map when you are ready.'"],
+    notExpectedIncluded: ['Try simple commands such as "look", "exits", "inventory", "take map from Gandalf", or "open door".'],
+  },
+  {
+    name: "look alias l works",
+    inputs: ["l"],
+    expectedIncluded: ["You are in Bilbo's round front hall"],
+    notExpectedIncluded: ["Please specify your action and the object."],
+  },
+  {
+    name: "examine alias x works",
+    inputs: ["x door"],
+    expectedIncluded: ["You see the round green door. It is closed."],
+    notExpectedIncluded: ["I'm not sure how to do that."],
+  },
+  {
+    name: "go forward gives directional guidance",
+    inputs: ["go forward"],
+    expectedIncluded: [
+      "You'll need to choose a direction from the exits available here.",
+      "From here, east leads to Bilbo's garden, west to the parlour, south to the dining room, and northeast to the study.",
+    ],
+    notExpectedIncluded: ['That direction is not recognized. Type "go <direction>" or "go through <door name>".'],
+  },
+  {
+    name: "drop everything is friendly when inventory is empty",
+    inputs: ["drop everything"],
+    expectedIncluded: ["You are not carrying anything to leave."],
+    notExpectedIncluded: ["You don't have the everything."],
+  },
+  {
+    name: "profanity outburst is rebuked by visible guide",
+    inputs: ["fuck this"],
+    expectedIncluded: ["Gandalf raises an eyebrow. 'Steady on, Bilbo. Plain words will serve you better than that.'"],
+    notExpectedIncluded: ["I'm not sure how to do that."],
+  },
+  {
+    name: "profanity filler does not block a valid command",
+    inputs: ["open the fucking door"],
+    expectedIncluded: ["You open the round green door."],
+    notExpectedIncluded: ["I'm not sure how to do that."],
+  },
+  {
+    name: "narrator rebukes profanity when no one is around",
+    inputs: ["vaffanculo"],
+    setup(game) {
+      movePlayerTo(game, "lane_beneath_hill");
+      for (const character of Object.values(game.characters)) {
+        if (character.id !== game.player.id) character.position = "rivendell";
+      }
+    },
+    clearOutputAfterSetup: true,
+    expectedIncluded: ["Your outburst echoes uselessly. A clearer command would serve you better."],
+    notExpectedIncluded: ["I'm not sure how to do that."],
+  },
+  {
+    name: "modern look question maps to room description",
+    inputs: ["what do i see"],
+    expectedIncluded: ["You are in Bilbo's round front hall"],
+    notExpectedIncluded: ["Questions are not supported as commands yet."],
+  },
+  {
+    name: "move east is treated as movement",
+    inputs: ["move east", "location"],
+    expectedIncluded: ["You are now in Hobbit Hole."],
+    notExpectedIncluded: ["You cannot find the east to move."],
+  },
+  {
+    name: "continue walking reuses forward guidance",
+    inputs: ["continue walking"],
+    expectedIncluded: [
+      "You'll need to choose a direction from the exits available here.",
+      "From here, east leads to Bilbo's garden, west to the parlour, south to the dining room, and northeast to the study.",
+    ],
+    notExpectedIncluded: ["I'm not sure how to do that."],
+  },
+  {
+    name: "ask for directions maps to exits",
+    inputs: ["ask for directions"],
+    expectedIncluded: ["From here, east leads to Bilbo's garden, west to the parlour, south to the dining room, and northeast to the study."],
+    notExpectedIncluded: ["Use: ask [character] for [item], or ask [character] to [command]."],
+  },
+  {
+    name: "hint aliases to tips",
+    inputs: ["hint"],
+    expectedIncluded: ["The carpet appears to be concealing something."],
+    notExpectedIncluded: ["I'm not sure how to do that."],
+  },
+  {
+    name: "health question maps to status",
+    inputs: ["check my health"],
+    expectedIncluded: ["Strength: 5. You are badly worn down. Overall it is no burden at all."],
+    notExpectedIncluded: ["Questions are not supported as commands yet."],
+  },
+  {
+    name: "inv aliases to inventory",
+    inputs: ["inv"],
+    expectedIncluded: ["You are carrying: nothing. Overall it is no burden at all."],
+    notExpectedIncluded: ["Please specify your action and the object."],
+  },
+  {
+    name: "show controls maps to help",
+    inputs: ["show controls"],
+    expectedIncluded: ['Try simple commands such as "look", "exits", "inventory", "take map from Gandalf", or "open door".'],
+    notExpectedIncluded: ["I'm not sure how to do that."],
+  },
+  {
+    name: "autosave command uses autosave system response",
+    inputs: ["autosave"],
+    expectedIncluded: ["No safe moment has been marked for your return."],
+    notExpectedIncluded: ['No saved game named "autosave" was found.'],
+  },
+  {
+    name: "undo command gives friendly unsupported message",
+    inputs: ["undo"],
+    expectedIncluded: ["Undo is not available here. If you need safety, use 'save name' or 'load autosave'."],
+    notExpectedIncluded: ["Please specify your action and the object."],
+  },
+  {
+    name: "speak with gandalf maps to talk",
+    inputs: ["speak with gandalf"],
+    expectedIncluded: ["Gandalf listens intently, expecting your words."],
+    notExpectedIncluded: ["You speak, but only silence meets your words."],
+  },
+  {
+    name: "speak to him uses remembered pronoun target",
+    inputs: ["talk to gandalf", "speak to him"],
+    expectedIncluded: ["Gandalf listens intently, expecting your words."],
+    notExpectedIncluded: ["You speak, but only silence meets your words."],
+  },
+  {
+    name: "ask gandalf for help gives onboarding advice",
+    inputs: ["ask gandalf for help"],
+    expectedIncluded: [
+      "Gandalf says 'Begin with what lies before you. Look about, mind the exits, and do not hesitate to ask for the map when you are ready.'",
+    ],
+    notExpectedIncluded: ["Gandalf does not have the help."],
+  },
+  {
+    name: "leave house maps to going outside",
+    inputs: ["leave house", "location"],
+    expectedIncluded: ["You are now in Bilbo's garden."],
+    notExpectedIncluded: ["You don't have the house."],
+  },
+  {
+    name: "go outside opens the front door when needed",
+    inputs: ["go outside", "location"],
+    expectedIncluded: ["You open the round green door.", "You are now in Bilbo's garden."],
+    notExpectedIncluded: ["The round green door is closed."],
+  },
+  {
+    name: "get out maps to going outside",
+    inputs: ["get out", "location"],
+    expectedIncluded: ["You open the round green door.", "You are now in Bilbo's garden."],
+    notExpectedIncluded: ["I don't see that here.", "The round green door is closed."],
+  },
+  {
+    name: "get out quickly still maps to going outside",
+    inputs: ["get out quickly", "location"],
+    expectedIncluded: ["You open the round green door.", "You are now in Bilbo's garden."],
+    notExpectedIncluded: ["I don't see that here.", "The round green door is closed."],
+  },
+  {
+    name: "get in maps to going inside",
+    inputs: ["go outside", "get in", "location"],
+    expectedIncluded: ["You are now in Hobbit Hole."],
+    notExpectedIncluded: ["I don't see that here.", "You don't have the in."],
+  },
+  {
+    name: "come out maps to going outside",
+    inputs: ["come out", "location"],
+    expectedIncluded: ["You open the round green door.", "You are now in Bilbo's garden."],
+    notExpectedIncluded: ["I don't see that here."],
+  },
+  {
+    name: "head out maps to going outside",
+    inputs: ["head out", "location"],
+    expectedIncluded: ["You open the round green door.", "You are now in Bilbo's garden."],
+    notExpectedIncluded: ["I don't see that here."],
+  },
+  {
+    name: "leave alone maps to going outside",
+    inputs: ["leave", "location"],
+    expectedIncluded: ["You open the round green door.", "You are now in Bilbo's garden."],
+    notExpectedIncluded: ["Please specify your action and the object."],
+  },
+  {
+    name: "enter alone maps to going inside from the garden",
+    inputs: ["go outside", "enter", "location"],
+    expectedIncluded: ["You are now in Hobbit Hole."],
+    notExpectedIncluded: ["Please specify your action and the object."],
+  },
+  {
+    name: "natural leave intent maps to going outside in game",
+    inputs: ["i want to leave", "location"],
+    expectedIncluded: ["You are now in Bilbo's garden."],
+    notExpectedIncluded: ["Please specify your action and the object."],
+  },
+  {
+    name: "id like to go outside works in game",
+    inputs: ["i'd like to go outside", "location"],
+    expectedIncluded: ["You are now in Bilbo's garden."],
+    notExpectedIncluded: ["I'm not sure how to do that."],
+  },
+  {
+    name: "let me out works in game",
+    inputs: ["let me out", "location"],
+    expectedIncluded: ["You are now in Bilbo's garden."],
+    notExpectedIncluded: ["I'm not sure how to do that."],
+  },
+  {
+    name: "show inventory maps to inventory",
+    inputs: ["show inventory"],
+    expectedIncluded: ["You are carrying: nothing. Overall it is no burden at all."],
+    notExpectedIncluded: ["Please specify your action and the object."],
+  },
+  {
+    name: "good morning maps to hello",
+    inputs: ["good morning"],
+    expectedIncluded: ["Gandalf says hello to you."],
+    notExpectedIncluded: ["I'm not sure how to do that."],
+  },
+  {
+    name: "talk to him defaults to visible character",
+    inputs: ["talk to him"],
+    expectedIncluded: ["Gandalf listens intently, expecting your words."],
+    notExpectedIncluded: ["I don't know who \"him\" refers to."],
+  },
+  {
+    name: "follow him defaults to visible character",
+    inputs: ["follow him"],
+    expectedIncluded: ["You follow Gandalf as closely as you can."],
+    notExpectedIncluded: ["I don't know who \"him\" refers to."],
+  },
+  {
+    name: "bare open asks for an object",
+    inputs: ["open"],
+    expectedIncluded: ["Open what?"],
+    notExpectedIncluded: ["Please specify your action and the object."],
+  },
+  {
+    name: "bare close asks for an object",
+    inputs: ["close"],
+    expectedIncluded: ["Close what?"],
+    notExpectedIncluded: ["Please specify your action and the object."],
+  },
+  {
+    name: "bare unlock asks for an object",
+    inputs: ["unlock"],
+    expectedIncluded: ["Unlock what?"],
+    notExpectedIncluded: ["Please specify your action and the object."],
+  },
+  {
+    name: "bare read asks for an object",
+    inputs: ["read"],
+    expectedIncluded: ["Read what?"],
+    notExpectedIncluded: ["Please specify your action and the object."],
+  },
+  {
+    name: "bare climb asks where",
+    inputs: ["climb"],
+    expectedIncluded: ["Climb where?"],
+    notExpectedIncluded: ["Please specify your action and the object."],
+  },
+  {
+    name: "unresolved object pronoun asks what it means",
+    inputs: ["take it"],
+    expectedIncluded: ['What do you mean by "it"?'],
+    notExpectedIncluded: ["I don't see that here."],
+  },
+  {
+    name: "unresolved object pronoun in open asks what it means",
+    inputs: ["open it"],
+    expectedIncluded: ['What do you mean by "it"?'],
+    notExpectedIncluded: ["I don't see that here."],
+  },
+  {
+    name: "unresolved object pronoun in give asks what it means",
+    inputs: ["give it to gandalf"],
+    expectedIncluded: ['What do you mean by "it"?'],
+    notExpectedIncluded: ["You do not have it."],
+  },
+  {
+    name: "resolved object pronoun still works after context",
+    inputs: ["take map from gandalf", "open it"],
+    expectedIncluded: [
+      "You take the curious map from Gandalf.",
+      "You unfold the curious map. You see a map with strange markings.",
+    ],
+    notExpectedIncluded: ['What do you mean by "it"?'],
+  },
+  {
+    name: "talk to gandalf about treasure works naturally",
+    inputs: ["talk to gandalf about treasure"],
+    expectedIncluded: ["Gandalf considers treasure, but gives no clear answer."],
+    notExpectedIncluded: ["Gandalf listens intently, expecting your words."],
+  },
+  {
+    name: "look around remains a room command",
+    inputs: ["look around"],
+    expectedIncluded: ["You are in Bilbo's round front hall"],
+    notExpectedIncluded: ["Please specify your action and the object."],
+  },
+  {
+    name: "wait remains a supported single-word command",
+    inputs: ["wait"],
+    expectedIncluded: ["You wait."],
+    notExpectedIncluded: ["Please specify your action and the object."],
+  },
+  {
+    name: "sleep remains a supported single-word command",
+    inputs: ["sleep"],
+    expectedIncluded: ["You sleep for a while, but dreams do not move the adventure on."],
+    notExpectedIncluded: ["Please specify your action and the object."],
+  },
+  {
+    name: "run away remains a supported natural command",
+    inputs: ["run away"],
+    expectedIncluded: ["You run away, but nothing happens."],
+    notExpectedIncluded: ["Please specify your action and the object."],
+  },
+  {
     name: "ask where is keeps the full question",
     inputs: ["ask gandalf where is thorin"],
     expectedIncluded: ["Gandalf considers where thorin is, but gives no clear answer."],
@@ -884,6 +1418,73 @@ const gameCases = [
     notExpectedIncluded: [
       "There is no one named Thorin here.",
       "There is no one named thorin here.",
+    ],
+  },
+  {
+    name: "green dragon pony preparation now lands in readable stages",
+    drive(game) {
+      game.execute("jump green_dragon");
+      game.doors.porta_green_dragon_inn_green_dragon_inn_outside.open = true;
+      game.flags.lanternon = true;
+      game.items.low_branch.visible = true;
+      placeCharacterWithPlayer(game, "thorin");
+      game.execute("ask thorin to look through window");
+      game.print(`Pony visible after window: ${game.items.calm_pony.visible ? "yes" : "no"}`);
+      game.execute("south");
+      game.print(`Pony visible after immediate exit: ${game.items.calm_pony.visible ? "yes" : "no"}`);
+      game.execute("climb on branch");
+      game.print(`Pony visible after a beat: ${game.items.calm_pony.visible ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Jumped to Green Dragon Inn.",
+      "There is a pony there after all.",
+      "Pony visible after window: no",
+      "Pony visible after immediate exit: no",
+      "Better give the innfolk another moment",
+      "A hostler leads a calm pony beneath the oak",
+      "Pony visible after a beat: yes",
+    ],
+  },
+  {
+    name: "green dragon companions no longer stay frozen in one room",
+    drive(game) {
+      game.execute("jump green_dragon");
+      const ambientIds = new Set(game.unexpectedParty.roster.map((entry) => entry.id).filter((id) => id !== "thorin"));
+      const roomRoster = (roomId) => Object.values(game.characters)
+        .filter((character) => ambientIds.has(character.id) && character.position === roomId)
+        .map((character) => character.id)
+        .sort();
+      const beforeInn = roomRoster("green_dragon_inn");
+      const beforeOutside = roomRoster("green_dragon_inn_outside");
+      const beforeSignature = `${beforeInn.join(",")}|${beforeOutside.join(",")}`;
+      game.print(`Green Dragon inn has company: ${beforeInn.length > 0 ? "yes" : "no"}`);
+      game.print(`Green Dragon yard has company: ${beforeOutside.length > 0 ? "yes" : "no"}`);
+      game.execute("wait");
+      const afterInn = roomRoster("green_dragon_inn");
+      const afterOutside = roomRoster("green_dragon_inn_outside");
+      const afterSignature = `${afterInn.join(",")}|${afterOutside.join(",")}`;
+      game.print(`Green Dragon roster changed: ${beforeSignature !== afterSignature ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Jumped to Green Dragon Inn.",
+      "Green Dragon inn has company: yes",
+      "Green Dragon yard has company: yes",
+      "Green Dragon roster changed: yes",
+    ],
+  },
+  {
+    name: "green dragon inn now includes patrons and an innkeeper",
+    drive(game) {
+      game.execute("jump green_dragon");
+      game.execute("look");
+      game.execute("ask innkeeper about ale");
+    },
+    expectedIncluded: [
+      "Jumped to Green Dragon Inn.",
+      "innkeeper is here.",
+      "pipe-smoking farmer is here.",
+      "travelling tinker is here.",
+      "The innkeeper says 'The ale is sound",
     ],
   },
   {
@@ -2086,8 +2687,90 @@ const gameCases = [
     },
     expectedIncluded: [
       "Jump checkpoints:",
+      "before_green_dragon",
       "green_dragon",
+      "after_trolls_cave",
       "smaug",
+    ],
+  },
+  {
+    name: "jump before green dragon applies a coherent pre-inn state",
+    drive(game) {
+      game.execute("jump before_green_dragon");
+      game.print(`Jump room: ${game.currentRoom}`);
+      game.print(`Has map: ${game.findInInventory("curious map") ? "yes" : "no"}`);
+      game.print(`Has key: ${game.findInInventory("curious key") ? "yes" : "no"}`);
+      game.print(`Has pipe: ${game.findInInventory("smoking pipe") ? "yes" : "no"}`);
+      game.print(`Pony sequence started: ${game.flags.seenpony ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Jumped to Before Green Dragon.",
+      "Jump room: green_dragon_inn_outside",
+      "Has map: yes",
+      "Has key: yes",
+      "Has pipe: yes",
+      "Pony sequence started: no",
+    ],
+  },
+  {
+    name: "jump after trolls cave applies a coherent post-loot state",
+    drive(game) {
+      game.execute("jump after_trolls_cave");
+      game.print(`Jump room: ${game.currentRoom}`);
+      game.print(`Has sword: ${game.findInInventory("short strong dagger") ? "yes" : "no"}`);
+      game.print(`Has rope: ${game.findInInventory("sturdy rope") ? "yes" : "no"}`);
+      game.print(`Has large key: ${game.findInInventory("large key") ? "yes" : "no"}`);
+      game.print(`Trolls transformed: ${game.trollsTransformed ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Jumped to After Trolls Cave.",
+      "Jump room: trollshaws_road",
+      "Has sword: yes",
+      "Has rope: yes",
+      "Has large key: yes",
+      "Trolls transformed: yes",
+    ],
+  },
+  {
+    name: "critical rope cannot be given away in rivendell before later travel needs",
+    drive(game) {
+      game.execute("jump rivendell");
+      game.execute("give rope to elrond");
+      game.print(`Has rope after refusal: ${game.findInInventory("sturdy rope") ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Elrond smiles faintly and says 'Keep the rope.",
+      "Has rope after refusal: yes",
+    ],
+    notExpectedIncluded: [
+      "You give the sturdy rope to Elrond.",
+    ],
+  },
+  {
+    name: "critical rope cannot be dropped before reaching beorn",
+    drive(game) {
+      game.execute("jump rivendell");
+      game.execute("drop rope");
+      game.print(`Has rope after early drop refusal: ${game.findInInventory("sturdy rope") ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Until the road has safely carried you as far as Beorn",
+      "Has rope after early drop refusal: yes",
+    ],
+    notExpectedIncluded: [
+      "You leave the sturdy rope.",
+    ],
+  },
+  {
+    name: "rope can be dropped after reaching beorn",
+    drive(game) {
+      game.execute("jump beorn");
+      game.execute("drop rope");
+      game.print(`Has rope after beorn drop: ${game.findInInventory("sturdy rope") ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You leave the sturdy rope.",
+      "Has rope after beorn drop: no",
     ],
   },
   {
@@ -2097,6 +2780,7 @@ const gameCases = [
       game.print(`Jump room: ${game.currentRoom}`);
       game.print(`Has map: ${game.findInInventory("curious map") ? "yes" : "no"}`);
       game.print(`Has key: ${game.findInInventory("curious key") ? "yes" : "no"}`);
+      game.print(`Has rope: ${game.findInInventory("sturdy rope") ? "yes" : "no"}`);
       game.print(`Trolls transformed: ${game.trollsTransformed ? "yes" : "no"}`);
     },
     expectedIncluded: [
@@ -2104,6 +2788,7 @@ const gameCases = [
       "Jump room: rivendell",
       "Has map: yes",
       "Has key: yes",
+      "Has rope: yes",
       "Trolls transformed: yes",
     ],
   },
@@ -2111,7 +2796,7 @@ const gameCases = [
     name: "jump trolls preserves offscreen dawn progression after leaving the clearing",
     drive(game) {
       game.execute("jump trolls");
-      game.execute("south east");
+      game.execute("south west");
       game.execute("wait");
       game.execute("wait");
       game.execute("wait");
@@ -2127,7 +2812,7 @@ const gameCases = [
     name: "ordinary turns do not advance troll dawn unless the key was stolen",
     drive(game) {
       game.execute("jump trolls");
-      game.execute("south east");
+      game.execute("south west");
       game.execute("look");
       game.execute("inventory");
       game.execute("exits");
@@ -2171,10 +2856,42 @@ const gameCases = [
     ],
   },
   {
+    name: "jump trolls allows one orienting command before bilbo is in immediate danger",
+    drive(game) {
+      game.execute("jump trolls");
+      game.execute("look");
+      game.print(`Endgame after first look: ${game.endgame ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Jumped to Trolls Clearing.",
+      "You are in the trolls' clearing.",
+      "Endgame after first look: no",
+    ],
+    notExpectedIncluded: [
+      "The hideous troll stoops, snatches you up before you can slip away",
+      "Hideous troll attacks you.",
+    ],
+  },
+  {
+    name: "green dragon companion narrative never emits a broken sentence for thorin",
+    drive(game) {
+      game.execute("jump green_dragon");
+      game.execute("look");
+    },
+    expectedIncluded: [
+      "Thorin",
+    ],
+    notExpectedIncluded: [
+      "Thorin  .",
+    ],
+  },
+  {
     name: "stone trolls do not mark a pre-battle autosave",
     drive(game) {
       game.execute("jump rivendell");
       game.execute("west");
+      game.execute("west");
+      game.execute("north west");
       game.print(`Stone trolls autosave: ${game.autosaveMeta?.label || "none"}`);
     },
     expectedIncluded: [
@@ -2184,6 +2901,171 @@ const gameCases = [
     ],
     notExpectedIncluded: [
       "A safe moment is marked here: before facing the trolls.",
+    ],
+  },
+  {
+    name: "post-troll road to rivendell requires bilbo to carry a blade",
+    drive(game) {
+      game.execute("jump trolls");
+      game.transformTrolls();
+      game.execute("south east");
+      game.print(`Road room after block: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "Jumped to Trolls Clearing.",
+      "The Trollshaws are no place for you to go unarmed.",
+      "Road room after block: trolls_clearing",
+    ],
+  },
+  {
+    name: "live trolls block the open road toward rivendell without killing bilbo",
+    drive(game) {
+      game.execute("jump trolls");
+      game.execute("south east");
+      game.print(`Road room with live trolls: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "Jumped to Trolls Clearing.",
+      "The road toward Rivendell lies bare in the trolls' firelight.",
+      "Road room with live trolls: trolls_clearing",
+    ],
+    notExpectedIncluded: [
+      "The tale ends here.",
+      "You have died",
+      "Game over",
+    ],
+  },
+  {
+    name: "live trolls treat east as a safe rivendellward attempt",
+    drive(game) {
+      game.execute("jump trolls");
+      game.execute("east");
+      game.print(`Endgame after eastward attempt: ${game.endgame ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Jumped to Trolls Clearing.",
+      "The road toward Rivendell lies bare in the trolls' firelight.",
+      "Endgame after eastward attempt: no",
+    ],
+    notExpectedIncluded: [
+      "You see no exit in that direction.",
+      "Hideous troll attacks you.",
+    ],
+  },
+  {
+    name: "repeated rivendellward attempts in the troll clearing do not themselves get bilbo killed",
+    drive(game) {
+      game.execute("jump trolls");
+      game.execute("east");
+      game.execute("south east");
+      game.execute("east");
+      game.print(`Endgame after repeated rivendellward attempts: ${game.endgame ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "The road toward Rivendell lies bare in the trolls' firelight.",
+      "You steal a glance toward the eastern road",
+      "Endgame after repeated rivendellward attempts: no",
+    ],
+    notExpectedIncluded: [
+      "Hideous troll attacks you.",
+    ],
+  },
+  {
+    name: "hidden valley descent can be secured to the roots",
+    setup(game) {
+      game.debugCompleteUnexpectedParty();
+      game.debugMarkPonyProgress();
+      game.transformTrolls();
+      game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true });
+      game.currentRoom = "hidden_valley_path";
+      game.player.position = "hidden_valley_path";
+    },
+    drive(game) {
+      game.execute("east");
+      game.execute("tie rope to roots");
+      game.execute("east");
+      game.print(`Descent room after roots: ${game.currentRoom}`);
+      game.print(`Rope kept after descent: ${game.findInInventory("sturdy rope") ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "The path falls away too sharply to trust by balance alone.",
+      "You fasten the sturdy rope twice around the pine roots",
+      "Once all are down, the line is worked loose and taken up again",
+      "Descent room after roots: rivendell",
+      "Rope kept after descent: yes",
+    ],
+  },
+  {
+    name: "returning to the hidden valley path after descent keeps rope fiction coherent",
+    setup(game) {
+      game.debugCompleteUnexpectedParty();
+      game.debugMarkPonyProgress();
+      game.transformTrolls();
+      game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true });
+      game.currentRoom = "hidden_valley_path";
+      game.player.position = "hidden_valley_path";
+      placeCharacterWithPlayer(game, "thorin");
+    },
+    drive(game) {
+      game.execute("ask thorin to brace rope");
+      game.execute("east");
+      game.execute("west");
+      game.execute("tie rope to roots");
+    },
+    expectedIncluded: [
+      "At your word, Thorin plants boots on the rock",
+      "Once all are down, the line is worked loose and taken up again",
+      "You have already proved out the descent here; with the way known, the company could rig the rope again in moments if needed.",
+    ],
+    notExpectedIncluded: [
+      "The rope is already made fast for the descent.",
+    ],
+  },
+  {
+    name: "companions can brace the rope for the hidden valley descent",
+    setup(game) {
+      game.debugCompleteUnexpectedParty();
+      game.debugMarkPonyProgress();
+      game.transformTrolls();
+      game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true });
+      game.currentRoom = "hidden_valley_path";
+      game.player.position = "hidden_valley_path";
+      placeCharacterWithPlayer(game, "thorin");
+    },
+    drive(game) {
+      game.execute("ask thorin to brace rope");
+      game.execute("east");
+      game.print(`Descent room after companion brace: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "At your word, Thorin plants",
+      "Descent room after companion brace: rivendell",
+    ],
+  },
+  {
+    name: "hidden valley climb down uses the rope gate and then the descent",
+    setup(game) {
+      game.debugCompleteUnexpectedParty();
+      game.debugMarkPonyProgress();
+      game.transformTrolls();
+      game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true });
+      game.currentRoom = "hidden_valley_path";
+      game.player.position = "hidden_valley_path";
+    },
+    drive(game) {
+      game.execute("climb down");
+      game.execute("tie rope to spike");
+      game.execute("climb down");
+      game.print(`Descent room after climb down: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "The path falls away too sharply to trust by balance alone.",
+      "You hitch the sturdy rope around the old iron spike",
+      "With the rope taking the worst of the drop",
+      "Descent room after climb down: rivendell",
+    ],
+    notExpectedIncluded: [
+      "You try to climb down, but nothing special happens.",
     ],
   },
   {
@@ -2541,6 +3423,7 @@ const gameCases = [
     name: "turn on lamp is handled as lighting",
     inputs: ["turn on lamp"],
     expectedIncluded: ["You light the elegant lamp. Its engraved metal catches the warm glow."],
+    notExpectedIncluded: ["The elegant lamp cannot be opened."],
   },
   {
     name: "trolls cave is dim without lantern",
@@ -2835,6 +3718,9 @@ const gameCases = [
       game.execute("jump trolls");
       outputLines.length = 0;
       game.execute("take large key");
+      game.execute("wait");
+      game.execute("wait");
+      game.execute("wait");
       game.execute("load autosave");
     },
     expectedIncluded: [
@@ -2980,6 +3866,341 @@ const gameCases = [
     expectedIncluded: ["Smaug says 'A courteous little voice in my halls? Come nearer, and let us see what sort of thief has learned manners.'"],
   },
 ];
+
+const BEGINNER_FORBIDDEN_OUTPUTS = [
+  "Please specify your action and the object.",
+  "Questions are not supported as commands yet.",
+  "Use: ask [character] for [item], or ask [character] to [command].",
+  "I'm not sure how to do that.",
+  "I am not sure I understood",
+  'That direction is not recognized. Type "go <direction>" or "go through <door name>".',
+  "I don't know how to get there from here.",
+];
+
+function beginnerCommandCase(contextName, setup, spec, index) {
+  const command = typeof spec === "string" ? spec : spec.command;
+  return {
+    name: `beginner ${String(index + 1).padStart(3, "0")} ${contextName}: ${command}`,
+    setup,
+    clearOutputAfterSetup: true,
+    inputs: [command],
+    expectedIncluded: (typeof spec === "object" && spec.expectedIncluded) || [/.+/],
+    notExpectedIncluded: [
+      ...BEGINNER_FORBIDDEN_OUTPUTS,
+      ...((typeof spec === "object" && spec.notExpectedIncluded) || []),
+    ],
+  };
+}
+
+const beginnerContexts = [
+  {
+    name: "bag end hall",
+    setup(game) {
+      game.restartGame();
+    },
+    commands: [
+      "help",
+      "what should i do",
+      "look around",
+      "where am i",
+      "where can i go",
+      "inventory",
+      "talk to gandalf",
+      "ask gandalf for help",
+      "take map",
+      "take map from gandalf",
+      "open door",
+      "go outside",
+      { command: "leave house", notExpectedIncluded: ["You don't have the house."] },
+      "look under carpet",
+      "open chest",
+      "open drawer",
+      "take lamp",
+      "turn on lamp",
+      "read map",
+      "save beginner-bagend",
+    ],
+  },
+  {
+    name: "bag end hall with key",
+    setup(game) {
+      game.restartGame();
+      game.execute("look under carpet");
+      game.execute("take key");
+    },
+    commands: [
+      "inventory",
+      "open chest",
+      "look in chest",
+      "open dresser",
+      "open top drawer",
+      "look in top drawer",
+      "open little drawer",
+      "look in little drawer",
+      "take old book",
+      "read old book",
+      "take parchment",
+      "write on parchment",
+      "smell room",
+      "listen",
+      "go west",
+      "go south",
+      { command: "go northeast", notExpectedIncluded: ['That direction is not recognized. Type "go <direction>" or "go through <door name>".'] },
+      "go outside",
+      "go to garden",
+      "look at lamp",
+    ],
+  },
+  {
+    name: "bilbos garden",
+    setup(game) {
+      game.restartGame();
+      game.execute("go outside");
+    },
+    commands: [
+      "look",
+      "where can i go",
+      "smell flowers",
+      "smell herbs",
+      "pick rose",
+      "water herbs",
+      "fill bird bath",
+      "open shed",
+      "look at shed",
+      "dig garden",
+      "plant seeds",
+      "look at bench",
+      "look at sun dial",
+      "go inside",
+      "go east",
+      { command: "leave garden", notExpectedIncluded: ["You don't have the garden."] },
+      "help",
+      "wait",
+      "inventory",
+      "map",
+    ],
+  },
+  {
+    name: "pantry",
+    setup(game) {
+      game.restartGame();
+      movePlayerTo(game, "bag_end_pantry");
+    },
+    commands: [
+      "look",
+      "where am i",
+      "where can i go",
+      "inventory",
+      "take seed cakes",
+      "eat seed cakes",
+      "take cheese",
+      "eat cheese",
+      "look at shelves",
+      "smell air",
+      "listen",
+      "search room",
+      "go west",
+      "go east",
+      "go north",
+      "help",
+      "map",
+      "wait",
+      "take pickles",
+      "take cold chicken",
+    ],
+  },
+  {
+    name: "green dragon inn",
+    setup(game) {
+      game.restartGame();
+      game.execute("jump green_dragon");
+    },
+    commands: [
+      "look",
+      "where am i",
+      "where can i go",
+      "talk to innkeeper",
+      "ask innkeeper for ale",
+      "ask innkeeper for help",
+      "talk to thorin",
+      "ask thorin for help",
+      "look through window",
+      "open door",
+      "go outside",
+      { command: "leave inn", notExpectedIncluded: ["You don't have the inn."] },
+      { command: "go back inside", expectedIncluded: [/.+/] },
+      "talk to farmer",
+      "talk to tinker",
+      "inventory",
+      "smell air",
+      "listen",
+      "save beginner-inn",
+      "wait",
+    ],
+  },
+  {
+    name: "trolls clearing",
+    setup(game) {
+      game.restartGame();
+      game.execute("jump trolls");
+    },
+    commands: [
+      "look",
+      "where can i go",
+      "look at trolls",
+      "talk to trolls",
+      "take key carefully",
+      "take lantern",
+      "turn on lantern",
+      "go east",
+      "go south east",
+      "go west",
+      "look around",
+      "search clearing",
+      "look at fire",
+      "inventory",
+      "wait",
+      "help",
+      "what should i do",
+      "save beginner-trolls",
+      "map",
+      "listen",
+    ],
+  },
+  {
+    name: "rivendell",
+    setup(game) {
+      game.restartGame();
+      game.execute("jump rivendell");
+    },
+    commands: [
+      "look",
+      "where am i",
+      "where can i go",
+      "talk to elrond",
+      "ask elrond for help",
+      "ask elrond about map",
+      "show map to elrond",
+      "read map",
+      "go outside",
+      "go east",
+      "go west",
+      "inventory",
+      "look at waterfall",
+      "smell air",
+      "listen",
+      "save beginner-rivendell",
+      "wait",
+      "talk to gandalf",
+      "ask gandalf for help",
+      "map",
+    ],
+  },
+  {
+    name: "beorn",
+    setup(game) {
+      game.restartGame();
+      game.execute("jump beorn");
+    },
+    commands: [
+      "look",
+      "talk to beorn",
+      "ask beorn for food",
+      "ask beorn for help",
+      "ask beorn about mirkwood",
+      "inventory",
+      "where can i go",
+      "go outside",
+      "go east",
+      "go west",
+      "look at table",
+      "show map to beorn",
+      "smell air",
+      "listen",
+      "wait",
+      "help",
+      "save beginner-beorn",
+      "map",
+      "where am i",
+      "look around",
+    ],
+  },
+  {
+    name: "mirkwood",
+    setup(game) {
+      game.restartGame();
+      game.execute("jump mirkwood");
+    },
+    commands: [
+      "look",
+      "where can i go",
+      "listen",
+      "smell air",
+      "look at trees",
+      "search path",
+      "go north",
+      "go south",
+      "go east",
+      "go west",
+      "talk to gandalf",
+      "ask gandalf for help",
+      "wear ring",
+      "take rope",
+      "inventory",
+      "map",
+      "wait",
+      "help",
+      "save beginner-mirkwood",
+      "where am i",
+    ],
+  },
+  {
+    name: "front gate",
+    setup(game) {
+      game.restartGame();
+      game.execute("jump front_gate");
+    },
+    commands: [
+      "look",
+      "where am i",
+      "where can i go",
+      "read map",
+      "open door",
+      "unlock door with key",
+      "go through door",
+      "talk to bard",
+      "ask bard for help",
+      "ask bard about dragon",
+      "give map to bard",
+      "show map to bard",
+      "inventory",
+      "listen",
+      "smell air",
+      "wait",
+      "help",
+      "save beginner-frontgate",
+      "map",
+      "look at rock face",
+    ],
+  },
+];
+
+const beginnerCommandCases = beginnerContexts.flatMap((context, contextIndex) => {
+  return context.commands.map((spec, commandIndex) => {
+    return beginnerCommandCase(
+      context.name,
+      context.setup,
+      spec,
+      (contextIndex * 20) + commandIndex,
+    );
+  });
+});
+
+gameCases.push(...beginnerCommandCases);
+
+const externalRegressions = loadExternalRegressionCases();
+cases.push(...externalRegressions.splitterCases);
+gameCases.push(...externalRegressions.gameCases);
 
 const Splitter = bootGame();
 const results = cases.map((testCase) => runCase(Splitter, testCase));

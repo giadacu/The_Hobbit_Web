@@ -1,0 +1,1077 @@
+{
+  "meta": {
+    "generatedAt": "2026-06-13T20:01:29.654Z",
+    "generator": "scripts/parser-mine.js",
+    "splitterCaseCount": 93
+  },
+  "splitterCases": [
+    {
+      "name": "corpus 001: get out",
+      "input": "get out",
+      "expected": [
+        "go out"
+      ],
+      "tags": [
+        "movement",
+        "exit"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 002: get in",
+      "input": "get in",
+      "expected": [
+        "go inside"
+      ],
+      "tags": [
+        "movement",
+        "enter"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 003: get inside",
+      "input": "get inside",
+      "expected": [
+        "go inside"
+      ],
+      "tags": [
+        "movement",
+        "enter"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 004: get outside",
+      "input": "get outside",
+      "expected": [
+        "go outside"
+      ],
+      "tags": [
+        "movement",
+        "exit"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 005: come in",
+      "input": "come in",
+      "expected": [
+        "go inside"
+      ],
+      "tags": [
+        "movement",
+        "enter"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 006: come out",
+      "input": "come out",
+      "expected": [
+        "go outside"
+      ],
+      "tags": [
+        "movement",
+        "exit"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 007: go in",
+      "input": "go in",
+      "expected": [
+        "go inside"
+      ],
+      "tags": [
+        "movement",
+        "enter"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 008: go out",
+      "input": "go out",
+      "expected": [
+        "go out"
+      ],
+      "tags": [
+        "movement",
+        "exit"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 009: walk in",
+      "input": "walk in",
+      "expected": [
+        "go inside"
+      ],
+      "tags": [
+        "movement",
+        "enter"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 010: walk out",
+      "input": "walk out",
+      "expected": [
+        "go outside"
+      ],
+      "tags": [
+        "movement",
+        "exit"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 011: move on",
+      "input": "move on",
+      "expected": [
+        "go forward"
+      ],
+      "tags": [
+        "movement",
+        "abstract"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 012: move forward",
+      "input": "move forward",
+      "expected": [
+        "go forward"
+      ],
+      "tags": [
+        "movement",
+        "abstract"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 013: move back",
+      "input": "move back",
+      "expected": [
+        "go back"
+      ],
+      "tags": [
+        "movement",
+        "abstract"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 014: head out",
+      "input": "head out",
+      "expected": [
+        "go outside"
+      ],
+      "tags": [
+        "movement",
+        "exit"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 015: head inside",
+      "input": "head inside",
+      "expected": [
+        "go inside"
+      ],
+      "tags": [
+        "movement",
+        "enter"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 016: climb down",
+      "input": "climb down",
+      "expected": [
+        "climb down"
+      ],
+      "tags": [
+        "physical"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 017: climb up",
+      "input": "climb up",
+      "expected": [
+        "climb up"
+      ],
+      "tags": [
+        "physical"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 018: sit down",
+      "input": "sit down",
+      "expected": [
+        "sit down"
+      ],
+      "tags": [
+        "physical"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 019: stand up",
+      "input": "stand up",
+      "expected": [
+        "stand up"
+      ],
+      "tags": [
+        "physical"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 020: wake up",
+      "input": "wake up",
+      "expected": [
+        "wake up"
+      ],
+      "tags": [
+        "physical"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 021: lie down",
+      "input": "lie down",
+      "expected": [
+        "lie down"
+      ],
+      "tags": [
+        "physical"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 022: take it",
+      "input": "take it",
+      "expected": [
+        "take it"
+      ],
+      "tags": [
+        "pronoun"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 023: open it",
+      "input": "open it",
+      "expected": [
+        "open it"
+      ],
+      "tags": [
+        "pronoun"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 024: close it",
+      "input": "close it",
+      "expected": [
+        "close it"
+      ],
+      "tags": [
+        "pronoun"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 025: use it",
+      "input": "use it",
+      "expected": [
+        "use it"
+      ],
+      "tags": [
+        "pronoun"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 026: read it",
+      "input": "read it",
+      "expected": [
+        "read it"
+      ],
+      "tags": [
+        "pronoun"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 027: drop it",
+      "input": "drop it",
+      "expected": [
+        "leave it"
+      ],
+      "tags": [
+        "pronoun"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 028: give it to Gandalf",
+      "input": "give it to Gandalf",
+      "expected": [
+        "give it to gandalf"
+      ],
+      "tags": [
+        "pronoun",
+        "social"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 029: attack him",
+      "input": "attack him",
+      "expected": [
+        "kill him"
+      ],
+      "tags": [
+        "pronoun",
+        "combat"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 030: talk to him",
+      "input": "talk to him",
+      "expected": [
+        "talk to him"
+      ],
+      "tags": [
+        "pronoun",
+        "social"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 031: follow him",
+      "input": "follow him",
+      "expected": [
+        "follow him"
+      ],
+      "tags": [
+        "pronoun",
+        "social"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 032: open",
+      "input": "open",
+      "expected": [
+        "open"
+      ],
+      "tags": [
+        "elliptic"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 033: close",
+      "input": "close",
+      "expected": [
+        "close"
+      ],
+      "tags": [
+        "elliptic"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 034: enter",
+      "input": "enter",
+      "expected": [
+        "go inside"
+      ],
+      "tags": [
+        "elliptic",
+        "movement"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 035: leave",
+      "input": "leave",
+      "expected": [
+        "go out"
+      ],
+      "tags": [
+        "elliptic",
+        "movement"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 036: unlock",
+      "input": "unlock",
+      "expected": [
+        "unlock"
+      ],
+      "tags": [
+        "elliptic"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 037: climb",
+      "input": "climb",
+      "expected": [
+        "climb"
+      ],
+      "tags": [
+        "elliptic"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 038: jump",
+      "input": "jump",
+      "expected": [
+        "jump"
+      ],
+      "tags": [
+        "elliptic"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 039: read",
+      "input": "read",
+      "expected": [
+        "read"
+      ],
+      "tags": [
+        "elliptic"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 040: I want to leave",
+      "input": "I want to leave",
+      "expected": [
+        "go out"
+      ],
+      "tags": [
+        "natural-language",
+        "movement"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 041: I'd like to go outside",
+      "input": "I'd like to go outside",
+      "expected": [
+        "go outside"
+      ],
+      "tags": [
+        "natural-language",
+        "movement"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 042: Let me out",
+      "input": "Let me out",
+      "expected": [
+        "go out"
+      ],
+      "tags": [
+        "natural-language",
+        "movement"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 043: Can I leave?",
+      "input": "Can I leave?",
+      "expected": [
+        "go out"
+      ],
+      "tags": [
+        "natural-language",
+        "movement"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 044: Can I get out of here?",
+      "input": "Can I get out of here?",
+      "expected": [
+        "exits"
+      ],
+      "tags": [
+        "natural-language",
+        "movement"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 045: I think I'll go north",
+      "input": "I think I'll go north",
+      "expected": [
+        "go north"
+      ],
+      "tags": [
+        "natural-language",
+        "movement"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 046: Maybe I should talk to Gandalf",
+      "input": "Maybe I should talk to Gandalf",
+      "expected": [
+        "talk to gandalf"
+      ],
+      "tags": [
+        "natural-language",
+        "social"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 047: Let's open the chest",
+      "input": "Let's open the chest",
+      "expected": [
+        "open chest"
+      ],
+      "tags": [
+        "natural-language"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 048: go north",
+      "input": "go north",
+      "expected": [
+        "go north"
+      ],
+      "tags": [
+        "direction"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 049: head north",
+      "input": "head north",
+      "expected": [
+        "north"
+      ],
+      "tags": [
+        "direction"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 050: walk north",
+      "input": "walk north",
+      "expected": [
+        "go north"
+      ],
+      "tags": [
+        "direction"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 051: travel north",
+      "input": "travel north",
+      "expected": [
+        "go north"
+      ],
+      "tags": [
+        "direction"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 052: move north",
+      "input": "move north",
+      "expected": [
+        "go north"
+      ],
+      "tags": [
+        "direction"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 053: go to the north",
+      "input": "go to the north",
+      "expected": [
+        "go north"
+      ],
+      "tags": [
+        "direction"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 054: proceed northward",
+      "input": "proceed northward",
+      "expected": [
+        "go north"
+      ],
+      "tags": [
+        "direction"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 055: grab sword",
+      "input": "grab sword",
+      "expected": [
+        "take sword"
+      ],
+      "tags": [
+        "synonym",
+        "inventory"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 056: pick up sword",
+      "input": "pick up sword",
+      "expected": [
+        "take sword"
+      ],
+      "tags": [
+        "synonym",
+        "inventory"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 057: collect sword",
+      "input": "collect sword",
+      "expected": [
+        "take sword"
+      ],
+      "tags": [
+        "synonym",
+        "inventory"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 058: carry sword",
+      "input": "carry sword",
+      "expected": [
+        "carry sword"
+      ],
+      "tags": [
+        "synonym",
+        "inventory"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 059: snag sword",
+      "input": "snag sword",
+      "expected": [
+        "take sword"
+      ],
+      "tags": [
+        "synonym",
+        "inventory"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 060: inspect sword",
+      "input": "inspect sword",
+      "expected": [
+        "examine sword"
+      ],
+      "tags": [
+        "synonym",
+        "examine"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 061: check sword",
+      "input": "check sword",
+      "expected": [
+        "check sword"
+      ],
+      "tags": [
+        "synonym",
+        "examine"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 062: study sword",
+      "input": "study sword",
+      "expected": [
+        "examine sword"
+      ],
+      "tags": [
+        "synonym",
+        "examine"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 063: look closely at sword",
+      "input": "look closely at sword",
+      "expected": [
+        "examine sword"
+      ],
+      "tags": [
+        "synonym",
+        "examine"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 064: open door and go through it",
+      "input": "open door and go through it",
+      "expected": [
+        "open door",
+        "go through door"
+      ],
+      "tags": [
+        "compound"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 065: take rope then climb tree",
+      "input": "take rope then climb tree",
+      "expected": [
+        "take rope",
+        "climb tree"
+      ],
+      "tags": [
+        "compound"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 066: get lantern and light it",
+      "input": "get lantern and light it",
+      "expected": [
+        "get lantern",
+        "light lantern"
+      ],
+      "tags": [
+        "compound"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 067: talk to Gandalf about treasure",
+      "input": "talk to Gandalf about treasure",
+      "expected": [
+        "ask gandalf about treasure"
+      ],
+      "tags": [
+        "compound",
+        "social"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 068: unlock chest with key",
+      "input": "unlock chest with key",
+      "expected": [
+        "unlock chest with key"
+      ],
+      "tags": [
+        "compound"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 069: hello",
+      "input": "hello",
+      "expected": [
+        "hello"
+      ],
+      "tags": [
+        "conversation"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 070: hi",
+      "input": "hi",
+      "expected": [
+        "hello"
+      ],
+      "tags": [
+        "conversation"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 071: good morning",
+      "input": "good morning",
+      "expected": [
+        "hello"
+      ],
+      "tags": [
+        "conversation"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 072: thanks",
+      "input": "thanks",
+      "expected": [
+        "thank"
+      ],
+      "tags": [
+        "conversation"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 073: thank you",
+      "input": "thank you",
+      "expected": [
+        "thank"
+      ],
+      "tags": [
+        "conversation"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 074: who are you?",
+      "input": "who are you?",
+      "expected": [
+        "talk"
+      ],
+      "tags": [
+        "conversation"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 075: what's your name?",
+      "input": "what's your name?",
+      "expected": [
+        "talk"
+      ],
+      "tags": [
+        "conversation"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 076: how are you?",
+      "input": "how are you?",
+      "expected": [
+        "talk"
+      ],
+      "tags": [
+        "conversation"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 077: where am I?",
+      "input": "where am I?",
+      "expected": [
+        "location"
+      ],
+      "tags": [
+        "meta"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 078: what can I do?",
+      "input": "what can I do?",
+      "expected": [
+        "help"
+      ],
+      "tags": [
+        "meta"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 079: what's here?",
+      "input": "what's here?",
+      "expected": [
+        "look"
+      ],
+      "tags": [
+        "meta"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 080: help me",
+      "input": "help me",
+      "expected": [
+        "help"
+      ],
+      "tags": [
+        "meta"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 081: hint",
+      "input": "hint",
+      "expected": [
+        "tips"
+      ],
+      "tags": [
+        "meta"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 082: objectives",
+      "input": "objectives",
+      "expected": [
+        "tips"
+      ],
+      "tags": [
+        "meta"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 083: save me",
+      "input": "save me",
+      "expected": [
+        "save me"
+      ],
+      "tags": [
+        "meta"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 084: show inventory",
+      "input": "show inventory",
+      "expected": [
+        "inventory"
+      ],
+      "tags": [
+        "meta"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 085: what am I carrying?",
+      "input": "what am I carrying?",
+      "expected": [
+        "inventory"
+      ],
+      "tags": [
+        "meta"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 086: take all",
+      "input": "take all",
+      "expected": [
+        "take all"
+      ],
+      "tags": [
+        "inventory"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 087: use key on door",
+      "input": "use key on door",
+      "expected": [
+        "use key on door"
+      ],
+      "tags": [
+        "compound"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 088: go back",
+      "input": "go back",
+      "expected": [
+        "go back"
+      ],
+      "tags": [
+        "movement",
+        "abstract"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 089: return",
+      "input": "return",
+      "expected": [
+        "return"
+      ],
+      "tags": [
+        "movement",
+        "abstract"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 090: follow Gandalf",
+      "input": "follow Gandalf",
+      "expected": [
+        "follow gandalf"
+      ],
+      "tags": [
+        "social"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 091: wait",
+      "input": "wait",
+      "expected": [
+        "wait"
+      ],
+      "tags": [
+        "meta"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 092: sleep",
+      "input": "sleep",
+      "expected": [
+        "sleep"
+      ],
+      "tags": [
+        "meta"
+      ],
+      "source": "parser-corpus"
+    },
+    {
+      "name": "corpus 093: run away",
+      "input": "run away",
+      "expected": [
+        "run away"
+      ],
+      "tags": [
+        "movement",
+        "abstract"
+      ],
+      "source": "parser-corpus"
+    }
+  ],
+  "gameCases": []
+}
