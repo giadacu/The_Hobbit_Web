@@ -38,6 +38,7 @@
   const layoutDivider = $("layout-divider");
   const layoutMode1Button = $("layout-mode-1");
   const layoutMode2Button = $("layout-mode-2");
+  $("mobile-scene-handle")?.remove();
   const SCENE_COMPASS_POINTS = {
     "north": $("scene-compass-north"),
     "north east": $("scene-compass-north-east"),
