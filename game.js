@@ -50,6 +50,11 @@
   const AMBIGUOUS_DOOR_VERBS = new Set(["open", "close", "unlock", "lock", "examine", "inspect", "break"]);
   const INVENTORY_ONLY_AMBIGUOUS_VERBS = new Set(["drop", "leave", "put", "wear", "remove", "eat", "drink", "give", "combine"]);
   const WITH_ITEM_CLARIFICATION_VERBS = new Set(["unlock", "lock", "break", "kill", "attack", "combine"]);
+  const DIRECT_OBJECT_PRONOUN_PROMPT_VERBS = new Set([
+    "take", "get", "open", "close", "use", "read", "drop", "leave", "give", "show",
+    "hand", "pass", "bring", "send", "return", "deliver", "unlock", "lock", "put",
+    "place", "set", "store", "combine", "throw",
+  ]);
   const LAYOUT_SWITCH_IDLE_MS = 1600;
   const LAYOUT_MOUSE_ACTIVITY_THRESHOLD = 28;
   const LAYOUT_SPLIT_PREF_KEY = "hobbit-web-layout-2-scene-width";
@@ -1518,6 +1523,11 @@
         "Bombur",
       ];
       this.verbs = [...new Set([...(data.parser.verbs || []), ...NATURAL_VERBS])];
+      this.transferVerbs = new Set(["show", "give", "hand", "pass", "bring", "send", "return", "deliver"]);
+      this.delegatedCharacterPronounVerbs = new Set(["ask", "tell"]);
+      this.directObjectPreferenceVerbs = new Set(["take", "get", "retrieve", "wear", "remove", "eat", "drink", "catch", "borrow", "give", "show", "hand", "pass", "bring", "send", "return", "deliver", "put", "drop", "leave", "place", "set", "store", "hide", "open", "close", "read", "throw", "combine"]);
+      this.targetPreferencePluralVerbs = new Set(["help", "support", "frighten", "scare", "escort", "protect", "persuade"]);
+      this.objectPrepositions = new Set(["in", "on", "at", "to", "with", "for", "from", "into", "inside", "under", "behind", "beside", "near", "about", "where", "whether", "if", "that", "past", "out", "off"]);
       this.directions = [
         "north", "south", "east", "west", "north east", "north west",
         "south east", "south west", "up", "down", "n", "s", "e", "w",
@@ -1552,6 +1562,71 @@
       this.lastDirectObject = null;
       this.lastTargetObject = null;
       this.commandContexts = [];
+    }
+
+    emptyReferenceContext() {
+      return { lastObject: null, lastDirectObject: null, lastTargetObject: null };
+    }
+
+    snapshotReferenceContext() {
+      return {
+        lastObject: this.lastObject,
+        lastDirectObject: this.lastDirectObject,
+        lastTargetObject: this.lastTargetObject,
+      };
+    }
+
+    seedReferenceContext(context = null) {
+      if (!context) return;
+      this.lastObject ||= context.lastObject || null;
+      this.lastDirectObject ||= context.lastDirectObject || null;
+      this.lastTargetObject ||= context.lastTargetObject || null;
+    }
+
+    rememberCommandContext() {
+      this.commandContexts.push(this.snapshotReferenceContext());
+    }
+
+    resolveHimHerPronoun(currentVerb, word) {
+      if (this.delegatedCharacterPronounVerbs.has(currentVerb)) {
+        return this.knownCharacterNames.includes(this.lastTargetObject) ? this.lastTargetObject : word;
+      }
+      return this.lastTargetObject || this.lastDirectObject || word;
+    }
+
+    resolveItOnePronoun(currentVerb, word) {
+      if (!(this.lastDirectObject || this.lastTargetObject)) return word;
+      if (word === "one" || this.directObjectPreferenceVerbs.has(currentVerb)) {
+        return this.lastDirectObject || this.lastTargetObject;
+      }
+      return this.lastTargetObject || this.lastDirectObject;
+    }
+
+    resolveThemPronoun(currentVerb) {
+      if (!(this.lastObject || this.lastDirectObject || this.lastTargetObject)) return "them";
+      if (this.targetPreferencePluralVerbs.has(currentVerb)) {
+        return this.lastTargetObject || this.lastDirectObject || this.lastObject;
+      }
+      return this.lastObject || this.lastDirectObject || this.lastTargetObject;
+    }
+
+    splitObjectTerms(verb, object) {
+      const words = object.split(/\s+/).filter(Boolean);
+      let direct = [];
+      let target = [];
+      for (let index = 0; index < words.length; index += 1) {
+        if (this.objectPrepositions.has(words[index])) {
+          target = words.slice(index + 1);
+          break;
+        }
+        direct.push(words[index]);
+      }
+      if (verb === "say" && words[0] === "to" && words.length > 1) {
+        direct = words.slice(1);
+        target = words.slice(1);
+      }
+      if (verb === "ask" && direct.length) target = direct.slice(0, 1);
+      return { words, direct, target };
     }
 
     split(text) {
@@ -1589,22 +1664,9 @@
         const askToIndex = currentVerb === "ask" ? words.indexOf("to") : -1;
         words = words.map((word, wordIndex) => {
           if (askToIndex >= 0 && wordIndex > askToIndex) return word;
-          if (["him", "her"].includes(word)) {
-            if (["ask", "tell"].includes(currentVerb)) {
-              return this.knownCharacterNames.includes(this.lastTargetObject) ? this.lastTargetObject : word;
-            }
-            if (this.lastTargetObject || this.lastDirectObject) return this.lastTargetObject || this.lastDirectObject;
-          }
-          if (["it", "one"].includes(word) && (this.lastDirectObject || this.lastTargetObject)) {
-            const directVerbs = new Set(["take", "get", "retrieve", "wear", "remove", "eat", "drink", "catch", "borrow", "give", "show", "hand", "pass", "bring", "send", "return", "deliver", "put", "drop", "leave", "place", "set", "store", "hide", "open", "close", "read", "throw", "combine"]);
-            if (word === "one" || directVerbs.has(currentVerb)) return this.lastDirectObject || this.lastTargetObject;
-            return this.lastTargetObject || this.lastDirectObject;
-          }
-          if (word === "them" && (this.lastObject || this.lastDirectObject || this.lastTargetObject)) {
-            const targetVerbs = new Set(["help", "support", "frighten", "scare", "escort", "protect", "persuade"]);
-            if (targetVerbs.has(currentVerb)) return this.lastTargetObject || this.lastDirectObject || this.lastObject;
-            return this.lastObject || this.lastDirectObject || this.lastTargetObject;
-          }
+          if (["him", "her"].includes(word)) return this.resolveHimHerPronoun(currentVerb, word);
+          if (["it", "one"].includes(word)) return this.resolveItOnePronoun(currentVerb, word);
+          if (word === "them") return this.resolveThemPronoun(currentVerb);
           return word;
         });
         let verb = words[0];
@@ -1622,13 +1684,7 @@
           result.push(object);
         }
         if (object) this.rememberObjects(verb, object);
-        if (verb || object) {
-          this.commandContexts.push({
-            lastObject: this.lastObject,
-            lastDirectObject: this.lastDirectObject,
-            lastTargetObject: this.lastTargetObject,
-          });
-        }
+        if (verb || object) this.rememberCommandContext();
       }
       return result.length ? result : [command];
     }
@@ -1639,6 +1695,7 @@
       const verb = match[1];
       const rest = match[2].trim();
       if (!rest || /^(?:to|at|into|me\b|you\b)/.test(rest)) return command;
+      if (!this.transferVerbs.has(verb)) return command;
       for (const name of this.knownCharacterNames) {
         if (!rest.startsWith(`${name} `)) continue;
         const item = rest.slice(name.length).trim();
@@ -1649,24 +1706,7 @@
     }
 
     rememberObjects(verb, object) {
-      const words = object.split(/\s+/).filter(Boolean);
-      const prepositions = new Set(["in", "on", "at", "to", "with", "for", "from", "into", "inside", "under", "behind", "beside", "near", "about", "where", "whether", "if", "that", "past", "out", "off"]);
-      let direct = [];
-      let target = [];
-      for (let index = 0; index < words.length; index += 1) {
-        if (prepositions.has(words[index])) {
-          target = words.slice(index + 1);
-          break;
-        }
-        direct.push(words[index]);
-      }
-      if (verb === "say" && words[0] === "to" && words.length > 1) {
-        direct = words.slice(1);
-        target = words.slice(1);
-      }
-      if (verb === "ask" && direct.length) {
-        target = direct.slice(0, 1);
-      }
+      const { words, direct, target } = this.splitObjectTerms(verb, object);
       if (direct.length) this.lastDirectObject = direct.at(-1);
       this.lastTargetObject = target.length ? target.at(-1) : this.lastDirectObject;
       this.lastObject = this.lastTargetObject || this.lastDirectObject || words.at(-1) || this.lastObject;
@@ -3033,14 +3073,82 @@
     }
   }
 
-  class ClarificationController {
+  class ClarificationReferenceResolver {
     constructor(game) {
       this.game = game;
     }
 
-    needsClarification(verb, objectText) {
+    parseSourceReference(objectText) {
+      return this.references.parseSourceReference(objectText);
+    }
+
+    resolveVisibleReference(name, options = {}) {
+      return this.references.resolveVisibleReference(name, options);
+    }
+
+    visibleReferenceChoices(name, options = {}) {
+      return this.references.visibleReferenceChoices(name, options);
+    }
+
+    inventoryReferenceChoices(name) {
+      return this.references.inventoryReferenceChoices(name);
+    }
+
+    resolveInventoryReference(name) {
+      return this.references.resolveInventoryReference(name);
+    }
+
+    resolveContainedItemReference(itemName, sourceName) {
+      return this.references.resolveContainedItemReference(itemName, sourceName);
+    }
+
+    findSourceItemMatches(itemName, sourceName) {
+      return this.references.findSourceItemMatches(itemName, sourceName);
+    }
+
+    findAllItemsInsideContainer(container, itemName) {
+      return this.references.findAllItemsInsideContainer(container, itemName);
+    }
+
+    sourceTargetChoices(sourceName, itemName = "") {
+      return this.references.sourceTargetChoices(sourceName, itemName);
+    }
+  }
+
+  class ClarificationMemory {
+    constructor(game) {
+      this.game = game;
+    }
+
+    rememberClarifiedReference(target, choice) {
+      return this.memory.rememberClarifiedReference(target, choice);
+    }
+
+    recallClarifiedReference(target, choices = []) {
+      return this.memory.recallClarifiedReference(target, choices);
+    }
+
+    pruneClarifiedReferences() {
+      return this.memory.pruneClarifiedReferences();
+    }
+  }
+
+  class ClarificationController {
+    constructor(game) {
+      this.game = game;
+      this.references = new ClarificationReferenceResolver(game);
+      this.memory = new ClarificationMemory(game);
+    }
+
+    coerceParsedCommand(commandOrVerb, objectText = "") {
+      if (commandOrVerb && typeof commandOrVerb === "object") return commandOrVerb;
+      return this.game.parseStructuredCommand(`${String(commandOrVerb || "").trim()} ${String(objectText || "").trim()}`.trim());
+    }
+
+    needsClarification(commandOrVerb, objectText = "") {
       const game = this.game;
-      const request = this.firstClarificationRequest(verb, objectText);
+      const parsed = this.coerceParsedCommand(commandOrVerb, objectText);
+      const request = this.firstClarificationRequest(parsed);
       if (!request) return false;
       const remembered = request.choices.length > 1 ? this.recallClarifiedReference(request.target, request.choices) : null;
       if (remembered && sameChoice(game.forcedChoice, remembered)) return false;
@@ -3065,8 +3173,10 @@
       return pending.choices.some((choice) => matches(choice.name, answer));
     }
 
-    ambiguousChoices(verb, objectText, fullObjectText = objectText) {
+    ambiguousChoices(commandOrVerb, objectText = "", fullObjectText = objectText) {
       const game = this.game;
+      const parsed = this.coerceParsedCommand(commandOrVerb, objectText);
+      const { verb } = parsed;
       const choices = [];
 
       if (AMBIGUOUS_ITEM_VERBS.has(verb)) {
@@ -3090,29 +3200,32 @@
       return uniqueChoices(choices);
     }
 
-    firstClarificationRequest(verb, objectText) {
-      for (const request of this.clarificationRequests(verb, objectText)) {
+    firstClarificationRequest(commandOrVerb, objectText = "") {
+      for (const request of this.clarificationRequests(commandOrVerb, objectText)) {
         if (request.choices.length > 1) return request;
       }
       return null;
     }
 
-    clarificationRequests(verb, objectText) {
+    clarificationRequests(commandOrVerb, objectText = "") {
       const game = this.game;
-      if (!objectText) return [];
+      const parsed = this.coerceParsedCommand(commandOrVerb, objectText);
+      const { verb, object: objectValue } = parsed;
+      const objectSource = objectValue;
+      if (!objectSource) return [];
       const requests = [];
 
-      const primary = this.primaryClarificationRequest(verb, objectText);
+      const primary = this.primaryClarificationRequest(parsed);
       if (primary) requests.push(primary);
 
       if (["take", "get"].includes(verb)) {
-        const source = this.parseSourceReference(objectText);
+        const source = this.parseSourceReference(objectSource);
         if (source) {
           const sourceChoices = this.sourceTargetChoices(source.sourceName, source.itemName);
           if (sourceChoices.length) {
             requests.push({
               verb,
-              objectText,
+              objectText: objectSource,
               choices: sourceChoices,
               target: normalize(source.sourceName),
               slot: "source-target",
@@ -3122,7 +3235,7 @@
       }
 
       if (["drop", "leave", "put"].includes(verb)) {
-        const placement = game.parsePlacementCommand(objectText);
+        const placement = game.parsePlacementCommand(objectSource);
         if (placement) {
           const targetChoices = this.visibleReferenceChoices(placement.targetName, {
             includeInventory: false,
@@ -3132,7 +3245,7 @@
           if (targetChoices.length) {
             requests.push({
               verb,
-              objectText,
+              objectText: objectSource,
               choices: targetChoices,
               target: normalize(placement.targetName),
               slot: "placement-target",
@@ -3142,13 +3255,13 @@
       }
 
       if (WITH_ITEM_CLARIFICATION_VERBS.has(verb)) {
-        const withTarget = this.parseWithReference(objectText);
+        const withTarget = this.parseWithReference(objectSource);
         if (withTarget?.itemName) {
           const keyChoices = this.inventoryReferenceChoices(withTarget.itemName);
           if (keyChoices.length) {
             requests.push({
               verb,
-              objectText,
+              objectText: objectSource,
               choices: keyChoices,
               target: normalize(withTarget.itemName),
               slot: "with-item",
@@ -3160,22 +3273,24 @@
       return requests;
     }
 
-    primaryClarificationRequest(verb, objectText) {
-      const request = parseAllTarget(primaryObjectText(verb, objectText));
+    primaryClarificationRequest(commandOrVerb, objectText = "") {
+      const parsed = this.coerceParsedCommand(commandOrVerb, objectText);
+      const { verb, object: objectValue, primaryObject } = parsed;
+      const request = parseAllTarget(primaryObject);
       if (request.all || !request.target) return null;
-      const choices = this.ambiguousChoices(verb, request.target, objectText);
+      const choices = this.ambiguousChoices(parsed, request.target, objectValue);
       if (!choices.length) return null;
       return {
         verb,
-        objectText,
+        objectText: objectValue,
         choices,
         target: request.target,
         slot: "primary",
       };
     }
 
-    resolveRememberedCommandChoice(verb, objectText) {
-      for (const request of this.clarificationRequests(verb, objectText)) {
+    resolveRememberedCommandChoice(commandOrVerb, objectText = "") {
+      for (const request of this.clarificationRequests(commandOrVerb, objectText)) {
         if (request.choices.length <= 1) continue;
         const remembered = this.recallClarifiedReference(request.target, request.choices);
         if (remembered) return remembered;
@@ -3183,20 +3298,24 @@
       return null;
     }
 
-    resolveRememberedClarification(verb, objectText) {
-      return this.resolveRememberedCommandChoice(verb, objectText);
+    resolveRememberedClarification(commandOrVerb, objectText = "") {
+      return this.resolveRememberedCommandChoice(commandOrVerb, objectText);
     }
 
-    resolveExplicitClarification(verb, objectText) {
-      if (!objectText) return null;
-      const request = parseAllTarget(primaryObjectText(verb, objectText));
+    resolveExplicitClarification(commandOrVerb, objectText = "") {
+      const parsed = this.coerceParsedCommand(commandOrVerb, objectText);
+      const { verb, object: objectValue, primaryObject } = parsed;
+      if (!objectValue) return null;
+      const request = parseAllTarget(primaryObject);
       if (request.all || !request.target) return null;
-      const choices = this.ambiguousChoices(verb, request.target, objectText);
+      const choices = this.ambiguousChoices(parsed, request.target, objectValue);
       return choices.length === 1 ? choices[0] : null;
     }
 
-    explicitClarificationReferences(verb, objectText) {
+    explicitClarificationReferences(commandOrVerb, objectText = "") {
       const game = this.game;
+      const parsed = this.coerceParsedCommand(commandOrVerb, objectText);
+      const { verb, object: objectValue, primaryObject } = parsed;
       const references = [];
       const seen = new Set();
       const addReference = (target, choice) => {
@@ -3208,12 +3327,12 @@
         references.push({ target, choice });
       };
 
-      const primaryTarget = primaryObjectText(verb, objectText);
-      const primaryChoice = this.resolveExplicitClarification(verb, objectText);
+      const primaryTarget = primaryObject;
+      const primaryChoice = this.resolveExplicitClarification(parsed);
       if (primaryChoice && primaryTarget) addReference(primaryTarget, primaryChoice);
 
       if (["take", "get"].includes(verb)) {
-        const source = this.parseSourceReference(objectText);
+        const source = this.parseSourceReference(objectValue);
         if (source) {
           const sourceChoice = this.resolveVisibleReference(source.sourceName, { closedContainers: true });
           if (sourceChoice) addReference(source.sourceName, sourceChoice);
@@ -3223,7 +3342,7 @@
       }
 
       if (["drop", "leave", "put"].includes(verb)) {
-        const placement = game.parsePlacementCommand(objectText);
+        const placement = game.parsePlacementCommand(objectValue);
         if (placement) {
           const targetChoice = this.resolveVisibleReference(placement.targetName, { closedContainers: true });
           if (targetChoice) addReference(placement.targetName, targetChoice);
@@ -3231,7 +3350,7 @@
       }
 
       if (WITH_ITEM_CLARIFICATION_VERBS.has(verb)) {
-        const withTarget = this.parseWithReference(objectText);
+        const withTarget = this.parseWithReference(objectValue);
         if (withTarget?.itemName) {
           const keyChoice = this.resolveInventoryReference(withTarget.itemName);
           if (keyChoice) addReference(withTarget.itemName, keyChoice);
@@ -3445,33 +3564,46 @@
       this.game = game;
     }
 
-    dispatch(verb, object, originalCommand = "") {
+    coerceParsedCommand(commandOrVerb, object = "", originalCommand = "") {
+      if (commandOrVerb && typeof commandOrVerb === "object") return commandOrVerb;
+      const verb = String(commandOrVerb || "").trim();
+      return {
+        text: originalCommand || `${verb} ${object}`.trim(),
+        verb,
+        object: String(object || "").trim(),
+        primaryObject: primaryObjectText(verb, object),
+      };
+    }
+
+    dispatch(commandOrVerb, object = "", originalCommand = "") {
       const game = this.game;
+      const parsed = this.coerceParsedCommand(commandOrVerb, object, originalCommand);
+      const { verb, object: objectText } = parsed;
       const handlers = {
-        take: () => game.take(object),
-        get: () => game.take(object),
-        leave: () => game.drop(object),
-        drop: () => game.drop(object),
-        put: () => game.drop(object),
-        open: () => game.open(object),
-        close: () => game.close(object),
-        unlock: () => game.unlock(object),
-        lock: () => game.lock(object),
-        look: () => game.look(object),
-        examine: () => game.examine(object),
-        inspect: () => game.examine(object),
-        search: () => game.examine(object),
-        explore: () => game.examine(object),
-        investigate: () => game.examine(object),
-        listen: () => game.sense("listen", object),
-        smell: () => game.sense("smell", object),
-        sniff: () => game.sense("smell", object),
-        watch: () => game.sense("watch", object),
-        eavesdrop: () => game.sense("listen", object),
-        scout: () => game.sense("search", object),
-        touch: () => game.touch("touch", object),
-        feel: () => game.touch("feel", object),
-        knock: () => game.touch("knock", object),
+        take: () => game.take(objectText),
+        get: () => game.take(objectText),
+        leave: () => game.drop(objectText),
+        drop: () => game.drop(objectText),
+        put: () => game.drop(objectText),
+        open: () => game.open(objectText),
+        close: () => game.close(objectText),
+        unlock: () => game.unlock(objectText),
+        lock: () => game.lock(objectText),
+        look: () => game.look(objectText),
+        examine: () => game.examine(objectText),
+        inspect: () => game.examine(objectText),
+        search: () => game.examine(objectText),
+        explore: () => game.examine(objectText),
+        investigate: () => game.examine(objectText),
+        listen: () => game.sense("listen", objectText),
+        smell: () => game.sense("smell", objectText),
+        sniff: () => game.sense("smell", objectText),
+        watch: () => game.sense("watch", objectText),
+        eavesdrop: () => game.sense("listen", objectText),
+        scout: () => game.sense("search", objectText),
+        touch: () => game.touch("touch", objectText),
+        feel: () => game.touch("feel", objectText),
+        knock: () => game.touch("knock", objectText),
         inventory: () => game.inventory(),
         inv: () => game.inventory(),
         i: () => game.inventory(),
@@ -3479,14 +3611,14 @@
         exits: () => game.showExits(),
         exit: () => game.showExits(),
         hello: () => game.hello(),
-        tips: () => game.tips(object),
-        hint: () => game.tips(object),
+        tips: () => game.tips(objectText),
+        hint: () => game.tips(objectText),
         verbs: () => game.verbs(),
         commands: () => game.verbs(),
         jumps: () => game.listJumpCheckpoints(),
         mysaves: () => game.listSaves(),
-        save: () => game.save(object),
-        load: () => game.load(object),
+        save: () => game.save(objectText),
+        load: () => game.load(objectText),
         autosave: () => game.resumeFromAutosave(),
         quit: () => game.quit(),
         restart: () => game.restartGame(),
@@ -3495,116 +3627,116 @@
         map: () => game.showMap(),
         location: () => game.print(actorizeSecondPerson(game.player, `You are now ${roomLocationPhrase(game.room())}.`)),
         status: () => game.showStatus(),
-        music: () => game.handleMusicCommand(object),
-        autoplay: () => game.autoplay(object),
-        teleport: () => game.handleJumpCommand(object),
-        warp: () => game.handleJumpCommand(object),
-        wear: () => game.wear(object),
-        remove: () => game.remove(object),
-        give: () => game.give(object),
-        show: () => game.show(object),
-        hand: () => game.give(object),
-        pass: () => game.give(object),
-        bring: () => game.give(object),
-        send: () => game.give(object),
-        return: () => game.give(object),
-        deliver: () => game.give(object),
-        ask: () => game.askFor(object),
-        borrow: () => game.askFor(object),
-        request: () => game.askFor(object),
-        carry: () => game.take(object),
-        hold: () => game.take(object),
-        catch: () => game.take(object),
-        follow: () => game.followCharacter(object),
-        guard: () => game.physicalAction("guard", object),
-        help: () => (object ? game.physicalAction("help", object) : game.showHelp()),
-        explain: () => game.physicalAction("explain", object),
-        negotiate: () => game.physicalAction("negotiate", object),
-        print: () => game.physicalAction("print", object),
-        call: () => game.socialAction("call", object),
-        wash: () => game.physicalAction("wash", object),
-        check: () => game.examine(object),
-        start: () => game.physicalAction("start", object),
-        refill: () => game.physicalAction("refill", object),
-        inform: () => game.socialAction("inform", object),
-        review: () => game.examine(object),
-        mend: () => game.mend(object),
-        repair: () => game.mend(object),
-        fix: () => game.mend(object),
-        write: () => game.write(object),
-        light: () => game.light(object),
-        pick: () => game.pick(object),
-        cut: () => game.cutTrim("cut", object),
-        trim: () => game.cutTrim("trim", object),
-        smash: () => game.breakThing(object),
-        fill: () => game.fill(object),
-        water: () => game.water(object),
-        plant: () => game.plant(object),
-        rake: () => game.rakeGarden(object),
-        dig: () => game.dig(object),
-        kill: () => game.attack(object),
-        attack: () => game.attack(object),
-        break: () => game.breakThing(object),
-        push: () => game.pushPull("push", object),
-        pull: () => game.pushPull("pull", object),
-        move: () => game.pushPull("move", object),
-        press: () => game.touch("press", object),
-        rotate: () => game.touch("turn", object),
-        tie: () => game.physicalAction("tie", object),
-        untie: () => game.physicalAction("untie", object),
-        place: () => game.drop(object),
-        set: () => game.drop(object),
-        store: () => game.drop(object),
-        lift: () => game.touch("lift", object),
-        turn: () => game.touch("turn", object),
-        use: () => game.touch("use", object),
-        find: () => game.examine(object),
-        read: () => game.read(object),
-        answer: () => game.socialAction("answer", object),
-        thank: () => game.socialAction("thank", object),
-        flatter: () => game.socialAction("flatter", object),
-        insult: () => game.socialAction("insult", object),
-        wave: () => (object ? game.socialAction("call", object) : game.hello()),
-        shake: () => game.physicalAction("shake", object),
-        hug: () => game.socialAction("flatter", object),
-        gather: () => game.socialAction("call", object),
-        hide: () => game.physicalAction("hide", object),
-        sneak: () => game.physicalAction("sneak", object),
-        escape: () => game.physicalAction("escape", object),
-        dodge: () => game.physicalAction("dodge", object),
-        block: () => game.physicalAction("block", object),
-        swing: () => game.physicalAction("swing", object),
-        sharpen: () => game.physicalAction("sharpen", object),
-        clean: () => game.physicalAction("clean", object),
-        bandage: () => game.physicalAction("bandage", object),
-        shoot: () => game.physicalAction("shoot", object),
-        fire: () => game.physicalAction("fire", object),
-        throw: () => game.throwItem(object),
-        climb: () => game.climb(object),
-        eat: () => game.eat(object),
-        drink: () => game.drink(object),
-        jump: () => game.handleJumpCommand(object) || game.physicalAction("jump", object),
-        sit: () => game.physicalAction("sit", object),
-        lie: () => game.physicalAction("lie", object),
-        stand: () => game.physicalAction("stand", object),
-        sleep: () => game.physicalAction("sleep", object),
-        rest: () => game.physicalAction("rest", object),
-        run: () => game.physicalAction("run", object),
-        wake: () => game.physicalAction("wake", object),
-        crawl: () => game.physicalAction("crawl", object),
-        leap: () => game.physicalAction("jump", object),
-        dive: () => game.physicalAction("dive", object),
-        swim: () => game.physicalAction("swim", object),
-        ride: () => game.physicalAction("ride", object),
-        cook: () => game.physicalAction("cook", object),
-        combine: () => game.combine(object),
+        music: () => game.handleMusicCommand(objectText),
+        autoplay: () => game.autoplay(objectText),
+        teleport: () => game.handleJumpCommand(objectText),
+        warp: () => game.handleJumpCommand(objectText),
+        wear: () => game.wear(objectText),
+        remove: () => game.remove(objectText),
+        give: () => game.give(parsed),
+        show: () => game.show(parsed),
+        hand: () => game.give(parsed),
+        pass: () => game.give(parsed),
+        bring: () => game.give(parsed),
+        send: () => game.give(parsed),
+        return: () => game.give(parsed),
+        deliver: () => game.give(parsed),
+        ask: () => game.askFor(parsed),
+        borrow: () => game.askFor(parsed),
+        request: () => game.askFor(parsed),
+        carry: () => game.take(objectText),
+        hold: () => game.take(objectText),
+        catch: () => game.take(objectText),
+        follow: () => game.followCharacter(objectText),
+        guard: () => game.physicalAction("guard", objectText),
+        help: () => (objectText ? game.physicalAction("help", objectText) : game.showHelp()),
+        explain: () => game.physicalAction("explain", objectText),
+        negotiate: () => game.physicalAction("negotiate", objectText),
+        print: () => game.physicalAction("print", objectText),
+        call: () => game.socialAction("call", objectText),
+        wash: () => game.physicalAction("wash", objectText),
+        check: () => game.examine(objectText),
+        start: () => game.physicalAction("start", objectText),
+        refill: () => game.physicalAction("refill", objectText),
+        inform: () => game.socialAction("inform", objectText),
+        review: () => game.examine(objectText),
+        mend: () => game.mend(objectText),
+        repair: () => game.mend(objectText),
+        fix: () => game.mend(objectText),
+        write: () => game.write(objectText),
+        light: () => game.light(objectText),
+        pick: () => game.pick(objectText),
+        cut: () => game.cutTrim("cut", objectText),
+        trim: () => game.cutTrim("trim", objectText),
+        smash: () => game.breakThing(objectText),
+        fill: () => game.fill(objectText),
+        water: () => game.water(objectText),
+        plant: () => game.plant(objectText),
+        rake: () => game.rakeGarden(objectText),
+        dig: () => game.dig(objectText),
+        kill: () => game.attack(objectText),
+        attack: () => game.attack(objectText),
+        break: () => game.breakThing(objectText),
+        push: () => game.pushPull("push", objectText),
+        pull: () => game.pushPull("pull", objectText),
+        move: () => game.pushPull("move", objectText),
+        press: () => game.touch("press", objectText),
+        rotate: () => game.touch("turn", objectText),
+        tie: () => game.physicalAction("tie", objectText),
+        untie: () => game.physicalAction("untie", objectText),
+        place: () => game.drop(objectText),
+        set: () => game.drop(objectText),
+        store: () => game.drop(objectText),
+        lift: () => game.touch("lift", objectText),
+        turn: () => game.touch("turn", objectText),
+        use: () => game.touch("use", objectText),
+        find: () => game.examine(objectText),
+        read: () => game.read(objectText),
+        answer: () => game.socialAction("answer", objectText),
+        thank: () => game.socialAction("thank", objectText),
+        flatter: () => game.socialAction("flatter", objectText),
+        insult: () => game.socialAction("insult", objectText),
+        wave: () => (objectText ? game.socialAction("call", objectText) : game.hello()),
+        shake: () => game.physicalAction("shake", objectText),
+        hug: () => game.socialAction("flatter", objectText),
+        gather: () => game.socialAction("call", objectText),
+        hide: () => game.physicalAction("hide", objectText),
+        sneak: () => game.physicalAction("sneak", objectText),
+        escape: () => game.physicalAction("escape", objectText),
+        dodge: () => game.physicalAction("dodge", objectText),
+        block: () => game.physicalAction("block", objectText),
+        swing: () => game.physicalAction("swing", objectText),
+        sharpen: () => game.physicalAction("sharpen", objectText),
+        clean: () => game.physicalAction("clean", objectText),
+        bandage: () => game.physicalAction("bandage", objectText),
+        shoot: () => game.physicalAction("shoot", objectText),
+        fire: () => game.physicalAction("fire", objectText),
+        throw: () => game.throwItem(objectText),
+        climb: () => game.climb(objectText),
+        eat: () => game.eat(objectText),
+        drink: () => game.drink(objectText),
+        jump: () => game.handleJumpCommand(objectText) || game.physicalAction("jump", objectText),
+        sit: () => game.physicalAction("sit", objectText),
+        lie: () => game.physicalAction("lie", objectText),
+        stand: () => game.physicalAction("stand", objectText),
+        sleep: () => game.physicalAction("sleep", objectText),
+        rest: () => game.physicalAction("rest", objectText),
+        run: () => game.physicalAction("run", objectText),
+        wake: () => game.physicalAction("wake", objectText),
+        crawl: () => game.physicalAction("crawl", objectText),
+        leap: () => game.physicalAction("jump", objectText),
+        dive: () => game.physicalAction("dive", objectText),
+        swim: () => game.physicalAction("swim", objectText),
+        ride: () => game.physicalAction("ride", objectText),
+        cook: () => game.physicalAction("cook", objectText),
+        combine: () => game.combine(objectText),
       };
 
       if (handlers[verb]) {
         handlers[verb]();
         return true;
       }
-      game.unrecognized(originalCommand || `${verb} ${object}`.trim());
+      game.unrecognized(parsed.text);
       return false;
     }
   }
@@ -4051,9 +4183,457 @@
     }
   }
 
+  class SocialCommandParser {
+    constructor(game, social) {
+      this.game = game;
+      this.social = social;
+    }
+
+    visibleOtherPeople() {
+      const game = this.game;
+      return game.peopleInRoom().filter((character) => character.id !== game.player.id && character.visible);
+    }
+
+    sortedVisibleOtherPeople() {
+      return this.visibleOtherPeople().slice().sort((a, b) => b.name.length - a.name.length);
+    }
+
+    defaultVisibleCharacter() {
+      const visiblePeople = this.visibleOtherPeople();
+      return visiblePeople.length === 1 ? visiblePeople[0] : null;
+    }
+
+    extractLeadingVisibleCharacter(text) {
+      const normalized = normalize(text);
+      if (!normalized) return null;
+      for (const character of this.sortedVisibleOtherPeople()) {
+        const name = normalize(character.name);
+        if (normalized === name) return { character, characterName: name, remainder: "" };
+        if (!normalized.startsWith(`${name} `)) continue;
+        return {
+          character,
+          characterName: name,
+          remainder: normalized.slice(name.length).trim(),
+        };
+      }
+      return null;
+    }
+
+    normalizePoliteSocialText(command) {
+      return normalize(command).replace(/^(?:please\s+)?/, "").replace(/\s+please$/, "").trim();
+    }
+
+    hasQuestionLead(text) {
+      return /^.+?\s+(?:where|whether|if|what|why|how|that)\b/.test(text);
+    }
+
+    conversationFallbackCharacter() {
+      const game = this.game;
+      const lastConversation = this.social.lastConversationCharacter();
+      if (lastConversation?.position === game.currentRoom && lastConversation.visible) return lastConversation;
+      return this.defaultVisibleCharacter();
+    }
+
+    parseTransferText(command) {
+      const text = normalize(command);
+      if (!text) return null;
+      if (text.startsWith("me ")) {
+        return { itemName: text.slice(3).trim(), targetName: "me" };
+      }
+      const giveMeNatural = text.match(/^(.+?)\s+(?:to\s+)?me$/);
+      if (giveMeNatural) return { itemName: giveMeNatural[1].trim(), targetName: "me" };
+      const giveMeMatch = text.match(/^(.+)\s+to\s+(me|you)$/);
+      if (giveMeMatch) return { itemName: giveMeMatch[1].trim(), targetName: giveMeMatch[2] };
+      const parts = text.split(/\s+(?:to|at|into)\s+/);
+      if (parts.length !== 2) return null;
+      return { itemName: parts[0].trim(), targetName: parts[1].trim() };
+    }
+
+    parseAskText(command) {
+      const game = this.game;
+      const text = this.normalizePoliteSocialText(command);
+      if (!text) return null;
+
+      if (text.startsWith("about ")) {
+        const fallback = this.conversationFallbackCharacter();
+        if (!fallback) return null;
+        return {
+          intent: "ask-topic",
+          characterName: normalize(fallback.name),
+          topic: text.slice(6).trim(),
+        };
+      }
+
+      const aboutMatch = text.match(/^(.+?)\s+about\s+(.+)$/);
+      if (aboutMatch) {
+        return {
+          intent: "ask-topic",
+          characterName: aboutMatch[1].trim(),
+          topic: aboutMatch[2].trim(),
+        };
+      }
+
+      const questionMatch = text.match(/^(.+?)\s+(where|whether|if|what|why|how|that)\s+(.+)$/);
+      if (questionMatch) {
+        return {
+          intent: "ask-topic",
+          characterName: questionMatch[1].trim(),
+          topic: game.normalizeConversationTopic(questionMatch[2], questionMatch[3]),
+        };
+      }
+
+      const riddleMatch = text.match(/^(.+?)\s+(?:a\s+)?riddle$/);
+      if (riddleMatch) {
+        return {
+          intent: "ask-topic",
+          characterName: riddleMatch[1].trim(),
+          topic: "a riddle",
+        };
+      }
+
+      if (!this.hasQuestionLead(text)) {
+        const explicitOrderMatch = text.match(/^(.+?)\s+to\s+(.+)$/);
+        if (explicitOrderMatch) {
+          return {
+            intent: "ask-order",
+            characterName: explicitOrderMatch[1].trim(),
+            order: explicitOrderMatch[2].trim(),
+          };
+        }
+      }
+
+      if (text.startsWith("for ")) {
+        const fallback = this.conversationFallbackCharacter();
+        if (!fallback) return null;
+        return {
+          intent: "ask-item",
+          characterName: normalize(fallback.name),
+          itemName: text.slice(4).trim(),
+        };
+      }
+
+      const directRequestMatch = text.match(/^(.+?)\s+for\s+(.+)$/);
+      if (directRequestMatch) {
+        return {
+          intent: "ask-item",
+          characterName: directRequestMatch[1].trim(),
+          itemName: directRequestMatch[2].trim(),
+        };
+      }
+
+      const reverseRequestMatch = text.match(/^(.+?)\s+from\s+(.+)$/);
+      if (reverseRequestMatch) {
+        return {
+          intent: "ask-item",
+          characterName: reverseRequestMatch[2].trim(),
+          itemName: reverseRequestMatch[1].trim(),
+        };
+      }
+
+      if (/^.+?\s+(?:for|about|where|whether|if|what|why|how|that)\b/.test(text)) return null;
+
+      const leadingCharacter = this.extractLeadingVisibleCharacter(text);
+      if (leadingCharacter?.remainder) {
+        return {
+          intent: "ask-order",
+          characterName: leadingCharacter.characterName,
+          order: leadingCharacter.remainder,
+        };
+      }
+
+      return null;
+    }
+
+    parseTalkCommand(command) {
+      let text = normalize(command).replace(/^(say|talk|speak|whisper|yell)(?:\s+|$)/, "").trim();
+      text = text.replace(/^(to|with)\s+/, "").trim();
+      if (!text) {
+        const fallback = this.conversationFallbackCharacter();
+        return fallback ? { characterName: normalize(fallback.name), order: "" } : null;
+      }
+      const quoted = text.match(/^(.+?)\s+"(.+)"$/);
+      if (quoted) return { characterName: quoted[1].trim(), order: quoted[2].trim() };
+      const leadingCharacter = this.extractLeadingVisibleCharacter(text);
+      if (leadingCharacter) return { characterName: leadingCharacter.characterName, order: leadingCharacter.remainder.replace(/^to\s+/, "") };
+      return { characterName: text, order: "" };
+    }
+  }
+
+  class SocialCharacterResolver {
+    constructor(game, social) {
+      this.game = game;
+      this.social = social;
+    }
+
+    normalizeCharacterAlias(targetName) {
+      const name = normalize(targetName);
+      const aliases = {
+        smaug: "dragon",
+        elves: "wood elf",
+        elf: "wood elf",
+        dwarves: "thorin",
+        dwarf: "thorin",
+        wizard: "gandalf",
+        "old wizard": "gandalf",
+        "that guy": "him",
+      };
+      return aliases[name] || name;
+    }
+
+    resolveCharacterTarget(targetName) {
+      const game = this.game;
+      const name = this.normalizeCharacterAlias(targetName);
+      if (["me", "you"].includes(name) && game.commandIssuer) {
+        return game.peopleInRoom().find((p) => p.id === game.commandIssuer.id) || null;
+      }
+      if (["him", "her", "them"].includes(name)) {
+        const lastConversation = this.lastConversationCharacter();
+        if (lastConversation?.position === game.currentRoom && lastConversation.visible) return lastConversation;
+        const lastReferenced = this.lastReferencedCharacter();
+        if (lastReferenced?.position === game.currentRoom && lastReferenced.visible) return lastReferenced;
+        const fallback = this.social.defaultConversationCharacter();
+        if (fallback) return fallback;
+      }
+      return game.peopleInRoom().find((p) => p.id !== game.player.id && matches(p.name, name)) || null;
+    }
+
+    findKnownCharacter(targetName) {
+      const game = this.game;
+      const name = this.normalizeCharacterAlias(targetName);
+      if (!name || ["me", "you"].includes(name)) return null;
+      return Object.values(game.characters).find((character) => character.id !== game.player.id && matches(character.name, name)) || null;
+    }
+
+    lastConversationCharacter() {
+      const game = this.game;
+      return game.lastConversationCharacterId ? game.characters[game.lastConversationCharacterId] || null : null;
+    }
+
+    lastReferencedCharacter() {
+      const game = this.game;
+      return game.lastReferencedCharacterId ? game.characters[game.lastReferencedCharacterId] || null : null;
+    }
+
+    rememberConversationCharacter(character) {
+      if (!character?.id) return;
+      this.game.lastConversationCharacterId = character.id;
+    }
+
+    rememberReferencedCharacter(textOrCharacter) {
+      const game = this.game;
+      if (!textOrCharacter) return;
+      if (typeof textOrCharacter === "object" && textOrCharacter.id) {
+        if (textOrCharacter.id !== game.player.id) game.lastReferencedCharacterId = textOrCharacter.id;
+        return;
+      }
+      const text = normalize(textOrCharacter);
+      if (!text) return;
+      const candidates = Object.values(game.characters)
+        .filter((character) => character.id !== game.player.id)
+        .sort((a, b) => b.name.length - a.name.length);
+      const found = candidates.find((character) => matches(character.name, text) || wordInCommand(text, character.name));
+      if (found) game.lastReferencedCharacterId = found.id;
+    }
+  }
+
+  class SocialOrderInterpreter {
+    constructor(game, social) {
+      this.game = game;
+      this.social = social;
+    }
+
+    interpretFriendlyOrder(character, commandOrParsed) {
+      const parsed = this.social.coerceParsedCommand(commandOrParsed);
+      const verb = normalize(parsed.verb);
+      const object = normalize(parsed.object);
+
+      const progressive = this.progressiveFriendlyOrder(character, parsed);
+      if (progressive) return progressive;
+
+      if (verb === "wait" && /\b(?:until|till)\b/.test(object)) {
+        return {
+          message: `${sentenceDisplayCharacterName(character)} says 'I will wait a while, but not forever.'`,
+          action: "wait",
+        };
+      }
+
+      const protectedMessage = this.protectedOrderRefusal(character, parsed);
+      if (protectedMessage) return { message: protectedMessage, action: "" };
+
+      return { message: "", action: parsed.text };
+    }
+
+    progressiveFriendlyOrder(character, commandOrParsed) {
+      const game = this.game;
+      const parsedCommand = this.social.coerceParsedCommand(commandOrParsed);
+      const verb = normalize(parsedCommand.verb);
+      const object = normalize(parsedCommand.object);
+      const guardedVerbs = new Set(["give", "hand", "pass", "send", "deliver", "return"]);
+      if (!guardedVerbs.has(verb) || !matches(character.name, "gandalf")) return null;
+
+      const itemName = this.social.transferItemName(parsedCommand, verb) || object.split(" to ")[0]?.trim() || object;
+      const item = game.findCharacterItem(character, itemName)?.item;
+      const actualName = item?.name || itemName;
+      if (!matches(actualName, "curious map")) return null;
+
+      const key = "gandalf_map_transfer_requests";
+      const count = (game.flags[key] || 0) + 1;
+      game.flags[key] = count;
+
+      if (count === 1) {
+        return {
+          message: "Gandalf says 'I think the curious map is safer in my hands for now.'",
+          action: "",
+        };
+      }
+      if (count === 2) {
+        return {
+          message: "Gandalf says 'You may have it soon, but let me keep it a little longer.'",
+          action: "",
+        };
+      }
+      return {
+        message: "Gandalf sighs and says 'Very well. Take it, and use it wisely.'",
+        action: parsedCommand.text,
+      };
+    }
+
+    protectedOrderRefusal(character, commandOrParsed) {
+      const game = this.game;
+      const parsedCommand = this.social.coerceParsedCommand(commandOrParsed);
+      const verb = normalize(parsedCommand.verb);
+      const object = normalize(parsedCommand.object);
+      const guardedVerbs = new Set(["drop", "leave", "give", "hand", "pass", "send", "deliver", "return"]);
+      if (!guardedVerbs.has(verb)) return "";
+
+      let itemName = object;
+      if (verb === "give" || ["hand", "pass", "send", "deliver", "return"].includes(verb)) {
+        itemName = this.social.transferItemName(parsedCommand, verb) || object.split(" to ")[0]?.trim() || object;
+      }
+      const item = game.findCharacterItem(character, itemName)?.item;
+      const actualName = item?.name || itemName;
+
+      if (matches(character.name, "gandalf") && matches(actualName, "curious map")) {
+        return "Gandalf says 'I think the curious map is safer in my hands for now.'";
+      }
+      if (matches(character.name, "thorin") && (matches(actualName, "curious key") || matches(actualName, "treasure") || matches(actualName, "arkenstone"))) {
+        return "Thorin says 'That is not something I mean to part with lightly.'";
+      }
+      if (matches(character.name, "bilbo") && matches(actualName, "golden ring")) {
+        return "Bilbo says 'I would rather keep the ring to myself just now.'";
+      }
+      return "";
+    }
+
+    handleBardDragonCommand(character, command) {
+      const game = this.game;
+      if (!matches(character.name, "bard")) return false;
+      const text = normalizeWords(command);
+      if (/\bget\b/.test(text) && /\barrow\b/.test(text) && /\bquiver\b/.test(text)) {
+        const hasArrow = character.inventory.some((itemId) => matches(game.items[itemId]?.name, "arrow"));
+        if (hasArrow) game.flags.bardreadiedarrow = true;
+        game.print(hasArrow ? "Bard readies the strong arrow from his quiver." : "Bard searches his quiver, but finds no arrow.");
+        return true;
+      }
+      const dragon = Object.values(game.characters).find((candidate) => matches(candidate.name, "dragon"));
+      const liveDragonVisible = Boolean(dragon && dragon.visible !== false);
+      const asksToAttack = /\b(kill|attack|shoot|slay|fire)\b/.test(text)
+        || /\btake\b.*\bshot\b/.test(text)
+        || (/\bloose\b/.test(text) && /\barrow\b/.test(text));
+      const targetsDragon = /\bdragon\b/.test(text) || (liveDragonVisible && (/\btake\b.*\bshot\b/.test(text) || /\bloose\b/.test(text)));
+      if (!asksToAttack || !targetsDragon) return false;
+
+      const hasBow = character.inventory.some((itemId) => matches(game.items[itemId]?.name, "bow"));
+      const hasArrow = character.inventory.some((itemId) => matches(game.items[itemId]?.name, "arrow"));
+      if (!hasBow || !hasArrow) {
+        game.print("Bard checks his gear, but he lacks the bow and arrow needed to face the dragon.");
+        return true;
+      }
+      if (!dragon || dragon.visible === false) {
+        game.print("Bard says the dragon has already been slain.");
+        return true;
+      }
+      dragon.visible = false;
+      dragon.attackFlag = 0;
+      game.flags.dragondefeated = true;
+      game.print("Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky.");
+      return true;
+    }
+  }
+
   class SocialRules {
     constructor(game) {
       this.game = game;
+      this.parser = new SocialCommandParser(game, this);
+      this.characters = new SocialCharacterResolver(game, this);
+      this.ordering = new SocialOrderInterpreter(game, this);
+    }
+
+    visibleOtherPeople() {
+      return this.parser.visibleOtherPeople();
+    }
+
+    sortedVisibleOtherPeople() {
+      return this.parser.sortedVisibleOtherPeople();
+    }
+
+    defaultVisibleCharacter() {
+      return this.parser.defaultVisibleCharacter();
+    }
+
+    extractLeadingVisibleCharacter(text) {
+      return this.parser.extractLeadingVisibleCharacter(text);
+    }
+
+    normalizePoliteSocialText(command) {
+      return this.parser.normalizePoliteSocialText(command);
+    }
+
+    hasQuestionLead(text) {
+      return this.parser.hasQuestionLead(text);
+    }
+
+    parseTransferText(command) {
+      return this.parser.parseTransferText(command);
+    }
+
+    parseAskText(command) {
+      return this.parser.parseAskText(command);
+    }
+
+    coerceParsedCommand(commandOrText, fallbackVerb = "") {
+      if (commandOrText && typeof commandOrText === "object") return commandOrText;
+      const text = String(commandOrText || "").trim();
+      if (!text) return this.game.parseStructuredCommand(fallbackVerb || "");
+      if (fallbackVerb && !text.startsWith(`${fallbackVerb} `) && text !== fallbackVerb) {
+        return this.game.parseStructuredCommand(`${fallbackVerb} ${text}`.trim());
+      }
+      return this.game.parseStructuredCommand(text);
+    }
+
+    parseTransferIntent(commandOrParsed, fallbackVerb = "give") {
+      const structured = this.coerceParsedCommand(commandOrParsed, fallbackVerb);
+      const parsed = this.parseTransferText(structured.object);
+      if (!parsed) return null;
+      return {
+        intent: structured.verb === "show" ? "show" : "transfer",
+        verb: structured.verb,
+        text: structured.text,
+        object: structured.object,
+        itemName: parsed.itemName,
+        targetName: parsed.targetName,
+      };
+    }
+
+    parseAskIntent(commandOrParsed) {
+      const structured = this.coerceParsedCommand(commandOrParsed, "ask");
+      const intent = this.parseAskText(structured.object);
+      return intent ? { ...intent, verb: structured.verb, text: structured.text, object: structured.object } : null;
+    }
+
+    transferItemName(commandOrParsed, fallbackVerb = "give") {
+      const intent = this.parseTransferIntent(commandOrParsed, fallbackVerb);
+      return intent?.itemName || null;
     }
 
     isTalkCommand(command) {
@@ -4062,38 +4642,33 @@
 
     handleCharacterFirstCommand(command) {
       const game = this.game;
-      const people = game.peopleInRoom()
-        .filter((character) => character.id !== game.player.id && character.visible)
-        .sort((a, b) => b.name.length - a.name.length);
-      for (const character of people) {
-        const name = normalize(character.name);
-        if (command === name) {
-          if (game.unexpectedParty?.blocksDirectInteraction(character, "talk")) return true;
-          game.print(`${sentenceDisplayCharacterName(character)} listens intently, expecting your words.`);
-          return true;
-        }
-        if (!command.startsWith(`${name} `)) continue;
-        const order = command.slice(name.length).trim().replace(/^to\s+/, "");
-        if (!order) continue;
-        if (character.friendly === false) {
-          this.respondToTalk(character);
-          return true;
-        }
-        if (game.unexpectedParty?.blocksDirectInteraction(character, "order")) return true;
-        this.delegateCharacterOrder(character, order);
+      const leadingCharacter = this.extractLeadingVisibleCharacter(command);
+      if (!leadingCharacter) return false;
+      const { character, remainder } = leadingCharacter;
+      if (!remainder) {
+        if (game.unexpectedParty?.blocksDirectInteraction(character, "talk")) return true;
+        game.print(`${sentenceDisplayCharacterName(character)} listens intently, expecting your words.`);
         return true;
       }
-      return false;
+      const order = remainder.replace(/^to\s+/, "");
+      if (!order) return false;
+      if (character.friendly === false) {
+        this.respondToTalk(character);
+        return true;
+      }
+      if (game.unexpectedParty?.blocksDirectInteraction(character, "order")) return true;
+      this.delegateCharacterOrder(character, order);
+      return true;
     }
 
-    give(command) {
+    give(commandOrParsed) {
       const game = this.game;
-      const parsed = this.parseGiveCommand(command);
-      if (!parsed) return game.print("Use: give [item] to [character].");
-      const item = game.findInInventory(parsed.itemName);
-      const target = this.resolveCharacterTarget(parsed.targetName);
-      if (!item) return game.print(game.heldItemMessage(parsed.itemName) || `${game.player.name} does not have the ${parsed.itemName}.`);
-      if (!target) return game.print(`There is no one named ${parsed.targetName} here.`);
+      const intent = this.parseTransferIntent(commandOrParsed, "give");
+      if (!intent) return game.print("Use: give [item] to [character].");
+      const item = game.findInInventory(intent.itemName);
+      const target = this.resolveCharacterTarget(intent.targetName);
+      if (!item) return game.print(game.heldItemMessage(intent.itemName) || `${game.player.name} does not have the ${intent.itemName}.`);
+      if (!target) return game.print(`There is no one named ${intent.targetName} here.`);
       if (game.unexpectedParty?.blocksDirectInteraction(target, "gift")) return;
       if (target.id === game.player.id) return game.print(`${game.player.name} already has the ${item.name}.`);
       const protectedReason = this.protectedQuestGearGiftMessage(target, item);
@@ -4131,14 +4706,14 @@
         : `${sentenceDisplayCharacterName(target)} says 'Best keep your blade. A traveler should not part with ready steel on an unfinished road.'`;
     }
 
-    show(command) {
+    show(commandOrParsed) {
       const game = this.game;
-      const parsed = this.parseGiveCommand(command);
-      if (!parsed) return game.print("Use: show [item] to [character].");
-      const item = game.findInInventory(parsed.itemName);
-      const target = this.resolveCharacterTarget(parsed.targetName);
-      if (!item) return game.print(game.heldItemMessage(parsed.itemName) || `${game.player.name} does not have the ${parsed.itemName}.`);
-      if (!target) return game.print(`There is no one named ${parsed.targetName} here.`);
+      const intent = this.parseTransferIntent(commandOrParsed, "show");
+      if (!intent) return game.print("Use: show [item] to [character].");
+      const item = game.findInInventory(intent.itemName);
+      const target = this.resolveCharacterTarget(intent.targetName);
+      if (!item) return game.print(game.heldItemMessage(intent.itemName) || `${game.player.name} does not have the ${intent.itemName}.`);
+      if (!target) return game.print(`There is no one named ${intent.targetName} here.`);
       if (game.unexpectedParty?.blocksDirectInteraction(target, "gift")) return;
       game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "show")} the ${item.name} to ${displayCharacterName(target)}.`);
       this.reactToShownItem(target, item);
@@ -4152,16 +4727,13 @@
       game.print(`${sentenceDisplayCharacterName(character)} looks at the ${item.name}, but says nothing useful.`);
     }
 
-    askFor(command) {
+    askFor(commandOrParsed) {
       const game = this.game;
-      const conversation = this.parseAskConversationCommand(command);
-      const delegated = conversation ? null : this.parseAskToCommand(command);
-      const parsed = this.parseAskForCommand(command);
-      const resolved = conversation || delegated || parsed;
-      if (!resolved) return game.print("Use: ask [character] for [item], or ask [character] to [command].");
-      if (resolved.topic) return this.askCharacterAbout(resolved.characterName, resolved.topic);
-      if (resolved.order) return this.askCharacterTo(resolved.characterName, resolved.order);
-      return this.askCharacterForItem(resolved.characterName, resolved.itemName);
+      const intent = this.parseAskIntent(commandOrParsed);
+      if (!intent) return game.print("Use: ask [character] for [item], or ask [character] to [command].");
+      if (intent.intent === "ask-topic") return this.askCharacterAbout(intent.characterName, intent.topic);
+      if (intent.intent === "ask-order") return this.askCharacterTo(intent.characterName, intent.order);
+      return this.askCharacterForItem(intent.characterName, intent.itemName);
     }
 
     askCharacterForItem(characterName, itemName) {
@@ -4249,7 +4821,7 @@
       if (game.unexpectedParty?.blocksDirectInteraction(character, "order")) return;
       this.rememberConversationCharacter(character);
       this.rememberReferencedCharacter(order);
-      if (this.handleBardDragonCommand(character, order)) return;
+      if (this.ordering.handleBardDragonCommand(character, order)) return;
       this.delegateCharacterOrder(character, order);
     }
 
@@ -4260,7 +4832,7 @@
       const delegatedSplitter = this.delegatedSplitterFor(character);
       this.seedDelegatedSplitter(delegatedSplitter);
       for (const action of delegatedSplitter.split(order)) {
-        const interpreted = this.interpretFriendlyOrder(character, action);
+        const interpreted = this.interpretFriendlyOrder(character, game.parseStructuredCommand(action));
         if (interpreted.message) game.print(interpreted.message);
         if (!interpreted.action) continue;
         const moved = game.processCommand(interpreted.action, character);
@@ -4281,98 +4853,25 @@
     seedDelegatedSplitter(splitter) {
       const game = this.game;
       if (!splitter) return;
-      splitter.lastObject ||= game.sharedDelegatedContext.lastObject;
-      splitter.lastDirectObject ||= game.sharedDelegatedContext.lastDirectObject;
-      splitter.lastTargetObject ||= game.sharedDelegatedContext.lastTargetObject;
+      splitter.seedReferenceContext(game.sharedDelegatedContext);
     }
 
     rememberDelegatedSplitter(splitter) {
       const game = this.game;
       if (!splitter) return;
-      game.sharedDelegatedContext = {
-        lastObject: splitter.lastObject || game.sharedDelegatedContext.lastObject,
-        lastDirectObject: splitter.lastDirectObject || game.sharedDelegatedContext.lastDirectObject,
-        lastTargetObject: splitter.lastTargetObject || game.sharedDelegatedContext.lastTargetObject,
-      };
+      game.sharedDelegatedContext = game.mergeCommandReferenceContext(game.sharedDelegatedContext, splitter.snapshotReferenceContext());
     }
 
-    interpretFriendlyOrder(character, action) {
-      const text = normalize(action);
-      const [verb, ...restWords] = text.split(/\s+/);
-      const object = restWords.join(" ").trim();
-
-      const progressive = this.progressiveFriendlyOrder(character, verb, object, text);
-      if (progressive) return progressive;
-
-      if (verb === "wait" && /\b(?:until|till)\b/.test(object)) {
-        return {
-          message: `${sentenceDisplayCharacterName(character)} says 'I will wait a while, but not forever.'`,
-          action: "wait",
-        };
-      }
-
-      const protectedMessage = this.protectedOrderRefusal(character, verb, object);
-      if (protectedMessage) return { message: protectedMessage, action: "" };
-
-      return { message: "", action };
+    interpretFriendlyOrder(character, commandOrParsed) {
+      return this.ordering.interpretFriendlyOrder(character, commandOrParsed);
     }
 
-    progressiveFriendlyOrder(character, verb, object, action) {
-      const game = this.game;
-      const guardedVerbs = new Set(["give", "hand", "pass", "send", "deliver", "return"]);
-      if (!guardedVerbs.has(verb) || !matches(character.name, "gandalf")) return null;
-
-      const parsed = this.parseGiveCommand(object);
-      const itemName = parsed?.itemName || object.split(" to ")[0]?.trim() || object;
-      const item = game.findCharacterItem(character, itemName)?.item;
-      const actualName = item?.name || itemName;
-      if (!matches(actualName, "curious map")) return null;
-
-      const key = "gandalf_map_transfer_requests";
-      const count = (game.flags[key] || 0) + 1;
-      game.flags[key] = count;
-
-      if (count === 1) {
-        return {
-          message: "Gandalf says 'I think the curious map is safer in my hands for now.'",
-          action: "",
-        };
-      }
-      if (count === 2) {
-        return {
-          message: "Gandalf says 'You may have it soon, but let me keep it a little longer.'",
-          action: "",
-        };
-      }
-      return {
-        message: "Gandalf sighs and says 'Very well. Take it, and use it wisely.'",
-        action,
-      };
+    progressiveFriendlyOrder(character, commandOrParsed) {
+      return this.ordering.progressiveFriendlyOrder(character, commandOrParsed);
     }
 
-    protectedOrderRefusal(character, verb, object) {
-      const game = this.game;
-      const guardedVerbs = new Set(["drop", "leave", "give", "hand", "pass", "send", "deliver", "return"]);
-      if (!guardedVerbs.has(verb)) return "";
-
-      let itemName = object;
-      if (verb === "give" || ["hand", "pass", "send", "deliver", "return"].includes(verb)) {
-        const parsed = this.parseGiveCommand(object);
-        itemName = parsed?.itemName || object.split(" to ")[0]?.trim() || object;
-      }
-      const item = game.findCharacterItem(character, itemName)?.item;
-      const actualName = item?.name || itemName;
-
-      if (matches(character.name, "gandalf") && matches(actualName, "curious map")) {
-        return "Gandalf says 'I think the curious map is safer in my hands for now.'";
-      }
-      if (matches(character.name, "thorin") && (matches(actualName, "curious key") || matches(actualName, "treasure") || matches(actualName, "arkenstone"))) {
-        return "Thorin says 'That is not something I mean to part with lightly.'";
-      }
-      if (matches(character.name, "bilbo") && matches(actualName, "golden ring")) {
-        return "Bilbo says 'I would rather keep the ring to myself just now.'";
-      }
-      return "";
+    protectedOrderRefusal(character, commandOrParsed) {
+      return this.ordering.protectedOrderRefusal(character, commandOrParsed);
     }
 
     askCharacterAbout(characterName, topic) {
@@ -4394,154 +4893,63 @@
     }
 
     parseAskForCommand(command) {
-      const text = normalize(command);
-      if (!text) return null;
-      if (text.startsWith("for ")) {
-        const fallback = this.defaultConversationCharacter();
-        if (!fallback) return null;
-        return { characterName: normalize(fallback.name), itemName: text.slice(4).trim() };
-      }
-      const polite = text.replace(/^(?:please\s+)?/, "").replace(/\s+please$/, "").trim();
-      const match = polite.match(/^(.+?)\s+for\s+(.+)$/);
-      if (match) return { characterName: match[1].trim(), itemName: match[2].trim() };
-      const fromMatch = polite.match(/^(.+?)\s+from\s+(.+)$/);
-      if (fromMatch) return { characterName: fromMatch[2].trim(), itemName: fromMatch[1].trim() };
-      return null;
+      const parsed = this.parseAskText(command);
+      return parsed?.intent === "ask-item"
+        ? { characterName: parsed.characterName, itemName: parsed.itemName }
+        : null;
     }
 
     parseAskConversationCommand(command) {
-      const game = this.game;
-      const text = normalize(command);
-      if (!text) return null;
-      if (text.startsWith("about ")) {
-        const fallback = this.defaultConversationCharacter();
-        if (!fallback) return null;
-        return { characterName: normalize(fallback.name), topic: text.slice(6).trim() };
-      }
-      const aboutMatch = text.match(/^(.+?)\s+about\s+(.+)$/);
-      if (aboutMatch) return { characterName: aboutMatch[1].trim(), topic: aboutMatch[2].trim() };
-      const match = text.match(/^(.+?)\s+(where|whether|if|what|why|how|that)\s+(.+)$/);
-      if (match) {
-        return {
-          characterName: match[1].trim(),
-          topic: game.normalizeConversationTopic(match[2], match[3]),
-        };
-      }
-      const riddle = text.match(/^(.+?)\s+(?:a\s+)?riddle$/);
-      if (riddle) return { characterName: riddle[1].trim(), topic: "a riddle" };
-      return null;
+      const parsed = this.parseAskText(command);
+      return parsed?.intent === "ask-topic"
+        ? { characterName: parsed.characterName, topic: parsed.topic }
+        : null;
     }
 
     parseAskToCommand(command) {
-      const game = this.game;
-      const text = normalize(command);
-      if (!text) return null;
-      if (/^.+?\s+(?:where|whether|if|what|why|how|that)\b/.test(text)) return null;
-      const match = text.match(/^(.+?)\s+to\s+(.+)$/);
-      if (match) return { characterName: match[1].trim(), order: match[2].trim() };
-      if (/^.+?\s+(?:for|about|where|whether|if|what|why|how|that)\b/.test(text)) return null;
-      const people = game.peopleInRoom()
-        .filter((character) => character.id !== game.player.id && character.visible)
-        .sort((a, b) => b.name.length - a.name.length);
-      for (const character of people) {
-        const name = normalize(character.name);
-        if (text.startsWith(`${name} `)) {
-          return { characterName: name, order: text.slice(name.length).trim() };
-        }
-      }
-      return null;
+      const parsed = this.parseAskText(command);
+      return parsed?.intent === "ask-order"
+        ? { characterName: parsed.characterName, order: parsed.order }
+        : null;
     }
 
     parseGiveCommand(command) {
-      const text = normalize(command);
-      if (!text) return null;
-      if (text.startsWith("me ")) {
-        return { itemName: text.slice(3).trim(), targetName: "me" };
-      }
-      const giveMeNatural = text.match(/^(.+?)\s+(?:to\s+)?me$/);
-      if (giveMeNatural) return { itemName: giveMeNatural[1].trim(), targetName: "me" };
-      const giveMeMatch = text.match(/^(.+)\s+to\s+(me|you)$/);
-      if (giveMeMatch) return { itemName: giveMeMatch[1].trim(), targetName: giveMeMatch[2] };
-      const parts = text.split(/\s+(?:to|at|into)\s+/);
-      if (parts.length !== 2) return null;
-      return { itemName: parts[0].trim(), targetName: parts[1].trim() };
+      return this.parseTransferText(command);
     }
 
     resolveCharacterTarget(targetName) {
-      const game = this.game;
-      const name = this.normalizeCharacterAlias(targetName);
-      if (["me", "you"].includes(name) && game.commandIssuer) {
-        return game.peopleInRoom().find((p) => p.id === game.commandIssuer.id) || null;
-      }
-      if (["him", "her", "them"].includes(name)) {
-        const lastConversation = this.lastConversationCharacter();
-        if (lastConversation?.position === game.currentRoom && lastConversation.visible) return lastConversation;
-        const lastReferenced = this.lastReferencedCharacter();
-        if (lastReferenced?.position === game.currentRoom && lastReferenced.visible) return lastReferenced;
-        const fallback = this.defaultConversationCharacter();
-        if (fallback) return fallback;
-      }
-      return game.peopleInRoom().find((p) => p.id !== game.player.id && matches(p.name, name)) || null;
+      return this.characters.resolveCharacterTarget(targetName);
     }
 
     findKnownCharacter(targetName) {
-      const game = this.game;
-      const name = this.normalizeCharacterAlias(targetName);
-      if (!name || ["me", "you"].includes(name)) return null;
-      return Object.values(game.characters).find((character) => character.id !== game.player.id && matches(character.name, name)) || null;
+      return this.characters.findKnownCharacter(targetName);
     }
 
     lastConversationCharacter() {
-      const game = this.game;
-      return game.lastConversationCharacterId ? game.characters[game.lastConversationCharacterId] || null : null;
+      return this.characters.lastConversationCharacter();
     }
 
     lastReferencedCharacter() {
-      const game = this.game;
-      return game.lastReferencedCharacterId ? game.characters[game.lastReferencedCharacterId] || null : null;
+      return this.characters.lastReferencedCharacter();
     }
 
     rememberConversationCharacter(character) {
-      if (!character?.id) return;
-      this.game.lastConversationCharacterId = character.id;
+      return this.characters.rememberConversationCharacter(character);
     }
 
     rememberReferencedCharacter(textOrCharacter) {
-      const game = this.game;
-      if (!textOrCharacter) return;
-      if (typeof textOrCharacter === "object" && textOrCharacter.id) {
-        if (textOrCharacter.id !== game.player.id) game.lastReferencedCharacterId = textOrCharacter.id;
-        return;
-      }
-      const text = normalize(textOrCharacter);
-      if (!text) return;
-      const candidates = Object.values(game.characters)
-        .filter((character) => character.id !== game.player.id)
-        .sort((a, b) => b.name.length - a.name.length);
-      const found = candidates.find((character) => matches(character.name, text) || wordInCommand(text, character.name));
-      if (found) game.lastReferencedCharacterId = found.id;
+      return this.characters.rememberReferencedCharacter(textOrCharacter);
     }
 
     normalizeCharacterAlias(targetName) {
-      const name = normalize(targetName);
-      const aliases = {
-        smaug: "dragon",
-        elves: "wood elf",
-        elf: "wood elf",
-        dwarves: "thorin",
-        dwarf: "thorin",
-        wizard: "gandalf",
-        "old wizard": "gandalf",
-        "that guy": "him",
-      };
-      return aliases[name] || name;
+      return this.characters.normalizeCharacterAlias(targetName);
     }
 
     handleTalk(command) {
       const game = this.game;
       const parsed = this.parseTalkCommand(command);
       if (!parsed) {
-        const visiblePeople = game.peopleInRoom().filter((character) => character.id !== game.player.id && character.visible);
+        const visiblePeople = this.visibleOtherPeople();
         if (!visiblePeople.length) return game.print("You speak, but only silence meets your words.");
         return game.print(`You could speak to ${joinNames(visiblePeople.map((character) => displayCharacterName(character)))}.`);
       }
@@ -4554,7 +4962,7 @@
       if (parsed.order) {
         this.rememberConversationCharacter(character);
         this.rememberReferencedCharacter(parsed.order);
-        if (this.handleBardDragonCommand(character, parsed.order)) return;
+        if (this.ordering.handleBardDragonCommand(character, parsed.order)) return;
         this.delegateCharacterOrder(character, parsed.order);
         return;
       }
@@ -4565,33 +4973,11 @@
     }
 
     parseTalkCommand(command) {
-      const game = this.game;
-      let text = normalize(command).replace(/^(say|talk|speak|whisper|yell)(?:\s+|$)/, "").trim();
-      text = text.replace(/^(to|with)\s+/, "").trim();
-      if (!text) {
-        const fallback = this.defaultConversationCharacter();
-        return fallback ? { characterName: normalize(fallback.name), order: "" } : null;
-      }
-      const quoted = text.match(/^(.+?)\s+"(.+)"$/);
-      if (quoted) return { characterName: quoted[1].trim(), order: quoted[2].trim() };
-      const people = game.peopleInRoom()
-        .filter((character) => character.id !== game.player.id && character.visible)
-        .sort((a, b) => b.name.length - a.name.length);
-      for (const character of people) {
-        const name = normalize(character.name);
-        if (text === name) return { characterName: name, order: "" };
-        if (text.startsWith(`${name} `)) return { characterName: name, order: text.slice(name.length).trim().replace(/^to\s+/, "") };
-      }
-      return { characterName: text, order: "" };
+      return this.parser.parseTalkCommand(command);
     }
 
     defaultConversationCharacter() {
-      const game = this.game;
-      const lastConversation = this.lastConversationCharacter();
-      if (lastConversation?.position === game.currentRoom && lastConversation.visible) return lastConversation;
-      const visiblePeople = game.peopleInRoom()
-        .filter((character) => character.id !== game.player.id && character.visible);
-      return visiblePeople.length === 1 ? visiblePeople[0] : null;
+      return this.parser.conversationFallbackCharacter();
     }
 
     respondToTalk(character) {
@@ -4609,38 +4995,7 @@
     }
 
     handleBardDragonCommand(character, command) {
-      const game = this.game;
-      if (!matches(character.name, "bard")) return false;
-      const text = normalizeWords(command);
-      if (/\bget\b/.test(text) && /\barrow\b/.test(text) && /\bquiver\b/.test(text)) {
-        const hasArrow = character.inventory.some((itemId) => matches(game.items[itemId]?.name, "arrow"));
-        if (hasArrow) game.flags.bardreadiedarrow = true;
-        game.print(hasArrow ? "Bard readies the strong arrow from his quiver." : "Bard searches his quiver, but finds no arrow.");
-        return true;
-      }
-      const dragon = Object.values(game.characters).find((candidate) => matches(candidate.name, "dragon"));
-      const liveDragonVisible = Boolean(dragon && dragon.visible !== false);
-      const asksToAttack = /\b(kill|attack|shoot|slay|fire)\b/.test(text)
-        || /\btake\b.*\bshot\b/.test(text)
-        || (/\bloose\b/.test(text) && /\barrow\b/.test(text));
-      const targetsDragon = /\bdragon\b/.test(text) || (liveDragonVisible && (/\btake\b.*\bshot\b/.test(text) || /\bloose\b/.test(text)));
-      if (!asksToAttack || !targetsDragon) return false;
-
-      const hasBow = character.inventory.some((itemId) => matches(game.items[itemId]?.name, "bow"));
-      const hasArrow = character.inventory.some((itemId) => matches(game.items[itemId]?.name, "arrow"));
-      if (!hasBow || !hasArrow) {
-        game.print("Bard checks his gear, but he lacks the bow and arrow needed to face the dragon.");
-        return true;
-      }
-      if (!dragon || dragon.visible === false) {
-        game.print("Bard says the dragon has already been slain.");
-        return true;
-      }
-      dragon.visible = false;
-      dragon.attackFlag = 0;
-      game.flags.dragondefeated = true;
-      game.print("Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky.");
-      return true;
+      return this.ordering.handleBardDragonCommand(character, command);
     }
   }
 
@@ -6266,7 +6621,7 @@
       game.lastReferencedCharacterId = null;
       game.splitter = new CommandSplitter(game.data);
       game.delegatedSplitters = new Map();
-      game.sharedDelegatedContext = { lastObject: null, lastDirectObject: null, lastTargetObject: null };
+      game.sharedDelegatedContext = game.emptyCommandReferenceContext();
       game.cancelOutputScrollAnimation({ jumpToTarget: false });
       output.replaceChildren();
       output.classList.remove("end-screen");
@@ -6334,7 +6689,7 @@
       }
       game.revealFromSpecial("examine", text);
       if (item.location?.type === "character" && item.location.id === game.player.id && game.player.name !== "You") {
-        return game.print(`${subject} ${actorVerb(game.player, "examine")} the ${item.name} in ${displayCharacterName(game.player)}'s possession. ${subject} ${actorVerb(game.player, "see")} ${description}.`);
+        return game.print(`${subject} ${actorVerb(game.player, "examine")} the ${item.name} and ${actorVerb(game.player, "see")} ${description}.`);
       }
       game.print(`${subject} ${actorVerb(game.player, "see")} ${description}.`);
     }
@@ -6940,7 +7295,7 @@
       this.lastConversationCharacterId = null;
       this.lastReferencedCharacterId = null;
       this.delegatedSplitters = new Map();
-      this.sharedDelegatedContext = { lastObject: null, lastDirectObject: null, lastTargetObject: null };
+      this.sharedDelegatedContext = this.emptyCommandReferenceContext();
       this.endgameRestartArmed = false;
       this.pendingEndgameChoice = null;
       this.arrivalNoticeTimers = [];
@@ -7404,18 +7759,39 @@
     }
 
     rememberSharedDelegatedContext(context = null) {
-      if (!context) return;
-      this.sharedDelegatedContext = {
-        lastObject: context.lastObject || this.sharedDelegatedContext.lastObject,
-        lastDirectObject: context.lastDirectObject || this.sharedDelegatedContext.lastDirectObject,
-        lastTargetObject: context.lastTargetObject || this.sharedDelegatedContext.lastTargetObject,
-      };
+      this.sharedDelegatedContext = this.mergeCommandReferenceContext(this.sharedDelegatedContext, context);
     }
 
     shouldRememberSharedDelegatedContext(command = "") {
       const text = normalize(command);
       if (!text) return false;
       return !/^(?:ask|talk|speak|say|whisper|yell)\b/.test(text);
+    }
+
+    emptyCommandReferenceContext() {
+      return { lastObject: null, lastDirectObject: null, lastTargetObject: null };
+    }
+
+    mergeCommandReferenceContext(base = null, incoming = null) {
+      const current = base || this.emptyCommandReferenceContext();
+      if (!incoming) return { ...current };
+      return {
+        lastObject: incoming.lastObject || current.lastObject,
+        lastDirectObject: incoming.lastDirectObject || current.lastDirectObject,
+        lastTargetObject: incoming.lastTargetObject || current.lastTargetObject,
+      };
+    }
+
+    parseStructuredCommand(command = "") {
+      const text = String(command || "").trim();
+      const [verb = "", ...rest] = text.split(/\s+/);
+      const object = rest.join(" ").trim();
+      return {
+        text,
+        verb,
+        object,
+        primaryObject: primaryObjectText(verb, object),
+      };
     }
 
     processCommand(command, actor = this.player) {
@@ -7440,11 +7816,11 @@
         return false;
       }
 
-      const [verb, ...rest] = command.split(/\s+/);
-      const object = rest.join(" ").trim();
+      const parsed = this.parseStructuredCommand(command);
+      const { verb, object } = parsed;
       if (!verb) return false;
-      const rememberedChoice = !this.forcedChoice ? this.resolveRememberedCommandChoice(verb, object) : null;
-      const explicitReferences = this.explicitClarificationReferences(verb, object);
+      const rememberedChoice = !this.forcedChoice ? this.resolveRememberedCommandChoice(parsed) : null;
+      const explicitReferences = this.explicitClarificationReferences(parsed);
       if (rememberedChoice) this.forcedChoice = rememberedChoice;
 
       try {
@@ -7462,15 +7838,15 @@
           return false;
         }
 
-        const pronounPrompt = this.unresolvedPronounPrompt(verb, object);
+        const pronounPrompt = this.unresolvedPronounPrompt(parsed);
         if (pronounPrompt) {
           this.print(pronounPrompt);
           return false;
         }
 
-        if (this.needsClarification(verb, object)) return false;
+        if (this.needsClarification(parsed)) return false;
 
-        this.commandRouter.dispatch(verb, object, command);
+        this.commandRouter.dispatch(parsed);
         for (const reference of explicitReferences) {
           this.rememberClarifiedReference(reference.target, reference.choice);
         }
@@ -7502,18 +7878,16 @@
       return prompts[verb] || "Please specify your action and the object. For example, type 'open door' or 'climb into tree'.";
     }
 
-    unresolvedPronounPrompt(_verb, object = "") {
+    unresolvedPronounPrompt(commandOrVerb, object = "") {
       if (this.commandIssuer) return "";
-      const verb = normalize(_verb);
-      const text = normalize(object);
+      const parsed = commandOrVerb && typeof commandOrVerb === "object"
+        ? commandOrVerb
+        : this.parseStructuredCommand(`${String(commandOrVerb || "").trim()} ${String(object || "").trim()}`.trim());
+      const verb = normalize(parsed.verb);
+      const text = normalize(parsed.object);
       if (!text) return "";
-      const directObjectVerbs = new Set([
-        "take", "get", "open", "close", "use", "read", "drop", "leave", "give", "show",
-        "hand", "pass", "bring", "send", "return", "deliver", "unlock", "lock", "put",
-        "place", "set", "store", "combine", "throw",
-      ]);
-      const primary = primaryObjectText(verb, text);
-      if (directObjectVerbs.has(verb) && primary === "it") return 'What do you mean by "it"?';
+      const primary = parsed.primaryObject || primaryObjectText(verb, text);
+      if (DIRECT_OBJECT_PRONOUN_PROMPT_VERBS.has(verb) && primary === "it") return 'What do you mean by "it"?';
       const characterPronoun = text.match(/\b(him|her|them)\b/);
       if (characterPronoun && !this.resolveCharacterTarget(characterPronoun[1])) {
         return `I don't know who "${characterPronoun[1]}" refers to.`;
@@ -8066,44 +8440,44 @@
       return this.world.findDoorsAll(name);
     }
 
-    needsClarification(verb, objectText) {
-      return this.clarifier.needsClarification(verb, objectText);
+    needsClarification(commandOrVerb, objectText = "") {
+      return this.clarifier.needsClarification(commandOrVerb, objectText);
     }
 
     isClarificationAnswer(response) {
       return this.clarifier.isClarificationAnswer(response);
     }
 
-    ambiguousChoices(verb, objectText, fullObjectText = objectText) {
-      return this.clarifier.ambiguousChoices(verb, objectText, fullObjectText);
+    ambiguousChoices(commandOrVerb, objectText = "", fullObjectText = objectText) {
+      return this.clarifier.ambiguousChoices(commandOrVerb, objectText, fullObjectText);
     }
 
-    firstClarificationRequest(verb, objectText) {
-      return this.clarifier.firstClarificationRequest(verb, objectText);
+    firstClarificationRequest(commandOrVerb, objectText = "") {
+      return this.clarifier.firstClarificationRequest(commandOrVerb, objectText);
     }
 
-    clarificationRequests(verb, objectText) {
-      return this.clarifier.clarificationRequests(verb, objectText);
+    clarificationRequests(commandOrVerb, objectText = "") {
+      return this.clarifier.clarificationRequests(commandOrVerb, objectText);
     }
 
-    primaryClarificationRequest(verb, objectText) {
-      return this.clarifier.primaryClarificationRequest(verb, objectText);
+    primaryClarificationRequest(commandOrVerb, objectText = "") {
+      return this.clarifier.primaryClarificationRequest(commandOrVerb, objectText);
     }
 
-    resolveRememberedCommandChoice(verb, objectText) {
-      return this.clarifier.resolveRememberedCommandChoice(verb, objectText);
+    resolveRememberedCommandChoice(commandOrVerb, objectText = "") {
+      return this.clarifier.resolveRememberedCommandChoice(commandOrVerb, objectText);
     }
 
-    resolveRememberedClarification(verb, objectText) {
-      return this.clarifier.resolveRememberedClarification(verb, objectText);
+    resolveRememberedClarification(commandOrVerb, objectText = "") {
+      return this.clarifier.resolveRememberedClarification(commandOrVerb, objectText);
     }
 
-    resolveExplicitClarification(verb, objectText) {
-      return this.clarifier.resolveExplicitClarification(verb, objectText);
+    resolveExplicitClarification(commandOrVerb, objectText = "") {
+      return this.clarifier.resolveExplicitClarification(commandOrVerb, objectText);
     }
 
-    explicitClarificationReferences(verb, objectText) {
-      return this.clarifier.explicitClarificationReferences(verb, objectText);
+    explicitClarificationReferences(commandOrVerb, objectText = "") {
+      return this.clarifier.explicitClarificationReferences(commandOrVerb, objectText);
     }
 
     parseSourceReference(objectText) {
@@ -8643,7 +9017,7 @@
       this.lastReferencedCharacterId = null;
       this.splitter = new CommandSplitter(this.data);
       this.delegatedSplitters = new Map();
-      this.sharedDelegatedContext = { lastObject: null, lastDirectObject: null, lastTargetObject: null };
+      this.sharedDelegatedContext = this.emptyCommandReferenceContext();
       this.autosaveSnapshot = null;
       this.autosaveMeta = null;
       this.cancelOutputScrollAnimation({ jumpToTarget: false });
@@ -9014,16 +9388,16 @@
       return this.social.rememberDelegatedSplitter(splitter);
     }
 
-    interpretFriendlyOrder(character, action) {
-      return this.social.interpretFriendlyOrder(character, action);
+    interpretFriendlyOrder(character, commandOrParsed) {
+      return this.social.interpretFriendlyOrder(character, commandOrParsed);
     }
 
-    progressiveFriendlyOrder(character, verb, object, action) {
-      return this.social.progressiveFriendlyOrder(character, verb, object, action);
+    progressiveFriendlyOrder(character, commandOrParsed) {
+      return this.social.progressiveFriendlyOrder(character, commandOrParsed);
     }
 
-    protectedOrderRefusal(character, verb, object) {
-      return this.social.protectedOrderRefusal(character, verb, object);
+    protectedOrderRefusal(character, commandOrParsed) {
+      return this.social.protectedOrderRefusal(character, commandOrParsed);
     }
 
     askCharacterAbout(characterName, topic) {

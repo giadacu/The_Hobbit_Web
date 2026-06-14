@@ -816,6 +816,66 @@ cases.push(...compoundDelegationRecipients.flatMap((name) => compoundDelegationT
   expected: template.expected(name),
 }))));
 
+const freshComplexRecipients = ["Elrond", "Dwalin", "Fili", "Kili", "Oin", "Gloin", "Bifur", "Innkeeper", "Gandalf", "Thorin"];
+const freshComplexTemplates = [
+  {
+    label: "show lantern place table",
+    input: (name) => `Show the lantern to ${name} and ask him to place it on the table.`,
+    expected: (name) => [`show lantern to ${name.toLowerCase()}`, `ask ${name.toLowerCase()} to place it on table`],
+  },
+  {
+    label: "give parchment write",
+    input: (name) => `Give the parchment to ${name} and ask him to write on it.`,
+    expected: (name) => [`give parchment to ${name.toLowerCase()}`, `ask ${name.toLowerCase()} to write on it`],
+  },
+  {
+    label: "hand seed cakes eat",
+    input: (name) => `Hand the seed cakes to ${name} and tell him to eat them.`,
+    expected: (name) => [`hand seed cakes to ${name.toLowerCase()}`, `ask ${name.toLowerCase()} to eat them`],
+  },
+  {
+    label: "pass wine drink",
+    input: (name) => `Pass the wine to ${name} and ask him to drink it.`,
+    expected: (name) => [`pass wine to ${name.toLowerCase()}`, `ask ${name.toLowerCase()} to drink it`],
+  },
+  {
+    label: "send rope tie roots",
+    input: (name) => `Send the rope to ${name} and ask him to tie it to the roots.`,
+    expected: (name) => [`send rope to ${name.toLowerCase()}`, `ask ${name.toLowerCase()} to tie it to roots`],
+  },
+  {
+    label: "bring broken map mend",
+    input: (name) => `Bring the broken map to ${name} and ask him to mend it.`,
+    expected: (name) => [`bring broken map to ${name.toLowerCase()}`, `ask ${name.toLowerCase()} to mend it`],
+  },
+  {
+    label: "deliver inkwell open",
+    input: (name) => `Deliver the dark glass inkwell to ${name} and ask him to open it.`,
+    expected: (name) => [`deliver dark glass inkwell to ${name.toLowerCase()}`, `ask ${name.toLowerCase()} to open it`],
+  },
+  {
+    label: "return key put drawer",
+    input: (name) => `Return the key to ${name} and ask him to put it in the little drawer.`,
+    expected: (name) => [`return key to ${name.toLowerCase()}`, `ask ${name.toLowerCase()} to put it in little drawer`],
+  },
+  {
+    label: "show rose smell",
+    input: (name) => `Show the rose to ${name} and ask him to smell it.`,
+    expected: (name) => [`show rose to ${name.toLowerCase()}`, `ask ${name.toLowerCase()} to smell it`],
+  },
+  {
+    label: "give pipe store chest",
+    input: (name) => `Give the pipe to ${name} and ask him to store it in the chest.`,
+    expected: (name) => [`give pipe to ${name.toLowerCase()}`, `ask ${name.toLowerCase()} to store it in chest`],
+  },
+];
+
+cases.push(...freshComplexRecipients.flatMap((name) => freshComplexTemplates.map((template) => ({
+  name: `fresh complex ${name.toLowerCase()} ${template.label}`,
+  input: template.input(name),
+  expected: template.expected(name),
+}))));
+
 const dialogueCases = [
   ["BILBO: Gandalf, are you certain this is the right path?", "Gandalf says 'It is the safest path available to us.'"],
   ["BILBO: Thorin, what lies beyond those hills?", "Thorin says 'The road to our homeland, if fortune favors us.'"],
@@ -1743,6 +1803,20 @@ const gameCases = [
       "You light the elegant lamp. Its engraved metal catches the warm glow.",
       "You unstopper the dark glass inkwell.",
       "You stopper the dark glass inkwell.",
+    ],
+  },
+  {
+    name: "delegated read owned item avoids repeated possession phrasing",
+    setup(game) {
+      placeCharacterWithPlayer(game, "gandalf");
+    },
+    inputs: ["ask gandalf to read the map"],
+    expectedIncluded: [
+      "Gandalf examines the curious map and sees a map with strange markings.",
+    ],
+    notExpectedIncluded: [
+      "in Gandalf's possession",
+      "Gandalf examines the curious map in Gandalf's possession.",
     ],
   },
   {
