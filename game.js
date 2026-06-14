@@ -4231,22 +4231,29 @@
       return /^(?:hello|hi|hey|good\s+morning)$/.test(normalize(text));
     }
 
-    isGreetingBroadcastCommand(command) {
+    parseGreetingCommand(command) {
       let text = normalize(command).replace(/^(say|talk|speak|whisper|yell)(?:\s+|$)/, "").trim();
       text = text.replace(/^(to|with)\s+/, "").trim();
-      if (!text) return false;
+      if (!text) return null;
 
       const greetingFirst = text.match(/^(.+?)\s+to\s+(.+)$/);
-      if (greetingFirst && this.isGreetingPhrase(greetingFirst[1]) && this.isCollectiveAudience(greetingFirst[2])) {
-        return true;
+      if (greetingFirst && this.isGreetingPhrase(greetingFirst[1])) {
+        if (this.isCollectiveAudience(greetingFirst[2])) return { mode: "broadcast" };
+        return { mode: "targeted", targetName: greetingFirst[2].trim() };
       }
 
       const audienceFirst = text.match(/^(.+?)\s*,?\s+(.+)$/);
-      if (audienceFirst && this.isCollectiveAudience(audienceFirst[1]) && this.isGreetingPhrase(audienceFirst[2])) {
-        return true;
+      if (audienceFirst && this.isGreetingPhrase(audienceFirst[2])) {
+        if (this.isCollectiveAudience(audienceFirst[1])) return { mode: "broadcast" };
+        return { mode: "targeted", targetName: audienceFirst[1].trim() };
       }
 
-      return this.isGreetingPhrase(text) && this.visibleOtherPeople().length > 1;
+      if (!this.isGreetingPhrase(text)) return null;
+      return this.visibleOtherPeople().length > 1 ? { mode: "broadcast" } : null;
+    }
+
+    isGreetingBroadcastCommand(command) {
+      return this.parseGreetingCommand(command)?.mode === "broadcast";
     }
 
     hasQuestionLead(text) {
@@ -4973,7 +4980,17 @@
 
     handleTalk(command) {
       const game = this.game;
-      if (this.parser.isGreetingBroadcastCommand(command)) return game.hello();
+      const greeting = this.parser.parseGreetingCommand(command);
+      if (greeting?.mode === "broadcast") return game.hello();
+      if (greeting?.mode === "targeted") {
+        const character = this.resolveCharacterTarget(greeting.targetName);
+        if (!character) return game.print("You speak, but only silence meets your words.");
+        if (character.friendly === false) return this.respondToTalk(character);
+        if (game.unexpectedParty?.blocksDirectInteraction(character, "talk")) return;
+        this.rememberConversationCharacter(character);
+        this.rememberReferencedCharacter(character);
+        return game.hello(character);
+      }
       const parsed = this.parseTalkCommand(command);
       if (!parsed) {
         const visiblePeople = this.visibleOtherPeople();
@@ -8902,9 +8919,14 @@
       this.handleTimedSpecials();
     }
 
-    hello() {
-      const greeters = this.peopleInRoom()
-        .filter((p) => p.name !== "You" && p.friendly === true && !this.unexpectedParty?.blocksGreetingResponse(p));
+    hello(targets = null) {
+      const requested = !targets
+        ? null
+        : Array.isArray(targets)
+          ? targets
+          : [targets];
+      const greeters = (requested || this.peopleInRoom())
+        .filter((p) => p.name !== "You" && (requested ? p.friendly !== false : p.friendly === true) && !this.unexpectedParty?.blocksGreetingResponse(p));
       if (!greeters.length) {
         return this.print(this.player.name === "You" ? "No one responds to your greeting." : `No one responds to ${this.player.name}'s greeting.`);
       }

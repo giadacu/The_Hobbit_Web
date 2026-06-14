@@ -1224,6 +1224,37 @@ const gameCases = [
     notExpectedIncluded: ["I'm not sure how to do that."],
   },
   {
+    name: "say hello to gandalf greets the named character",
+    setup(game) {
+      placeCharacterWithPlayer(game, "gandalf");
+      placeCharacterWithPlayer(game, "thorin");
+    },
+    inputs: ["say hello to gandalf"],
+    expectedIncluded: ["Gandalf says hello to you."],
+    notExpectedIncluded: ["You speak, but only silence meets your words.", "Thorin says hello to you."],
+  },
+  {
+    name: "say hi to gandalf also greets the named character",
+    setup(game) {
+      placeCharacterWithPlayer(game, "gandalf");
+      placeCharacterWithPlayer(game, "thorin");
+    },
+    inputs: ["say hi to gandalf"],
+    expectedIncluded: ["Gandalf says hello to you."],
+    notExpectedIncluded: ["You speak, but only silence meets your words.", "Thorin says hello to you."],
+  },
+  {
+    name: "say hello to elrond greets only elrond",
+    setup(game) {
+      movePlayerTo(game, "rivendell");
+      placeCharacterWithPlayer(game, "gandalf");
+      placeCharacterWithPlayer(game, "elrond");
+    },
+    inputs: ["say hello to elrond"],
+    expectedIncluded: ["Elrond says hello to you."],
+    notExpectedIncluded: ["You speak, but only silence meets your words.", "Gandalf says hello to you."],
+  },
+  {
     name: "say hello to all greets the visible group",
     setup(game) {
       placeCharacterWithPlayer(game, "gandalf");
