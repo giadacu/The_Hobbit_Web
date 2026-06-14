@@ -3,6 +3,7 @@
   const IMAGE_ROOT = "assets/local-images/";
   const MUSIC_ROOT = "assets/local-music/";
   const ASSET_VERSION = "20260612-1338";
+  const ASSET_QUERY_SUFFIX = window.location.protocol === "file:" ? "" : `?v=${ASSET_VERSION}`;
   const TEMPORARY_IMAGE_ALIASES = {
     "thrors-map": "Thrors_map.jpg",
     "thrors map": "Thrors_map.jpg",
@@ -1828,9 +1829,9 @@
 
     rememberObjects(verb, object) {
       const { words, direct, target } = this.splitObjectTerms(verb, object);
-      if (direct.length) this.lastDirectObject = direct.at(-1);
-      this.lastTargetObject = target.length ? target.at(-1) : this.lastDirectObject;
-      this.lastObject = this.lastTargetObject || this.lastDirectObject || words.at(-1) || this.lastObject;
+      if (direct.length) this.lastDirectObject = direct[direct.length - 1];
+      this.lastTargetObject = target.length ? target[target.length - 1] : this.lastDirectObject;
+      this.lastObject = this.lastTargetObject || this.lastDirectObject || words[words.length - 1] || this.lastObject;
     }
   }
 
@@ -2119,8 +2120,8 @@
       if (this.state.currentArrival.stage === 1) {
         return {
           message: this.game.currentRoom === "bilbos_garden"
-            ? this.pick(profile.approachGarden.map((line) => line.replaceAll("{name}", dwarf.name)), this.seededHash(`${dwarf.id}:approach:garden:${this.state.turnCounter}`))
-            : this.pick(profile.approachHall.map((line) => line.replaceAll("{name}", dwarf.name)), this.seededHash(`${dwarf.id}:approach:hall:${this.state.turnCounter}`)),
+            ? this.pick(profile.approachGarden.map((line) => replaceAllText(line, "{name}", dwarf.name)), this.seededHash(`${dwarf.id}:approach:garden:${this.state.turnCounter}`))
+            : this.pick(profile.approachHall.map((line) => replaceAllText(line, "{name}", dwarf.name)), this.seededHash(`${dwarf.id}:approach:hall:${this.state.turnCounter}`)),
           cooldown: this.pickCooldown(profile.approachCooldown[0], profile.approachCooldown[1]),
           apply: () => {
             this.setPartyDoorOpen(true);
@@ -2133,8 +2134,8 @@
       if (this.state.currentArrival.stage === 2) {
         return {
           message: this.game.currentRoom === "bilbos_garden"
-            ? this.pick(profile.entryGarden.map((line) => line.replaceAll("{name}", dwarf.name)), this.seededHash(`${dwarf.id}:entry:garden:${this.state.turnCounter}`))
-            : this.pick(profile.entryHall.map((line) => line.replaceAll("{name}", dwarf.name)), this.seededHash(`${dwarf.id}:entry:hall:${this.state.turnCounter}`)),
+            ? this.pick(profile.entryGarden.map((line) => replaceAllText(line, "{name}", dwarf.name)), this.seededHash(`${dwarf.id}:entry:garden:${this.state.turnCounter}`))
+            : this.pick(profile.entryHall.map((line) => replaceAllText(line, "{name}", dwarf.name)), this.seededHash(`${dwarf.id}:entry:hall:${this.state.turnCounter}`)),
           cooldown: this.pickCooldown(profile.entryCooldown[0], profile.entryCooldown[1]),
           apply: () => {
             this.setPartyDoorOpen(true);
@@ -2537,7 +2538,7 @@
           ? `${dwarf.name} goes back inside.`
           : `${dwarf.name} comes in again from the garden.`;
       }
-      const targetRoom = this.game.rooms[toRoom]?.name || toRoom.replaceAll("_", " ");
+      const targetRoom = this.game.rooms[toRoom]?.name || replaceAllText(toRoom, "_", " ");
       const travel = [
         `${dwarf.name} wanders off toward the ${targetRoom.toLowerCase()}.`,
         `${dwarf.name} slips away in search of room, food, or both.`,
@@ -10772,7 +10773,7 @@
           message: "You stumble blindly over loose stone and bang yourself painfully in the dark.",
         },
       ];
-      const outcome = outcomes[roll] || outcomes.at(-1);
+      const outcome = outcomes[roll] || outcomes[outcomes.length - 1];
       this.player.strength = Math.max(0, (this.player.strength || 0) - outcome.damage);
       this.print(`${outcome.message} Strength: ${this.player.strength}.`, "danger");
       if (this.player.strength <= 0) {
@@ -12917,13 +12918,13 @@
   function joinNames(names) {
     if (names.length <= 1) return names[0] || "";
     if (names.length === 2) return `${names[0]} and ${names[1]}`;
-    return `${names.slice(0, -1).join(", ")}, and ${names.at(-1)}`;
+    return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
   }
 
   function joinAlternatives(names) {
     if (names.length <= 1) return names[0] || "";
     if (names.length === 2) return `${names[0]} or ${names[1]}`;
-    return `${names.slice(0, -1).join(", ")}, or ${names.at(-1)}`;
+    return `${names.slice(0, -1).join(", ")}, or ${names[names.length - 1]}`;
   }
 
   function sameChoice(first, second) {
@@ -12935,7 +12936,7 @@
     if (!normalized) return [];
     const keys = [normalized];
     const parts = normalized.split(/\s+/).filter(Boolean);
-    const head = parts.at(-1) || "";
+    const head = parts[parts.length - 1] || "";
     if (head && head !== normalized) keys.push(head);
     return [...new Set(keys)];
   }
@@ -13014,6 +13015,10 @@
     return normalize(text).replace(/\s+/g, "");
   }
 
+  function replaceAllText(text, search, replacement) {
+    return String(text).split(search).join(replacement);
+  }
+
   function narrativeRuleMatches(rule = {}, context = {}) {
     if (rule.roomIds && !rule.roomIds.includes(context.roomId || context.room?.id)) return false;
     if (rule.characterIds && !rule.characterIds.includes(context.character?.id)) return false;
@@ -13073,7 +13078,7 @@
   }
 
   function assetUrl(root, file) {
-    return `${root}${String(file).split("/").map(encodeURIComponent).join("/")}?v=${ASSET_VERSION}`;
+    return `${root}${String(file).split("/").map(encodeURIComponent).join("/")}${ASSET_QUERY_SUFFIX}`;
   }
 
   function compassDirectionKey(direction) {
