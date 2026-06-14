@@ -3,6 +3,11 @@
   const IMAGE_ROOT = "assets/local-images/";
   const MUSIC_ROOT = "assets/local-music/";
   const ASSET_VERSION = "20260612-1338";
+  const TEMPORARY_IMAGE_ALIASES = {
+    "thrors-map": "Thrors_map.jpg",
+    "thrors map": "Thrors_map.jpg",
+    "thrors_map": "Thrors_map.jpg",
+  };
   const SAVE_PREFIX = "hobbit-web-save:";
   const LAYOUT_PREF_KEY = "hobbit-web-layout-mode";
 
@@ -63,6 +68,10 @@
   const OUTPUT_SCROLL_EASING = 0.16;
   const PROFANITY_OUTBURST_RE = /\b(?:fuck(?:ing)?|fuckin|shit|bullshit|damn(?:ed)?|asshole|bastard|cazzo|merda|vaffanculo|fanculo|stronz[oaie]?)\b/i;
   const PROFANITY_FILLER_RE = /\b(?:fuck(?:ing)?|fuckin|shit|bullshit|damn(?:ed)?|bloody|bastard(?:s)?|asshole(?:s)?|cazzo|merda|vaffanculo|fanculo|stronz[oaie]?|maledett[oaie]?)\b/gi;
+  const TRAVELING_COMPANION_NAMES = [
+    "gandalf", "thorin", "balin", "dwalin", "fili", "kili", "dori", "nori", "ori",
+    "oin", "gloin", "bifur", "bofur", "bombur",
+  ];
 
   const commandsWithoutObject = new Set([
     "look", "wait", "inventory", "inv", "i", "save", "load", "quit", "verbs",
@@ -155,9 +164,12 @@
       apply(game) {
         game.debugCompleteUnexpectedParty();
         game.debugMarkPonyProgress();
+        game.debugMarkTrollRoadProgress();
         game.transformTrolls();
         game.flags.rivendellropesecured = true;
-        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true });
+        game.flags.rivendell_preparations_complete = false;
+        game.flags.mapread = false;
+        game.debugGiveJourneyCheckpointLoadout();
         game.debugMovePlayer("rivendell");
         game.debugSetCharacterRoom("elrond", "rivendell");
       },
@@ -170,9 +182,9 @@
       apply(game) {
         game.debugCompleteUnexpectedParty();
         game.debugMarkPonyProgress();
+        game.debugMarkTrollRoadProgress();
         game.transformTrolls();
-        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true });
-        game.debugGivePlayerItem("large key");
+        game.debugGiveJourneyCheckpointLoadout();
         game.debugMovePlayer("trollshaws_road");
       },
     },
@@ -184,9 +196,12 @@
       apply(game) {
         game.debugCompleteUnexpectedParty();
         game.debugMarkPonyProgress();
+        game.debugMarkTrollRoadProgress();
         game.transformTrolls();
+        game.flags.mapread = true;
+        game.flags.rivendell_preparations_complete = true;
         game.flags.rivendellropesecured = true;
-        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true });
+        game.debugGiveJourneyCheckpointLoadout();
         game.debugMovePlayer("deep_dark_lake");
         game.debugSetCharacterRoom("gollum", "deep_dark_lake");
       },
@@ -199,10 +214,12 @@
       apply(game) {
         game.debugCompleteUnexpectedParty();
         game.debugMarkPonyProgress();
+        game.debugMarkTrollRoadProgress();
         game.transformTrolls();
         game.flags.mapread = true;
+        game.flags.rivendell_preparations_complete = true;
         game.flags.rivendellropesecured = true;
-        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true, ring: true });
+        game.debugGiveJourneyCheckpointLoadout({ ring: true });
         game.debugMovePlayer("beorns_house");
         game.debugSetCharacterRoom("beorn", "beorns_house");
       },
@@ -215,10 +232,13 @@
       apply(game) {
         game.debugCompleteUnexpectedParty();
         game.debugMarkPonyProgress();
+        game.debugMarkTrollRoadProgress();
         game.transformTrolls();
         game.flags.mapread = true;
+        game.flags.rivendell_preparations_complete = true;
         game.flags.rivendellropesecured = true;
-        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true, ring: true });
+        game.debugGiveJourneyCheckpointLoadout({ ring: true });
+        game.debugMarkBeornRecovery();
         game.debugMovePlayer("mirkwood_forest_path");
       },
     },
@@ -230,10 +250,13 @@
       apply(game) {
         game.debugCompleteUnexpectedParty();
         game.debugMarkPonyProgress();
+        game.debugMarkTrollRoadProgress();
         game.transformTrolls();
         game.flags.mapread = true;
+        game.flags.rivendell_preparations_complete = true;
         game.flags.rivendellropesecured = true;
-        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true, ring: true });
+        game.debugGiveJourneyCheckpointLoadout({ ring: true });
+        game.debugMarkBeornRecovery();
         game.debugMovePlayer("wooden_town");
         game.debugSetCharacterRoom("bard", "wooden_town");
       },
@@ -246,10 +269,13 @@
       apply(game) {
         game.debugCompleteUnexpectedParty();
         game.debugMarkPonyProgress();
+        game.debugMarkTrollRoadProgress();
         game.transformTrolls();
         game.flags.mapread = true;
+        game.flags.rivendell_preparations_complete = true;
         game.flags.rivendellropesecured = true;
-        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true, ring: true });
+        game.debugGiveJourneyCheckpointLoadout({ ring: true });
+        game.debugMarkBeornRecovery();
         game.debugMovePlayer("front_gate");
         game.debugSetCharacterRoom("bard", "front_gate");
       },
@@ -262,11 +288,14 @@
       apply(game) {
         game.debugCompleteUnexpectedParty();
         game.debugMarkPonyProgress();
+        game.debugMarkTrollRoadProgress();
         game.transformTrolls();
         game.flags.mapread = true;
+        game.flags.rivendell_preparations_complete = true;
         game.flags.secretdoorsun = true;
         game.flags.rivendellropesecured = true;
-        game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true, ring: true });
+        game.debugGiveJourneyCheckpointLoadout({ ring: true });
+        game.debugMarkBeornRecovery();
         game.debugMovePlayer("lower_halls");
         game.debugSetCharacterRoom("bard", "lower_halls");
         game.debugGiveCharacterItem("bow", "bard");
@@ -408,6 +437,17 @@
     "These halls were made for song and counsel, not for hurried hearts.",
     "Often the small hand sets in motion what the great could never compel.",
     "In Rivendell, old things yield their meaning slowly, yet seldom in vain.",
+  ];
+
+  const RIVENDELL_ELROND_TOPIC_KEYWORDS = [
+    "journey", "road", "departure", "depart", "leave", "leaving", "east", "quest",
+    "erebor", "mountain", "dwarves", "thorin", "family", "history", "map",
+    "moon letters", "moon-letters", "markings",
+    "secret door", "door", "key",
+  ];
+
+  const RIVENDELL_ELROND_HEIRLOOM_ITEMS = [
+    "curious map", "curious key", "majestic sword",
   ];
 
   const BEORN_AMBIENT_LINES = [
@@ -585,6 +625,12 @@
     "deep_misty_valley_2",
   ]);
 
+  const BEORN_MOUNTAIN_APPROACH_ROOMS = new Set([
+    "narrow_dangerous_path",
+    "treeless_opening",
+    "great_river",
+  ]);
+
   const ATMOSPHERIC_EVENT_POOLS = {
     bag_end_house: [
       "Somewhere deeper in Bag End, crockery rattles, a kettle begins to sing, and dwarf laughter answers it.",
@@ -721,6 +767,16 @@
         text: "a regiment of polished pegs standing tidy once more now that the dwarf-cloaks have gone abroad",
       },
     ],
+    hidden_door_runes: [
+      {
+        when: ({ game }) => !game.rivendellPreparationsComplete(),
+        text: "weathered seams and pale scratches in the western stone, no more intelligible than any other chance marking at first glance",
+      },
+      {
+        when: ({ game }) => game.rivendellPreparationsComplete() && !game.flags.secretdoorsun,
+        text: "pale runes or seams in the stone, too faint to resolve fully without a more favorable light",
+      },
+    ],
   };
 
   const CONTEXTUAL_ROOM_DESCRIPTION_RULES = {
@@ -734,6 +790,25 @@
       {
         when: ({ game }) => game.flags.dragondefeated,
         text: "You are in Lake-town, where hammers, shouted orders, and relieved exhaustion travel the plankways together above the dark water. Boats still knock at their moorings, but the talk is of rebuilding, losses, and what may yet come from the Mountain.",
+      },
+    ],
+    front_gate: [
+      {
+        text: "You stand before the Front Gate of Erebor. Vast stonework and weathered carvings still command awe here, but the enormous entrance stands silent, sealed by age, ruin, and shadow. Whatever welcome it once gave, it gives none now.",
+      },
+    ],
+    erebor_hidden_door: [
+      {
+        when: ({ game }) => !game.rivendellPreparationsComplete(),
+        text: "You are on a narrow shelf of stone along the western wall of the Mountain. Here the rock looks stern, weathered, and disappointingly featureless, broken only by old seams, lichen, and the ordinary deceptions of age and shadow.",
+      },
+      {
+        when: ({ game }) => game.rivendellPreparationsComplete() && !game.flags.secretdoorsun,
+        text: "You are on the western side of the Mountain, where the stone gives off the faintest suggestion of craft to eyes that know to look for it. Yet nothing yields fully; the wall seems to be waiting on an hour not yet come.",
+      },
+      {
+        when: ({ game }) => game.flags.secretdoorsun,
+        text: "You stand before a narrow hidden door cunningly wrought into the western side of the Mountain, so artfully fitted that even found, it seems half a secret still. Pale lines answer the slanting light, and the old craft of Erebor at last shows itself.",
       },
     ],
     erebor_treasure_approach: [
@@ -916,6 +991,42 @@
       ),
       text: "With the rope taking the worst of the drop, the company picks its way safely into the hidden valley. Once all are down, the line is worked loose and taken up again before the last short stretch into Rivendell.",
     },
+    {
+      onceFlag: "beornmountainweathereased",
+      when: ({ game, fromRoomId, toRoomId }) => (
+        toRoomId === "beorns_house"
+        && BEORN_MOUNTAIN_APPROACH_ROOMS.has(fromRoomId)
+        && game.bilboHasRecoveredRing()
+      ),
+      text: "The weather does not wholly clear, but the worst of its fury passes as you come down at last toward Beorn's lands, leaving only torn cloud and a bitter wind behind you on the heights.",
+    },
+  ];
+
+  const BEORN_MOUNTAIN_STORM_WEATHER = [
+    "A savage gust comes shrieking over the heights and drives sleet slantwise into every face.",
+    "Cloud rolls low across the pass, and the wind turns suddenly hard enough to stagger even the ponies.",
+    "A burst of mountain rain lashes the rocks, then sharpens at once into stinging ice.",
+    "The weather closes like a hand about the path: wet mist first, then a bitter gale hunting through it.",
+    "From somewhere above, a black rack of cloud spills wind and freezing rain down the mountainside.",
+  ];
+
+  const BEORN_MOUNTAIN_STORM_BARRIERS = [
+    "Loose stones rattle underfoot, and the track toward Beorn's lands becomes too treacherous to trust.",
+    "The path ahead vanishes behind whirling grey, so that another few yards would be no better than walking blind.",
+    "The ledges beyond look ready to throw man and pony alike into the dark if the company presses on.",
+    "Every hollow in the rock fills with racing water and broken scree, making the onward way sheer folly for the moment.",
+    "The mountain seems bent on turning you back, hammering the road until no sensible traveler would force it.",
+  ];
+
+  const BEORN_MOUNTAIN_STORM_COMPANIONS = [
+    ["Thorin", "We gain nothing by throwing ourselves away on the mountain."],
+    ["Balin", "Best wait a little, Master Baggins. Hills have slain hardier folk than us by patience alone."],
+    ["Dwalin", "Another step in this and we'll be picking dwarves and ponies off the rocks below."],
+    ["Gandalf", "There are times to strive against weather, and times to let it spend its malice first."],
+    ["Bombur", "If this path grows any slicker, I shall arrive at Beorn's upside down and without dignity."],
+    ["Fili", "The heights are playing tricks on the eye. I would not trust that road just now."],
+    ["Kili", "I like a hard road well enough, but not one that means to throw us off it."],
+    ["Bifur", "The mountain has the louder voice for the present. We should heed it."],
   ];
 
   function applyImmersionExpansion(data) {
@@ -949,6 +1060,8 @@
     data.connections = data.connections.filter((connection) => !(
       (connection.from === "trolls_clearing" && connection.to === "rivendell")
       || (connection.from === "rivendell" && connection.to === "trolls_clearing")
+      || (connection.from === "front_gate" && connection.to === "lower_halls")
+      || (connection.from === "lower_halls" && connection.to === "front_gate")
     ));
 
     const ensureItem = (id, config) => {
@@ -1020,7 +1133,7 @@
     data.rooms.deep_dark_lake.description = "You are beside the black underground lake. The air is cold, wet, and close; drops fall from unseen heights, whispers echo where no one should be standing, and the darkness feels alive with hidden movement beyond the reach of your hands.";
     data.rooms.beorns_house.description = "You are in Beorn's great house, built broad and strong of timber, with a central fire, long tables, and the scent of bread, honey, and clean straw. Everything is orderly, sturdy, and touched by the curious discipline of a household in which beasts and men alike keep good manners.";
     data.rooms.wooden_town.description = "You are in Lake-town, a forest of timber halls, jetties, and plank bridges raised above the dark water. Merchants call, boats creak at their moorings, and the talk of trade, weather, and the Mountain moves continually through the town.";
-    data.rooms.front_gate.description = "You stand before the Front Gate of Erebor, where vast stonework, weathered carvings, and old dwarf-craft still command awe despite ruin and neglect. Dust lies thick in the seams, yet the place feels wakeful, as though memory itself keeps guard here.";
+    data.rooms.front_gate.description = "You stand before the Front Gate of Erebor, where vast stonework, weathered carvings, and old dwarf-craft still command awe despite ruin and neglect. The entrance itself stands mute and forbidding, giving no sign that it was ever meant to yield to strangers now.";
     data.rooms.lower_halls.description = "You enter the lower halls of Erebor, a mighty chamber of pillars, carvings, and treasure under the Mountain's ancient stone. The air is warm, close, and faintly tainted by dragon-smoke, while every footfall seems an impertinence in a kingdom too old to forget itself.";
 
     [
@@ -1067,7 +1180,7 @@
       ["laketown_warehouses", "Warehouses", "Heavy doors and tarred beams guard the warehouse district, where grain, salted fish, rope, and trade-goods lie stacked in the dim. It smells of river-water, labor, and careful counting.", "Wooden_town.jpeg", "relaxed"],
       ["laketown_bridges", "Bridges", "A web of bridges links the town's neighborhoods above the water. Looking down through the planks, you see the black lake moving quietly under all this human bustle.", "long_lake.jpeg", "relaxed"],
       ["laketown_tavern", "Tavern", "The tavern is loud with cups, weather-talk, and brave opinions formed at safe distances from dragons. Even so, the people here watch the Mountain between jokes.", "Green_dragon.jpeg", "relaxed"],
-      ["erebor_hidden_door", "Hidden Door", "A narrow door cunningly wrought into the mountain-face lies here, so artfully fitted that even knowing it exists does not lessen the marvel. Moonlight and memory seem equally required of it.", "Gate_Lonely_Mountain.jpeg", "adventure"],
+      ["erebor_hidden_door", "Western Wall", "You stand on a narrow shelf beneath the western wall of the Mountain. The stone is old, stern, and close-lipped, showing nothing at first but weathering, shadow, and the patient silence of rock.", "Gate_Lonely_Mountain.jpeg", "adventure"],
       ["erebor_watch_chamber", "Watch Chamber", "This small chamber above the approach was plainly meant for quiet eyes and patient watches. Slits in the stone command the way below, and the dust has not quite smothered the old discipline of the place.", "front_gate.jpeg", "adventure"],
       ["erebor_upper_tunnels", "Upper Tunnels", "The upper tunnels run on in exact dwarf-work, their walls scored with tool-marks, way-runes, and faint traces of old soot. Each turning feels deliberate, as though planned by minds that despised waste.", "smooth_straight.jpeg", "adventure"],
       ["erebor_ancient_armoury", "Ancient Armoury", "Racks and wall-hooks fill the old armoury, though many stand empty now. Broken helms, split shields, and a few surviving pieces of craft tell of a people who expected both war and ceremony.", "lower_halls.jpeg", "adventure"],
@@ -1124,7 +1237,15 @@
     ensureTwoWay("laketown_marketplace", "south", "laketown_warehouses", "north");
     ensureTwoWay("laketown_bridges", "south", "laketown_tavern", "north");
     ensureTwoWay("front_gate", "north east", "erebor_hidden_door", "south west");
-    ensureTwoWay("front_gate", "east", "erebor_watch_chamber", "west");
+    ensureTwoWay("erebor_hidden_door", "east", "erebor_watch_chamber", "west");
+    data.connections.forEach((connection) => {
+      if (
+        (connection.from === "erebor_hidden_door" && connection.to === "erebor_watch_chamber")
+        || (connection.from === "erebor_watch_chamber" && connection.to === "erebor_hidden_door")
+      ) {
+        connection.requiredFlag = "secretdoorsun";
+      }
+    });
     ensureTwoWay("erebor_watch_chamber", "east", "erebor_upper_tunnels", "west");
     ensureTwoWay("erebor_upper_tunnels", "south", "erebor_ancient_armoury", "north");
     ensureTwoWay("erebor_upper_tunnels", "east", "erebor_abandoned_workshop", "west");
@@ -2910,6 +3031,27 @@
       return this.pickCompanionPoseText(character, roomId, index);
     }
 
+    overflowCompanionNarrative(names, roomId = this.game.currentRoom) {
+      if (!names.length) return "";
+      const joinedNames = joinNames(names);
+      const singular = names.length === 1;
+      const variants = singular
+        ? [
+          `${joinedNames} is nearby as well.`,
+          `${joinedNames} lingers a little apart.`,
+          `${joinedNames} is close at hand.`,
+          `${joinedNames} waits a little apart with the restlessness of the road still on him.`,
+        ]
+        : [
+          `${joinedNames} are nearby as well.`,
+          `${joinedNames} linger a little apart.`,
+          `${joinedNames} are close at hand.`,
+          `${joinedNames} wait a little apart, keeping the quiet fellowship of the road.`,
+        ];
+      const seed = hashString(`${this.game.storySeed}:${roomId}:overflow:${names.join("|")}`);
+      return variants[Math.abs(seed) % variants.length];
+    }
+
     roomCompanionNarrative(roomId = this.game.currentRoom) {
       const companions = this.visibleCompanions(roomId);
       if (!companions.length) {
@@ -2924,12 +3066,15 @@
         if (pose) usedPoses.add(pose);
         return pose ? `${character.name} ${pose}` : `${character.name} is nearby`;
       }).filter(Boolean);
-      const overflow = companions.length > highlights.length ? ` Others of the company are nearby as well.` : "";
+      const overflowCompanions = companions.slice(highlights.length).map((character) => character.name);
+      const overflow = overflowCompanions.length
+        ? ` ${this.overflowCompanionNarrative(overflowCompanions, roomId)}`
+        : "";
       return `${highlights.join(". ")}.${overflow}`;
     }
 
     narratedCompanionIds(roomId = this.game.currentRoom) {
-      return new Set(this.visibleCompanions(roomId).slice(0, 3).map((character) => character.id));
+      return new Set(this.visibleCompanions(roomId).map((character) => character.id));
     }
 
     maybeComment() {
@@ -4755,7 +4900,14 @@
     reactToShownItem(character, item) {
       const game = this.game;
       if ((matches(character.name, "gandalf") || matches(character.name, "elrond")) && matches(item.name, "curious map")) {
-        return game.print(`${sentenceDisplayCharacterName(character)} studies the ${item.name} carefully.`);
+        game.print(`${sentenceDisplayCharacterName(character)} studies the ${item.name} carefully.`);
+        game.noteElrondPreparationInteraction(character, { mode: "show-map", item });
+        return;
+      }
+      if (matches(character.name, "elrond") && matchesAny(item.name, RIVENDELL_ELROND_HEIRLOOM_ITEMS)) {
+        game.print(`${sentenceDisplayCharacterName(character)} gives the ${item.name} a long considering look.`);
+        game.noteElrondPreparationInteraction(character, { mode: "show-heirloom", item });
+        return;
       }
       game.print(`${sentenceDisplayCharacterName(character)} looks at the ${item.name}, but says nothing useful.`);
     }
@@ -4778,7 +4930,12 @@
       if (special) {
         this.rememberConversationCharacter(character);
         this.rememberReferencedCharacter(itemName);
-        return game.print(special);
+        game.print(special);
+        game.noteElrondPreparationInteraction(character, {
+          mode: matchesAny(itemName, ["advice", "help", "counsel", "map"]) ? "ask-help" : "ask-for",
+          topic: itemName,
+        });
+        return;
       }
       const requestedCharacter = this.findKnownCharacter(itemName);
       if (requestedCharacter) {
@@ -4921,8 +5078,13 @@
       this.rememberConversationCharacter(character);
       this.rememberReferencedCharacter(topic);
       const special = game.specialConversationResponse(character, topic);
-      if (special) return game.print(special);
+      if (special) {
+        game.print(special);
+        game.noteElrondPreparationInteraction(character, { mode: "ask-topic", topic });
+        return;
+      }
       game.print(`${sentenceDisplayCharacterName(character)} considers ${game.formatConversationTopic(topic)}, but gives no clear answer.`);
+      game.noteElrondPreparationInteraction(character, { mode: "ask-topic", topic });
     }
 
     parseAskForCommand(command) {
@@ -5012,7 +5174,11 @@
       }
       this.rememberConversationCharacter(character);
       const special = game.specialTalkResponse(character);
-      if (special) return game.print(special);
+      if (special) {
+        game.print(special);
+        game.noteElrondPreparationInteraction(character, { mode: "talk" });
+        return;
+      }
       game.print(`${sentenceDisplayCharacterName(character)} listens intently, expecting your words.`);
     }
 
@@ -5066,7 +5232,12 @@
       const game = this.game;
       const room = game.room();
       const scene = roomImage.closest(".scene");
-      if (game.roomIsDark()) {
+      if (game.temporaryImage?.file) {
+        roomImage.removeAttribute("hidden");
+        const src = assetUrl(IMAGE_ROOT, game.temporaryImage.file);
+        this.swapRoomImage(scene, src);
+        roomImage.alt = game.temporaryImage.alt || room.name || "Story image";
+      } else if (game.roomIsDark()) {
         this.finishImageTransition(scene);
         game.currentImageSrc = "";
         roomImage.setAttribute("hidden", "hidden");
@@ -5471,6 +5642,7 @@
       const game = this.game;
       game.clearArrivalNoticeTimers();
       game.stopAutoplay();
+      game.clearTemporaryImage({ render: false });
       game.items = save.items;
       game.doors = save.doors;
       game.characters = save.characters;
@@ -5792,6 +5964,20 @@
       const text = normalize(topic);
       const configuredResponse = characterConfiguredTopicResponse(character, text);
       if (configuredResponse) return configuredResponse;
+      if (IMMERSION_RIVENDELL_ROOMS.has(game.currentRoom) && !game.rivendellPreparationsComplete()) {
+        if (matches(character.name, "gandalf") && matchesAny(text, ["journey", "road", "departure", "depart", "leave", "leaving", "east"])) {
+          return "Gandalf says 'Patience. Wisdom often travels more slowly than feet.'";
+        }
+        if (matches(character.name, "thorin") && matchesAny(text, ["journey", "road", "departure", "depart", "leave", "leaving", "east"])) {
+          return "Thorin says 'There is no profit in haste.'";
+        }
+        if (matches(character.name, "balin") && matchesAny(text, ["rivendell", "lore", "knowledge", "wisdom", "books", "maps"])) {
+          return "Balin says 'There are few places in Middle-earth where so much knowledge may be found.'";
+        }
+        if (matches(character.name, "dwalin") && matchesAny(text, ["journey", "road", "departure", "depart", "leave", "leaving", "east"])) {
+          return "Dwalin says 'We shall leave soon enough.'";
+        }
+      }
       if (game.unexpectedParty?.isAmbientDwarf(character)) {
         if (matchesAny(text, ["food", "supper", "tea", "ale", "beer", "pantry"])) return game.unexpectedParty.dwarfProfile(character).ask;
         if (matchesAny(text, ["quest", "road", "journey", "mountain", "thorin"])) return `${sentenceDisplayCharacterName(character)} says 'We have not come merely to enjoy your excellent housekeeping, though I mean to do my best with it while it lasts.'`;
@@ -5852,6 +6038,7 @@
       ring.visible = true;
       ring.location = { type: "character", id: game.player.id };
       game.player.inventory.push(ring.id);
+      game.flags.bilbo_has_ring = true;
       return true;
     }
 
@@ -5989,11 +6176,11 @@
       }
       if (game.currentRoom === "dark_dungeon") game.toggleDoorByName("red door", "Someone opens the red door.", "Someone closes the red door.");
       if (game.currentRoom === "large_dry_cave") game.toggleDoorByName("small hidden crevice", "A small hidden crevice is revealed.", "The small hidden crevice disappears.");
-      if (["front_gate", "stoe_of_ravenhill", "little_steep_bay", "lonely_mountain"].includes(game.currentRoom) && !game.flags.secretdoorsun) {
+      if (game.currentRoom === "erebor_hidden_door" && game.rivendellPreparationsComplete() && !game.flags.secretdoorsun) {
         game.secretDoorWaitCounter += 1;
         if (game.secretDoorWaitCounter >= 1) {
           game.flags.secretdoorsun = true;
-          game.print("The sun shines on the rock and reveals a secret door.");
+          game.print("As the light slants across the western stone, a narrow line answers it. What looked like barren rock resolves at last into a secret door.");
         }
       }
       if (game.flags.treasuretaken && game.currentRoom === "lonely_mountain" && game.liveDragon()) {
@@ -6314,12 +6501,6 @@
         return "say to bard \"shoot dragon\"";
       }
 
-      if (beforeDragonDefeat && !this.autoplayHas("small key")) {
-        if (game.currentRoom !== "hobbit_hole") return this.autoplayRouteCommandTo("hobbit_hole");
-        if (!game.visibleSearch("small key")) return "lift carpet";
-        return "take small key";
-      }
-
       if (beforeDragonDefeat && !this.autoplayHas("firestone")) {
         if (game.currentRoom !== "bag_end_guest_room") return this.autoplayRouteCommandTo("bag_end_guest_room");
         const guestTrunk = game.items.guest_room_trunk;
@@ -6388,6 +6569,12 @@
         const prepRopeLoad = this.autoplayRequiredPickupPrepCommand("sturdy rope");
         if (prepRopeLoad) return prepRopeLoad;
         return "take rope";
+      }
+
+      if (beforeDragonDefeat && !game.flags.mapread) {
+        if (game.currentRoom !== "rivendell") return this.autoplayRouteCommandTo("rivendell");
+        if (!game.flags.rivendell_progress_talk) return "talk to elrond";
+        if (!game.flags.rivendell_progress_quest) return "ask elrond about journey";
       }
 
       if (beforeDragonDefeat && game.currentRoom === "deep_dark_lake" && !game.gollumState?.pocketQuestionAsked) {
@@ -6489,6 +6676,10 @@
 
       if (this.autoplayHas("treasure") && game.currentRoom === "hobbit_hole") {
         const chest = game.items.heavy_wooden_chest;
+        if (chest.locked && !this.autoplayHas("small key")) {
+          if (!game.visibleSearch("small key")) return "lift carpet";
+          return "take small key";
+        }
         if (chest.locked) return "unlock chest";
         if (!chest.open) return "open chest";
         return "put treasure in chest";
@@ -6639,6 +6830,7 @@
       this.stopAutoplay();
       game.clearIdleAdvanceTimer();
       game.clearArrivalNoticeTimers();
+      game.clearTemporaryImage({ render: false });
       game.rooms = clone(game.data.rooms);
       game.items = clone(game.data.items);
       game.doors = clone(game.data.doors);
@@ -6839,7 +7031,15 @@
         return game.print(`${subject} ${actorVerb(game.player, "study")} the ${text}. It shows no hidden passage or useful object.`);
       }
 
-      if (matchesAny(text, ["wall", "walls", "rock", "rocks", "stone", "stones", "ceiling", "crack", "cracks"])) {
+      if (matchesAny(text, ["wall", "walls", "rock", "rocks", "stone", "stones", "ceiling", "crack", "cracks", "gate", "door", "entrance"])) {
+        if (game.currentRoom === "front_gate" && matchesAny(text, ["gate", "door", "entrance", "rock", "stone", "wall"])) {
+          return game.print("The enormous gate stands silent and inaccessible. No obvious way lies through.");
+        }
+        if (game.currentRoom === "erebor_hidden_door") {
+          if (!game.rivendellPreparationsComplete()) return game.print("The western wall appears featureless: only old stone, weathering, and shadows that promise more than they prove.");
+          if (!game.flags.secretdoorsun) return game.print("Now and again the western stone hints at deliberate work, but the marks refuse to settle into sense without a better light.");
+          return game.print("In the slanting light the western stone resolves into a cunningly hidden door, its pale runes barely waking on the rock.");
+        }
         if (lower.includes("cave") || lower.includes("cavern") || lower.includes("passage")) return game.print(`The stone is cold and rough. ${subject} ${actorVerb(game.player, "find")} no loose block or hidden catch.`);
         if (lower.includes("secret door") || lower.includes("rock face")) return game.print("The rock face gives away nothing yet.");
         return game.print(`${subject} ${actorVerb(game.player, "inspect")} the ${text}. Nothing moves.`);
@@ -7296,6 +7496,8 @@
     setFlag(name, value) {
       const game = this.game;
       game.flags[name] = value;
+      if (name === "mapread" && value) game.flags.rivendell_preparations_complete = true;
+      if (name === "bilbo_has_ring" && value) game.flags.bilbo_has_ring = true;
       if (name.endsWith("open")) game.flags[name.replace(/open$/, "closed")] = !value;
     }
   }
@@ -7484,6 +7686,8 @@
       this.pendingInitialCommandFocus = true;
       this.currentImageSrc = roomImage.getAttribute("src") || "";
       this.imageTransitionCycle = 0;
+      this.temporaryImage = null;
+      this.temporaryImageDismissOnNextCommand = false;
       this.audio = musicPlayer;
       this.audio.loop = true;
       this.audio.preload = "auto";
@@ -7547,6 +7751,8 @@
       this.player = this.characters[this.data.player] || Object.values(this.characters).find((c) => c.name === "You");
       this.currentRoom = this.player.position || this.data.startRoom;
       this.visitedRooms.add(this.currentRoom);
+      this.temporaryImage = null;
+      this.temporaryImageDismissOnNextCommand = false;
       this.spiderEyesState = null;
       this.gollumState = this.createGollumState();
       this.turnCount = 0;
@@ -7643,7 +7849,7 @@
         };
       }
       for (const connection of this.connections) {
-        if ((connection.from === "front_gate" && connection.to === "lower_halls") || (connection.from === "lower_halls" && connection.to === "front_gate")) {
+        if ((connection.from === "erebor_hidden_door" && connection.to === "erebor_watch_chamber") || (connection.from === "erebor_watch_chamber" && connection.to === "erebor_hidden_door")) {
           connection.door = "secret_door_front_gate";
         }
       }
@@ -7848,6 +8054,9 @@
       this.clearIdleAdvanceTimer();
       try {
         const lower = rawCommand.toLowerCase();
+        if (this.temporaryImageDismissOnNextCommand && normalize(lower)) {
+          this.clearTemporaryImage({ render: false });
+        }
         if (this.endgame) {
           const normalizedEndgame = normalize(lower);
           if (this.pendingEndgameChoice) {
@@ -7992,6 +8201,7 @@
       const parsed = this.parseStructuredCommand(command);
       const { verb, object } = parsed;
       if (!verb) return false;
+      if (this.tryBareGollumAnswer(command, parsed)) return false;
       const rememberedChoice = !this.forcedChoice ? this.resolveRememberedCommandChoice(parsed) : null;
       const explicitReferences = this.explicitClarificationReferences(parsed);
       if (rememberedChoice) this.forcedChoice = rememberedChoice;
@@ -8381,7 +8591,12 @@
       const narratedCompanionIds = this.companionDirector?.narratedCompanionIds(this.currentRoom) || new Set();
       const peopleText = people
         .filter((p) => !p.justEntered)
-        .map((p) => this.characterPresence(p, { omitBase: narratedCompanionIds.has(p.id) }))
+        .map((p) => {
+          if (narratedCompanionIds.has(p.id)) {
+            return this.characterLoadoutText(p, { explicitSubject: true });
+          }
+          return this.characterPresence(p);
+        })
         .filter(Boolean)
         .join(" ");
       const atmosphericNarrative = this.roomAtmosphericNarrative();
@@ -8438,6 +8653,35 @@
 
     render() {
       return this.layout.render();
+    }
+
+    resolveTemporaryImageName(imageName = "") {
+      const raw = String(imageName || "").trim();
+      if (!raw) return "";
+      if (/\.[a-z0-9]+$/i.test(raw)) return raw;
+      const normalized = normalize(raw);
+      const dashed = normalized.replace(/[_\s]+/g, "-");
+      return TEMPORARY_IMAGE_ALIASES[dashed] || TEMPORARY_IMAGE_ALIASES[normalized] || raw;
+    }
+
+    showTemporaryImage(imageName, options = {}) {
+      const file = this.resolveTemporaryImageName(imageName);
+      if (!file) return false;
+      this.temporaryImage = {
+        file,
+        alt: String(options.alt || options.label || imageName || "").trim(),
+      };
+      this.temporaryImageDismissOnNextCommand = options.dismissOnNextCommand !== false;
+      this.sceneMapVisible = false;
+      this.render();
+      return true;
+    }
+
+    clearTemporaryImage(options = {}) {
+      const { render = true } = options;
+      this.temporaryImage = null;
+      this.temporaryImageDismissOnNextCommand = false;
+      if (render) this.render();
     }
 
     swapRoomImage(scene, nextSrc) {
@@ -8573,9 +8817,10 @@
       if (matches(character.name, "bard") && !carriedLabels.some((label) => normalize(label).includes("quiver"))) {
         carriedLabels.push("a quiver");
       }
-      if (options.includeEmpty && !carriedLabels.length && !worn.length) return "He is carrying nothing. He is wearing nothing.";
-      const carriedText = carriedLabels.length ? `He is carrying ${carriedLabels.join(", ")}.` : "";
-      const wornText = worn.length ? `He is wearing ${worn.map((item) => itemLabel(item.name)).join(", ")}.` : "";
+      const subject = options.explicitSubject ? displayCharacterName(character) : "He";
+      if (options.includeEmpty && !carriedLabels.length && !worn.length) return `${subject} is carrying nothing. ${subject} is wearing nothing.`;
+      const carriedText = carriedLabels.length ? `${subject} is carrying ${carriedLabels.join(", ")}.` : "";
+      const wornText = worn.length ? `${subject} is wearing ${worn.map((item) => itemLabel(item.name)).join(", ")}.` : "";
       return [carriedText, wornText].filter(Boolean).join(" ");
     }
 
@@ -8921,11 +9166,18 @@
       return connection.from === "hidden_valley_path" && connection.to === "rivendell";
     }
 
+    rivendellPreparationGate(connection) {
+      if (!connection || this.rivendellPreparationsComplete()) return false;
+      return connection.from === "rivendell" && connection.to === "misty_mountain";
+    }
+
     narrativeTravelBlock(connection) {
       if (!connection) return false;
       return this.liveTrollExposureGate(connection)
         || this.rivendellWeaponGate(connection)
         || this.rivendellRopeGate(connection)
+        || this.rivendellPreparationGate(connection)
+        || this.beornMountainStormGate(connection)
         || (
         connection.from === "bilbos_garden"
         && connection.direction === "east"
@@ -8958,6 +9210,14 @@
         if (attempts === 1) return "The drop still looks too treacherous. You should secure the rope first: to the roots, to the iron spike, or by setting one of the company to brace it.";
         return "The hidden valley waits below, but not for a careless climber. The rope must be made fast before anyone goes down.";
       }
+      if (this.rivendellPreparationGate(connection)) {
+        const attempts = Number(this.flags.rivendelldepartureattempts || 0);
+        if (attempts <= 0) return "The road continues eastward, but the company seems strangely reluctant to depart.";
+        if (attempts === 1) return "Gandalf lingers beneath the trees, thoughtful, as though some matter remains unresolved.";
+        if (attempts === 2) return "Thorin studies the valley in silence, and no one moves to gather the company for the road.";
+        return "You have the feeling that your business in Rivendell is not yet finished, though no one says so plainly.";
+      }
+      if (this.beornMountainStormGate(connection)) return this.beornMountainStormMessage();
       if (!this.narrativeTravelBlock(connection)) return "";
       const attempts = Number(this.flags.bagendexitattempts || 0);
       const thorinPresent = Boolean(this.unexpectedParty?.state?.thorinArrived);
@@ -8982,6 +9242,14 @@
       }
       if (this.rivendellRopeGate(connection)) {
         this.flags.rivendelldescentattempts = Number(this.flags.rivendelldescentattempts || 0) + 1;
+        return;
+      }
+      if (this.rivendellPreparationGate(connection)) {
+        this.flags.rivendelldepartureattempts = Number(this.flags.rivendelldepartureattempts || 0) + 1;
+        return;
+      }
+      if (this.beornMountainStormGate(connection)) {
+        this.flags.beornmountainstormattempts = Number(this.flags.beornmountainstormattempts || 0) + 1;
         return;
       }
       if (!this.narrativeTravelBlock(connection)) return;
@@ -9289,6 +9557,17 @@
       if (this.items.calm_pony) this.items.calm_pony.visible = false;
     }
 
+    debugMarkTrollRoadProgress() {
+      this.visitedRooms.add("dreary");
+      this.visitedRooms.add("trolls_clearing");
+      this.visitedRooms.add("trolls_cave");
+      this.visitedTrollsClearing = true;
+    }
+
+    debugMarkBeornRecovery() {
+      this.player.strength = Math.max(this.player.strength || 0, 6);
+    }
+
     debugGiveStandardLoadout(options = {}) {
       const config = {
         map: true,
@@ -9307,6 +9586,18 @@
       if (config.sword) this.debugGivePlayerItem("short strong dagger");
       if (config.rope) this.debugGivePlayerItem("sturdy rope");
       if (config.ring) this.debugGivePlayerItem("golden ring");
+    }
+
+    debugGiveJourneyCheckpointLoadout(options = {}) {
+      const config = {
+        ring: false,
+        ...options,
+      };
+      this.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true, ring: config.ring });
+      this.debugGivePlayerItem("firestone");
+      this.debugGivePlayerItem("sturdy key");
+      this.debugGivePlayerItem("large key");
+      this.debugGivePlayerItem("majestic sword");
     }
 
     quit() {
@@ -9650,6 +9941,19 @@
       return this.encounters.handleGollumAnswer(answerText);
     }
 
+    tryBareGollumAnswer(command = "", parsed = null) {
+      if (this.currentRoom !== "deep_dark_lake" || !this.gollumState?.awaitingAnswer) return false;
+      const structured = parsed && typeof parsed === "object" ? parsed : this.parseStructuredCommand(command);
+      const text = String(structured?.text || command || "").trim();
+      if (!text) return false;
+      const verb = normalize(structured?.verb || "");
+      if (ACTIONABLE_COMMAND_STARTERS.has(verb) || this.isDirection(text) || text.startsWith("go ")) return false;
+      const riddle = this.currentGollumRiddle();
+      if (!riddle?.answers?.length || !this.gollumAnswerMatches(text, riddle.answers)) return false;
+      this.handleGollumAnswer(text);
+      return true;
+    }
+
     resolveGollumPocketQuestion() {
       return this.encounters.resolveGollumPocketQuestion();
     }
@@ -9688,7 +9992,14 @@
       if (matches(character.name, "elrond") && matches(item.name, "curious map")) {
         this.flags.elrond_has_been_given_map = true;
         this.flags.initiative_elrond_read_prompt = true;
-        return this.print("Elrond studies the curious map and says 'Its lines are patient. So should be the one who seeks them.'");
+        this.print("Elrond studies the curious map and says 'Its lines are patient. So should be the one who seeks them.'");
+        this.noteElrondPreparationInteraction(character, { mode: "give-map", item });
+        return;
+      }
+      if (matches(character.name, "elrond") && matchesAny(item.name, RIVENDELL_ELROND_HEIRLOOM_ITEMS)) {
+        this.print(`Elrond accepts the ${item.name} only long enough to weigh its age and purpose, then returns his attention to you.`);
+        this.noteElrondPreparationInteraction(character, { mode: "give-heirloom", item });
+        return;
       }
       if (matches(character.name, "thorin")) {
         if (matches(item.name, "curious key")) return this.print("Thorin weighs the curious key in his hand and says 'Some doors remember the shape of old promises.'");
@@ -9949,6 +10260,10 @@
     climb(objectName) {
       const text = normalize(objectName);
       if (!text) return this.print("Climb where?");
+      if (matchesAny(text, ["pass", "the pass", "path", "the path", "track", "the track", "way ahead"])) {
+        const preferredAdvance = this.preferredBeornMountainAdvance();
+        if (preferredAdvance) return this.move(preferredAdvance.direction);
+      }
       if (this.currentRoom === "hidden_valley_path" && matchesAny(text, ["down", "downward", "downwards", "descent", "drop"])) {
         const descent = this.connectionsFrom(this.currentRoom).find((connection) => connection.to === "rivendell");
         if (descent && this.narrativeTravelBlock(descent)) {
@@ -10184,6 +10499,8 @@
         return false;
       }
       if (this.isAbstractTravelCommand(command)) {
+        const preferredAdvance = this.preferredBeornMountainAdvance();
+        if (preferredAdvance) return this.move(preferredAdvance.direction);
         const exits = this.roomConnections();
         if (exits.length === 1) return this.move(exits[0].direction);
         this.print("You'll need to choose a direction from the exits available here.");
@@ -10407,6 +10724,9 @@
       const movedInTotalDarkness = this.roomIsDark(previousRoom);
       this.currentRoom = connection.to;
       this.player.position = connection.to;
+      if (connection.to === "beorns_house" && BEORN_MOUNTAIN_APPROACH_ROOMS.has(previousRoom)) {
+        this.flags.beorn_mountain_arrival_complete = true;
+      }
       if (previousRoom === "deep_dark_lake" && this.gollumState?.pocketQuestionAsked && this.player.noticeable === false && !this.gollumState.escaped && this.isGollumPresentInLake()) {
         this.gollumState.escaped = true;
         this.print("Invisible under the ring, you slip past Gollum as he claws wildly about for his precious.");
@@ -10621,6 +10941,7 @@
       if (!character.visible || character.carriedBy || character.position !== this.currentRoom) return false;
       if (character.id === this.player.id || character.friendly === false) return false;
       if (this.player.noticeable === false) {
+        if (this.isTravelingCompanion(character)) return false;
         const flag = `initiative_${character.id}_unseen`;
         if (this.flags[flag]) return false;
         this.flags[flag] = true;
@@ -10633,6 +10954,13 @@
       if (action.effect) action.effect();
       this.print(action.message);
       return true;
+    }
+
+    isTravelingCompanion(character) {
+      if (!character || character.id === this.player.id) return false;
+      if (character.partyBound || character.followingPlayer || character.movementMode === "follow") return true;
+      if (this.unexpectedParty?.isAmbientDwarf(character)) return true;
+      return TRAVELING_COMPANION_NAMES.some((name) => matches(character.name, name));
     }
 
     characterInitiative(character) {
@@ -10742,7 +11070,7 @@
       if (this.autoplayHas("curious map") && !this.flags.mapread) {
         return {
           flag: "initiative_gandalf_asks_for_map",
-          message: "Gandalf says 'That map has slept long enough. Rivendell may wake more from it than I can.'",
+          message: "Gandalf says 'There are old matters in this house worth a patient hearing yet.'",
         };
       }
       if (this.autoplayHas("smoking pipe") && !this.flags.initiative_gandalf_pipe) {
@@ -10773,7 +11101,7 @@
           message: "Thorin whispers 'Stone walls are stern things, but not every opening is useless.'",
         };
       }
-      if (this.currentRoom === "front_gate" && this.flags.secretdoorsun && !this.doorOpenByName("secret door") && this.characterHas(character, "curious key")) {
+      if (this.currentRoom === "erebor_hidden_door" && this.flags.secretdoorsun && !this.doorOpenByName("secret door") && this.characterHas(character, "curious key")) {
         return {
           flag: "initiative_thorin_secret_door",
           message: "Thorin turns the curious key in his fingers and watches the sunlit stone in silence.",
@@ -10792,13 +11120,13 @@
       if (this.autoplayHas("curious map") && !this.flags.mapread) {
         return {
           flag: "initiative_elrond_requests_map",
-          message: "Elrond says 'That map is older than it looks. It may speak more clearly under Rivendell's light.'",
+          message: "Elrond says 'You have brought more into this house than road-dust and weariness. Some things should be looked on before you depart.'",
         };
       }
       if (this.characterHas(character, "curious map") && !this.flags.mapread) {
         return {
           flag: "initiative_elrond_read_prompt",
-          message: "Elrond traces the markings on the map and says 'These signs are not idle decoration.'",
+          message: "Elrond turns the worn parchment gently in his hands, as though waiting for it to choose its moment.",
         };
       }
       if (!this.flags.elrond_lunch_given && this.currentRoom === "rivendell") {
@@ -10862,6 +11190,142 @@
       });
       const door = found?.door && this.doors[found.door];
       return Boolean(door && door.open && !door.locked);
+    }
+
+    rivendellPreparationsComplete() {
+      return Boolean(this.flags.rivendell_preparations_complete || this.flags.mapread);
+    }
+
+    bilboHasRecoveredRing() {
+      if (this.flags.bilbo_has_ring) return true;
+      const ring = this.items.golden_ring;
+      if (!ring) return false;
+      return this.player.inventory.includes(ring.id) || this.player.worn.includes(ring.id);
+    }
+
+    beornMountainArrivalComplete() {
+      return Boolean(this.flags.beorn_mountain_arrival_complete);
+    }
+
+    beornMountainStormGate(connection) {
+      if (!connection || this.beornMountainArrivalComplete() || this.bilboHasRecoveredRing()) return false;
+      return (
+        (connection.from === "narrow_place" && connection.to === "narrow_dangerous_path")
+        || (connection.from === "narrow_dangerous_path" && connection.to === "beorns_house")
+        || (connection.from === "treeless_opening" && connection.to === "beorns_house")
+        || (connection.from === "great_river" && connection.to === "beorns_house")
+      );
+    }
+
+    beornMountainStormMessage() {
+      const attempts = Number(this.flags.beornmountainstormattempts || 0);
+      const weather = BEORN_MOUNTAIN_STORM_WEATHER[attempts % BEORN_MOUNTAIN_STORM_WEATHER.length];
+      const barrier = BEORN_MOUNTAIN_STORM_BARRIERS[Math.floor(attempts / 2) % BEORN_MOUNTAIN_STORM_BARRIERS.length];
+      const speakerIndex = Math.abs(attempts * 3 + (this.storySeed || 0)) % BEORN_MOUNTAIN_STORM_COMPANIONS.length;
+      const [speaker, line] = BEORN_MOUNTAIN_STORM_COMPANIONS[speakerIndex];
+      return `${weather} ${barrier} ${speaker} says '${line}'`;
+    }
+
+    preferredBeornMountainAdvance() {
+      const priority = {
+        narrow_place: "narrow_dangerous_path",
+        narrow_dangerous_path: "beorns_house",
+        treeless_opening: "beorns_house",
+        great_river: "beorns_house",
+      }[this.currentRoom];
+      if (!priority) return null;
+      return this.roomConnections().find((connection) => connection.to === priority) || null;
+    }
+
+    inRivendellForPreparations() {
+      return IMMERSION_RIVENDELL_ROOMS.has(this.currentRoom);
+    }
+
+    visibleElrondHere() {
+      const elrond = this.characters.elrond;
+      if (!elrond || !elrond.visible) return null;
+      return elrond.position === this.currentRoom ? elrond : null;
+    }
+
+    rivendellMapBearer() {
+      const playerMap = this.findInInventory("curious map");
+      if (playerMap && !playerMap.broken) return { owner: "player", item: playerMap };
+      for (const id of ["elrond", "gandalf"]) {
+        const character = this.characters[id];
+        if (!character || !character.visible || character.position !== this.currentRoom) continue;
+        const inventoryId = [...(character.inventory || []), ...(character.worn || [])]
+          .find((itemId) => matches(this.items[itemId]?.name, "curious map") && !this.items[itemId]?.broken);
+        if (inventoryId) return { owner: id, character, item: this.items[inventoryId] };
+      }
+      return null;
+    }
+
+    markRivendellPreparationProgress(key) {
+      if (!key) return false;
+      const flag = `rivendell_progress_${key}`;
+      if (this.flags[flag]) return false;
+      this.flags[flag] = true;
+      this.flags.rivendell_preparation_progress = Number(this.flags.rivendell_preparation_progress || 0) + 1;
+      return true;
+    }
+
+    noteElrondPreparationInteraction(character, details = {}) {
+      if (!matches(character?.name, "elrond")) return false;
+      if (!this.inRivendellForPreparations()) return false;
+      if (!this.visibleElrondHere()) return false;
+      if (this.rivendellPreparationsComplete()) return false;
+
+      const mode = String(details.mode || "");
+      const topic = normalize(String(details.topic || ""));
+      const itemName = normalize(details.item?.name || "");
+      const progressKeys = [];
+
+      if (mode === "talk") progressKeys.push("talk");
+      if (matchesAny(topic, RIVENDELL_ELROND_TOPIC_KEYWORDS)) progressKeys.push("quest");
+      if (mode === "ask-help") progressKeys.push("counsel");
+      if (matchesAny(itemName, RIVENDELL_ELROND_HEIRLOOM_ITEMS) || ["show-map", "give-map"].includes(mode)) progressKeys.push("heirloom");
+
+      let progressed = false;
+      for (const key of progressKeys) {
+        if (this.markRivendellPreparationProgress(key)) progressed = true;
+      }
+
+      const bearer = this.rivendellMapBearer();
+      const progress = Number(this.flags.rivendell_preparation_progress || 0);
+      if (progressed && bearer && progress < 2 && !this.flags.rivendell_elrond_document_prompted) {
+        this.flags.rivendell_elrond_document_prompted = true;
+        this.print("After hearing you out, Elrond's gaze lingers on the weathered things the company has carried so far. 'There are older matters in your keeping than road-dust alone,' he says quietly.");
+      }
+
+      if (!bearer) return progressed;
+      if (progress >= 2 || ["show-map", "give-map"].includes(mode)) {
+        this.triggerRivendellPreparationRevelation(bearer);
+      }
+      return progressed;
+    }
+
+    triggerRivendellPreparationRevelation(bearer = this.rivendellMapBearer()) {
+      if (!bearer || this.rivendellPreparationsComplete()) return false;
+
+      let handoffLine = "Elrond draws the curious map nearer and studies it in silence.";
+      if (bearer.owner === "player") {
+        handoffLine = "At his quiet request, you place the curious map in Elrond's hands.";
+      } else if (bearer.owner === "gandalf") {
+        handoffLine = "At a glance from Elrond, Gandalf yields up the curious map without argument.";
+      }
+
+      this.flags.rivendell_preparations_complete = true;
+      this.flags.mapread = true;
+      this.flags.elrond_revelation_complete = true;
+
+      this.showTemporaryImage("thrors-map", { alt: "Thror's Map" });
+      this.print("As the talk deepens, Elrond's attention settles at last on the old tokens of the quest.");
+      this.print(handoffLine);
+      this.print("Elrond spreads the weathered parchment before the Company, and all draw close while the Lord of Rivendell studies the ancient markings.");
+      this.print("Beneath Rivendell's light he studies the weathered parchment until pale moon-letters begin to answer him.");
+      this.print("When he speaks again, it is only to mark a narrow western door, and the season and light by which it may be found.");
+      this.print("Gandalf seems satisfied. Thorin straightens, and a steadier purpose settles over the company. The time for departure has finally come.");
+      return true;
     }
 
     updateRingTimers() {
@@ -10957,6 +11421,111 @@
       }
     }
 
+    combatNarrativeSequence() {
+      const next = Number(this.flags.combatnarrativecounter || 0) + 1;
+      this.flags.combatnarrativecounter = next;
+      return next;
+    }
+
+    combatHash(key, sequence, salt = 0) {
+      return hashString(`${this.storySeed || 0}:combat:${sequence}:${this.turnCount}:${this.currentRoom}:${key}:${salt}`);
+    }
+
+    combatPick(list, key, sequence, salt = 0) {
+      if (!list?.length) return "";
+      return list[Math.abs(this.combatHash(key, sequence, salt)) % list.length];
+    }
+
+    combatWeaponType(weapon = null) {
+      const name = normalize(weapon?.name || "");
+      if (!name) return "bare";
+      if (matchesAny(name, ["sword", "blade", "sting"])) return "sword";
+      if (matchesAny(name, ["dagger", "knife"])) return "dagger";
+      if (matchesAny(name, ["axe", "hatchet", "cleaver"])) return "axe";
+      if (matchesAny(name, ["club", "cudgel", "staff", "branch", "stick", "log", "stone"])) return "club";
+      if (matchesAny(name, ["bow", "arrow"])) return "bow";
+      return "club";
+    }
+
+    combatFoeKind(character) {
+      const name = normalize(character?.name || "");
+      if (name.includes("goblin")) return "goblin";
+      if (name.includes("troll")) return "troll";
+      if (name.includes("spider")) return "spider";
+      if (name.includes("wolf") || name.includes("warg")) return "wolf";
+      if (name.includes("dragon")) return "dragon";
+      if (name.includes("gollum")) return "gollum";
+      return "foe";
+    }
+
+    combatEnvironmentCategory(roomId = this.currentRoom) {
+      if (IMMERSION_GOBLIN_ROOMS.has(roomId)) return "goblin";
+      if (IMMERSION_MIRKWOOD_ROOMS.has(roomId) || ["forest_road", "forest_road_2", "forest", "waterfall", "running_river"].includes(roomId)) return "forest";
+      if (IMMERSION_RIVENDELL_ROOMS.has(roomId)) return "rivendell";
+      if (IMMERSION_MOUNTAIN_ROOMS.has(roomId) || BEORN_MOUNTAIN_APPROACH_ROOMS.has(roomId)) return "mountain";
+      if (IMMERSION_BEORN_ROOMS.has(roomId) || ["treeless_opening", "great_river"].includes(roomId)) return "beorn";
+      if (IMMERSION_EREBOR_OUTER_ROOMS.has(roomId) || IMMERSION_EREBOR_INNER_ROOMS.has(roomId) || roomId === "front_gate") return "erebor";
+      return "generic";
+    }
+
+    combatEnvironmentLine(category, sequence) {
+      const pools = {
+        goblin: [
+          "The clash echoes wildly from stone to stone, and the dark gives back the sound in ugly fashion.",
+          "The sound runs through the cavern in harsh echoes, mingling with the drip of unseen water.",
+          "Sparks and echoes leap together in the underground dark, as though deeper hollows were listening.",
+        ],
+        forest: [
+          "Leaves shiver overhead, and roots catch at every uncertain step beneath the boughs.",
+          "Branches whip and shadows reel together, so that the fight seems half swallowed by the wood.",
+          "The struggle shakes leaf and twig alike, and the forest gives back no comfort for it.",
+        ],
+        rivendell: [
+          "Even there the sound goes strangely among water, white stone, and the stillness of the trees.",
+          "For an instant the peace of Rivendell is broken by the clash, and nearby water answers it softly.",
+          "The stroke rings oddly in that fair place, beneath leaves and moon-pale stone.",
+        ],
+        mountain: [
+          "Wind worries at cloak and footing alike, and loose stones clatter away into the depths below.",
+          "Cold air and broken stone make every movement perilous upon the height.",
+          "The mountain gives little room for error, and pebbles skitter away beneath uncertain feet.",
+        ],
+        beorn: [
+          "The sound carries across timber, yard, and open weather with a rude harshness.",
+          "The fight jars against the ordered strength of Beorn's lands like something that does not belong there.",
+          "Even in the open air the blow lands hard enough to send a rough echo through wood and yard.",
+        ],
+        erebor: [
+          "The sound rings through the old stonework and seems for a moment to wake the mountain's memory.",
+          "Under the Mountain the stroke goes far, striking harshly against hall and pillar.",
+          "Ancient stone gives back the noise with a cold and mighty echo.",
+        ],
+        generic: [
+          "For a moment the whole place seems narrowed to breath, fear, and the ring of the blow.",
+          "The struggle comes and is over in a rush, leaving only the echo of it behind.",
+          "The brief violence of it seems louder than such a small fight has any right to be.",
+        ],
+      };
+      return this.combatPick(pools[category] || pools.generic, `environment:${category}`, sequence);
+    }
+
+    combatConditionPhrase(character) {
+      const strength = Number(character?.strength || 0);
+      const isPlayer = character?.id === this.data.player;
+      if (strength <= (isPlayer ? 5 : 2)) return "Every breath is labor now, and the next movement must be made by sheer stubbornness.";
+      if (strength <= (isPlayer ? 8 : 4)) return "Weariness is already in the limbs, and the work is no longer easy.";
+      return "";
+    }
+
+    combatEmotionState(character, opponent) {
+      const attackFlag = Number(character?.attackFlag || 0);
+      if (attackFlag >= 2) return "rage";
+      if ((character?.strength || 0) + 2 < (opponent?.strength || 0)) return "fear";
+      if (character?.friendly === "neutral") return "confusion";
+      if ((character?.strength || 0) > (opponent?.strength || 0) + 5) return "arrogance";
+      return "desperation";
+    }
+
     attackCharacter(attacker, target, weapon = null, options = {}) {
       if (!attacker.visible) return "";
       if (attacker.id === target.id) return `${attacker.name} cannot attack themselves.`;
@@ -10965,31 +11534,170 @@
       if (attacker.friendly === "neutral" && !options.forced) return `${attacker.name} ignores your request.`;
       if (!target.visible) return `${attacker.name} tries to attack ${target.name}, but ${target.name} is already dead.`;
 
-      const attackerName = displayCharacterName(attacker);
-      const targetName = displayCharacterName(target);
       const attackStrength = (attacker.strength || 1) + (weapon ? (weapon.weight || 0) : 0);
-      const successful = attackStrength > (target.strength || 1);
+      const targetStrength = target.strength || 1;
+      const successful = attackStrength > targetStrength;
+      const margin = attackStrength - targetStrength;
       const fallen = successful ? target : attacker;
       const winner = successful ? attacker : target;
-      const weaponText = weapon ? ` with ${weapon.name}` : "";
-      let message;
+      const loser = fallen;
+      const attackerName = displayCharacterName(attacker);
+      const targetName = displayCharacterName(target);
+      const attackerIsPlayer = attacker.id === this.data.player;
+      const targetIsPlayer = target.id === this.data.player;
+      const sequence = this.combatNarrativeSequence();
+      const weaponType = this.combatWeaponType(weapon);
+      const environment = this.combatEnvironmentCategory();
+      const foeKind = this.combatFoeKind(loser);
+      const attackerCondition = this.combatConditionPhrase(attacker);
+      const targetCondition = this.combatConditionPhrase(target);
+      const winnerEmotion = this.combatEmotionState(winner, loser);
+      const critical = Math.abs(margin) >= 6;
 
-      if (attacker.id === this.data.player) {
-        message = `You attack ${targetName}${weaponText}.`;
-        message += successful
-          ? ` ${capitalize(targetName)} counters, but you strike again and ${targetName} falls.`
-          : ` ${capitalize(targetName)} counters at once, and the fight is over almost before it begins.`;
-      } else if (target.id === this.data.player) {
-        message = `${attackerName} attacks you${weaponText}.`;
-        message += successful
-          ? ` You strike back, but ${attackerName} comes on again and lays you low.`
-          : ` You counterattack and ${attackerName} falls.`;
-      } else {
-        message = `${attackerName} attacks ${targetName}${weaponText}.`;
-        message += successful
-          ? ` ${capitalize(targetName)} strikes back, but ${attackerName} attacks again and ${targetName} falls.`
-          : ` ${capitalize(targetName)} counters and ${attackerName} falls.`;
+      const leadPools = {
+        bare_player: [
+          `You throw yourself at ${targetName} before there is time to think better of it, hands going out in a desperate grapple.`,
+          `With nothing but your own small strength to trust, you dart in and seize at ${targetName} as the struggle begins.`,
+          `You meet ${targetName} at close quarters, more from sudden courage than any practiced art of fighting.`,
+        ],
+        bare_enemy: [
+          `${capitalize(attackerName)} comes on in a rush, clawing and striking at you with savage force.`,
+          `${capitalize(attackerName)} hurls itself at you, and in a moment the fight is all hands, blows, and confusion.`,
+          `${capitalize(attackerName)} closes with you at once, turning the struggle into a rough and breathless grapple.`,
+        ],
+        sword_player: [
+          "Your blade flashes before you have time to doubt yourself, drawing a bright arc through the gloom.",
+          "Steel sings in your hand as you strike, and the sudden light of the blade seems brighter than it ought.",
+          "You bring the sword round with a swift hard stroke, and for a heartbeat the steel is all you can see.",
+        ],
+        sword_enemy: [
+          `${capitalize(attackerName)} comes at you with flashing steel, the blade cutting a bright line through the air.`,
+          `${capitalize(attackerName)} raises a sword and strikes with alarming swiftness, steel singing before your eyes.`,
+          `${capitalize(attackerName)} attacks with drawn steel, and the stroke comes in cold and glittering haste.`,
+        ],
+        dagger_player: [
+          "You dart in with the dagger, trusting speed and nearness rather than strength.",
+          "Your dagger goes forward in a quick close stroke, almost before fear can check it.",
+          `You slip inside the reach of ${targetName} and strike with the dagger at close quarters.`,
+        ],
+        dagger_enemy: [
+          `${capitalize(attackerName)} slips in close with a knife-quick movement and strikes for you at once.`,
+          `${capitalize(attackerName)} comes in low and fast, the dagger flickering before you can quite follow it.`,
+          `${capitalize(attackerName)} presses near with a short blade, quick as a snake in close grass.`,
+        ],
+        axe_player: [
+          "You hew with the heavy weapon in both hands, trusting its weight to do what skill may not.",
+          "The blow comes round with grim force, more like chopping timber than fencing.",
+          "You drive the edge downward with all the strength you can gather.",
+        ],
+        axe_enemy: [
+          `${capitalize(attackerName)} brings the heavy blade down with brutal force, careless of grace and full of power.`,
+          `${capitalize(attackerName)} hacks at you in a savage descending stroke.`,
+          `${capitalize(attackerName)} swings heavily, as though to split shield, bone, and hope together.`,
+        ],
+        club_player: [
+          "You swing the makeshift weapon awkwardly but with honest force.",
+          "You strike with a rough brutal motion, more desperate than graceful.",
+          "The blow is clumsy, yet there is weight enough in it to make the air grunt.",
+        ],
+        club_enemy: [
+          `${capitalize(attackerName)} rushes in with a brutal swinging blow.`,
+          `${capitalize(attackerName)} lays about with rude force, caring nothing for elegance.`,
+          `${capitalize(attackerName)} strikes with a coarse crushing motion meant to batter you flat.`,
+        ],
+        bow_player: [
+          "You snatch a swift chance and loose your shot before it can be lost.",
+          "The bow bends, the string sings, and your stroke goes forth in a breath.",
+          "You fire quickly, with fear and resolve mixed together in the same motion.",
+        ],
+        bow_enemy: [
+          `${capitalize(attackerName)} takes the briefest aim and lets fly at once.`,
+          `${capitalize(attackerName)}'s shot comes suddenly, swift as a thought and nearly as cold.`,
+          `${capitalize(attackerName)} looses in one hard motion before you are ready for it.`,
+        ],
+      };
+      const leadKey = `${weaponType}_${targetIsPlayer ? "enemy" : "player"}`;
+      const lead = this.combatPick(leadPools[leadKey] || leadPools.club_player, `combat-lead:${leadKey}:${attacker.id}:${target.id}`, sequence);
+
+      const exchange = successful
+        ? this.combatPick([
+          attackerIsPlayer
+            ? `Bilbo scarcely knows how he manages it, but ${targetName} is checked and driven back before the answer can come.`
+            : `${capitalize(targetName)} tries to answer the stroke, but cannot wholly recover the ground already lost.`,
+          attackerIsPlayer
+            ? `For an instant ${targetName} shows ${critical ? "something very like fear" : "a flicker of uncertainty"}, and that is enough.`
+            : `${capitalize(attackerName)} presses the advantage with ${winnerEmotion === "rage" ? "hot fury" : winnerEmotion === "arrogance" ? "grim confidence" : "dogged desperation"}.`,
+          critical
+            ? "The whole thing turns in a heartbeat, sudden and complete."
+            : "The struggle hangs for a brief instant on one movement and one failing of guard.",
+        ], `combat-exchange:success:${attacker.id}:${target.id}`, sequence)
+        : this.combatPick([
+          attackerIsPlayer
+            ? `You overreach upon the turn, and in that small unhappy instant your guard lies bare.`
+            : targetIsPlayer
+              ? `You fend and stumble backward, but the answering stroke comes on too quickly to master.`
+              : `${capitalize(attackerName)} leaves an opening, and ${targetName} is quick enough to take it.`,
+          attackerIsPlayer
+            ? `${capitalize(targetName)} is on you at once with ${winnerEmotion === "rage" ? "a snarl of rage" : winnerEmotion === "arrogance" ? "cruel certainty" : "desperate speed"}.`
+            : targetIsPlayer
+              ? `${capitalize(attackerName)} gives you no time to recover the lost step.`
+              : `${capitalize(targetName)} turns the fight in one fierce answer.`,
+          critical
+            ? "The end comes with terrible swiftness."
+            : "After that, the issue is plain enough.",
+        ], `combat-exchange:failure:${attacker.id}:${target.id}`, sequence);
+
+      const finishPools = {
+        goblin: [
+          `${capitalize(displayCharacterName(loser))} collapses among the stones and lies still.`,
+          `${capitalize(displayCharacterName(loser))} falls in a heap upon the rock and does not rise again.`,
+          `${capitalize(displayCharacterName(loser))} crumples into the cavern dust, and the malice goes out of it.`,
+        ],
+        troll: [
+          `${capitalize(displayCharacterName(loser))} crashes down with a weight that seems to shake the ground itself.`,
+          `${capitalize(displayCharacterName(loser))} topples like a felled trunk and lies motionless.`,
+          `${capitalize(displayCharacterName(loser))} comes down heavily, and even the earth seems to grudge the blow.`,
+        ],
+        spider: [
+          `${capitalize(displayCharacterName(loser))} folds in upon itself and lies twisted among leaf and shadow.`,
+          `${capitalize(displayCharacterName(loser))} drops and curls inward, its fury spent at last.`,
+          `${capitalize(displayCharacterName(loser))} sinks into the dark tangle and does not stir again.`,
+        ],
+        wolf: [
+          `${capitalize(displayCharacterName(loser))} rolls over among the stones and lies still.`,
+          `${capitalize(displayCharacterName(loser))} goes down in a snarl that ends abruptly.`,
+          `${capitalize(displayCharacterName(loser))} collapses in the dust, all its rush gone out of it.`,
+        ],
+        gollum: [
+          `${capitalize(displayCharacterName(loser))} reels in the dark by the water and is lost to sight among stone and blackness.`,
+          `${capitalize(displayCharacterName(loser))} pitches away into the shadows by the lake and moves no more.`,
+          `${capitalize(displayCharacterName(loser))} falls among the wet stones, swallowed at once by dark and echo.`,
+        ],
+        dragon: [
+          `${capitalize(displayCharacterName(loser))} shudders, falters, and falls in ruinous might.`,
+          `${capitalize(displayCharacterName(loser))} sinks at last, and the terror of it is ended.`,
+          `${capitalize(displayCharacterName(loser))} goes down like a storm breaking itself upon the earth.`,
+        ],
+        foe: [
+          `${capitalize(displayCharacterName(loser))} falls and lies still.`,
+          `${capitalize(displayCharacterName(loser))} collapses at last, and the fight is done.`,
+          `${capitalize(displayCharacterName(loser))} goes down hard, and rises no more.`,
+        ],
+      };
+      const finish = this.combatPick(finishPools[foeKind] || finishPools.foe, `combat-finish:${foeKind}:${loser.id}`, sequence);
+      const environmentLine = this.combatEnvironmentLine(environment, sequence);
+
+      const lines = [lead];
+      if (attackerCondition && (critical || attackerIsPlayer || targetIsPlayer)) lines.push(attackerCondition);
+      else if (targetCondition && (critical || attackerIsPlayer || targetIsPlayer)) lines.push(targetCondition);
+      lines.push(exchange, finish);
+      if (critical || Math.abs(this.combatHash("combat-env-toggle", sequence)) % 2 === 0) lines.push(environmentLine);
+
+      let message = lines.filter(Boolean).join(" ");
+      if (message === this.flags.lastcombatmessage) {
+        message = `${message} ${this.combatEnvironmentLine(environment, sequence + 1)}`;
       }
+      this.flags.lastcombatmessage = message;
 
       this.dropInventory(fallen);
       fallen.visible = false;
@@ -11622,7 +12330,12 @@
       .replace(/^proceed\s+eastward$/i, "go east")
       .replace(/^proceed\s+westward$/i, "go west")
       .replace(/^follow\s+the\s+(?:road|path)$/i, "go forward")
+      .replace(/^press\s+on$/i, "go forward")
+      .replace(/^ignore\s+storm$/i, "go forward")
+      .replace(/^urge\s+(?:the\s+)?company\s+forward$/i, "go forward")
+      .replace(/^lead\s+(?:the\s+)?pon(?:y|ies)\s+forward$/i, "go forward")
       .replace(/^take\s+the\s+(?:left|right)\s+path$/i, "go forward")
+      .replace(/^climb\s+(?:the\s+)?pass$/i, "climb pass")
       .replace(/^cross\s+the\s+(?:stream|road|river)$/i, "go forward")
       .replace(/^(?:continue\s+walking|keep\s+going|keep\s+moving|explore\s+further|venture\s+onward|move\s+closer|advance)$/i, "go forward")
       .replace(/^(?:step\s+back|retreat|come\s+back\s+here)$/i, "go back")

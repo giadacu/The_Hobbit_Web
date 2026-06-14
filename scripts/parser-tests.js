@@ -438,6 +438,26 @@ const cases = [
     expected: ["go forward"],
   },
   {
+    name: "press on alias",
+    input: "Press on.",
+    expected: ["go forward"],
+  },
+  {
+    name: "ignore storm alias",
+    input: "Ignore storm.",
+    expected: ["go forward"],
+  },
+  {
+    name: "lead ponies forward alias",
+    input: "Lead ponies forward.",
+    expected: ["go forward"],
+  },
+  {
+    name: "climb pass alias",
+    input: "Climb pass.",
+    expected: ["climb pass"],
+  },
+  {
     name: "head inside alias",
     input: "Head inside.",
     expected: ["go inside"],
@@ -2931,9 +2951,23 @@ const gameCases = [
     },
     expectedIncluded: [
       "Gandalf waits by the round green door as though measuring the evening by expected knocks.",
-      "He is carrying a curious map.",
+      "Gandalf is carrying a curious map.",
     ],
     notExpectedIncluded: [
+      "Gandalf is here.",
+    ],
+  },
+  {
+    name: "companion overflow is named instead of repeated as flat presence lines",
+    drive(game) {
+      game.execute("jump rivendell");
+    },
+    expectedIncluded: [
+      /Gandalf.*(nearby as well|linger a little apart|close at hand|wait a little apart)/,
+      "Elrond is here.",
+    ],
+    notExpectedIncluded: [
+      "Others of the company are nearby as well.",
       "Gandalf is here.",
     ],
   },
@@ -3016,11 +3050,30 @@ const gameCases = [
     ],
   },
   {
+    name: "jump green dragon applies a coherent inn milestone state",
+    drive(game) {
+      game.execute("jump green_dragon");
+      game.print(`Jump room: ${game.currentRoom}`);
+      game.print(`Has map: ${game.findInInventory("curious map") ? "yes" : "no"}`);
+      game.print(`Has pipe: ${game.findInInventory("smoking pipe") ? "yes" : "no"}`);
+      game.print(`Pony sequence started: ${game.flags.seenpony ? "yes" : "no"}`);
+      game.print(`Autoplay next at inn: ${game.nextAutoplayCommand()}`);
+    },
+    expectedIncluded: [
+      "Jumped to Green Dragon Inn.",
+      "Jump room: green_dragon_inn",
+      "Has map: yes",
+      "Has pipe: yes",
+      "Pony sequence started: no",
+      "Autoplay next at inn: open weathered oak door",
+    ],
+  },
+  {
     name: "jump after trolls cave applies a coherent post-loot state",
     drive(game) {
       game.execute("jump after_trolls_cave");
       game.print(`Jump room: ${game.currentRoom}`);
-      game.print(`Has sword: ${game.findInInventory("short strong dagger") ? "yes" : "no"}`);
+      game.print(`Has sword: ${game.findInInventory("majestic sword") ? "yes" : "no"}`);
       game.print(`Has rope: ${game.findInInventory("sturdy rope") ? "yes" : "no"}`);
       game.print(`Has large key: ${game.findInInventory("large key") ? "yes" : "no"}`);
       game.print(`Trolls transformed: ${game.trollsTransformed ? "yes" : "no"}`);
@@ -3077,6 +3130,20 @@ const gameCases = [
     ],
   },
   {
+    name: "jump rivendell lets autoplay continue from elronds counsel instead of backtracking west",
+    drive(game) {
+      game.execute("jump rivendell");
+      game.print(`Autoplay next from Rivendell: ${game.nextAutoplayCommand()}`);
+    },
+    expectedIncluded: [
+      "Jumped to Rivendell.",
+      "Autoplay next from Rivendell: talk to elrond",
+    ],
+    notExpectedIncluded: [
+      "Autoplay next from Rivendell: west",
+    ],
+  },
+  {
     name: "jump rivendell applies a coherent milestone state",
     drive(game) {
       game.execute("jump rivendell");
@@ -3084,7 +3151,11 @@ const gameCases = [
       game.print(`Has map: ${game.findInInventory("curious map") ? "yes" : "no"}`);
       game.print(`Has key: ${game.findInInventory("curious key") ? "yes" : "no"}`);
       game.print(`Has rope: ${game.findInInventory("sturdy rope") ? "yes" : "no"}`);
+      game.print(`Has firestone: ${game.findInInventory("firestone") ? "yes" : "no"}`);
+      game.print(`Has large key: ${game.findInInventory("large key") ? "yes" : "no"}`);
+      game.print(`Has sword: ${game.findInInventory("majestic sword") ? "yes" : "no"}`);
       game.print(`Trolls transformed: ${game.trollsTransformed ? "yes" : "no"}`);
+      game.print(`Rivendell ready: ${game.rivendellPreparationsComplete() ? "yes" : "no"}`);
     },
     expectedIncluded: [
       "Jumped to Rivendell.",
@@ -3092,7 +3163,46 @@ const gameCases = [
       "Has map: yes",
       "Has key: yes",
       "Has rope: yes",
+      "Has firestone: yes",
+      "Has large key: yes",
+      "Has sword: yes",
       "Trolls transformed: yes",
+      "Rivendell ready: no",
+    ],
+  },
+  {
+    name: "rivendell blocks eastward departure until elronds counsel is complete",
+    drive(game) {
+      game.execute("jump rivendell");
+      game.execute("east");
+      game.print(`Room after blocked departure: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "Jumped to Rivendell.",
+      "The road continues eastward, but the company seems strangely reluctant to depart.",
+      "Room after blocked departure: rivendell",
+    ],
+  },
+  {
+    name: "elrond conversation can naturally complete rivendell preparations",
+    drive(game) {
+      game.execute("jump rivendell");
+      game.execute("talk to elrond");
+      game.execute("ask elrond about journey");
+      game.print(`Rivendell ready after counsel: ${game.rivendellPreparationsComplete() ? "yes" : "no"}`);
+      game.execute("east");
+      game.print(`Room after counsel departure: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "After hearing you out, Elrond's gaze lingers on the weathered things the company has carried so far.",
+      "As the talk deepens, Elrond's attention settles at last on the old tokens of the quest.",
+      "When he speaks again, it is only to mark a narrow western door",
+      "Rivendell ready after counsel: yes",
+      "Room after counsel departure: misty_mountain",
+    ],
+    notExpectedIncluded: [
+      "You need Elrond",
+      "You cannot go that way",
     ],
   },
   {
@@ -3173,6 +3283,44 @@ const gameCases = [
     notExpectedIncluded: [
       "The hideous troll stoops, snatches you up before you can slip away",
       "Hideous troll attacks you.",
+    ],
+  },
+  {
+    name: "jump gollum applies a coherent pre-riddle state",
+    drive(game) {
+      game.execute("jump gollum");
+      game.print(`Jump room: ${game.currentRoom}`);
+      game.print(`Rivendell ready: ${game.rivendellPreparationsComplete() ? "yes" : "no"}`);
+      game.print(`Has ring: ${game.findInInventory("golden ring") ? "yes" : "no"}`);
+      game.print(`Gollum here: ${game.characters.gollum?.position === game.currentRoom ? "yes" : "no"}`);
+      game.print(`Autoplay next at lake: ${game.nextAutoplayCommand()}`);
+    },
+    expectedIncluded: [
+      "Jumped to Deep Dark Lake.",
+      "Jump room: deep_dark_lake",
+      "Rivendell ready: yes",
+      "Has ring: no",
+      "Gollum here: yes",
+      "Autoplay next at lake: light lantern",
+    ],
+  },
+  {
+    name: "jump beorn applies a coherent arrival state",
+    drive(game) {
+      game.execute("jump beorn");
+      game.print(`Jump room: ${game.currentRoom}`);
+      game.print(`Has ring: ${game.findInInventory("golden ring") ? "yes" : "no"}`);
+      game.print(`Beorn here: ${game.characters.beorn?.position === game.currentRoom ? "yes" : "no"}`);
+      game.print(`Strength at Beorn: ${game.player.strength}`);
+      game.print(`Autoplay next at Beorn: ${game.nextAutoplayCommand()}`);
+    },
+    expectedIncluded: [
+      "Jumped to Beorn's House.",
+      "Jump room: beorns_house",
+      "Has ring: yes",
+      "Beorn here: yes",
+      "Strength at Beorn: 5",
+      "Autoplay next at Beorn: open curtain",
     ],
   },
   {
@@ -3394,6 +3542,85 @@ const gameCases = [
     ],
   },
   {
+    name: "front gate is atmospheric while the western wall becomes the real entrance",
+    drive(game) {
+      game.execute("jump front_gate");
+      game.execute("look at rock face");
+      game.execute("north east");
+      game.print(`Western wall room: ${game.currentRoom}`);
+      game.execute("wait");
+      game.execute("unlock secret door with curious key");
+      game.execute("open secret door");
+      game.execute("east");
+      game.print(`Room after hidden door entry: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "Jumped to Front Gate.",
+      "The enormous gate stands silent and inaccessible. No obvious way lies through.",
+      "Western wall room: erebor_hidden_door",
+      "What looked like barren rock resolves at last into a secret door.",
+      "You unlock the secret door with the curious key.",
+      "You open the secret door.",
+      "Room after hidden door entry: erebor_watch_chamber",
+    ],
+    notExpectedIncluded: [
+      "Room after hidden door entry: lower_halls",
+    ],
+  },
+  {
+    name: "jump mirkwood applies a coherent post-beorn travel state",
+    drive(game) {
+      game.execute("jump mirkwood");
+      game.print(`Jump room: ${game.currentRoom}`);
+      game.print(`Has ring: ${game.findInInventory("golden ring") ? "yes" : "no"}`);
+      game.print(`Strength after Beorn: ${game.player.strength}`);
+      game.print(`Autoplay next in Mirkwood: ${game.nextAutoplayCommand()}`);
+    },
+    expectedIncluded: [
+      "Jumped to Mirkwood.",
+      "Jump room: mirkwood_forest_path",
+      "Has ring: yes",
+      "Strength after Beorn: 6",
+      "Autoplay next in Mirkwood: east",
+    ],
+  },
+  {
+    name: "jump laketown applies a coherent bard rendezvous state",
+    drive(game) {
+      game.execute("jump laketown");
+      game.print(`Jump room: ${game.currentRoom}`);
+      game.print(`Bard here: ${game.characters.bard?.position === game.currentRoom ? "yes" : "no"}`);
+      game.print(`Strength after Beorn: ${game.player.strength}`);
+      game.print(`Autoplay next in Lake-town: ${game.nextAutoplayCommand()}`);
+    },
+    expectedIncluded: [
+      "Jumped to Lake-town.",
+      "Jump room: wooden_town",
+      "Bard here: yes",
+      "Strength after Beorn: 6",
+      "Autoplay next in Lake-town: pick up bard",
+    ],
+  },
+  {
+    name: "jump front gate applies a coherent mountain approach state",
+    drive(game) {
+      game.execute("jump front_gate");
+      game.print(`Jump room: ${game.currentRoom}`);
+      game.print(`Bard here: ${game.characters.bard?.position === game.currentRoom ? "yes" : "no"}`);
+      game.print(`Secret door revealed: ${game.flags.secretdoorsun ? "yes" : "no"}`);
+      game.print(`Strength after Beorn: ${game.player.strength}`);
+      game.print(`Autoplay next at Front Gate: ${game.nextAutoplayCommand()}`);
+    },
+    expectedIncluded: [
+      "Jumped to Front Gate.",
+      "Jump room: front_gate",
+      "Bard here: yes",
+      "Secret door revealed: no",
+      "Strength after Beorn: 6",
+      "Autoplay next at Front Gate: pick up bard",
+    ],
+  },
+  {
     name: "jump smaug sets up the dragon endgame",
     drive(game) {
       game.execute("jump smaug");
@@ -3402,6 +3629,8 @@ const gameCases = [
       game.print(`Bard here: ${bard?.position === game.currentRoom ? "yes" : "no"}`);
       game.print(`Arrow with Bard: ${bard?.inventory?.some((itemId) => /arrow/i.test(game.items[itemId]?.name || "")) ? "yes" : "no"}`);
       game.print(`Dragon alive: ${game.liveDragon() ? "yes" : "no"}`);
+      game.print(`Strength after Beorn: ${game.player.strength}`);
+      game.print(`Autoplay next with Smaug: ${game.nextAutoplayCommand()}`);
     },
     expectedIncluded: [
       "Jumped to Smaug.",
@@ -3409,6 +3638,8 @@ const gameCases = [
       "Bard here: yes",
       "Arrow with Bard: yes",
       "Dragon alive: yes",
+      "Strength after Beorn: 6",
+      "Autoplay next with Smaug: pick up bard",
     ],
   },
   {
@@ -3909,6 +4140,45 @@ const gameCases = [
     expectedIncluded: ["Elrond says 'Such maps do not speak plainly to hasty eyes. Patience, and the right light, reveal more than force ever could.'"],
   },
   {
+    name: "rivendell revelation shows thrors map until next command",
+    setup(game) {
+      movePlayerTo(game, "rivendell");
+      game.debugGiveStandardLoadout({ map: true, sword: true, rope: true });
+      game.debugSetCharacterRoom("elrond", "rivendell");
+      game.flags.rivendell_preparations_complete = false;
+      game.flags.mapread = false;
+    },
+    drive(game) {
+      game.triggerRivendellPreparationRevelation();
+      game.print(`Temporary image file active: ${game.temporaryImage?.file || "none"}`);
+      game.execute("look");
+      game.print(`Temporary image after next command: ${/Thrors_map\\.jpg/i.test(game.currentImageSrc) ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Elrond spreads the weathered parchment before the Company, and all draw close while the Lord of Rivendell studies the ancient markings.",
+      "Temporary image file active: Thrors_map.jpg",
+      "Temporary image after next command: no",
+    ],
+  },
+  {
+    name: "temporary image does not persist through restore",
+    setup(game) {
+      movePlayerTo(game, "rivendell");
+      game.showTemporaryImage("thrors-map", { alt: "Thror's Map" });
+    },
+    drive(game) {
+      const snapshot = game.storage.createSnapshot();
+      game.storage.restoreSnapshot(snapshot);
+      const roomImageEl = document.getElementById("room-image");
+      game.print(`Temporary image flag after restore: ${game.temporaryImage ? "yes" : "no"}`);
+      game.print(`Temporary image src after restore: ${/Thrors_map\\.jpg/i.test(roomImageEl.src) ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Temporary image flag after restore: no",
+      "Temporary image src after restore: no",
+    ],
+  },
+  {
     name: "beorn answers food request in his house",
     setup(game) {
       game.currentRoom = "beorns_house";
@@ -3916,6 +4186,57 @@ const gameCases = [
     },
     inputs: ["ask beorn for food"],
     expectedIncluded: ["Beorn says 'There is food and a roof for honest guests. Help yourself, but do not mistake hospitality for weakness.'"],
+  },
+  {
+    name: "combat narration reflects swordplay and goblin cave atmosphere",
+    setup(game) {
+      movePlayerTo(game, "goblins_dungeon");
+      addHostileTestCharacter(game, "test_goblin", { name: "nasty goblin", strength: 1 });
+      giveItemToCharacter(game, "majestic_sword", game.player.id);
+    },
+    inputs: ["attack nasty goblin with majestic sword"],
+    expectedIncluded: [
+      /(blade|steel|sword)/i,
+      "goblin",
+      /(dark|drip|cavern|echo)/i,
+    ],
+  },
+  {
+    name: "combat narration for enemy attack reflects danger to bilbo",
+    setup(game) {
+      movePlayerTo(game, "goblins_dungeon");
+      addHostileTestCharacter(game, "test_goblin", { name: "hideous goblin", strength: 12 });
+    },
+    drive(game) {
+      game.attackCharacter(game.characters.test_goblin, game.player, null, { forced: true });
+      game.print(`Combat death choice: ${game.pendingEndgameChoice || "none"}`);
+    },
+    expectedIncluded: [
+      /(you|your)/i,
+      /(rush|strik|grapple|blow|guard)/i,
+      "Combat death choice: death",
+    ],
+  },
+  {
+    name: "combat narration varies across repeated similar attacks",
+    setup(game) {
+      movePlayerTo(game, "goblins_dungeon");
+      giveItemToCharacter(game, "majestic_sword", game.player.id);
+    },
+    drive(game) {
+      addHostileTestCharacter(game, "test_goblin_one", { name: "mean goblin", strength: 1 });
+      const firstStart = outputLines.length;
+      game.execute("attack mean goblin with majestic sword");
+      const first = outputLines.slice(firstStart).find((line) => /(falls|lies still|does not rise again|collapses)/i.test(line)) || "";
+
+      addHostileTestCharacter(game, "test_goblin_two", { name: "vicious goblin", strength: 1 });
+      const secondStart = outputLines.length;
+      game.execute("attack vicious goblin with majestic sword");
+      const second = outputLines.slice(secondStart).find((line) => /(falls|lies still|does not rise again|collapses)/i.test(line)) || "";
+
+      game.print(`Combat lines differ: ${first !== second ? "yes" : "no"}`);
+    },
+    expectedIncluded: ["Combat lines differ: yes"],
   },
   {
     name: "gollum riddle path grants escape with ring",
@@ -3933,13 +4254,128 @@ const gameCases = [
       game.execute("say to gollum \"what have i got in my pocket\"");
       game.execute("wear ring");
       game.execute("north");
+      game.print(`Ring flag after Gollum: ${game.flags.bilbo_has_ring ? "yes" : "no"}`);
     },
     expectedIncluded: [
       "Groping beside the water in the dark, your fingers close around a small cold ring. Almost without thinking, you slip it into your pocket.",
       "Gollum narrows his pale eyes. 'Baggins has answered. Now Baggins asks, yes. Ask it, precious, ask it.'",
       "You wear the golden ring and become unnoticeable.",
       "Invisible under the ring, you slip past Gollum as he claws wildly about for his precious.",
+      "Ring flag after Gollum: yes",
     ],
+  },
+  {
+    name: "gollum accepts bare riddle answers without answer verb",
+    setup(game) {
+      game.currentRoom = "deep_dark_lake";
+      game.player.position = "deep_dark_lake";
+      game.checkSpecialSituations();
+      game.gollumState.riddleIds = [2, 3];
+      game.gollumState.currentRiddleIndex = 0;
+    },
+    inputs: [
+      "ask gollum a riddle",
+      "teeth",
+      "egg",
+    ],
+    expectedIncluded: [
+      "Gollum nods reluctantly. 'Right, precious. Right.' Gollum croons 'A box without hinges, key, or lid, yet golden treasure inside is hid. What is it, eh?'",
+      "Gollum narrows his pale eyes. 'Baggins has answered. Now Baggins asks, yes. Ask it, precious, ask it.'",
+    ],
+    notExpectedIncluded: [
+      "Please specify your action and the object.",
+      "I'm not sure how to do that.",
+    ],
+  },
+  {
+    name: "wearing ring does not trigger puzzled companion reactions",
+    setup(game) {
+      game.currentRoom = "dark_stuffy_passage_13";
+      game.player.position = "dark_stuffy_passage_13";
+      placeCharacterWithPlayer(game, "gandalf");
+      placeCharacterWithPlayer(game, "thorin");
+      placeCharacterWithPlayer(game, "unexpected_party_gloin");
+      placeCharacterWithPlayer(game, "unexpected_party_bifur");
+      giveItemToCharacter(game, "golden_ring", game.player.id);
+    },
+    inputs: ["wear ring"],
+    expectedIncluded: ["You wear the golden ring and become unnoticeable."],
+    notExpectedIncluded: [
+      "Gandalf looks around, puzzled, unable to see who is there.",
+      "Thorin looks around, puzzled, unable to see who is there.",
+      "Gloin looks around, puzzled, unable to see who is there.",
+      "Bifur looks around, puzzled, unable to see who is there.",
+    ],
+  },
+  {
+    name: "beorn road is storm-blocked before ring",
+    setup(game) {
+      game.currentRoom = "narrow_place";
+      game.player.position = "narrow_place";
+      game.flags.bilbo_has_ring = false;
+    },
+    drive(game) {
+      game.execute("go east");
+      game.print(`Storm room: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      /(wind|weather|path|rocks|mountain|sleet|cloud)/i,
+      /(Thorin|Balin|Dwalin|Gandalf|Bombur|Fili|Kili|Bifur) says/,
+      "Storm room: narrow_place",
+    ],
+  },
+  {
+    name: "storm varies across repeated natural mountain pushes",
+    setup(game) {
+      game.currentRoom = "narrow_place";
+      game.player.position = "narrow_place";
+      game.flags.bilbo_has_ring = false;
+    },
+    drive(game) {
+      const beforeFirst = outputLines.length;
+      game.execute("press on");
+      const first = outputLines.slice(beforeFirst).at(-1) || "";
+      const beforeSecond = outputLines.length;
+      game.execute("ignore storm");
+      const second = outputLines.slice(beforeSecond).at(-1) || "";
+      game.print(`Storm lines differ: ${first !== second ? "yes" : "no"}`);
+      game.print(`Storm room after retry: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "Storm lines differ: yes",
+      "Storm room after retry: narrow_place",
+    ],
+  },
+  {
+    name: "beorn road opens once bilbo has the ring",
+    setup(game) {
+      game.currentRoom = "great_river";
+      game.player.position = "great_river";
+      game.flags.bilbo_has_ring = true;
+    },
+    drive(game) {
+      game.execute("lead ponies forward");
+      game.print(`Arrival room: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "Arrival room: beorns_house",
+      "The weather does not wholly clear, but the worst of its fury passes as you come down at last toward Beorn's lands, leaving only torn cloud and a bitter wind behind you on the heights.",
+    ],
+  },
+  {
+    name: "storm never returns after mountain arrival at beorn",
+    setup(game) {
+      game.currentRoom = "great_river";
+      game.player.position = "great_river";
+      game.flags.bilbo_has_ring = false;
+      game.flags.beorn_mountain_arrival_complete = true;
+    },
+    drive(game) {
+      game.execute("go south");
+      game.print(`Post-arrival room: ${game.currentRoom}`);
+    },
+    expectedIncluded: ["Post-arrival room: beorns_house"],
+    notExpectedIncluded: [/(Thorin|Balin|Dwalin|Gandalf|Bombur|Fili|Kili|Bifur) says/],
   },
   {
     name: "gollum does not attack gandalf while player is invisible",

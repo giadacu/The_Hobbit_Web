@@ -4823,8 +4823,8 @@ window.HOBBIT_DATA = {
         "Look for hidden passages or objects that can help you escape."
       ],
       "Rivendell": [
-        "Elrond may have useful thoughts about old maps, secret doors, and moon-letters.",
-        "If Elrond is here, try talking to him or asking about the map."
+        "The company seems in no great haste to leave Rivendell.",
+        "Wisdom and old counsel may still have some part to play here."
       ],
       "Beorns House": [
         "Beorn is no courtier, but he respects plain speech.",
