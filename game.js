@@ -11,6 +11,7 @@
   };
   const SAVE_PREFIX = "hobbit-web-save:";
   const LAYOUT_PREF_KEY = "hobbit-web-layout-mode";
+  const MOBILE_LAYOUT_MAX_WIDTH = 860;
 
   const $ = (id) => document.getElementById(id);
   const output = $("output");
@@ -5231,10 +5232,11 @@
       game.layoutSwitchAutoHide = this.shouldAutoHideLayoutSwitch();
       game.layoutResizeCleanup = null;
       game.layoutMouseAnchor = null;
-      game.layoutMode = this.loadLayoutModePreference();
+      game.layoutModePreference = this.loadLayoutModePreference();
+      game.layoutMode = "1";
       game.layout2SceneWidth = this.loadLayout2SceneWidthPreference();
       this.applyLayout2SceneWidth(game.layout2SceneWidth, { persist: false });
-      this.applyLayoutMode(game.layoutMode);
+      this.applyLayoutMode(game.layoutModePreference);
       this.initializeLayoutSwitchVisibility();
       this.initializeLayoutDivider();
     }
@@ -5390,6 +5392,18 @@
     loadLayoutModePreference() {
       const saved = String(localStorage.getItem(LAYOUT_PREF_KEY) || "").trim();
       return ["1", "2"].includes(saved) ? saved : "1";
+    }
+
+    isDedicatedMobileLayout() {
+      if (typeof window.matchMedia === "function") {
+        return window.matchMedia(`(max-width: ${MOBILE_LAYOUT_MAX_WIDTH}px)`).matches;
+      }
+      return (window.innerWidth || 0) <= MOBILE_LAYOUT_MAX_WIDTH;
+    }
+
+    effectiveLayoutMode(mode) {
+      const normalized = ["1", "2"].includes(String(mode)) ? String(mode) : "1";
+      return this.isDedicatedMobileLayout() ? "1" : normalized;
     }
 
     loadLayout2SceneWidthPreference() {
@@ -5568,22 +5582,24 @@
     applyLayoutMode(mode) {
       const game = this.game;
       const normalized = ["1", "2"].includes(String(mode)) ? String(mode) : "1";
-      game.layoutMode = normalized;
-      document.body?.setAttribute("data-layout", normalized);
-      document.documentElement?.setAttribute?.("data-layout", normalized);
-      if (normalized === "2") this.applyLayout2SceneWidth(game.layout2SceneWidth, { persist: false });
+      const effective = this.effectiveLayoutMode(normalized);
+      game.layoutModePreference = normalized;
+      game.layoutMode = effective;
+      document.body?.setAttribute("data-layout", effective);
+      document.documentElement?.setAttribute?.("data-layout", effective);
+      if (effective === "2") this.applyLayout2SceneWidth(game.layout2SceneWidth, { persist: false });
       const syncPressed = (button, value) => {
         if (!button) return;
-        button.setAttribute("aria-pressed", normalized === value ? "true" : "false");
+        button.setAttribute("aria-pressed", game.layoutModePreference === value ? "true" : "false");
       };
       syncPressed(layoutMode1Button, "1");
       syncPressed(layoutMode2Button, "2");
-      if (normalized !== "2") this.stopLayoutResize();
+      if (effective !== "2") this.stopLayoutResize();
     }
 
     setLayoutMode(mode) {
       this.applyLayoutMode(mode);
-      localStorage.setItem(LAYOUT_PREF_KEY, this.game.layoutMode);
+      localStorage.setItem(LAYOUT_PREF_KEY, this.game.layoutModePreference);
     }
   }
 
@@ -7981,7 +7997,10 @@
         window.addEventListener("pageshow", () => {
           if (this.pendingInitialCommandFocus) this.scheduleInitialCommandFocus();
         });
-        window.addEventListener("resize", () => this.applyLayout2SceneWidth(this.layout2SceneWidth, { persist: false }));
+        window.addEventListener("resize", () => {
+          this.applyLayoutMode(this.layoutModePreference);
+          this.applyLayout2SceneWidth(this.layout2SceneWidth, { persist: false });
+        });
       }
     }
 
