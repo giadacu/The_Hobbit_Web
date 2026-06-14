@@ -668,75 +668,6 @@ li.empty {
   border-bottom: 0;
 }
 
-@media (max-width: 860px) {
-  .game-shell {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(220px, 36dvh) minmax(0, 1fr) minmax(100px, 22dvh);
-  }
-
-  .scene,
-  .console,
-  .sidebar {
-    grid-column: 1 / 2;
-    border-right: 0;
-  }
-
-  .scene {
-    grid-row: 1 / 2;
-  }
-
-  .console {
-    grid-row: 2 / 3;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .sidebar {
-    grid-column: 1 / 2;
-    grid-row: 3 / 4;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px;
-    height: auto;
-    overflow-y: auto;
-  }
-
-  .sidebar section + section {
-    margin-top: 0;
-    padding-top: 0;
-    border-top: 0;
-  }
-}
-
-@media (max-width: 560px) {
-  .sidebar {
-    grid-template-columns: 1fr;
-  }
-
-  .output {
-    padding: 16px;
-    font-size: 16px;
-  }
-
-  .layout-switch {
-    bottom: 10px;
-    right: 10px;
-    left: auto;
-    justify-content: flex-start;
-  }
-
-  .scene-compass {
-    left: 12px;
-    bottom: 12px;
-    padding: 8px 10px;
-    gap: 8px;
-  }
-
-  .scene-compass__rose {
-    width: 82px;
-    height: 82px;
-  }
-}
-
 body[data-layout="2"] .game-shell {
   --layout-2-scene-clamped: clamp(36%, var(--layout-2-scene-width), 72%);
   grid-template-columns:
@@ -774,5 +705,62 @@ body[data-layout="2"] .sidebar {
   body[data-layout="2"] .scene,
   body[data-layout="2"] .console {
     border-right: 0;
+  }
+}
+
+@media (max-width: 860px) {
+  .game-shell,
+  body[data-layout="2"] .game-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(240px, 42dvh) minmax(0, 1fr);
+  }
+
+  .scene,
+  .console,
+  body[data-layout="2"] .scene,
+  body[data-layout="2"] .console {
+    grid-column: 1 / 2;
+    border-right: 0;
+  }
+
+  .scene,
+  body[data-layout="2"] .scene {
+    grid-row: 1 / 2;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .console,
+  body[data-layout="2"] .console {
+    grid-row: 2 / 3;
+    border-bottom: 0;
+  }
+
+  .sidebar,
+  .layout-switch,
+  .layout-divider,
+  .scene-compass,
+  body[data-layout="2"] .sidebar,
+  body[data-layout="2"] .layout-divider {
+    display: none !important;
+  }
+
+  .output {
+    padding: 18px 16px 14px;
+    font-size: 16px;
+    line-height: 1.48;
+  }
+
+  .line {
+    max-width: none;
+  }
+
+  .command-form {
+    padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+    gap: 8px;
+  }
+
+  .command-form input {
+    min-height: 40px;
+    font-size: 18px;
   }
 }
