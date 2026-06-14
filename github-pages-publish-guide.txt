@@ -1,0 +1,50 @@
+GitHub Pages publish guide
+
+This site is published from:
+- Repository: giadacu/The_Hobbit_Web
+- Branch: main
+- Folder: / (root)
+- Public URL: https://giadacu.github.io/The_Hobbit_Web/
+
+How updates go online
+
+`git commit` alone does not update the website.
+The website updates after you push to GitHub.
+
+Usual workflow
+
+1. Check what changed
+git status
+
+2. Stage the files you want to publish
+git add .
+
+3. Create a commit
+git commit -m "Describe the change"
+
+4. Push to GitHub
+git push
+
+What happens next
+
+- GitHub receives the push on `main`
+- GitHub Pages republishes the site automatically
+- The update is usually visible within a few minutes
+- GitHub says it can take up to about 10 minutes
+
+Quick version
+
+git add .
+git commit -m "Update site"
+git push
+
+Useful checks
+
+- Repo page: https://github.com/giadacu/The_Hobbit_Web
+- Pages settings: https://github.com/giadacu/The_Hobbit_Web/settings/pages
+- Deploy/build status: https://github.com/giadacu/The_Hobbit_Web/actions
+
+Note
+
+Only pushes to the published branch update the public site.
+Right now that branch is `main`.
