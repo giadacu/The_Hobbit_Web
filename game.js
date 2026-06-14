@@ -5463,6 +5463,7 @@
         turnCount: game.turnCount,
         endgame: game.endgame,
         unexpectedParty: game.unexpectedParty?.serialize(),
+        combatAftermath: game.aftermath?.serialize(),
       });
     }
 
@@ -5497,6 +5498,7 @@
       game.ensureTrollKeyRecovered();
       game.addZXFinaleState();
       game.unexpectedParty?.load(save.unexpectedParty || null);
+      game.aftermath?.load(save.combatAftermath || null);
       game.companionDirector?.sync();
       game.cancelOutputScrollAnimation({ jumpToTarget: false });
       output.replaceChildren();
@@ -6708,6 +6710,8 @@
       const door = game.findDoor(text)?.door;
       const subject = actorSubject(game.player, true);
       if (door) return game.print(`${subject} ${actorVerb(game.player, "see")} the ${door.name}. It is ${door.open ? "open" : "closed"}.`);
+      const remnant = game.aftermath?.findRemnant(text);
+      if (remnant) return game.print(`${subject} ${actorVerb(game.player, "see")} ${game.aftermath.examineRemnant(remnant)}.`);
       const character = game.resolveCharacterTarget(text);
       if (character) return game.examineCharacter(character);
       const scopedCharacter = game.findKnownCharacter(text.replace(/\s+(?:in|inside|into|at|under|behind|near|around|through|over|on)\s+.+$/, ""));
@@ -7296,6 +7300,129 @@
     }
   }
 
+  class CombatAftermathController {
+    constructor(game) {
+      this.game = game;
+    }
+
+    reset() {
+      this.game.roomRemnants = {};
+      this.game.lastAftermathRoom = this.game.currentRoom || null;
+    }
+
+    serialize() {
+      return clone({
+        roomRemnants: this.game.roomRemnants || {},
+      });
+    }
+
+    load(savedState = null) {
+      this.game.roomRemnants = savedState?.roomRemnants || {};
+      this.game.lastAftermathRoom = this.game.currentRoom || null;
+    }
+
+    notePlayerRoom() {
+      const game = this.game;
+      const currentRoom = game.currentRoom || null;
+      const previousRoom = game.lastAftermathRoom || null;
+      if (previousRoom && previousRoom !== currentRoom) this.markRoomOffstage(previousRoom);
+      if (currentRoom) this.resumeRoom(currentRoom);
+      game.lastAftermathRoom = currentRoom;
+    }
+
+    registerCharacterDeath(character) {
+      const game = this.game;
+      if (!character || character.id === game.data.player || character.friendly !== false) return;
+      const roomId = character.position || game.currentRoom;
+      if (!roomId) return;
+      const remnants = this.roomRemnants(roomId);
+      remnants.push({
+        id: `corpse:${character.id}:${game.turnCount}`,
+        type: "corpse",
+        sourceCharacterId: character.id,
+        characterName: character.name,
+        offstageTurns: 0,
+        offstageSinceTurn: null,
+      });
+    }
+
+    roomSummary(roomId = this.game.currentRoom) {
+      this.resumeRoom(roomId);
+      const remnants = this.roomRemnants(roomId).filter((remnant) => !this.isExpired(remnant));
+      if (!remnants.length) return "";
+      const labels = remnants.map((remnant) => this.remnantLabel(remnant));
+      if (labels.length === 1) return `The body of ${labels[0]} lies here.`;
+      return `The bodies of ${joinNames(labels)} lie here.`;
+    }
+
+    findRemnant(text, roomId = this.game.currentRoom) {
+      this.resumeRoom(roomId);
+      const query = normalize(text);
+      if (!query) return null;
+      return this.roomRemnants(roomId).find((remnant) => !this.isExpired(remnant) && this.matchesRemnant(remnant, query)) || null;
+    }
+
+    examineRemnant(remnant) {
+      if (!remnant) return "";
+      const label = this.remnantLabel(remnant);
+      return `the body of ${label} lying where the struggle ended, still enough now to show that the danger here has already passed`;
+    }
+
+    roomRemnants(roomId) {
+      const all = this.game.roomRemnants || {};
+      if (!all[roomId]) all[roomId] = [];
+      return all[roomId];
+    }
+
+    markRoomOffstage(roomId) {
+      for (const remnant of this.roomRemnants(roomId)) {
+        if (remnant.offstageSinceTurn == null) remnant.offstageSinceTurn = this.game.turnCount;
+      }
+    }
+
+    resumeRoom(roomId) {
+      const remnants = this.roomRemnants(roomId);
+      for (const remnant of remnants) {
+        if (remnant.offstageSinceTurn == null) continue;
+        remnant.offstageTurns = Number(remnant.offstageTurns || 0) + Math.max(0, this.game.turnCount - Number(remnant.offstageSinceTurn || 0));
+        remnant.offstageSinceTurn = null;
+      }
+      this.pruneExpired(roomId);
+    }
+
+    pruneExpired(roomId) {
+      const all = this.game.roomRemnants || {};
+      const kept = this.roomRemnants(roomId).filter((remnant) => !this.isExpired(remnant));
+      if (kept.length) all[roomId] = kept;
+      else delete all[roomId];
+    }
+
+    isExpired(remnant) {
+      return Number(remnant?.offstageTurns || 0) > 10;
+    }
+
+    remnantLabel(remnant) {
+      const name = String(remnant?.characterName || "someone").trim();
+      if (!name) return "someone";
+      return isProperName(name) ? name : `the ${name}`;
+    }
+
+    matchesRemnant(remnant, query) {
+      const name = normalize(remnant?.characterName || "");
+      if (!name) return false;
+      return [
+        name,
+        `body`,
+        `corpse`,
+        `dead ${name}`,
+        `body of ${name}`,
+        `corpse of ${name}`,
+        `the body of ${name}`,
+        `the corpse of ${name}`,
+      ].includes(query);
+    }
+  }
+
   class HobbitGame {
     constructor(data) {
       this.data = data;
@@ -7312,6 +7439,7 @@
       this.flow = new GameFlowController(this);
       this.exploration = new ExplorationController(this);
       this.specialActions = new SpecialActionController(this);
+      this.aftermath = new CombatAftermathController(this);
       this.rooms = clone(data.rooms);
       this.items = clone(data.items);
       this.doors = clone(data.doors);
@@ -7393,6 +7521,7 @@
         character.insideContainer = character.insideContainer || null;
         character.carriedBy = null;
       }
+      this.aftermath.reset();
       this.normalizeCharacterMovementModes();
       for (const placement of this.data.placements) {
         if (this.items[placement.item]) this.items[placement.item].location = { type: "room", id: placement.room };
@@ -8219,6 +8348,7 @@
         ? { initial: options, full: options }
         : { initial: false, full: false, ...options };
       this.companionDirector?.sync();
+      this.aftermath?.notePlayerRoom();
       const room = this.room();
       if (!room) return;
       if (this.currentRoom === "trolls_clearing" && this.trollsTransformed) this.ensureTrollKeyRecovered();
@@ -8244,6 +8374,7 @@
         .join(" ");
       const objects = this.itemsInRoom(this.currentRoom).filter((item) => item.visible && this.shouldListRoomItem(item));
       const objectText = objects.length ? `You see: ${objects.map((item) => this.describeItemShort(item)).join(", ")}.` : "";
+      const aftermathText = this.aftermath?.roomSummary(this.currentRoom) || "";
       const people = this.visiblePeopleInRoom().filter((p) => p.name !== "You" && p.visible);
       const arrivingPeople = people.filter((p) => p.justEntered);
       const companionNarrative = this.companionDirector?.roomCompanionNarrative(this.currentRoom) || "";
@@ -8255,8 +8386,8 @@
         .join(" ");
       const atmosphericNarrative = this.roomAtmosphericNarrative();
       const detailsText = showFullDetails
-        ? [doorText, objectText, companionNarrative, atmosphericNarrative, peopleText].filter(Boolean).join(" ")
-        : [companionNarrative, atmosphericNarrative, peopleText].filter(Boolean).join(" ");
+        ? [doorText, objectText, aftermathText, companionNarrative, atmosphericNarrative, peopleText].filter(Boolean).join(" ")
+        : [aftermathText, companionNarrative, atmosphericNarrative, peopleText].filter(Boolean).join(" ");
       this.print([roomText, detailsText].filter(Boolean).join(" "));
       for (const person of arrivingPeople) {
         this.scheduleCharacterArrivalNotice(person);
@@ -10862,6 +10993,7 @@
 
       this.dropInventory(fallen);
       fallen.visible = false;
+      this.aftermath?.registerCharacterDeath(fallen);
       attacker.attackFlag = 0;
       if (fallen.id === this.data.player) {
         this.endGame(message, { fatal: true });

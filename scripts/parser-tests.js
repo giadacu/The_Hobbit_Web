@@ -192,6 +192,30 @@ function movePlayerTo(game, roomId) {
   game.visitedRooms.add(roomId);
 }
 
+function addHostileTestCharacter(game, id = "test_goblin", overrides = {}) {
+  const roomId = overrides.position || game.player.position;
+  game.characters[id] = {
+    id,
+    name: overrides.name || "goblin",
+    position: roomId,
+    visible: true,
+    friendly: false,
+    strength: overrides.strength ?? 1,
+    inventory: [],
+    worn: [],
+    attackFlag: 0,
+    hasMetPlayer: true,
+    justEntered: false,
+    noticeable: true,
+    wearingRing: false,
+    ringTimer: 0,
+    insideContainer: null,
+    carriedBy: null,
+    movementMode: "never",
+  };
+  return game.characters[id];
+}
+
 const cases = [
   {
     name: "object manipulation",
@@ -1253,6 +1277,63 @@ const gameCases = [
     inputs: ["say hello to elrond"],
     expectedIncluded: ["Elrond says hello to you."],
     notExpectedIncluded: ["You speak, but only silence meets your words.", "Gandalf says hello to you."],
+  },
+  {
+    name: "killed enemy leaves a body in the room description",
+    setup(game) {
+      addHostileTestCharacter(game);
+    },
+    inputs: ["kill goblin", "look"],
+    expectedIncluded: ["The body of the goblin lies here."],
+    notExpectedIncluded: ["The goblin is here."],
+  },
+  {
+    name: "dead enemy can be examined by name",
+    setup(game) {
+      addHostileTestCharacter(game);
+    },
+    inputs: ["kill goblin", "examine goblin"],
+    expectedIncluded: ["You see the body of the goblin lying where the struggle ended"],
+    notExpectedIncluded: ["There is no one named goblin here."],
+  },
+  {
+    name: "dead enemy can be examined as a body",
+    setup(game) {
+      addHostileTestCharacter(game);
+    },
+    inputs: ["kill goblin", "examine body"],
+    expectedIncluded: ["You see the body of the goblin lying where the struggle ended"],
+    notExpectedIncluded: ["I don't see that here."],
+  },
+  {
+    name: "enemy body survives a short offstage absence",
+    setup(game) {
+      addHostileTestCharacter(game);
+    },
+    drive(game) {
+      game.execute("kill goblin");
+      game.execute("go outside");
+      for (let index = 0; index < 9; index += 1) game.execute("wait");
+      outputLines.length = 0;
+      game.execute("go inside");
+    },
+    expectedIncluded: ["The body of the goblin lies here."],
+    notExpectedIncluded: ["The goblin is here."],
+  },
+  {
+    name: "enemy body disappears after more than ten offstage turns",
+    setup(game) {
+      addHostileTestCharacter(game);
+    },
+    drive(game) {
+      game.execute("kill goblin");
+      game.execute("go outside");
+      for (let index = 0; index < 10; index += 1) game.execute("wait");
+      outputLines.length = 0;
+      game.execute("go inside");
+    },
+    expectedIncluded: ["You are in Bilbo's round front hall"],
+    notExpectedIncluded: ["The body of the goblin lies here.", "The goblin is here."],
   },
   {
     name: "say hello to all greets the visible group",
