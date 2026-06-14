@@ -67,6 +67,7 @@
   const LAYOUT_SPLIT_PREF_KEY = "hobbit-web-layout-2-scene-width";
   const DEFAULT_LAYOUT_2_SCENE_WIDTH = 54;
   const IDLE_WAIT_MS = 30000;
+  const OUTPUT_SCROLL_BOTTOM_THRESHOLD = 24;
   const OUTPUT_SCROLL_EASING = 0.16;
   const PROFANITY_OUTBURST_RE = /\b(?:fuck(?:ing)?|fuckin|shit|bullshit|damn(?:ed)?|asshole|bastard|cazzo|merda|vaffanculo|fanculo|stronz[oaie]?)\b/i;
   const PROFANITY_FILLER_RE = /\b(?:fuck(?:ing)?|fuckin|shit|bullshit|damn(?:ed)?|bloody|bastard(?:s)?|asshole(?:s)?|cazzo|merda|vaffanculo|fanculo|stronz[oaie]?|maledett[oaie]?)\b/gi;
@@ -8198,6 +8199,8 @@
       this.idleWaitMs = IDLE_WAIT_MS;
       this.outputScrollFrame = null;
       this.outputScrollTarget = 0;
+      this.outputScrollAnimating = false;
+      this.outputPinnedToBottom = true;
       this.pendingInitialCommandFocus = true;
       this.currentImageSrc = roomImage.getAttribute("src") || "";
       this.imageTransitionCycle = 0;
@@ -8403,6 +8406,7 @@
           return;
         }
         input.value = "";
+        this.outputPinnedToBottom = true;
         this.clearIdleAdvanceTimer();
         this.print(`> ${command}`, "command");
         this.execute(command);
@@ -8470,6 +8474,12 @@
           if (document.activeElement === input) this.hideLayoutSwitch();
         });
       }
+      if (output) {
+        output.addEventListener("pointerdown", () => this.handleOutputInteraction(), { passive: true });
+        output.addEventListener("wheel", () => this.handleOutputInteraction(), { passive: true });
+        output.addEventListener("touchstart", () => this.handleOutputInteraction(), { passive: true });
+        output.addEventListener("scroll", () => this.handleOutputScroll(), { passive: true });
+      }
       input?.addEventListener("blur", () => this.scheduleIdleAdvance());
       if (this.layoutSwitchAutoHide && layoutDivider) {
         layoutDivider.addEventListener("mouseenter", () => this.cancelLayoutSwitchHide());
@@ -8531,19 +8541,47 @@
         clearTimeout(this.outputScrollFrame);
       }
       this.outputScrollFrame = null;
+      this.outputScrollAnimating = false;
       if (jumpToTarget && output) output.scrollTop = this.outputScrollTarget || 0;
     }
 
-    scheduleOutputScroll() {
+    outputDistanceFromBottom() {
+      if (!output) return 0;
+      const scrollHeight = Number(output.scrollHeight) || 0;
+      const viewportHeight = Number(output.clientHeight || output.offsetHeight) || 0;
+      const scrollTop = Number(output.scrollTop) || 0;
+      return Math.max(0, scrollHeight - viewportHeight - scrollTop);
+    }
+
+    isOutputNearBottom(threshold = OUTPUT_SCROLL_BOTTOM_THRESHOLD) {
+      return this.outputDistanceFromBottom() <= threshold;
+    }
+
+    handleOutputInteraction() {
+      this.cancelOutputScrollAnimation({ jumpToTarget: false });
+      if (!this.isOutputNearBottom()) this.clearIdleAdvanceTimer();
+    }
+
+    handleOutputScroll() {
+      if (this.outputScrollAnimating) return;
+      this.outputPinnedToBottom = this.isOutputNearBottom();
+      if (!this.outputPinnedToBottom) this.cancelOutputScrollAnimation({ jumpToTarget: false });
+      this.scheduleIdleAdvance();
+    }
+
+    scheduleOutputScroll(force = false) {
       if (!output) return;
+      if (!force && !this.outputPinnedToBottom && !this.isOutputNearBottom()) return;
       const scrollHeight = Number(output.scrollHeight) || 0;
       const viewportHeight = Number(output.clientHeight || output.offsetHeight) || 0;
       this.outputScrollTarget = Math.max(0, scrollHeight - viewportHeight);
       if (Math.abs((Number(output.scrollTop) || 0) - this.outputScrollTarget) < 1) {
         output.scrollTop = this.outputScrollTarget;
+        this.outputScrollAnimating = false;
         return;
       }
       if (this.outputScrollFrame) return;
+      this.outputScrollAnimating = true;
 
       const step = () => {
         const currentTop = Number(output.scrollTop) || 0;
@@ -8551,6 +8589,7 @@
         if (Math.abs(delta) < 1) {
           output.scrollTop = this.outputScrollTarget;
           this.outputScrollFrame = null;
+          this.outputScrollAnimating = false;
           return;
         }
         output.scrollTop = currentTop + (delta * OUTPUT_SCROLL_EASING);
@@ -8990,7 +9029,11 @@
     }
 
     idleAdvanceSuspended() {
-      return this.endgame || this.autoplayRunning || this.pendingClarification || Boolean(String(input?.value || "").trim());
+      return this.endgame
+        || this.autoplayRunning
+        || this.pendingClarification
+        || Boolean(String(input?.value || "").trim())
+        || !this.outputPinnedToBottom;
     }
 
     scheduleIdleAdvance(delay = this.idleWaitMs) {
@@ -9304,6 +9347,7 @@
 
     print(text, kind = "") {
       if (!text) return;
+      const shouldFollowOutput = this.outputPinnedToBottom || this.isOutputNearBottom();
       for (const part of String(text).split(/(?<=[.!?])(?:2|3|4)(?!\d)|\n/).filter(Boolean)) {
         if (this.autoplayCapturingOutput && kind !== "command" && kind !== "system") {
           this.autoplayCapturedText = [this.autoplayCapturedText, part.trim()].filter(Boolean).join(" ");
@@ -9313,7 +9357,8 @@
         line.textContent = part.trim();
         output.append(line);
       }
-      this.scheduleOutputScroll();
+      this.outputPinnedToBottom = shouldFollowOutput;
+      this.scheduleOutputScroll(shouldFollowOutput);
     }
 
     itemsInRoom(roomId) {
