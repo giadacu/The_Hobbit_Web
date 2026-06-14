@@ -44,7 +44,7 @@ window.HOBBIT_DATA = {
       "id": "rivendell",
       "name": "Rivendell",
       "description": "You are in the beautiful elven town of Rivendell. Graceful arches and delicate spires rise among ancient trees, their leaves whispering with the breeze. Clear streams wind through lush gardens, reflecting the light of the setting sun. The air is filled with the sound of elven music and laughter. Elegant buildings, adorned with intricate carvings, blend harmoniously with nature, creating an atmosphere of timeless serenity and enchantment.",
-      "image": "Rivendell.jpeg",
+      "image": "rivendell.png",
       "transformedImage": null,
       "sound": "relaxed"
     },

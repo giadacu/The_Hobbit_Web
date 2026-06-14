@@ -1036,12 +1036,12 @@
       ["bywater_bridge", "Bywater Bridge", "The road crosses a small stone bridge over a clear-running stream. Beneath it the water chatters over smooth pebbles and slips away among reeds and watercress. On the far bank stands a little mill with a turning wheel, its steady creak mingling with the murmur of the water in a way that suggests useful work done without hurry. Ducks paddle lazily in the shallows, smoke rises from chimneys beyond the trees, and ahead, not far now, the Green Dragon's sign may sometimes be glimpsed through the branches when the sun catches it just so.", "stone_bridge.png", "relaxed"],
       ["trollshaws_road", "Trollshaws Road", "The eastward road threads under beech and pine through the Trollshaws, where the land rises and falls in long uneasy folds. The air is colder here than it ought to be, and though the way is plain enough, the silence between the trees feels watchful rather than empty.", "trollshaws.png", "adventure"],
       ["hidden_valley_path", "Hidden Valley Path", "The path narrows abruptly at the edge of a steep hidden drop, then bends away in a sharp descent toward a green valley glimpsed far below. Pine roots clutch the soil, an old iron spike juts from the rock, and the whole way looks passable only to those willing to trust a rope and one another.", "hidden_valley.png", "adventure"],
-      ["rivendell_courtyard", "Courtyard", "White stone and living ivy share this quiet courtyard, where the sound of falling water softens every footstep. Benches stand in sun and shade alike, inviting weary travelers to believe that peace may yet be a practical thing.", "Rivendell.jpeg", "relaxed"],
-      ["rivendell_library", "Library", "Tall shelves and carved ladders fill the library with the hush of well-kept wisdom. Scrolls, red-bound volumes, maps, and forgotten songs wait here with the patience of things certain they will outlast haste.", "map.jpeg", "relaxed"],
-      ["rivendell_hall_of_fire", "Hall of Fire", "Firelight and song belong equally to this hall. Cushioned seats ring the hearth, the rafters hold echoes of ancient music, and any tale told here seems at once older and truer than it did outside.", "Rivendell.jpeg", "relaxed"],
-      ["rivendell_guest_chambers", "Guest Chambers", "These guest chambers are simple by elvish standards and magnificent by most others. Fresh water, clean linen, and open windows overlooking the valley make them feel more like healing than lodging.", "Rivendell.jpeg", "relaxed"],
-      ["rivendell_terrace", "Terrace", "The terrace looks over pine-clad slopes and silver water. Evening light lingers here lovingly, and the valley below seems less a refuge built by hands than a blessing laid upon the land.", "Rivendell.jpeg", "relaxed"],
-      ["rivendell_bridge", "Bridge", "A graceful bridge crosses the rushing water at the edge of Rivendell, its carved rails cool beneath the hand. From here the valley feels defended not by walls but by beauty, depth, and old wisdom.", "Rivendell.jpeg", "relaxed"],
+      ["rivendell_courtyard", "Courtyard", "White stone and living ivy share this quiet courtyard, where the sound of falling water softens every footstep. Benches stand in sun and shade alike, inviting weary travelers to believe that peace may yet be a practical thing.", "courtyard.png", "relaxed"],
+      ["rivendell_library", "Library", "Tall shelves and carved ladders fill the library with the hush of well-kept wisdom. Scrolls, red-bound volumes, maps, and forgotten songs wait here with the patience of things certain they will outlast haste.", "library_rivendell.png", "relaxed"],
+      ["rivendell_hall_of_fire", "Hall of Fire", "Firelight and song belong equally to this hall. Cushioned seats ring the hearth, the rafters hold echoes of ancient music, and any tale told here seems at once older and truer than it did outside.", "hall_of_fire.png", "relaxed"],
+      ["rivendell_guest_chambers", "Guest Chambers", "These guest chambers are simple by elvish standards and magnificent by most others. Fresh water, clean linen, and open windows overlooking the valley make them feel more like healing than lodging.", "guest_chambers_rivendell.png", "relaxed"],
+      ["rivendell_terrace", "Terrace", "The terrace looks over pine-clad slopes and silver water. Evening light lingers here lovingly, and the valley below seems less a refuge built by hands than a blessing laid upon the land.", "terrace_rivendell.png", "relaxed"],
+      ["rivendell_bridge", "Bridge", "A graceful bridge crosses the rushing water at the edge of Rivendell, its carved rails cool beneath the hand. From here the valley feels defended not by walls but by beauty, depth, and old wisdom.", "bridge_rivendell.png", "relaxed"],
       ["narrow_ledge", "Narrow Ledge", "This ledge is little wider than a cart-plank, with mountain emptiness falling away beneath one shoulder and a raw wall of stone pressing the other. Even the wind seems to pass here single-file.", "narrow_path_7.jpeg", "adventure"],
       ["mountain_lookout", "Mountain Lookout", "A rare shelf of level stone offers a view of broken ridges, cloud-shadow, and far valleys already half lost in haze. For a moment the world opens wide enough to remind you how long the road still is.", "mountains.jpeg", "adventure"],
       ["storm_shelter", "Storm Shelter", "A shallow overhang in the mountain gives some shelter from rain and ice-driven wind. Travelers have camped here before; the soot on the rock and the circle of old stones show it plainly.", "large_dry_cave.jpeg", "adventure"],
@@ -4223,6 +4223,32 @@
       return normalize(command).replace(/^(?:please\s+)?/, "").replace(/\s+please$/, "").trim();
     }
 
+    isCollectiveAudience(text) {
+      return /^(?:the\s+)?(?:all|everyone|everybody|companions|company|party|folks|friends|dwarves)$/.test(normalize(text));
+    }
+
+    isGreetingPhrase(text) {
+      return /^(?:hello|hi|hey|good\s+morning)$/.test(normalize(text));
+    }
+
+    isGreetingBroadcastCommand(command) {
+      let text = normalize(command).replace(/^(say|talk|speak|whisper|yell)(?:\s+|$)/, "").trim();
+      text = text.replace(/^(to|with)\s+/, "").trim();
+      if (!text) return false;
+
+      const greetingFirst = text.match(/^(.+?)\s+to\s+(.+)$/);
+      if (greetingFirst && this.isGreetingPhrase(greetingFirst[1]) && this.isCollectiveAudience(greetingFirst[2])) {
+        return true;
+      }
+
+      const audienceFirst = text.match(/^(.+?)\s*,?\s+(.+)$/);
+      if (audienceFirst && this.isCollectiveAudience(audienceFirst[1]) && this.isGreetingPhrase(audienceFirst[2])) {
+        return true;
+      }
+
+      return this.isGreetingPhrase(text) && this.visibleOtherPeople().length > 1;
+    }
+
     hasQuestionLead(text) {
       return /^.+?\s+(?:where|whether|if|what|why|how|that)\b/.test(text);
     }
@@ -4947,6 +4973,7 @@
 
     handleTalk(command) {
       const game = this.game;
+      if (this.parser.isGreetingBroadcastCommand(command)) return game.hello();
       const parsed = this.parseTalkCommand(command);
       if (!parsed) {
         const visiblePeople = this.visibleOtherPeople();
@@ -8876,17 +8903,21 @@
     }
 
     hello() {
-      if (this.player.name === "You" && this.player.wearingRing && this.player.noticeable === false) {
-        const replies = this.peopleInRoom()
-          .filter((p) => p.name !== "You" && p.friendly === true && !this.unexpectedParty?.blocksGreetingResponse(p))
-          .map((p) => `${p.name} says 'who's talking?'`);
-        return this.print(replies.length ? replies.join("\n") : "No one responds to your greeting.");
+      const greeters = this.peopleInRoom()
+        .filter((p) => p.name !== "You" && p.friendly === true && !this.unexpectedParty?.blocksGreetingResponse(p));
+      if (!greeters.length) {
+        return this.print(this.player.name === "You" ? "No one responds to your greeting." : `No one responds to ${this.player.name}'s greeting.`);
       }
-      const greeter = this.player.name === "You" ? "you" : this.player.name;
-      const replies = this.peopleInRoom()
-        .filter((p) => p.name !== "You" && p.friendly === true && !this.unexpectedParty?.blocksGreetingResponse(p))
-        .map((p) => `${p.name} says hello to ${greeter}.`);
-      this.print(replies.length ? replies.join("\n") : (this.player.name === "You" ? "No one responds to your greeting." : `No one responds to ${this.player.name}'s greeting.`));
+      if (this.player.name === "You" && this.player.wearingRing && this.player.noticeable === false) {
+        if (greeters.length === 1) return this.print(`${greeters[0].name} says 'who's talking?'`);
+        return this.print(`${joinNames(greeters.map((p) => p.name))} look around and say 'who's talking?'`);
+      }
+      if (greeters.length === 1) {
+        const greeter = this.player.name === "You" ? "you" : this.player.name;
+        return this.print(`${greeters[0].name} says hello to ${greeter}.`);
+      }
+      const greeterText = this.player.name === "You" ? "your greeting" : `${this.player.name}'s greeting`;
+      this.print(`${joinNames(greeters.map((p) => p.name))} answer ${greeterText}.`);
     }
 
     tips(object) {
