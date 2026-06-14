@@ -6516,7 +6516,7 @@
       goblin.friendly = false;
       goblin.attackFlag = 0;
       victim.position = game.currentRoom;
-      game.print("A hulking goblin drops out of a crack above and crashes into the company before anyone can shout warning.");
+      game.print("A hulking goblin drops out of a crack above and crashes into the company before anyone can shout warning.", "danger");
       game.print(`${victim.name} goes down under it with a cry, pinned in the foul dark while the brute hacks and claws for the kill.`);
       game.print("The thing is too strong to bring down in one rush. Bilbo must join the attack, and at least one companion must strike with him.");
       return true;
@@ -6562,16 +6562,17 @@
       const goblin = this.goblinTunnelGoblin();
       if (!goblin || !this.isGoblinTunnelEncounterActive()) return null;
       if (target?.id !== goblin.id || attacker?.id === goblin.id) return null;
+      const bilboId = game.data.player;
 
       const victim = this.goblinTunnelVictim();
       const attackers = this.goblinTunnelAttackerIds();
       attackers.add(attacker.id);
       this.setGoblinTunnelAttackerIds(attackers);
 
-      const hasBilbo = attackers.has(game.player.id);
-      const hasCompanion = [...attackers].some((id) => id !== game.player.id);
+      const hasBilbo = attackers.has(bilboId);
+      const hasCompanion = [...attackers].some((id) => id !== bilboId);
       if (hasBilbo && hasCompanion) {
-        const supporterId = [...attackers].find((id) => id !== game.player.id) || "";
+        const supporterId = [...attackers].find((id) => id !== bilboId) || "";
         const supporter = game.characters[supporterId] || attacker;
         const supporterName = displayCharacterName(supporter);
         const victimName = victim?.name || "your companion";
@@ -6592,7 +6593,7 @@
         return `${finish} ${environment}`;
       }
 
-      if (attacker.id === game.player.id) {
+      if (attacker.id === bilboId) {
         const lead = weapon
           ? `Bilbo's ${weapon.name} flashes in the dark and tears the hulking goblin half away from ${victim?.name || "its prey"} for one precious instant.`
           : `Bilbo hurls himself at the hulking goblin and wrenches it half away from ${victim?.name || "its prey"} for one precious instant.`;
@@ -9106,21 +9107,33 @@
       const arrivingPeople = people.filter((p) => p.justEntered);
       const companionNarrative = this.companionDirector?.roomCompanionNarrative(this.currentRoom) || "";
       const narratedCompanionIds = this.companionDirector?.narratedCompanionIds(this.currentRoom) || new Set();
-      const peopleText = people
+      const peopleEntries = people
         .filter((p) => !p.justEntered)
         .map((p) => {
+          let text = "";
           if (narratedCompanionIds.has(p.id)) {
-            return this.characterLoadoutText(p, { explicitSubject: true });
+            text = this.characterLoadoutText(p, { explicitSubject: true });
+          } else {
+            text = this.characterPresence(p);
           }
-          return this.characterPresence(p);
+          return {
+            kind: p.friendly === false ? "danger" : "",
+            text,
+          };
         })
-        .filter(Boolean)
+        .filter((entry) => entry.text)
+      const friendlyPeopleText = peopleEntries
+        .filter((entry) => !entry.kind)
+        .map((entry) => entry.text)
         .join(" ");
+      const hostilePeopleEntries = peopleEntries.filter((entry) => entry.kind === "danger");
       const atmosphericNarrative = this.roomAtmosphericNarrative();
       const detailsText = showFullDetails
-        ? [doorText, objectText, aftermathText, companionNarrative, atmosphericNarrative, peopleText].filter(Boolean).join(" ")
-        : [aftermathText, companionNarrative, atmosphericNarrative, peopleText].filter(Boolean).join(" ");
+        ? [doorText, objectText, companionNarrative, atmosphericNarrative, friendlyPeopleText].filter(Boolean).join(" ")
+        : [companionNarrative, atmosphericNarrative, friendlyPeopleText].filter(Boolean).join(" ");
       this.print([roomText, detailsText].filter(Boolean).join(" "));
+      if (aftermathText) this.print(aftermathText, "danger");
+      for (const entry of hostilePeopleEntries) this.print(entry.text, entry.kind);
       for (const person of arrivingPeople) {
         this.scheduleCharacterArrivalNotice(person);
         person.justEntered = false;
@@ -9158,7 +9171,7 @@
         this.arrivalNoticeTimers = this.arrivalNoticeTimers.filter((id) => id !== timer);
         const current = this.characters[characterId];
         if (!current || !current.visible || current.position !== this.currentRoom || current.position !== roomId) return;
-        this.print(this.characterArrivalMessage(current));
+        this.print(this.characterArrivalMessage(current), current.friendly === false ? "danger" : "");
       }, delay);
       this.arrivalNoticeTimers.push(timer);
     }

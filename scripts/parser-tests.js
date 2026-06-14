@@ -1310,6 +1310,58 @@ const gameCases = [
     notExpectedIncluded: ["The goblin is here."],
   },
   {
+    name: "enemy lines in room descriptions use danger styling",
+    setup(game) {
+      movePlayerTo(game, "bilbos_garden");
+      addHostileTestCharacter(game);
+    },
+    drive(game) {
+      const outputElement = document.getElementById("output");
+      outputElement.replaceChildren();
+      game.execute("look");
+      const liveLine = outputElement.children.find((line) => line.textContent.includes("goblin is here."));
+      const liveDanger = liveLine?.className.includes("danger") ? "yes" : "no";
+
+      game.execute("kill goblin");
+      outputElement.replaceChildren();
+      game.execute("look");
+      const corpseLine = outputElement.children.find((line) => line.textContent === "The body of the goblin lies here.");
+      const deadDanger = corpseLine?.className.includes("danger") ? "yes" : "no";
+      game.print(`Live enemy line danger: ${liveDanger}`);
+      game.print(`Dead enemy line danger: ${deadDanger}`);
+    },
+    expectedIncluded: [
+      "Live enemy line danger: yes",
+      "Dead enemy line danger: yes",
+    ],
+  },
+  {
+    name: "hostile arrival notices use danger styling",
+    setup(game) {
+      movePlayerTo(game, "bilbos_garden");
+      addHostileTestCharacter(game, "test_warg", { name: "vicious warg", position: "pantry", strength: 6 });
+    },
+    drive(game) {
+      const outputElement = document.getElementById("output");
+      const originalSetTimeout = global.setTimeout;
+      try {
+        global.setTimeout = (fn) => {
+          fn();
+          return 0;
+        };
+        outputElement.replaceChildren();
+        game.moveCharacter(game.characters.test_warg, game.currentRoom, "west");
+        const arrivalLine = outputElement.children.find((line) => line.textContent.includes("vicious warg enters."));
+        game.print(`Hostile arrival line danger: ${arrivalLine?.className.includes("danger") ? "yes" : "no"}`);
+      } finally {
+        global.setTimeout = originalSetTimeout;
+      }
+    },
+    expectedIncluded: [
+      "Hostile arrival line danger: yes",
+    ],
+  },
+  {
     name: "dead enemy can be examined by name",
     setup(game) {
       addHostileTestCharacter(game);
@@ -4363,6 +4415,24 @@ const gameCases = [
     expectedIncluded: ["Combat lines differ: yes"],
   },
   {
+    name: "hulking goblin ambush opener uses danger styling",
+    setup(game) {
+      movePlayerTo(game, "dark_stuffy_passage_14");
+      placeCharacterWithPlayer(game, "thorin");
+      placeCharacterWithPlayer(game, "gandalf");
+    },
+    drive(game) {
+      const outputElement = document.getElementById("output");
+      outputElement.replaceChildren();
+      game.checkSpecialSituations();
+      const openerLine = outputElement.children.find((line) => line.textContent === "A hulking goblin drops out of a crack above and crashes into the company before anyone can shout warning.");
+      game.print(`Goblin ambush opener danger: ${openerLine?.className.includes("danger") ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Goblin ambush opener danger: yes",
+    ],
+  },
+  {
     name: "tunnel ambush goblin requires bilbo and a companion to finish it",
     setup(game) {
       movePlayerTo(game, "dark_stuffy_passage_14");
@@ -4378,8 +4448,12 @@ const gameCases = [
     expectedIncluded: [
       "Thorin goes down under it with a cry",
       "another of the company must strike now",
+      /(Bilbo darts in again as Gandalf crashes into the brute from the flank|Gandalf strikes as Bilbo keeps the hulking goblin off balance|Bilbo's desperate stroke opens the moment Gandalf needs)/,
       /(drag it off Thorin|creature is hacked down before it can recover its grip on Thorin|is finished there in the tunnel dust)/,
       "The body of the hulking goblin lies here.",
+    ],
+    notExpectedIncluded: [
+      "as you crashes into the brute from the flank",
     ],
   },
   {
