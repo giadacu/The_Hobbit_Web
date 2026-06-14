@@ -82,6 +82,8 @@ function bootGame() {
   }
 
   global.window = global;
+  global.location = { protocol: "file:" };
+  global.window.location = global.location;
   global.document = {
     getElementById: (id) => elements.get(id) || makeElement(id),
     createElement: () => makeElement(),
@@ -2463,8 +2465,8 @@ const gameCases = [
       "ask gandalf to dig garden",
     ],
     expectedIncluded: [
-      "Gandalf wears the golden ring and becomes unnoticeable.",
-      "Gandalf removes the golden ring and becomes noticeable again.",
+      /Gandalf (?:wears the golden ring and becomes unnoticeable\.|slips the golden ring on and fades from notice\.|draws the golden ring onto .* finger and passes from sight\.)/,
+      /Gandalf (?:removes the golden ring and becomes noticeable again\.|slips the golden ring off and returns to sight\.|tugs the golden ring free and becomes visible once more\.)/,
       "Gandalf waters the rose bush. The leaves look fresher.",
       "Gandalf plants a few seeds in a soft patch of earth. They will need time and care.",
       "Gandalf trims the rose bush carefully. It looks a little neater.",
@@ -2703,6 +2705,21 @@ const gameCases = [
     ],
   },
   {
+    name: "stop alone halts autoplay when it is running",
+    drive(game) {
+      game.execute("autoplay fast");
+      game.print(`Autoplay after start: ${game.autoplayRunning ? "yes" : "no"}`);
+      game.execute("stop");
+      game.print(`Autoplay after stop: ${game.autoplayRunning ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Autoplay fast started. Type 'stop' to stop it.",
+      "Autoplay after start: yes",
+      "Autoplay stopped.",
+      "Autoplay after stop: no",
+    ],
+  },
+  {
     name: "autoplay wins without weight drops",
     drive(game) {
       const originalRandom = Math.random;
@@ -2791,11 +2808,11 @@ const gameCases = [
     name: "ornate box starts in guest trunk instead of top drawer",
     inputs: ["open top drawer", "examine top drawer", "go west", "go south", "open guest trunk", "examine guest trunk"],
     expectedIncluded: [
-      "You see the top drawer; inside there is: a neatly folded linen sheet.",
-      "You see a sturdy trunk placed at the foot of the guest bed; inside there is: a folded quilt smelling faintly of lavender and cupboard freshness, a small, ornate box.",
+      "You see the top drawer; inside is a neatly folded linen sheet.",
+      "You see a sturdy trunk placed at the foot of the guest bed; inside are a folded quilt smelling faintly of lavender and cupboard freshness, a small, ornate box.",
     ],
     notExpectedIncluded: [
-      "You see the top drawer; inside there is: a neatly folded linen sheet, a small, ornate box.",
+      "You see the top drawer; inside is a neatly folded linen sheet, a small, ornate box.",
     ],
   },
   {
@@ -2809,7 +2826,7 @@ const gameCases = [
     },
     expectedIncluded: [
       "You open the top drawer.",
-      "You see the top drawer; inside there is: a neatly folded linen sheet.",
+      "You see the top drawer; inside is a neatly folded linen sheet.",
       "Drawer clarification count: 1",
     ],
   },
@@ -2961,6 +2978,8 @@ const gameCases = [
     name: "companion overflow is named instead of repeated as flat presence lines",
     drive(game) {
       game.execute("jump rivendell");
+      ["thorin", "unexpected_party_balin", "unexpected_party_dwalin", "unexpected_party_fili", "gandalf"].forEach((id) => placeCharacterWithPlayer(game, id));
+      game.execute("look");
     },
     expectedIncluded: [
       /Gandalf.*(nearby as well|linger a little apart|close at hand|wait a little apart)/,
@@ -3083,7 +3102,7 @@ const gameCases = [
       "Jump room: trollshaws_road",
       "Has sword: yes",
       "Has rope: yes",
-      "Has large key: yes",
+      "Has large key: no",
       "Trolls transformed: yes",
     ],
   },
@@ -3164,7 +3183,7 @@ const gameCases = [
       "Has key: yes",
       "Has rope: yes",
       "Has firestone: yes",
-      "Has large key: yes",
+      "Has large key: no",
       "Has sword: yes",
       "Trolls transformed: yes",
       "Rivendell ready: no",
@@ -3565,6 +3584,54 @@ const gameCases = [
     ],
     notExpectedIncluded: [
       "Room after hidden door entry: lower_halls",
+    ],
+  },
+  {
+    name: "jump rivendell still leaves room to take beorns meal",
+    drive(game) {
+      game.execute("jump rivendell");
+      for (let step = 0; step < 400 && game.currentRoom !== "beorns_house" && !game.endgame; step += 1) {
+        const command = game.nextAutoplayCommand();
+        if (!command) throw new Error(`Expected a route to Beorn, but autoplay stopped in ${game.currentRoom}.`);
+        game.execute(command);
+      }
+      if (game.currentRoom !== "beorns_house") throw new Error(`Expected to reach Beorn's House, got ${game.currentRoom}.`);
+      game.print(`Weight at Beorn: ${game.currentCarryWeight()}/${game.carryCapacity()}`);
+      game.execute("open curtain");
+      game.execute("open cupboard");
+      game.execute("take meal");
+      game.print(`Has meal at Beorn: ${game.findInInventory("meal") ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Jumped to Rivendell.",
+      "Weight at Beorn: 46/52",
+      "You take the meal from the cupboard.",
+      "Has meal at Beorn: yes",
+    ],
+    notExpectedIncluded: [
+      "The meal would be too much to carry",
+      "You drop the",
+    ],
+  },
+  {
+    name: "autoplay can free room for beorns meal if needed",
+    drive(game) {
+      game.execute("jump rivendell");
+      for (let step = 0; step < 400 && game.currentRoom !== "beorns_house" && !game.endgame; step += 1) {
+        const command = game.nextAutoplayCommand();
+        if (!command) throw new Error(`Expected a route to Beorn, but autoplay stopped in ${game.currentRoom}.`);
+        game.execute(command);
+      }
+      game.debugGivePlayerItem("large key");
+      game.execute("open curtain");
+      game.execute("open cupboard");
+      game.execute("examine cupboard");
+      game.flags.autoplayexaminedcupboard = true;
+      const command = game.nextAutoplayCommand();
+      game.print(`Autoplay next at Beorn while overloaded: ${command}`);
+    },
+    expectedIncluded: [
+      "Autoplay next at Beorn while overloaded: drop large key",
     ],
   },
   {
@@ -4281,8 +4348,8 @@ const gameCases = [
     expectedIncluded: [
       "Groping beside the water in the dark, your fingers close around a small cold ring. Almost without thinking, you slip it into your pocket.",
       "Gollum narrows his pale eyes. 'Baggins has answered. Now Baggins asks, yes. Ask it, precious, ask it.'",
-      "You wear the golden ring and become unnoticeable.",
-      "Invisible under the ring, you slip past Gollum as he claws wildly about for his precious.",
+      /You (?:wear the golden ring and become unnoticeable\.|slip the golden ring on and fade from notice\.|draw the golden ring onto your finger and pass from sight\.)/,
+      /(?:Invisible under the ring, you slip past Gollum as he claws wildly about for his precious\.|Hidden by the ring, you edge past Gollum while he gropes and hisses for his precious\.|Unseen beneath the ring, you steal by Gollum while his hands scrabble desperately in the dark\.)/,
       "Ring flag after Gollum: yes",
     ],
   },
@@ -4321,7 +4388,9 @@ const gameCases = [
       giveItemToCharacter(game, "golden_ring", game.player.id);
     },
     inputs: ["wear ring"],
-    expectedIncluded: ["You wear the golden ring and become unnoticeable."],
+    expectedIncluded: [
+      /You (?:wear the golden ring and become unnoticeable\.|slip the golden ring on and fade from notice\.|draw the golden ring onto your finger and pass from sight\.)/,
+    ],
     notExpectedIncluded: [
       "Gandalf looks around, puzzled, unable to see who is there.",
       "Thorin looks around, puzzled, unable to see who is there.",
@@ -4576,7 +4645,9 @@ const gameCases = [
     },
     inputs: ["north"],
     expectedIncluded: [],
-    notExpectedIncluded: ["Invisible under the ring, you slip past Gollum as he claws wildly about for his precious."],
+    notExpectedIncluded: [
+      /(?:Invisible under the ring, you slip past Gollum as he claws wildly about for his precious\.|Hidden by the ring, you edge past Gollum while he gropes and hisses for his precious\.|Unseen beneath the ring, you steal by Gollum while his hands scrabble desperately in the dark\.)/,
+    ],
   },
   {
     name: "missing exit reports no visible exit rather than unrecognized direction",

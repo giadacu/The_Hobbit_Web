@@ -219,7 +219,7 @@ window.HOBBIT_DATA = {
     "dark_stuffy_passage_1": {
       "id": "dark_stuffy_passage_1",
       "name": "Dark Stuffy Passage 1",
-      "description": "You are in a dark stuffy passage. The air is thick with dust, and the faint sound of dripping water echoes through the narrow space.",
+      "description": "Dust hangs thick in this cramped black passage, and faint dripping echoes somewhere beyond the reach of your hands.",
       "image": "dark_stuffy_1.jpeg",
       "transformedImage": null,
       "sound": "suspence"
@@ -227,7 +227,7 @@ window.HOBBIT_DATA = {
     "dark_stuffy_passage_2": {
       "id": "dark_stuffy_passage_2",
       "name": "Dark Stuffy Passage 2",
-      "description": "You are in a dark stuffy passage. The walls are close and damp, making every breath feel heavy and labored.",
+      "description": "The walls draw close here, damp and oppressive, until every breath feels heavier than the last.",
       "image": "dark_stuffy_2.jpeg",
       "transformedImage": null,
       "sound": "suspence"
@@ -235,7 +235,7 @@ window.HOBBIT_DATA = {
     "dark_stuffy_passage_3": {
       "id": "dark_stuffy_passage_3",
       "name": "Dark Stuffy Passage 3",
-      "description": "You are in a dark stuffy passage. The oppressive darkness presses in from all sides, with only the sound of your footsteps breaking the silence.",
+      "description": "Darkness presses in on every side, and only the small betraying sound of your own footsteps disturbs it.",
       "image": "dark_stuffy_3.jpeg",
       "transformedImage": null,
       "sound": "suspence"
@@ -243,7 +243,7 @@ window.HOBBIT_DATA = {
     "dark_stuffy_passage_4": {
       "id": "dark_stuffy_passage_4",
       "name": "Dark Stuffy Passage 4",
-      "description": "You are in a dark stuffy passage. The musty smell of mold fills your nostrils, and the ceiling feels like it's closing in on you.",
+      "description": "A musty reek of mold clings to this tunnel, and the low roof gives the unpleasant sense of stooping toward you.",
       "image": "dark_stuffy_4.jpeg",
       "transformedImage": null,
       "sound": "suspence"
@@ -259,7 +259,7 @@ window.HOBBIT_DATA = {
     "dark_stuffy_passage_5": {
       "id": "dark_stuffy_passage_5",
       "name": "Dark Stuffy Passage 5",
-      "description": "You are in a dark stuffy passage. The air is stale and unmoving, carrying a faint, unpleasant odor that lingers.",
+      "description": "The air in this passage is stale and dead, carrying an old sour smell that seems unwilling to disperse.",
       "image": "dark_stuffy_5.jpeg",
       "transformedImage": null,
       "sound": "suspence"
@@ -267,7 +267,7 @@ window.HOBBIT_DATA = {
     "dark_stuffy_passage_6": {
       "id": "dark_stuffy_passage_6",
       "name": "Dark Stuffy Passage 6",
-      "description": "You are in a dark stuffy passage. Shadows loom ominously, and the confined space amplifies every small sound.",
+      "description": "Shadows mass thickly in the cramped passage, and the narrow stone throws every small sound back at you.",
       "image": "dark_stuffy_6.jpeg",
       "transformedImage": null,
       "sound": "suspence"
@@ -275,7 +275,7 @@ window.HOBBIT_DATA = {
     "dark_stuffy_passage_7": {
       "id": "dark_stuffy_passage_7",
       "name": "Dark Stuffy Passage 7",
-      "description": "You are in a dark stuffy passage. The walls are rough and cold to the touch, with an unsettling feeling of being enclosed.",
+      "description": "Rough cold stone hems you in here, close enough to touch on either side and too close for comfort.",
       "image": "dark_stuffy_7.jpeg",
       "transformedImage": null,
       "sound": "suspence"
@@ -283,7 +283,7 @@ window.HOBBIT_DATA = {
     "dark_stuffy_passage_8": {
       "id": "dark_stuffy_passage_8",
       "name": "Dark Stuffy Passage 8",
-      "description": "You are in a dark stuffy passage. The air is suffocatingly still, and it feels as though the darkness itself is pressing down on you.",
+      "description": "The air lies suffocatingly still, as though even the darkness had weight enough to bear down on you.",
       "image": "dark_stuffy_8.jpeg",
       "transformedImage": null,
       "sound": "suspence"
@@ -291,7 +291,7 @@ window.HOBBIT_DATA = {
     "dark_stuffy_passage_9": {
       "id": "dark_stuffy_passage_9",
       "name": "Dark Stuffy Passage 9",
-      "description": "You are in a dark stuffy passage. The silence is thick, broken only by the distant sound of scurrying creatures.",
+      "description": "A thick uneasy silence holds this passage, broken only now and then by some distant furtive scurrying.",
       "image": "dark_stuffy_9.jpeg",
       "transformedImage": null,
       "sound": "suspence"
@@ -299,7 +299,7 @@ window.HOBBIT_DATA = {
     "dark_stuffy_passage_10": {
       "id": "dark_stuffy_passage_10",
       "name": "Dark Stuffy Passage 10",
-      "description": "You are in a dark stuffy passage. The confined space makes it difficult to move freely, and each step stirs up more dust.",
+      "description": "There is scarcely room to move freely here, and each careful step kicks fresh dust into the close air.",
       "image": "dark_stuffy_10.jpeg",
       "transformedImage": null,
       "sound": "suspence"
@@ -307,7 +307,7 @@ window.HOBBIT_DATA = {
     "dark_stuffy_passage_11": {
       "id": "dark_stuffy_passage_11",
       "name": "Dark Stuffy Passage 11",
-      "description": "You are in a dark stuffy passage. The lack of ventilation makes the air feel heavy and hard to breathe.",
+      "description": "No breath of air reaches this place, and the closeness of it makes breathing feel like work.",
       "image": "dark_stuffy_11.jpeg",
       "transformedImage": null,
       "sound": "suspence"
@@ -315,7 +315,7 @@ window.HOBBIT_DATA = {
     "dark_stuffy_passage_12": {
       "id": "dark_stuffy_passage_12",
       "name": "Dark Stuffy Passage 12",
-      "description": "You are in a dark stuffy passage. The darkness is almost tangible, and the passage seems to stretch endlessly ahead.",
+      "description": "The darkness here feels nearly solid, and the passage ahead seems longer than any honest tunnel ought to be.",
       "image": "dark_stuffy_12.jpeg",
       "transformedImage": null,
       "sound": "suspence"
@@ -323,7 +323,7 @@ window.HOBBIT_DATA = {
     "dark_stuffy_passage_13": {
       "id": "dark_stuffy_passage_13",
       "name": "Dark Stuffy Passage 13",
-      "description": "You are in a dark stuffy passage. The oppressive heat adds to the discomfort, making every breath feel thick and warm.",
+      "description": "Heat sits heavily in this black passage, turning every breath thick and unpleasantly warm.",
       "image": "dark_stuffy_13.jpeg",
       "transformedImage": null,
       "sound": "suspence"
@@ -339,7 +339,7 @@ window.HOBBIT_DATA = {
     "dark_stuffy_passage_14": {
       "id": "dark_stuffy_passage_14",
       "name": "Dark Stuffy Passage 14",
-      "description": "You are in a dark stuffy passage. The musty smell of old, decaying wood fills the air, adding to the sense of unease.",
+      "description": "The passage smells of damp rot and old wood, a stale breath that only deepens the unease of the place.",
       "image": "dark_stuffy_14.jpeg",
       "transformedImage": null,
       "sound": "suspence"
@@ -347,7 +347,7 @@ window.HOBBIT_DATA = {
     "dark_stuffy_passage_15": {
       "id": "dark_stuffy_passage_15",
       "name": "Dark Stuffy Passage 15",
-      "description": "You are in a dark stuffy passage. The narrow confines amplify your heartbeat, making it sound unnaturally loud in the silence.",
+      "description": "The narrow confines make your own heartbeat sound louder than it should, as though the dark were listening back.",
       "image": "dark_stuffy_15.jpeg",
       "transformedImage": null,
       "sound": "suspence"

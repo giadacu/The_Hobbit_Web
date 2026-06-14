@@ -3004,7 +3004,17 @@
         rivendell: ["looks more rested here than on the open road", "studies the elvish work with open respect", "listens in spite of himself for distant song"],
         beorn_house: ["glances often toward the yard and its disciplined beasts", "seems impressed by the strength of the house", "watches the door with road-bred caution"],
         beorn_wild: ["watches the river and the banks with a traveller's respect", "seems relieved to be in open country again", "keeps an eye on the wild land round about as though expecting movement"],
-        goblins: ["waits tensely in the dark", "listens for any stir ahead", "keeps close to the wall, breathing carefully"],
+        goblins: [
+          "waits tensely in the dark",
+          "listens for any stir ahead",
+          "keeps close to the wall, breathing carefully",
+          "moves with one hand on the rough stone, unwilling to trust the dark",
+          "holds still whenever the tunnels seem to mutter among themselves",
+          "breathes shallowly, as though even sound might draw trouble",
+          "keeps a wary eye on every turning, however little the gloom allows",
+          "stands with shoulders tight, listening for boots, claws, or worse",
+          "waits in the foul dark like one expecting the mountain itself to betray him",
+        ],
         mirkwood: ["looks worn by hunger and bad light", "watches the branches overhead with undisguised mistrust", "moves like someone afraid the trees may be listening"],
         elves: ["keeps quiet under the eyes of the Elvenking's folk", "studies the halls as though measuring chances of escape", "waits with dwarf patience and dwarf resentment"],
         laketown_town: ["watches the water and the people with equal suspicion", "seems steadier for the sound of human trade and labor", "keeps his cloak close in the lake-wind"],
@@ -6390,14 +6400,14 @@
       const game = this.game;
       const mode = normalize(object);
       if (mode === "stop" || mode === "off") return this.stopAutoplay("Autoplay stopped.");
-      if (game.autoplayRunning) return game.print("Autoplay is already running. Type 'stop autoplay' or 'autoplay stop' to stop it.", "system");
+      if (game.autoplayRunning) return game.print("Autoplay is already running. Type 'stop' to stop it.", "system");
       game.clearIdleAdvanceTimer();
       game.autoplayMode = mode === "fast" ? "fast" : "slow";
       game.autoplayDelay = game.autoplayMode === "fast" ? 450 : 2700;
       game.autoplayRunning = true;
       game.autoplayWaits = 0;
       game.autoplayRunId += 1;
-      game.print(`Autoplay ${game.autoplayMode} started. Type 'stop autoplay' or 'autoplay stop' to stop it.`, "system");
+      game.print(`Autoplay ${game.autoplayMode} started. Type 'stop' to stop it.`, "system");
       this.scheduleAutoplayStep();
     }
 
@@ -6547,7 +6557,7 @@
         return "climb branch";
       }
 
-      if (beforeDragonDefeat && !this.autoplayHas("large key")) {
+      if (beforeDragonDefeat && !this.autoplayHas("large key") && !game.flags.largekeyspent) {
         if (!game.visitedTrollsClearing) return this.autoplayRouteCommandTo("trolls_clearing");
         if (game.currentRoom !== "trolls_clearing") return this.autoplayRouteCommandTo("trolls_clearing");
         if (!game.trollsTransformed) return "carefully take large key and south west";
@@ -6623,6 +6633,8 @@
         if (curtain && !curtain.open) return "open curtain";
         if (cupboard && !cupboard.open) return "open cupboard";
         if (!game.flags.autoplayexaminedcupboard) return this.autoplayOnce("autoplayexaminedcupboard", "examine cupboard");
+        const prepMealLoad = this.autoplayRequiredPickupPrepCommand("meal");
+        if (prepMealLoad) return prepMealLoad;
         return "take meal";
       }
 
@@ -6719,6 +6731,7 @@
         "majestic sword": ["ornate box", "small key", "sturdy key"],
         "sturdy rope": ["ornate box", "small key", "sturdy key", "firestone", "brass lantern"],
         "golden ring": ["ornate box"],
+        "meal": ["large key", "sturdy key", "firestone", "brass lantern"],
       };
       const expendable = expendableByNeed[item.name] || [];
       for (const name of expendable) {
@@ -6926,7 +6939,7 @@
       if (item.mended) description = game.mendedItemDescription(item);
       if (item.container && item.open && item.contents.length) {
         const visible = item.contents.map((id) => game.items[id]).filter((child) => child?.visible);
-        if (visible.length) description += `; inside there is: ${visible.map((child) => game.describeItemShort(child)).join(", ")}`;
+        if (visible.length) description += `; ${game.containerContentsDescription(visible)}`;
       }
       game.revealFromSpecial("examine", text);
       if (item.location?.type === "character" && item.location.id === game.player.id && game.player.name !== "You") {
@@ -8081,7 +8094,7 @@
           this.print(adventureEndedText(), "system");
           return;
         }
-        if (normalize(lower) === "stop autoplay") {
+        if (this.autoplayRunning && ["stop", "stop autoplay", "autoplay stop"].includes(normalize(lower))) {
           this.stopAutoplay("Autoplay stopped.");
           this.render();
           return;
@@ -9605,8 +9618,71 @@
       this.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true, sword: true, rope: true, ring: config.ring });
       this.debugGivePlayerItem("firestone");
       this.debugGivePlayerItem("sturdy key");
-      this.debugGivePlayerItem("large key");
+      this.flags.largekeyspent = true;
       this.debugGivePlayerItem("majestic sword");
+    }
+
+    cyclingVariant(key, variants, salt = "") {
+      if (!Array.isArray(variants) || !variants.length) return "";
+      this.flags.narrativeVariantCounts ||= {};
+      const currentCount = Number(this.flags.narrativeVariantCounts[key] || 0);
+      this.flags.narrativeVariantCounts[key] = currentCount + 1;
+      const seed = hashString(`${this.storySeed}:${key}:${salt}:${currentCount}:${this.turnCount}`);
+      return variants[Math.abs(seed) % variants.length];
+    }
+
+    containerContentsDescription(visibleItems = []) {
+      if (!visibleItems.length) return "";
+      const listed = visibleItems.map((child) => this.describeItemShort(child)).join(", ");
+      return visibleItems.length === 1 ? `inside is ${listed}` : `inside are ${listed}`;
+    }
+
+    ringWearMessage(character = this.player) {
+      const actor = character?.name === "You" ? "You" : character?.name || "Someone";
+      const verb = actor === "You" ? "wear" : "wears";
+      const become = actor === "You" ? "become" : "becomes";
+      const possessive = actor === "You" ? "your" : characterPossessiveName(character);
+      return this.cyclingVariant("ring-wear", [
+        `${actor} ${verb} the golden ring and ${become} unnoticeable.`,
+        `${actor} slip${actor === "You" ? "" : "s"} the golden ring on and fade${actor === "You" ? "" : "s"} from notice.`,
+        `${actor} draw${actor === "You" ? "" : "s"} the golden ring onto ${possessive} finger and pass${actor === "You" ? "" : "es"} from sight.`,
+      ], actor);
+    }
+
+    ringRemoveMessage(character = this.player) {
+      const actor = character?.name === "You" ? "You" : character?.name || "Someone";
+      const verb = actor === "You" ? "remove" : "removes";
+      const become = actor === "You" ? "become" : "becomes";
+      return this.cyclingVariant("ring-remove", [
+        `${actor} ${verb} the golden ring and ${become} noticeable again.`,
+        `${actor} slip${actor === "You" ? "" : "s"} the golden ring off and return${actor === "You" ? "" : "s"} to sight.`,
+        `${actor} tug${actor === "You" ? "" : "s"} the golden ring free and ${become} visible once more.`,
+      ], actor);
+    }
+
+    ringSlipMessage(character) {
+      if (!character) return "The golden ring slips away.";
+      if (character.id === this.data.player) {
+        return this.cyclingVariant("ring-slip-player", [
+          "The golden ring slips off your finger and falls back into your pocket.",
+          "The golden ring loosens on your finger, then drops into your pocket.",
+          "The golden ring slides free from your finger and settles in your pocket.",
+        ]);
+      }
+      const possessive = characterPossessiveName(character);
+      return this.cyclingVariant("ring-slip-npc", [
+        `The golden ring slips off ${possessive} finger and falls in ${possessive} pocket.`,
+        `The golden ring slides from ${possessive} finger and drops into ${possessive} pocket.`,
+        `The golden ring works loose on ${possessive} finger and settles back in ${possessive} pocket.`,
+      ], character.id);
+    }
+
+    gollumRingEscapeMessage() {
+      return this.cyclingVariant("gollum-ring-escape", [
+        "Invisible under the ring, you slip past Gollum as he claws wildly about for his precious.",
+        "Hidden by the ring, you edge past Gollum while he gropes and hisses for his precious.",
+        "Unseen beneath the ring, you steal by Gollum while his hands scrabble desperately in the dark.",
+      ]);
     }
 
     quit() {
@@ -9775,7 +9851,7 @@
         for (const character of this.peopleInRoom()) {
           if (character.movementMode === "follow" && character.id !== this.player.id) character.followingPlayer = false;
         }
-        return this.print(this.player.name === "You" ? "You wear the golden ring and become unnoticeable." : `${this.player.name} wears the golden ring and becomes unnoticeable.`);
+        return this.print(this.ringWearMessage(this.player));
       }
       if (!item.wearable) return this.print(`The ${item.name} cannot be worn.`);
       this.detachItem(item.id);
@@ -9813,7 +9889,7 @@
         this.items[id].location = { type: "character", id: this.player.id };
         if (!this.player.inventory.includes(id)) this.player.inventory.push(id);
       }
-      this.print(this.player.name === "You" ? "You remove the golden ring and become noticeable again." : `${this.player.name} removes the golden ring and becomes noticeable again.`);
+      this.print(this.ringRemoveMessage(this.player));
     }
 
     give(command) {
@@ -10738,7 +10814,7 @@
       }
       if (previousRoom === "deep_dark_lake" && this.gollumState?.pocketQuestionAsked && this.player.noticeable === false && !this.gollumState.escaped && this.isGollumPresentInLake()) {
         this.gollumState.escaped = true;
-        this.print("Invisible under the ring, you slip past Gollum as he claws wildly about for his precious.");
+        this.print(this.gollumRingEscapeMessage());
       }
       if (movedInTotalDarkness && this.applyDarkMovementHazard(previousRoom, direction, connection.to)) return true;
       this.moveFollowers(previousRoom, connection.to, direction);
@@ -11351,7 +11427,7 @@
           this.items[ringId].location = { type: "character", id: character.id };
           if (!character.inventory.includes(ringId)) character.inventory.push(ringId);
         }
-        this.print(character.id === this.data.player ? "The golden ring slips off you finger and falls in your pocket." : `The golden ring slips off ${characterPossessiveName(character)} finger and falls in ${characterPossessiveName(character)} pocket.`);
+        this.print(this.ringSlipMessage(character));
       }
     }
 
@@ -11799,6 +11875,9 @@
     }
 
     checkSpecialSituations() {
+      if (this.currentRoom === "trolls_cave" || this.visitedRooms.has("trolls_cave")) {
+        this.flags.largekeyspent = true;
+      }
       return this.hazards.checkSpecialSituations();
     }
 
