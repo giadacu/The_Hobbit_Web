@@ -19,11 +19,13 @@
   const form = $("command-form");
   const gameShell = $("game-shell");
   const roomImage = $("room-image");
+  const scenePanel = roomImage?.closest(".scene") || null;
   const imageReveal = $("image-reveal");
   const imageRevealOutline = $("image-reveal-outline");
   const imageRevealFill = $("image-reveal-fill");
   const sceneMapOverlay = $("scene-map-overlay");
   const sceneMapImage = $("scene-map-image");
+  const mobileSceneHandle = $("mobile-scene-handle");
   const musicPlayer = $("music-player");
   const sceneCompass = $("scene-compass");
   const sceneCompassRose = $("scene-compass-rose");
@@ -67,6 +69,10 @@
   const LAYOUT_SPLIT_PREF_KEY = "hobbit-web-layout-2-scene-width";
   const DEFAULT_LAYOUT_2_SCENE_WIDTH = 54;
   const IDLE_WAIT_MS = 30000;
+  const MOBILE_SCENE_PEEK_HEIGHT = 28;
+  const MOBILE_SCENE_EXPANDED_RATIO = 0.42;
+  const MOBILE_SCENE_MIN_HEIGHT = 240;
+  const MOBILE_SCENE_MAX_HEIGHT = 420;
   const OUTPUT_SCROLL_BOTTOM_THRESHOLD = 24;
   const OUTPUT_SCROLL_EASING = 0.16;
   const PROFANITY_OUTBURST_RE = /\b(?:fuck(?:ing)?|fuckin|shit|bullshit|damn(?:ed)?|asshole|bastard|cazzo|merda|vaffanculo|fanculo|stronz[oaie]?)\b/i;
@@ -5418,6 +5424,10 @@
       game.layoutSwitchHideTimer = null;
       game.layoutSwitchAutoHide = this.shouldAutoHideLayoutSwitch();
       game.layoutResizeCleanup = null;
+      game.mobileSceneDrawerCleanup = null;
+      game.mobileSceneHeight = null;
+      game.mobileSceneExpandedHeight = 0;
+      game.mobileSceneDragMoved = false;
       game.layoutMouseAnchor = null;
       game.layoutModePreference = this.loadLayoutModePreference();
       game.layoutMode = "1";
@@ -5426,6 +5436,7 @@
       this.applyLayoutMode(game.layoutModePreference);
       this.initializeLayoutSwitchVisibility();
       this.initializeLayoutDivider();
+      this.initializeMobileSceneDrawer();
     }
 
     render() {
@@ -5592,6 +5603,144 @@
     effectiveLayoutMode(mode) {
       const normalized = ["1", "2"].includes(String(mode)) ? String(mode) : "1";
       return this.isDedicatedMobileLayout() ? "1" : normalized;
+    }
+
+    mobileSceneExpandedHeight() {
+      const viewportHeight = Number(window.innerHeight || document.documentElement?.clientHeight || 0) || 0;
+      const scaled = Math.round(viewportHeight * MOBILE_SCENE_EXPANDED_RATIO);
+      return Math.min(MOBILE_SCENE_MAX_HEIGHT, Math.max(MOBILE_SCENE_MIN_HEIGHT, scaled || MOBILE_SCENE_MIN_HEIGHT));
+    }
+
+    mobileSceneBounds() {
+      return {
+        min: MOBILE_SCENE_PEEK_HEIGHT,
+        max: this.mobileSceneExpandedHeight(),
+      };
+    }
+
+    applyMobileSceneHeight(value, options = {}) {
+      const game = this.game;
+      const { min, max } = this.mobileSceneBounds();
+      const fallback = options.preferCollapsed ? min : max;
+      const numeric = Number.parseFloat(value);
+      const next = Math.min(max, Math.max(min, Number.isFinite(numeric) ? numeric : fallback));
+      game.mobileSceneExpandedHeight = max;
+      game.mobileSceneHeight = next;
+      const collapsed = next <= min + 2;
+      document.body?.style?.setProperty?.("--mobile-scene-peek-height", `${min}px`);
+      document.body?.style?.setProperty?.("--mobile-scene-expanded-height", `${max}px`);
+      document.body?.style?.setProperty?.("--mobile-scene-current-height", `${next}px`);
+      document.documentElement?.style?.setProperty?.("--mobile-scene-peek-height", `${min}px`);
+      document.documentElement?.style?.setProperty?.("--mobile-scene-expanded-height", `${max}px`);
+      document.documentElement?.style?.setProperty?.("--mobile-scene-current-height", `${next}px`);
+      document.body?.setAttribute("data-mobile-scene-collapsed", collapsed ? "true" : "false");
+      document.documentElement?.setAttribute?.("data-mobile-scene-collapsed", collapsed ? "true" : "false");
+      if (mobileSceneHandle) mobileSceneHandle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      if (game.outputPinnedToBottom) game.scheduleOutputScroll(true);
+      return next;
+    }
+
+    resetMobileSceneDrawer() {
+      const game = this.game;
+      game.mobileSceneHeight = null;
+      game.mobileSceneExpandedHeight = 0;
+      document.body?.style?.removeProperty?.("--mobile-scene-current-height");
+      document.body?.style?.removeProperty?.("--mobile-scene-expanded-height");
+      document.body?.style?.removeProperty?.("--mobile-scene-peek-height");
+      document.documentElement?.style?.removeProperty?.("--mobile-scene-current-height");
+      document.documentElement?.style?.removeProperty?.("--mobile-scene-expanded-height");
+      document.documentElement?.style?.removeProperty?.("--mobile-scene-peek-height");
+      document.body?.removeAttribute?.("data-mobile-scene-collapsed");
+      document.documentElement?.removeAttribute?.("data-mobile-scene-collapsed");
+      if (mobileSceneHandle) mobileSceneHandle.setAttribute("aria-expanded", "true");
+    }
+
+    syncMobileSceneDrawer(options = {}) {
+      const game = this.game;
+      if (!this.isDedicatedMobileLayout()) {
+        this.resetMobileSceneDrawer();
+        return;
+      }
+      const { min, max } = this.mobileSceneBounds();
+      const preferCollapsed = options.preferCollapsed === true;
+      const next = options.forceExpanded
+        ? max
+        : Number.isFinite(game.mobileSceneHeight)
+          ? Math.min(max, Math.max(min, game.mobileSceneHeight))
+          : (preferCollapsed ? min : max);
+      this.applyMobileSceneHeight(next, { preferCollapsed });
+    }
+
+    toggleMobileSceneDrawer(expanded = null) {
+      if (!this.isDedicatedMobileLayout()) return;
+      const { min, max } = this.mobileSceneBounds();
+      const current = Number.isFinite(this.game.mobileSceneHeight) ? this.game.mobileSceneHeight : max;
+      const shouldExpand = expanded == null ? current <= min + ((max - min) / 2) : Boolean(expanded);
+      this.applyMobileSceneHeight(shouldExpand ? max : min);
+    }
+
+    stopMobileSceneDrag() {
+      const cleanup = this.game.mobileSceneDrawerCleanup;
+      if (typeof cleanup === "function") cleanup();
+      this.game.mobileSceneDrawerCleanup = null;
+    }
+
+    initializeMobileSceneDrawer() {
+      const game = this.game;
+      if (!scenePanel || !mobileSceneHandle) return;
+
+      mobileSceneHandle.addEventListener("click", (event) => {
+        if (!this.isDedicatedMobileLayout()) return;
+        if (game.mobileSceneDragMoved) {
+          game.mobileSceneDragMoved = false;
+          event.preventDefault();
+          return;
+        }
+        this.toggleMobileSceneDrawer();
+      });
+
+      scenePanel.addEventListener("pointerdown", (event) => {
+        if (!this.isDedicatedMobileLayout()) return;
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        if (!Number.isFinite(event.clientY)) return;
+        event.preventDefault();
+        this.stopMobileSceneDrag();
+        const startY = event.clientY;
+        const startHeight = Number.isFinite(game.mobileSceneHeight) ? game.mobileSceneHeight : this.mobileSceneBounds().max;
+        game.mobileSceneDragMoved = false;
+
+        const move = (moveEvent) => {
+          if (!Number.isFinite(moveEvent.clientY)) return;
+          const delta = moveEvent.clientY - startY;
+          if (Math.abs(delta) > 6) game.mobileSceneDragMoved = true;
+          this.applyMobileSceneHeight(startHeight + delta);
+        };
+
+        const finish = () => {
+          const { min, max } = this.mobileSceneBounds();
+          const current = Number.isFinite(game.mobileSceneHeight) ? game.mobileSceneHeight : max;
+          const midpoint = min + ((max - min) / 2);
+          const moved = game.mobileSceneDragMoved;
+          this.applyMobileSceneHeight(current > midpoint ? max : min);
+          this.stopMobileSceneDrag();
+          if (moved) {
+            window.setTimeout(() => {
+              game.mobileSceneDragMoved = false;
+            }, 0);
+          }
+        };
+
+        document.addEventListener("pointermove", move);
+        document.addEventListener("pointerup", finish, { once: true });
+        document.addEventListener("pointercancel", finish, { once: true });
+        game.mobileSceneDrawerCleanup = () => {
+          document.removeEventListener("pointermove", move);
+          document.removeEventListener("pointerup", finish);
+          document.removeEventListener("pointercancel", finish);
+        };
+      });
+
+      this.syncMobileSceneDrawer();
     }
 
     loadLayout2SceneWidthPreference() {
@@ -5783,6 +5932,7 @@
       syncPressed(layoutMode1Button, "1");
       syncPressed(layoutMode2Button, "2");
       if (effective !== "2") this.stopLayoutResize();
+      this.syncMobileSceneDrawer();
     }
 
     setLayoutMode(mode) {
