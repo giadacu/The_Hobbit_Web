@@ -383,7 +383,7 @@
     ],
     mountains: [
       "The mountains do not hate us, but they care very little whether we live.",
-      "Keep your footing and your courage. Both are easily lost on these heights.",
+      "When the heights begin to speak in that voice, shelter is wiser than pride.",
     ],
     goblins: [
       "Goblins love noise, darkness, and cruelty; let us offer them as little of ourselves as we can.",
@@ -601,6 +601,45 @@
     "dark_stuffy_passage_15",
   ]);
 
+  const GOLLUM_PURSUIT_ECHO_POOLS = {
+    deep: [
+      "Close behind, Gollum's scream tears through the black passages: 'Thief! Thief! Baggins!' and for one sick instant it seems to come from just beyond the next turn.",
+      "The dark carries Gollum's grief too well here. 'My precious!' bursts out behind you and returns so near at hand that you turn before you can stop yourself.",
+      "Somewhere in the deep ways Gollum gives a choking wail, and the tunnels hand it on from crack to crack until it sounds as though he is crawling after you through the stone itself.",
+      "A wet shriek races the walls behind you. 'Thief, thief, thief!' The echoes crowd so close that the dark feels full of reaching fingers.",
+    ],
+    maze: [
+      "Gollum's cries scatter into the side-passages and come back changed, one voice hissing, another sobbing, a third laughing thinly in the dark.",
+      "From one black opening to the next leaps the cry of 'my precious,' until the passages seem to be whispering it among themselves.",
+      "His howling loses any single direction here; it skitters round corners, drops from ledges, and rises underfoot, leaving you no sure sense of where he truly is.",
+      "The maze of tunnels toys with Gollum's grief, sending it ahead of you, behind you, and once terribly close at your shoulder before it slips away again.",
+    ],
+    approach: [
+      "Farther on, Gollum's voice turns raw with panic. 'Baggins! Thief!' It is not so near now, but no less dreadful for that.",
+      "The cries still pursue you, thinner than before yet more desperate, like something that knows it is losing you and means to hate you forever for it.",
+      "A long miserable wail follows through the stale air, no longer close enough to place, yet sharp enough to keep your heart beating like a trapped thing.",
+      "Behind you Gollum goes on calling for his precious in a broken voice that makes the last stretches of tunnel feel lonelier, not safer.",
+    ],
+    threshold: [
+      "From the black behind the gate comes one last shriek of 'my precious,' so full of malice and misery that even the open air gives little comfort.",
+      "Even near the mouth of the tunnels, Gollum's voice finds you: distant now, but venomous enough to make you flinch as though he had breathed on your neck.",
+      "The mountain throws back a last torn cry from Gollum, and though it comes from far below now, it clings to you like cold water.",
+      "Behind the goblin gate his lament rises once more, thin with distance and yet so bitter that escape still does not feel like safety.",
+    ],
+  };
+
+  const GOLLUM_PURSUIT_RING_TAILS = [
+    "Invisible or no, each cry seems to find the very finger where the ring rests, as though Gollum's hunger could smell gold through dark and stone.",
+    "There is something worse in the way he calls for his precious now: each shriek feels less like blind grief than a hand blindly reaching toward the ring on you.",
+    "Whenever he screams for his precious, it seems aimed not at the tunnels generally, but straight at the small circle hidden on your hand.",
+  ];
+
+  const GOLLUM_PURSUIT_EXHAUSTION_TAILS = [
+    "Your own breath comes back harsh and uneven, and for a dreadful instant it sounds as though the tunnels are betraying you to him.",
+    "You are breathing too hard to feel truly hidden; every gasp seems loud enough to serve as a guide.",
+    "Weariness is in your legs and throat alike now, so that even your frightened breathing feels like something hunting on your heels.",
+  ];
+
   const IMMERSION_MOUNTAIN_ROOMS = new Set([
     "misty_mountain",
     "narrow_place",
@@ -707,10 +746,10 @@
   };
 
   const GOLLUM_ACTIVITY_LINES = [
-    "Gollum crouches low in his little boat, paddling a slow circle just beyond the edge of sight.",
-    "Gollum slips away into the darkness for a breathless moment before his pale eyes show again over the water.",
-    "Gollum worries at a limp fish with quick fingers, muttering to himself between tiny bites.",
-    "Gollum drifts close enough for the water to knock softly at the stones, then backs away into the black.",
+    "Gollum crouches low in his little boat, paddling a slow circle just beyond the edge of sight as though measuring the dark between you.",
+    "Gollum slips away into the darkness for a breathless moment; when his pale eyes show again over the water, they seem nearer than before.",
+    "Gollum worries at a limp fish with quick fingers, muttering between tiny bites and glancing up as if wondering whether you would taste better.",
+    "Gollum drifts close enough for the black water to tap softly at the stones by your feet, then eases back into the blind dark.",
   ];
 
   const SMAUG_STATE_DESCRIPTIONS = {
@@ -782,6 +821,67 @@
   };
 
   const CONTEXTUAL_ROOM_DESCRIPTION_RULES = {
+    narrow_path_6: [
+      {
+        text: "You are on a narrow path threading between broken stones and sparse wind-bent growth. The ground offers no easy stride, and the air upon this part of the mountain never seems wholly at rest; even in quieter moments it feels like a place through which weather is merely passing on its way to something harsher.",
+      },
+    ],
+    narrow_path_9: [
+      {
+        text: "You are on a narrow path bending through scattered boulders and coarse grass. Each turn shows another shoulder of the mountain, another change of light, another hint that the heights are broader and less welcoming than they first appeared. The road is passable, but it asks attention at every step.",
+      },
+    ],
+    misty_mountain: [
+      {
+        when: ({ game }) => game.beornMountainStormActive(),
+        text: "You are on a hard mountain path in the Misty Mountains. The trail runs among black crags and steep emptiness, with the cold sharpening and the sky gathering itself above the eastern heights. Gusts come and go without pattern, harder each time, and low cloud keeps drawing ragged shadows over the road as though the mountain were slowly making up its mind against your journey.",
+      },
+      {
+        when: ({ game }) => game.bilboHasRecoveredRing() && !game.beornMountainArrivalComplete(),
+        text: "You are on a hard mountain path in the Misty Mountains. The trail is still narrow and severe, but the strange spite has gone out of the weather. Cold wind roams the heights in the ordinary mountain fashion, and the road east, though perilous, no longer looks as though the whole range were bent on denying it.",
+      },
+    ],
+    narrow_place: [
+      {
+        when: ({ game }) => game.beornMountainStormActive(),
+        text: "You are in a narrow place with a dreadful drop into a dim valley. The path here pinches between raw stone and a black emptiness below, while the wind comes racing round the cliff in sudden blows that make the very ledge seem to flinch. To the east the traverse grows more exposed with every glance; to the north a dry cave-mouth opens under the rock, poor comfort perhaps, but honest shelter.",
+      },
+      {
+        when: ({ game }) => game.bilboHasRecoveredRing() && !game.beornMountainArrivalComplete(),
+        text: "You are in a narrow place with a dreadful drop into a dim valley. It is still a stern perch above the abyss, but the wind no longer strikes with that strange malice. The eastward way looks dangerous only in the plain mountain sense, while the cave to the north has fallen back from desperate refuge to mere shelter.",
+      },
+    ],
+    large_dry_cave: [
+      {
+        when: ({ game }) => game.beornMountainStormActive(),
+        text: "You are in a large dry cave. The ground is level enough for weary bodies, and the rock gives blessed shelter from the violence abroad on the heights. Light steals in through cracks and the cave-mouth, but every now and then a harder burst of wind goes booming past outside, making it plain that this place is no luxury: it is the one sensible refuge within reach.",
+      },
+      {
+        when: ({ game }) => game.bilboHasRecoveredRing() && !game.beornMountainArrivalComplete(),
+        text: "You are in a large dry cave. Its stone floor and arching roof still offer good shelter, yet the place no longer feels like a last necessity. Outside, the air has steadied, and the cave has become once more a prudent resting-place rather than a mercy snatched from hostile weather.",
+      },
+    ],
+    narrow_dangerous_path: [
+      {
+        when: ({ game }) => game.beornMountainStormActive(),
+        text: "You are on a narrow dangerous path. The cliff-trail twists over exposed stone with little enough footing at the best of times, and now the wind comes striking across it in fierce oblique gusts that set pebbles dancing into the gulf. Dark cloud travels fast over the ridges, and the last descent toward Beorn's country seems forever on the point of being snatched away into mere hazard.",
+      },
+    ],
+    treeless_opening: [
+      {
+        text: "You are in a treeless opening where the mountain land begins to ease at last into broader reaches. Yet there is little softness in it: coarse grass lies bent beneath the wind, scattered stones show through the earth, and the sky above seems too large and changeable to trust for long. It feels less like peace than a place where shelter might be near, if the weather allows it.",
+      },
+    ],
+    great_river: [
+      {
+        text: "You are at the Great River, broad and cold under a wide unsettled sky. Its waters move with grave strength between dark slopes and lower wooded lands, while shifting light and racing cloud give the whole valley a look of grandeur touched with warning. The banks promise a road onward, but not one to be taken lightly.",
+      },
+    ],
+    mountains: [
+      {
+        text: "You are among the mountains. Their ridges rise in stern ranks of stone and snow, with deep valleys, hanging clouds, and far-off waters falling in white threads through the dark. Whatever beauty they possess is of the severe kind, fit more to humble travelers than to comfort them.",
+      },
+    ],
     trolls_clearing: [
       {
         when: ({ game }) => game.trollsTransformed,
@@ -839,6 +939,26 @@
     {
       when: ({ roomId }) => IMMERSION_MIRKWOOD_ROOMS.has(roomId) && roomId !== "place_of_black_spiders",
       text: "Hunger, weariness, and the sameness of the trees make it hard to believe in straight roads.",
+    },
+    {
+      roomIds: ["misty_mountain"],
+      when: ({ game }) => game.beornMountainStormActive(),
+      text: "Farther east the weather keeps thickening upon the heights, and more than one of the company has begun to study the sky as closely as the road.",
+    },
+    {
+      roomIds: ["narrow_place"],
+      when: ({ game }) => game.beornMountainStormActive(),
+      text: "The cave to the north looks cheerless enough, yet it has the great virtue of being there.",
+    },
+    {
+      roomIds: ["large_dry_cave"],
+      when: ({ game }) => game.beornMountainStormActive(),
+      text: "Each fresh roar past the cave-mouth makes the shelter seem less accidental and more providential.",
+    },
+    {
+      roomIds: ["misty_mountain", "narrow_place", "large_dry_cave", "narrow_dangerous_path"],
+      when: ({ game }) => game.bilboHasRecoveredRing() && !game.beornMountainArrivalComplete(),
+      text: "Whatever strange ill-will had been abroad among the heights appears to have spent itself. The wind remains cold, but it no longer presses on the company like an enemy.",
     },
     {
       roomIds: ["trolls_clearing"],
@@ -1000,36 +1120,76 @@
         && BEORN_MOUNTAIN_APPROACH_ROOMS.has(fromRoomId)
         && game.bilboHasRecoveredRing()
       ),
-      text: "The weather does not wholly clear, but the worst of its fury passes as you come down at last toward Beorn's lands, leaving only torn cloud and a bitter wind behind you on the heights.",
+      text: "As you come down at last toward Beorn's lands, the strange malice goes out of the weather. Wind still roams the heights behind you, but the mountains seem at last to have released their grip.",
     },
   ];
 
   const BEORN_MOUNTAIN_STORM_WEATHER = [
-    "A savage gust comes shrieking over the heights and drives sleet slantwise into every face.",
-    "Cloud rolls low across the pass, and the wind turns suddenly hard enough to stagger even the ponies.",
-    "A burst of mountain rain lashes the rocks, then sharpens at once into stinging ice.",
-    "The weather closes like a hand about the path: wet mist first, then a bitter gale hunting through it.",
-    "From somewhere above, a black rack of cloud spills wind and freezing rain down the mountainside.",
+    "A hard wind rises among the heights and comes in fitful blows, snapping cloaks and making even the ponies lower their heads.",
+    "Cloud drags low over the ridges, and the gusts begin to strike from awkward angles, as though the mountain were feeling for the Company's balance.",
+    "The air grows steadily colder. Torn vapors race the crags, and every few moments a stronger blast goes hunting down the path.",
+    "A long howl of wind rolls from peak to peak, carrying grit, cold, and the smell of wet stone until speech itself must be forced against it.",
+    "Dark cloud masses above the eastern ridges. Far thunder mutters somewhere out of sight while savage crosswinds worry every exposed turning of the path.",
   ];
 
-  const BEORN_MOUNTAIN_STORM_BARRIERS = [
-    "Loose stones rattle underfoot, and the track toward Beorn's lands becomes too treacherous to trust.",
-    "The path ahead vanishes behind whirling grey, so that another few yards would be no better than walking blind.",
-    "The ledges beyond look ready to throw man and pony alike into the dark if the company presses on.",
-    "Every hollow in the rock fills with racing water and broken scree, making the onward way sheer folly for the moment.",
-    "The mountain seems bent on turning you back, hammering the road until no sensible traveler would force it.",
-  ];
+  const BEORN_MOUNTAIN_STORM_BARRIERS = {
+    narrow_place: [
+      "Ahead, the eastward traverse is taking the full force of the crosswind, and loose stones are already skipping away over the brink.",
+      "Beyond this pinch of rock the ledge lies too bare and narrow to trust while the gusts are striking across it in savage bursts.",
+      "The path east is shedding grit and broken pebbles into the dim valley below, as though the mountain were trying the road loose beneath your feet.",
+      "What lies eastward is no longer a road to be managed by nerve alone; it is an exposed shelf waiting for one ill-timed gust to empty it.",
+    ],
+    narrow_dangerous_path: [
+      "The last stretch offers no shelter at all, and the ridge ahead is throwing the wind clean across the track.",
+      "The cliff-path twists on without cover, too exposed to trust while every blast comes side-on and eager to unfoot the company.",
+      "Loose shale and sudden gusts make the onward ledge a bargain against the abyss, and a poor one.",
+      "The mountainside has become all violence and exposure here, with nowhere to crouch and no safe yard to gain by forcing it.",
+    ],
+    treeless_opening: [
+      "The open ground leaves you naked to the weather, and the gusts sweep it so fiercely that the last little way cannot be crossed with any confidence.",
+      "What looked from afar like the easing of the land is now worse: there is no rock-wall here to break the wind, only open exposure and racing cloud.",
+      "The plain itself is passable, but not while the gale keeps striking broadside and driving all warmth out of man and beast alike.",
+    ],
+    great_river: [
+      "Cold wind comes racing along the river-course, meeting the mountain gusts in confused blows that make a straight approach impossible.",
+      "The water below is no comfort: the broad valley funnels the weather, and the nearer road lies under one long buffeting sweep of air.",
+      "Even within sight of safer country the banks offer no real passage, for the wind batters the open way as if determined to keep the company out.",
+    ],
+    default: [
+      "The road ahead has taken on that look mountains have when they mean to punish insistence.",
+      "For the moment the heights plainly have the better of the argument.",
+    ],
+  };
 
-  const BEORN_MOUNTAIN_STORM_COMPANIONS = [
-    ["Thorin", "We gain nothing by throwing ourselves away on the mountain."],
-    ["Balin", "Best wait a little, Master Baggins. Hills have slain hardier folk than us by patience alone."],
-    ["Dwalin", "Another step in this and we'll be picking dwarves and ponies off the rocks below."],
-    ["Gandalf", "There are times to strive against weather, and times to let it spend its malice first."],
-    ["Bombur", "If this path grows any slicker, I shall arrive at Beorn's upside down and without dignity."],
-    ["Fili", "The heights are playing tricks on the eye. I would not trust that road just now."],
-    ["Kili", "I like a hard road well enough, but not one that means to throw us off it."],
-    ["Bifur", "The mountain has the louder voice for the present. We should heed it."],
-  ];
+  const BEORN_MOUNTAIN_STORM_COMPANIONS = {
+    narrow_place: [
+      ["Gandalf", "There is shelter under the rock to the north, and sounder ground behind us. East can wait."],
+      ["Thorin", "West or north, then. I will not spend the Company on that ledge."],
+      ["Balin", "That cave-mouth looks dry, Master Baggins, and dry shelter is wealth enough on a mountain-day like this."],
+      ["Dwalin", "Another blast like that and the hill will choose for us. Into shelter, or back."],
+    ],
+    narrow_dangerous_path: [
+      ["Gandalf", "Beorn's roof may lie not far beyond, but the mountain means to charge too dearly for the last little distance."],
+      ["Thorin", "A house in sight is not the same thing as a house reached."],
+      ["Dwalin", "I like a hard road well enough, but not one that means to throw us off before supper."],
+      ["Balin", "We have endured too much to lose the company within scent of a warm hearth."],
+    ],
+    treeless_opening: [
+      ["Thorin", "Open ground is no kindness when the wind has all the room it wants."],
+      ["Gandalf", "The worst roads are often the ones that look easiest from a distance."],
+      ["Bifur", "The land is broad enough, but the weather has narrowed it for us."],
+    ],
+    great_river: [
+      ["Gandalf", "The river has made a trumpet of the valley. We shall not force a passage through that blaring wind."],
+      ["Balin", "Broad water, open bank, and a wild cross-breeze: three good reasons to wait rather than one."],
+      ["Kili", "If the wind had hands, it would be using both on us."],
+    ],
+    default: [
+      ["Thorin", "We gain nothing by throwing ourselves away on the mountain."],
+      ["Balin", "Hills have slain hardier folk than us by patience alone."],
+      ["Gandalf", "There are times to strive against weather, and times to let it spend its malice first."],
+    ],
+  };
 
   function applyImmersionExpansion(data) {
     if (!data || data.__immersionExpansionApplied) return data;
@@ -1132,7 +1292,7 @@
     data.rooms.hobbit_hole.description = "You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions.";
     data.rooms.bilbos_garden.description = "You are in the front garden before Bag End, where clipped borders, herbs, and bright flowers soften the green slope. A neat path leads to the famous round door, and the air smells of soil, roses, and well-watered earth in the Hill.";
     data.rooms.rivendell.description = "You are in the heart of Rivendell, where carved stone, running water, and old trees are woven together so gently that no hand seems to dominate the place. Light falls softly through leaves and arches alike, and song lingers even when no singer is near.";
-    data.rooms.deep_dark_lake.description = "You are beside the black underground lake. The air is cold, wet, and close; drops fall from unseen heights, whispers echo where no one should be standing, and the darkness feels alive with hidden movement beyond the reach of your hands.";
+    data.rooms.deep_dark_lake.description = "You are beside the black underground lake. The air is cold, wet, and close; drops fall from unseen heights, whispers echo where no one should be standing, and the darkness feels alive with hidden movement beyond the reach of your hands. No answering voice of Gandalf or the dwarves reaches you here; somewhere in the goblin dark you have been cut off from the company.";
     data.rooms.beorns_house.description = "You are in Beorn's great house, built broad and strong of timber, with a central fire, long tables, and the scent of bread, honey, and clean straw. Everything is orderly, sturdy, and touched by the curious discipline of a household in which beasts and men alike keep good manners.";
     data.rooms.wooden_town.description = "You are in Lake-town, a forest of timber halls, jetties, and plank bridges raised above the dark water. Merchants call, boats creak at their moorings, and the talk of trade, weather, and the Mountain moves continually through the town.";
     data.rooms.front_gate.description = "You stand before the Front Gate of Erebor, where vast stonework, weathered carvings, and old dwarf-craft still command awe despite ruin and neglect. The entrance itself stands mute and forbidding, giving no sign that it was ever meant to yield to strangers now.";
@@ -4771,6 +4931,26 @@
       return this.parser.defaultVisibleCharacter();
     }
 
+    isolatedCompanionAppeal(targetName = "") {
+      const game = this.game;
+      if (game.currentRoom !== "deep_dark_lake") return "";
+      const normalized = normalize(targetName);
+      if (!normalized) return "";
+      const known = this.findKnownCharacter(targetName);
+      const knownId = normalize(known?.id || known?.name || "");
+      const companyTerms = new Set(["company", "companions", "dwarves", "party", "friends", "everyone", "everybody", "others"]);
+      const refersToCompany = companyTerms.has(normalized)
+        || TRAVELING_COMPANION_NAMES.includes(normalized)
+        || TRAVELING_COMPANION_NAMES.includes(knownId)
+        || TRAVELING_COMPANION_NAMES.some((name) => normalized.includes(name));
+      if (!refersToCompany) return "";
+      return game.cyclingVariant("deep-lake-companion-appeal", [
+        "You call for help, but only the cave answers you. No voice of Gandalf or the dwarves comes back through the black passages; you have been cut off from the company.",
+        "Your frightened appeal dies over the black water. Somewhere beyond blind tunnels the company is out of earshot, and no one answers you.",
+        "You try to call the others, but the words seem small in that vast dark. No companion hears you; there is only the lake, the stone, and Gollum.",
+      ], normalized);
+    }
+
     extractLeadingVisibleCharacter(text) {
       return this.parser.extractLeadingVisibleCharacter(text);
     }
@@ -4936,7 +5116,7 @@
     askCharacterForItem(characterName, itemName) {
       const game = this.game;
       const character = this.resolveAskForCharacterTarget(characterName, itemName);
-      if (!character) return game.print(`There is no one named ${characterName} here.`);
+      if (!character) return game.print(this.isolatedCompanionAppeal(characterName) || `There is no one named ${characterName} here.`);
       if (game.unexpectedParty?.blocksDirectInteraction(character, "item")) return;
       const special = this.specialAskForResponse(character, itemName);
       if (special) {
@@ -5017,7 +5197,7 @@
     askCharacterTo(characterName, order) {
       const game = this.game;
       const character = this.resolveCharacterTarget(characterName);
-      if (!character) return game.print(`There is no one named ${characterName} here.`);
+      if (!character) return game.print(this.isolatedCompanionAppeal(characterName) || `There is no one named ${characterName} here.`);
       if (character.friendly === false) return this.respondToTalk(character);
       if (game.player.name === "You" && game.player.noticeable === false) return game.print(`${sentenceDisplayCharacterName(character)} says 'who's talking?'`);
       if (game.unexpectedParty?.blocksDirectInteraction(character, "order")) return;
@@ -5079,7 +5259,7 @@
     askCharacterAbout(characterName, topic) {
       const game = this.game;
       const character = this.resolveCharacterTarget(characterName);
-      if (!character) return game.print(`There is no one named ${characterName} here.`);
+      if (!character) return game.print(this.isolatedCompanionAppeal(characterName) || `There is no one named ${characterName} here.`);
       if (matches(character.name, "dragon")) {
         const special = game.specialConversationResponse(character, topic) || game.specialTalkResponse(character);
         return game.print(special);
@@ -5158,7 +5338,7 @@
       if (greeting?.mode === "broadcast") return game.hello();
       if (greeting?.mode === "targeted") {
         const character = this.resolveCharacterTarget(greeting.targetName);
-        if (!character) return game.print("You speak, but only silence meets your words.");
+        if (!character) return game.print(this.isolatedCompanionAppeal(greeting.targetName) || "You speak, but only silence meets your words.");
         if (character.friendly === false) return this.respondToTalk(character);
         if (game.unexpectedParty?.blocksDirectInteraction(character, "talk")) return;
         this.rememberConversationCharacter(character);
@@ -5172,7 +5352,7 @@
         return game.print(`You could speak to ${joinNames(visiblePeople.map((character) => displayCharacterName(character)))}.`);
       }
       const character = this.resolveCharacterTarget(parsed.characterName);
-      if (!character) return game.print("You speak, but only silence meets your words.");
+      if (!character) return game.print(this.isolatedCompanionAppeal(parsed.characterName) || "You speak, but only silence meets your words.");
       if (character.friendly === false) return this.respondToTalk(character);
       if (game.player.name === "You" && game.player.noticeable === false) return game.print(`${sentenceDisplayCharacterName(character)} says 'who's talking?'`);
       if (game.unexpectedParty?.blocksDirectInteraction(character, parsed.order ? "order" : "talk")) return;
@@ -5398,7 +5578,8 @@
       if (typeof window.matchMedia === "function") {
         return window.matchMedia(`(max-width: ${MOBILE_LAYOUT_MAX_WIDTH}px)`).matches;
       }
-      return (window.innerWidth || 0) <= MOBILE_LAYOUT_MAX_WIDTH;
+      const width = Number(window.innerWidth);
+      return Number.isFinite(width) && width > 0 && width <= MOBILE_LAYOUT_MAX_WIDTH;
     }
 
     effectiveLayoutMode(mode) {
@@ -5757,9 +5938,12 @@
         currentRiddleIndex: 0,
         riddleIds,
         awaitingPlayerRiddle: false,
+        playerRiddleHintCount: 0,
+        finalWarning: false,
         pocketQuestionAsked: false,
         enraged: false,
         escaped: false,
+        pursuitEchoCooldown: 0,
         activityIndex: 0,
         activityCooldown: 0,
         revealStyle: Math.abs(hashString(`${game.storySeed}:gollum-reveal`)) % 4,
@@ -5781,6 +5965,8 @@
       if (restored.currentRiddleIndex >= restored.riddleIds.length) restored.currentRiddleIndex = restored.riddleIds.length - 1;
       restored.activityIndex = Number.isInteger(restored.activityIndex) ? restored.activityIndex : base.activityIndex;
       restored.activityCooldown = Number.isFinite(restored.activityCooldown) ? restored.activityCooldown : base.activityCooldown;
+      restored.playerRiddleHintCount = Math.max(0, Number(restored.playerRiddleHintCount) || 0);
+      restored.pursuitEchoCooldown = Math.max(0, Number(restored.pursuitEchoCooldown) || 0);
       restored.revealStyle = Number.isInteger(restored.revealStyle) ? restored.revealStyle : base.revealStyle;
       restored.deathStyle = Number.isInteger(restored.deathStyle) ? restored.deathStyle : base.deathStyle;
       return restored;
@@ -5810,24 +5996,24 @@
     gollumRevealLines() {
       const styles = [
         [
-          "A small boat glides out across the black water. In it crouches Gollum, pale eyes shining in the dark.",
+          "A small boat glides out across the black water without a sound. In it crouches Gollum, pale eyes burning steadily in the dark.",
           "Gollum whispers 'What is it, my precious? Lost, is it? Hungry, is it?'",
-          "For the moment he seems more curious than murderous. Riddles may yet buy you time.",
+          "He has not struck yet, but the pause feels thin as a thread. Riddles may be the only thing holding him back.",
         ],
         [
-          "A wet scraping reaches you from the stones, and then Gollum unfolds himself from the darkness at the water's edge.",
+          "A wet scraping reaches you from the stones, and then Gollum unfolds himself from the darkness at the water's edge, all joints and hunger.",
           "His pale eyes blink once. 'Lost, is it? Lost and found by us, perhapses?' he whispers.",
-          "He seems intent on studying you before deciding whether you are guest, game, or thief.",
+          "He studies you with terrible patience, as though deciding whether you are guest, game, or thief and finding each answer pleasing.",
         ],
         [
-          "Something disturbs the black water. A narrow boat noses silently from the dark, and Gollum is suddenly there, peering at you over its side.",
+          "Something disturbs the black water. A narrow boat noses silently from the dark, and Gollum is suddenly there, peering at you over its side as if he has always been waiting.",
           "Gollum rocks gently and murmurs 'A nasty little Baggins in the dark. Shall we talk, precious?'",
-          "His hunger is plain, but so is his fascination. A riddle-game might hold him for a while.",
+          "His hunger is plain, and his fascination feels no safer. A riddle-game might hold him for a while, if your nerve holds too.",
         ],
         [
-          "You catch a flash of pale eyes before the rest of him emerges from shadow, one hand on a boat, the other on the slick stones.",
+          "You catch a flash of pale eyes before the rest of him emerges from shadow, one hand on a boat, the other spread on the slick stones as if ready to spring.",
           "Gollum gives a thin smile. 'We knows a stranger when we smells one, yes. We talks first, perhaps.'",
-          "He has not attacked yet. There is room, for the moment, for words and riddles.",
+          "He has not attacked yet, but every word feels like borrowed time. Speak carefully, and keep him talking.",
         ],
       ];
       return styles[this.game.gollumState?.revealStyle || 0] || styles[0];
@@ -5837,16 +6023,16 @@
       const game = this.game;
       const openers = [
         {
-          first: "Gollum glides over the black water and whispers 'If Baggins answers true, then Baggins may ask. If not, we eats him, yes.'",
-          repeat: "Gollum paddles nearer and whispers 'If Baggins answers true, then Baggins may ask. If not, we eats him, yes.'",
+          first: "Gollum glides over the black water until the boat nearly kisses the stones and whispers 'If Baggins answers true, then Baggins may ask. If not, we eats him, yes.'",
+          repeat: "Gollum paddles nearer, close enough now that you hear his breathing, and whispers 'If Baggins answers true, then Baggins may ask. If not, we eats him, yes.'",
         },
         {
           first: "Gollum tilts his head and rasps 'Answer true, little Baggins, and then you may ask. Answer false, and we keeps you forever.'",
-          repeat: "Gollum taps the boat with one claw. 'Again, yes. Answer true and ask. Answer false and feed us.'",
+          repeat: "Gollum taps the boat with one claw, slow and sharp in the dark. 'Again, yes. Answer true and ask. Answer false and feed us.'",
         },
         {
           first: "Gollum folds himself low in the boat. 'Riddles first, precious. True answers earn a question. False answers earn the dark.'",
-          repeat: "Gollum circles closer. 'More riddles, yes. Truth buys time. Mistakes buy death.'",
+          repeat: "Gollum circles closer until the black water stirs at your feet. 'More riddles, yes. Truth buys time. Mistakes buy death.'",
         },
       ];
       const variant = openers[Math.abs(hashString(`${game.storySeed}:gollum-opener`)) % openers.length];
@@ -5875,11 +6061,98 @@
       return styles[this.game.gollumState?.deathStyle || 0] || styles[0];
     }
 
+    gollumFinalWarningLine() {
+      return this.game.cyclingVariant("gollum-final-warning", [
+        "Gollum goes very still. Then he bares his teeth and whispers 'Wrong once, Baggins. Wrong once only. Answer false again, and there will be no more riddles for Baggins. Now answer proper.'",
+        "Gollum's fingers tighten on the boat until they squeal on the wood. 'False, precious. One more false answer, and the game is over for Baggins. Try again, and do not fail us.'",
+        "A low hiss leaks out of Gollum, thin and eager. 'No more mistakes now. The next false word ends the game, precious. Answer true, or not at all.'",
+      ]);
+    }
+
+    gollumPlayerRiddleHint(options = {}) {
+      const game = this.game;
+      if (!game.gollumState) game.gollumState = this.createGollumState();
+      const hints = [
+        "Gollum tilts his head. 'Baggins has won his asking, yes. Best ask something only Baggins can answer, perhaps.'",
+        "Gollum's pale eyes narrow. 'Not all riddles are for the wide world, no. Some are close-kept. Close-kept by one small hand, perhaps.'",
+        "Gollum leans nearer, listening to the dark between your words. 'Ask your own riddle, Baggins. The sort a stranger could not know by looking.'",
+        "Gollum whispers impatiently. 'What does Baggins keep from us, then? Ask that, if Baggins is so clever.'",
+      ];
+      const hintIndex = Math.min(game.gollumState.playerRiddleHintCount || 0, hints.length - 1);
+      if (options.advance !== false) {
+        game.gollumState.playerRiddleHintCount = Math.min(hints.length - 1, hintIndex + 1);
+      }
+      return hints[hintIndex];
+    }
+
+    gollumEscapeInterception(direction = "north") {
+      const way = direction === "north" ? "the northern passage" : `the way ${direction}`;
+      return `${this.game.cyclingVariant("gollum-escape-intercept", [
+        `You edge away under the ring, but Gollum skitters after you over stone and boat alike, blocking ${way} by instinct alone.`,
+        `Invisible though you are, you scarcely move before Gollum darts ahead and bars ${way}, head cocked as if listening to your fear.`,
+        `You steal toward ${way}, yet Gollum wheels and crouches there before you can pass, tracking you by sound, breath, and guesswork.`,
+      ], direction)} ${this.gollumPlayerRiddleHint()}`;
+    }
+
+    gollumRingExpiryDeath() {
+      return this.game.cyclingVariant("gollum-ring-expiry-death", [
+        "At the faint slip of the ring into your pocket, Gollum jerks toward the sound with a cry of triumph and falls on you before you can recover.",
+        "The ring drops into your pocket with the smallest whisper, but Gollum hears it. He shrieks, springs, and the dark closes over the struggle at once.",
+        "The moment the ring leaves your finger, Gollum whirls toward you as though the sound itself had guided him. In a heartbeat he is on you in the dark.",
+      ]);
+    }
+
+    advanceGollumPursuitEcho() {
+      const game = this.game;
+      const state = game.gollumState;
+      if (!state?.pocketQuestionAsked || !state.escaped) return false;
+      if (!IMMERSION_GOBLIN_ROOMS.has(game.currentRoom) || game.currentRoom === "deep_dark_lake") return false;
+      const zone = this.gollumPursuitZone(game.currentRoom);
+      if (!zone) return false;
+      state.pursuitEchoCooldown = Math.max(0, Number(state.pursuitEchoCooldown) || 0);
+      if (state.pursuitEchoCooldown > 0) {
+        state.pursuitEchoCooldown -= 1;
+        return false;
+      }
+      const lines = GOLLUM_PURSUIT_ECHO_POOLS[zone] || GOLLUM_PURSUIT_ECHO_POOLS.maze;
+      const baseLine = game.cyclingVariant(`gollum-pursuit-echo:${zone}`, lines, game.currentRoom);
+      const tail = this.gollumPursuitEchoTail();
+      const line = tail ? `${baseLine} ${tail}` : baseLine;
+      state.pursuitEchoCooldown = 1 + (Math.abs(hashString(`${game.storySeed}:gollum-pursuit-cooldown:${game.turnCount}`)) % 2);
+      game.print(line);
+      return true;
+    }
+
+    gollumPursuitEchoTail() {
+      const game = this.game;
+      const parts = [];
+      if (game.player?.wearingRing && game.player?.noticeable === false) {
+        parts.push(game.cyclingVariant("gollum-pursuit-tail:ring", GOLLUM_PURSUIT_RING_TAILS, game.currentRoom));
+      }
+      if ((game.player?.strength || 0) <= 5) {
+        parts.push(game.cyclingVariant("gollum-pursuit-tail:exhaustion", GOLLUM_PURSUIT_EXHAUSTION_TAILS, game.currentRoom));
+      }
+      return parts.join(" ");
+    }
+
+    gollumPursuitZone(roomId) {
+      if (!roomId || roomId === "narrow_dangerous_path") return null;
+      if (roomId === "inside_goblins_gate" || roomId === "outside_goblins_gate") return "threshold";
+      if (roomId === "goblins_dungeon" || roomId === "dark_winding_passage" || roomId === "big_cavern") return "approach";
+      const passageMatch = /^dark_stuffy_passage_(\d+)$/.exec(roomId);
+      if (!passageMatch) return "approach";
+      const passageNumber = Number(passageMatch[1]);
+      if (passageNumber >= 12) return "deep";
+      if (passageNumber >= 7) return "maze";
+      if (passageNumber >= 1) return "approach";
+      return "approach";
+    }
+
     gollumRoomNarrative() {
       const game = this.game;
       const gollum = this.currentGollum();
       if (!gollum || gollum.position !== "deep_dark_lake" || gollum.visible === false) return "";
-      if (!game.gollumState?.met) return "The black water gives back no light, and some patient thing beyond it seems to be listening.";
+      if (!game.gollumState?.met) return "The black water gives back no light. Somewhere beyond it, something waits with all the patience of hunger.";
       return GOLLUM_ACTIVITY_LINES[game.gollumState?.activityIndex || 0] || GOLLUM_ACTIVITY_LINES[0];
     }
 
@@ -5970,7 +6243,7 @@
           ], hashString(`${game.storySeed}:gollum-talk-intro`));
         }
         if (game.gollumState.awaitingAnswer) return "Gollum hisses 'Answer first, precious.'";
-        if (game.gollumState.awaitingPlayerRiddle) return "Gollum licks his lips. 'Now Baggins asks, yes. Ask it, precious, ask it.'";
+        if (game.gollumState.awaitingPlayerRiddle) return this.gollumPlayerRiddleHint();
         if (game.gollumState.pocketQuestionAsked) return "Gollum is past speech now. He hunts only for his precious.";
       }
       if (matches(character.name, "dragon")) {
@@ -6014,6 +6287,7 @@
         if (text === "a riddle" || text === "riddle") return this.beginGollumRiddleContest();
         if (text.includes("pocket")) return this.resolveGollumPocketQuestion();
         if (text.includes("exit") || text.includes("way out")) {
+          if (game.gollumState?.awaitingPlayerRiddle) return this.gollumPlayerRiddleHint();
           return game.gollumState?.pocketQuestionAsked
             ? "Gollum rasps from the dark 'North, yes. But not for thieves. Not for Baggins, no.'"
             : "Gollum bares his teeth. 'Win first, then ask of ways out, precious.'";
@@ -6082,7 +6356,7 @@
       game.gollumState.awaitingAnswer = true;
       gollum.friendly = "neutral";
       const riddle = this.currentGollumRiddle();
-      if (!riddle) return "Gollum watches you in tense silence from the dark water.";
+      if (!riddle) return "Gollum watches you in taut silence from the dark water, as though a single mistake would bring him out of the boat.";
       return `${this.gollumContestOpener()} ${riddle.question}`;
     }
 
@@ -6102,6 +6376,11 @@
       const riddle = riddles[game.gollumState.currentRiddleIndex];
       if (!riddle) return false;
       if (!this.gollumAnswerMatches(answerText, riddle.answers)) {
+        if (!game.gollumState.finalWarning) {
+          game.gollumState.finalWarning = true;
+          game.print(`${this.gollumFinalWarningLine()} ${riddle.question}`, "danger");
+          return true;
+        }
         const outcome = this.gollumWrongAnswerOutcome();
         game.print(outcome.attack, "danger");
         game.endGame(outcome.ending, { fatal: true });
@@ -6115,6 +6394,7 @@
       }
       game.gollumState.awaitingAnswer = false;
       game.gollumState.awaitingPlayerRiddle = true;
+      game.gollumState.playerRiddleHintCount = 0;
       game.print("Gollum narrows his pale eyes. 'Baggins has answered. Now Baggins asks, yes. Ask it, precious, ask it.'");
       return true;
     }
@@ -6134,9 +6414,10 @@
         gollum.attackFlag = 0;
       }
       game.gollumState.awaitingPlayerRiddle = false;
+      game.gollumState.playerRiddleHintCount = 0;
       game.gollumState.pocketQuestionAsked = true;
       game.gollumState.enraged = true;
-      return "You ask 'What have I got in my pocket?' Gollum freezes, then hisses wild guesses: 'Knife? String? Handses?' At last he slips away to fetch what he meant to give you, only to discover that his ring is gone. He returns shrieking for his precious, and the little ring in your pocket suddenly feels heavier than gold.";
+      return "You ask 'What have I got in my pocket?' Gollum freezes, then hisses wild guesses: 'Knife? String? Handses?' At last he slips away to fetch what he meant to give you, and the cave seems to hold its breath. Then he discovers that his ring is gone. He comes back shrieking for his precious, and the little ring in your pocket suddenly feels heavier than gold.";
     }
 
     handleGollumSpeech(text) {
@@ -6152,7 +6433,7 @@
         return true;
       }
       if (game.gollumState?.awaitingPlayerRiddle) {
-        game.print("Gollum scowls. 'That is no fair riddle. Ask properly, precious, ask properly.'");
+        game.print(this.gollumPlayerRiddleHint());
         return true;
       }
       return false;
@@ -6163,11 +6444,14 @@
       if (game.currentRoom !== "deep_dark_lake" || direction !== "north") return "";
       if (!game.gollumState?.met) return "";
       if (!this.isGollumPresentInLake()) return "";
+      if (game.gollumState.awaitingPlayerRiddle) {
+        return this.gollumEscapeInterception(direction);
+      }
       if (!game.gollumState.pocketQuestionAsked) {
-        return "Gollum crouches between you and the northern passage. You will have to get through the riddle-game first.";
+        return "Gollum crouches between you and the northern passage, pale eyes fixed on you without a blink. You will have to get through the riddle-game first.";
       }
       if (game.player.noticeable === false) return "";
-      return "Gollum is waiting by the way north, clawing at the stones and hunting for his precious. You will need better concealment to slip past him.";
+      return "Gollum is waiting by the way north, clawing at the stones and sniffing the dark like a hound on blood. You will need better concealment to slip past him.";
     }
   }
 
@@ -6302,12 +6586,13 @@
         if (game.ensureLakeRingInPocket()) {
           game.print("Groping beside the water in the dark, your fingers close around a small cold ring. Almost without thinking, you slip it into your pocket.");
         }
+        game.print("No answering voice of Gandalf or the dwarves reaches you here. Blind passages and black water have cut you off from the company.");
         for (const line of game.gollumRevealLines()) game.print(line);
         return;
       }
 
       if (game.gollumState.pocketQuestionAsked && game.player.noticeable !== false) {
-        game.print("Gollum prowls between you and the northern passage, sniffing for the ring.");
+        game.print("Gollum prowls between you and the northern passage, sniffing for the ring with quick, desperate breaths.");
       }
     }
 
@@ -9258,7 +9543,7 @@
         if (attempts === 2) return "Thorin studies the valley in silence, and no one moves to gather the company for the road.";
         return "You have the feeling that your business in Rivendell is not yet finished, though no one says so plainly.";
       }
-      if (this.beornMountainStormGate(connection)) return this.beornMountainStormMessage();
+      if (this.beornMountainStormGate(connection)) return this.beornMountainStormMessage(connection);
       if (!this.narrativeTravelBlock(connection)) return "";
       const attempts = Number(this.flags.bagendexitattempts || 0);
       const thorinPresent = Boolean(this.unexpectedParty?.state?.thorinArrived);
@@ -9315,6 +9600,10 @@
 
     advanceGollumActivity() {
       return this.encounters.advanceGollumActivity();
+    }
+
+    advanceGollumPursuitEcho() {
+      return this.encounters.advanceGollumPursuitEcho();
     }
 
     currentSmaugState() {
@@ -10400,6 +10689,10 @@
     }
 
     physicalAction(verb, objectName = "") {
+      if (verb === "run" && this.currentRoom === "deep_dark_lake" && this.gollumState?.awaitingPlayerRiddle) {
+        this.print(this.gollumEscapeInterception("north"));
+        return;
+      }
       const text = normalize(objectName);
       const command = [verb, text].filter(Boolean).join(" ");
       const response = this.standardResponse(command);
@@ -11020,6 +11313,7 @@
       this.unexpectedParty?.advanceTurn();
       this.companionDirector?.sync();
       this.advanceGollumActivity();
+      this.advanceGollumPursuitEcho();
       this.advanceSmaugAwareness();
       this.maybeAtmosphericEvent();
       this.companionDirector?.maybeComment();
@@ -11311,8 +11605,29 @@
       return Boolean(this.flags.beorn_mountain_arrival_complete);
     }
 
+    beornMountainStormActive() {
+      return !this.beornMountainArrivalComplete() && !this.bilboHasRecoveredRing();
+    }
+
+    beornMountainStormStage() {
+      const attempts = Number(this.flags.beornmountainstormattempts || 0);
+      if (attempts >= 6) return 3;
+      if (attempts >= 3) return 2;
+      if (attempts >= 1) return 1;
+      return 0;
+    }
+
+    beornMountainStormConnectionKey(connection) {
+      if (!connection) return "default";
+      if (connection.from === "narrow_place" && connection.to === "narrow_dangerous_path") return "narrow_place";
+      if (connection.from === "narrow_dangerous_path" && connection.to === "beorns_house") return "narrow_dangerous_path";
+      if (connection.from === "treeless_opening" && connection.to === "beorns_house") return "treeless_opening";
+      if (connection.from === "great_river" && connection.to === "beorns_house") return "great_river";
+      return "default";
+    }
+
     beornMountainStormGate(connection) {
-      if (!connection || this.beornMountainArrivalComplete() || this.bilboHasRecoveredRing()) return false;
+      if (!connection || !this.beornMountainStormActive()) return false;
       return (
         (connection.from === "narrow_place" && connection.to === "narrow_dangerous_path")
         || (connection.from === "narrow_dangerous_path" && connection.to === "beorns_house")
@@ -11321,18 +11636,23 @@
       );
     }
 
-    beornMountainStormMessage() {
+    beornMountainStormMessage(connection = null) {
       const attempts = Number(this.flags.beornmountainstormattempts || 0);
-      const weather = BEORN_MOUNTAIN_STORM_WEATHER[attempts % BEORN_MOUNTAIN_STORM_WEATHER.length];
-      const barrier = BEORN_MOUNTAIN_STORM_BARRIERS[Math.floor(attempts / 2) % BEORN_MOUNTAIN_STORM_BARRIERS.length];
-      const speakerIndex = Math.abs(attempts * 3 + (this.storySeed || 0)) % BEORN_MOUNTAIN_STORM_COMPANIONS.length;
-      const [speaker, line] = BEORN_MOUNTAIN_STORM_COMPANIONS[speakerIndex];
+      const stage = this.beornMountainStormStage();
+      const key = this.beornMountainStormConnectionKey(connection);
+      const weather = BEORN_MOUNTAIN_STORM_WEATHER[Math.min(stage + (attempts % 2), BEORN_MOUNTAIN_STORM_WEATHER.length - 1)];
+      const barrierPool = BEORN_MOUNTAIN_STORM_BARRIERS[key] || BEORN_MOUNTAIN_STORM_BARRIERS.default;
+      const barrierIndex = Math.abs(Math.floor(attempts / 2) + (this.storySeed || 0)) % barrierPool.length;
+      const barrier = barrierPool[barrierIndex];
+      const companionPool = BEORN_MOUNTAIN_STORM_COMPANIONS[key] || BEORN_MOUNTAIN_STORM_COMPANIONS.default;
+      const speakerIndex = Math.abs(attempts * 3 + (this.storySeed || 0)) % companionPool.length;
+      const [speaker, line] = companionPool[speakerIndex];
       return `${weather} ${barrier} ${speaker} says '${line}'`;
     }
 
     preferredBeornMountainAdvance() {
       const priority = {
-        narrow_place: "narrow_dangerous_path",
+        narrow_place: this.beornMountainStormActive() ? "large_dry_cave" : "narrow_dangerous_path",
         narrow_dangerous_path: "beorns_house",
         treeless_opening: "beorns_house",
         great_river: "beorns_house",
@@ -11447,6 +11767,16 @@
           if (!character.inventory.includes(ringId)) character.inventory.push(ringId);
         }
         this.print(this.ringSlipMessage(character));
+        if (
+          character.id === this.data.player
+          && this.currentRoom === "deep_dark_lake"
+          && this.gollumState?.awaitingPlayerRiddle
+          && this.isGollumPresentInLake()
+        ) {
+          this.print(this.encounters.gollumRingExpiryDeath(), "danger");
+          this.endGame("Gollum catches you as the ring fails.", { fatal: true });
+          return;
+        }
       }
     }
 

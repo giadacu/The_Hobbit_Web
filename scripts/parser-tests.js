@@ -3324,6 +3324,19 @@ const gameCases = [
     ],
   },
   {
+    name: "deep dark lake entrance makes separation from the company explicit",
+    setup(game) {
+      game.currentRoom = "dark_stuffy_passage_13";
+      game.player.position = "dark_stuffy_passage_13";
+    },
+    drive(game) {
+      game.execute("south");
+    },
+    expectedIncluded: [
+      "No answering voice of Gandalf or the dwarves reaches you here. Blind passages and black water have cut you off from the company.",
+    ],
+  },
+  {
     name: "jump beorn applies a coherent arrival state",
     drive(game) {
       game.execute("jump beorn");
@@ -3558,6 +3571,50 @@ const gameCases = [
     expectedIncluded: [
       "Compass Rivendell: east=true west=true north=true visible=yes",
       "Compass dark hidden: yes",
+    ],
+  },
+  {
+    name: "layout fallback without matchMedia keeps desktop width in layout 2",
+    drive(game) {
+      const originalMatchMedia = window.matchMedia;
+      const originalInnerWidth = window.innerWidth;
+      try {
+        delete window.matchMedia;
+        window.innerWidth = 1200;
+        game.setLayoutMode("2");
+        game.render();
+        game.print(`Fallback desktop layout: effective=${game.layoutMode} preferred=${game.layoutModePreference} body=${document.body.getAttribute("data-layout") || "none"}`);
+      } finally {
+        if (originalMatchMedia === undefined) delete window.matchMedia;
+        else window.matchMedia = originalMatchMedia;
+        if (originalInnerWidth === undefined) delete window.innerWidth;
+        else window.innerWidth = originalInnerWidth;
+      }
+    },
+    expectedIncluded: [
+      "Fallback desktop layout: effective=2 preferred=2 body=2",
+    ],
+  },
+  {
+    name: "layout fallback without matchMedia forces mobile width to layout 1",
+    drive(game) {
+      const originalMatchMedia = window.matchMedia;
+      const originalInnerWidth = window.innerWidth;
+      try {
+        delete window.matchMedia;
+        window.innerWidth = 600;
+        game.setLayoutMode("2");
+        game.render();
+        game.print(`Fallback mobile layout: effective=${game.layoutMode} preferred=${game.layoutModePreference} body=${document.body.getAttribute("data-layout") || "none"}`);
+      } finally {
+        if (originalMatchMedia === undefined) delete window.matchMedia;
+        else window.matchMedia = originalMatchMedia;
+        if (originalInnerWidth === undefined) delete window.innerWidth;
+        else window.innerWidth = originalInnerWidth;
+      }
+    },
+    expectedIncluded: [
+      "Fallback mobile layout: effective=1 preferred=2 body=1",
     ],
   },
   {
@@ -4340,9 +4397,10 @@ const gameCases = [
       game.execute(`answer ${firstRiddle.answers[0]}`);
       const secondRiddle = game.currentGollumRiddle();
       game.execute(`answer ${secondRiddle.answers[0]}`);
-      game.execute("say to gollum \"what have i got in my pocket\"");
+      game.execute("say to gollum \"what's in my pocket\"");
       game.execute("wear ring");
       game.execute("north");
+      game.execute("wait");
       game.print(`Ring flag after Gollum: ${game.flags.bilbo_has_ring ? "yes" : "no"}`);
     },
     expectedIncluded: [
@@ -4350,7 +4408,72 @@ const gameCases = [
       "Gollum narrows his pale eyes. 'Baggins has answered. Now Baggins asks, yes. Ask it, precious, ask it.'",
       /You (?:wear the golden ring and become unnoticeable\.|slip the golden ring on and fade from notice\.|draw the golden ring onto your finger and pass from sight\.)/,
       /(?:Invisible under the ring, you slip past Gollum as he claws wildly about for his precious\.|Hidden by the ring, you edge past Gollum while he gropes and hisses for his precious\.|Unseen beneath the ring, you steal by Gollum while his hands scrabble desperately in the dark\.)/,
+      /(?:Close behind, Gollum's scream tears through the black passages|The dark carries Gollum's grief too well here|Somewhere in the deep ways Gollum gives a choking wail|A wet shriek races the walls behind you)/,
       "Ring flag after Gollum: yes",
+    ],
+  },
+  {
+    name: "gollum pursuit echoes change near the goblin gate and stop outside the tunnels",
+    setup(game) {
+      game.currentRoom = "outside_goblins_gate";
+      game.player.position = "outside_goblins_gate";
+      game.gollumState = game.encounters.createGollumState();
+      game.gollumState.pocketQuestionAsked = true;
+      game.gollumState.escaped = true;
+      game.gollumState.pursuitEchoCooldown = 0;
+    },
+    drive(game) {
+      const thresholdTriggered = game.advanceGollumPursuitEcho();
+      game.print(`Threshold echo: ${thresholdTriggered ? "yes" : "no"}`);
+      game.currentRoom = "narrow_dangerous_path";
+      game.player.position = "narrow_dangerous_path";
+      game.gollumState.pursuitEchoCooldown = 0;
+      const outsideTriggered = game.advanceGollumPursuitEcho();
+      game.print(`Outside echo: ${outsideTriggered ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      /(?:From the black behind the gate comes one last shriek of 'my precious,'|Even near the mouth of the tunnels, Gollum's voice finds you:|The mountain throws back a last torn cry from Gollum,|Behind the goblin gate his lament rises once more,)/,
+      "Threshold echo: yes",
+      "Outside echo: no",
+    ],
+  },
+  {
+    name: "gollum pursuit echoes reflect ring obsession and bilbo exhaustion",
+    setup(game) {
+      game.currentRoom = "dark_stuffy_passage_12";
+      game.player.position = "dark_stuffy_passage_12";
+      game.gollumState = game.encounters.createGollumState();
+      game.gollumState.pocketQuestionAsked = true;
+      game.gollumState.escaped = true;
+      game.gollumState.pursuitEchoCooldown = 0;
+      game.player.wearingRing = true;
+      game.player.noticeable = false;
+      game.player.strength = 4;
+    },
+    drive(game) {
+      const triggered = game.advanceGollumPursuitEcho();
+      game.print(`Stateful echo: ${triggered ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      /(?:Close behind, Gollum's scream tears through the black passages|The dark carries Gollum's grief too well here|Somewhere in the deep ways Gollum gives a choking wail|A wet shriek races the walls behind you)/,
+      /(?:Invisible or no, each cry seems to find the very finger where the ring rests|There is something worse in the way he calls for his precious now|Whenever he screams for his precious, it seems aimed not at the tunnels generally)/,
+      /(?:Your own breath comes back harsh and uneven|You are breathing too hard to feel truly hidden|Weariness is in your legs and throat alike now)/,
+      "Stateful echo: yes",
+    ],
+  },
+  {
+    name: "calling for companions at the lake reveals bilbos isolation",
+    setup(game) {
+      game.currentRoom = "deep_dark_lake";
+      game.player.position = "deep_dark_lake";
+      game.checkSpecialSituations();
+    },
+    drive(game) {
+      game.execute("ask gandalf for help");
+      game.execute("talk to thorin");
+    },
+    expectedIncluded: [
+      /(cut you off from the company|out of earshot|No companion hears you)/,
     ],
   },
   {
@@ -4374,6 +4497,29 @@ const gameCases = [
     notExpectedIncluded: [
       "Please specify your action and the object.",
       "I'm not sure how to do that.",
+    ],
+  },
+  {
+    name: "wearing the ring does not let bilbo slip past before the pocket question",
+    setup(game) {
+      game.currentRoom = "deep_dark_lake";
+      game.player.position = "deep_dark_lake";
+      game.checkSpecialSituations();
+    },
+    drive(game) {
+      game.execute("ask gollum a riddle");
+      const firstRiddle = game.currentGollumRiddle();
+      game.execute(`answer ${firstRiddle.answers[0]}`);
+      const secondRiddle = game.currentGollumRiddle();
+      game.execute(`answer ${secondRiddle.answers[0]}`);
+      game.execute("wear ring");
+      game.execute("north");
+      game.print(`Blocked escape room: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      /(?:blocking the northern passage|bars the northern passage|crouches there before you can pass)/,
+      /(?:Best ask something only Baggins can answer|Not all riddles are for the wide world|Ask your own riddle, Baggins|What does Baggins keep from us, then)/,
+      "Blocked escape room: deep_dark_lake",
     ],
   },
   {
@@ -4486,7 +4632,7 @@ const gameCases = [
     notExpectedIncluded: ["Gollum attacks Gandalf."],
   },
   {
-    name: "gollum wrong answers still kill through varied attack text",
+    name: "gollum first wrong answer becomes an explicit final warning",
     setup(game) {
       game.currentRoom = "deep_dark_lake";
       game.player.position = "deep_dark_lake";
@@ -4494,6 +4640,48 @@ const gameCases = [
     },
     drive(game) {
       game.execute("ask gollum a riddle");
+      game.execute("answer toaster");
+      game.print(`Gollum warning endgame: ${game.endgame ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      /(?:Wrong once, Baggins\. Wrong once only\.|One more false answer, and the game is over for Baggins\.|No more mistakes now\.)/,
+      "Gollum warning endgame: no",
+    ],
+  },
+  {
+    name: "ring expiring during gollums questioning kills bilbo",
+    setup(game) {
+      game.currentRoom = "deep_dark_lake";
+      game.player.position = "deep_dark_lake";
+      game.checkSpecialSituations();
+    },
+    drive(game) {
+      game.execute("ask gollum a riddle");
+      const firstRiddle = game.currentGollumRiddle();
+      game.execute(`answer ${firstRiddle.answers[0]}`);
+      const secondRiddle = game.currentGollumRiddle();
+      game.execute(`answer ${secondRiddle.answers[0]}`);
+      game.execute("wear ring");
+      game.player.ringTimer = 1;
+      game.execute("wait");
+      game.print(`Ring expiry endgame: ${game.endgame ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      /The golden ring .*pocket\./,
+      /Gollum .*?(triumph|dark|struggle|finger)/,
+      "Ring expiry endgame: yes",
+    ],
+  },
+  {
+    name: "gollum second wrong answer still kills through varied attack text",
+    setup(game) {
+      game.currentRoom = "deep_dark_lake";
+      game.player.position = "deep_dark_lake";
+      game.checkSpecialSituations();
+    },
+    drive(game) {
+      game.execute("ask gollum a riddle");
+      game.execute("answer toaster");
       game.execute("answer toaster");
       game.print(`Gollum death endgame: ${game.endgame ? "yes" : "no"}`);
     },
@@ -4511,6 +4699,7 @@ const gameCases = [
     drive(game) {
       game.execute("south");
       game.execute("ask gollum a riddle");
+      game.execute("answer toaster");
       game.execute("answer toaster");
       game.print(`Death choice: ${game.pendingEndgameChoice || "none"}`);
       game.print(`Autosave room: ${game.autosaveMeta?.roomId || "none"}`);
@@ -4531,6 +4720,7 @@ const gameCases = [
     drive(game) {
       game.execute("south");
       game.execute("ask gollum a riddle");
+      game.execute("answer toaster");
       game.execute("answer toaster");
       game.execute("autosave");
       game.print(`Resume room: ${game.currentRoom}`);
