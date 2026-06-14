@@ -1120,7 +1120,7 @@
         && BEORN_MOUNTAIN_APPROACH_ROOMS.has(fromRoomId)
         && game.bilboHasRecoveredRing()
       ),
-      text: "As you come down at last toward Beorn's lands, the strange malice goes out of the weather. Wind still roams the heights behind you, but the mountains seem at last to have released their grip.",
+      text: "The weather does not wholly clear, but the worst of its fury passes as you come down at last toward Beorn's lands, leaving only torn cloud and a bitter wind behind you on the heights.",
     },
   ];
 
@@ -1320,17 +1320,17 @@
       ["narrow_ledge", "Narrow Ledge", "This ledge is little wider than a cart-plank, with mountain emptiness falling away beneath one shoulder and a raw wall of stone pressing the other. Even the wind seems to pass here single-file.", "narrow_path_7.jpeg", "adventure"],
       ["mountain_lookout", "Mountain Lookout", "A rare shelf of level stone offers a view of broken ridges, cloud-shadow, and far valleys already half lost in haze. For a moment the world opens wide enough to remind you how long the road still is.", "mountains.jpeg", "adventure"],
       ["storm_shelter", "Storm Shelter", "A shallow overhang in the mountain gives some shelter from rain and ice-driven wind. Travelers have camped here before; the soot on the rock and the circle of old stones show it plainly.", "large_dry_cave.jpeg", "adventure"],
-      ["beorn_great_hall", "Great Hall", "Beorn's great hall rises high and timbered, with carved beams, a long hearth, and a table built for appetites that do not trouble over refinement. Honey, bread, and strength seem native to the room.", "Beorns.jpeg", "relaxed"],
-      ["beorn_stable", "Stable", "The stable is large, clean, and astonishingly orderly. The horses stand like intelligent servants rather than beasts, and the straw is so neatly laid that you begin to suspect discipline deeper than training.", "Beorns1.jpeg", "relaxed"],
-      ["beorn_garden", "Garden", "A practical garden stretches here in straight, well-kept beds of herbs, beans, roots, and bee-loving flowers. Nothing is ornamental without also being useful, though usefulness in this place has a beauty of its own.", "Bilbosgarden.jpeg", "relaxed"],
-      ["beorn_animal_yard", "Animal Yard", "The animal yard is quiet in a way that should feel impossible. Dogs, sheep, and great shaggy creatures keep their places with solemn attention, as though the household runs on law rather than habit.", "Beorns1.jpeg", "relaxed"],
-      ["mirkwood_forest_path", "Forest Path", "A black forest path runs under close-packed boughs where little light survives to touch the roots. The air is dry, stale, and old, and every turn seems just a little too like the last.", "Mirkwood.jpeg", "suspence"],
-      ["mirkwood_spider_grove", "Spider Grove", "The trees here are curtained with webbing from branch to branch, so that the grove looks wrapped in old frost though the air is warm and foul. Cocoon-shapes hang among the trunks where no fruit should grow.", "spider_place.jpeg", "suspence"],
-      ["mirkwood_dark_glade", "Dark Glade", "A dim glade opens unexpectedly beneath the trees, though it offers no comfort. The silence is wrong, the moss is too soft, and even the shafts of light that reach the ground seem unwilling to stay.", "dark_stuffy_14.jpeg", "suspence"],
-      ["mirkwood_enchanted_stream", "Enchanted Stream", "A narrow dark stream winds through the wood, clear enough to tempt the thirsty and strange enough to warn the wise. It runs without song, as though afraid of being overheard.", "forest_river.jpeg", "suspence"],
-      ["mirkwood_deer_trail", "Deer Trail", "A pale trail, hardly more than bent grass and delicate prints, slips among the trees here. It feels like the work of swift clean creatures from a brighter wood than this one.", "green_forest.jpeg", "suspence"],
-      ["mirkwood_fallen_tree_crossing", "Fallen Tree Crossing", "A mighty trunk has fallen across a murky runnel, making a crossing too narrow for comfort and too useful to ignore. Bark peels from it in long strips like weathered skin.", "forest_road_2.jpeg", "suspence"],
-      ["mirkwood_ruined_clearing", "Ruined Clearing", "Broken stones and choked foundations lie in this clearing, half swallowed by root and fern. Whatever stood here belonged to another age, and the wood has taken it back with ill grace.", "elvish_clearing.jpeg", "suspence"],
+      ["beorn_great_hall", "Great Hall", "Beorn's great hall rises high and timbered, with carved beams, a long hearth, and a table built for appetites that do not trouble over refinement. Honey, bread, and strength seem native to the room.", "beorn_great_hall.png", "relaxed"],
+      ["beorn_stable", "Stable", "The stable is large, clean, and astonishingly orderly. The horses stand like intelligent servants rather than beasts, and the straw is so neatly laid that you begin to suspect discipline deeper than training.", "beorn_stable.png", "relaxed"],
+      ["beorn_garden", "Garden", "A practical garden stretches here in straight, well-kept beds of herbs, beans, roots, and bee-loving flowers. Nothing is ornamental without also being useful, though usefulness in this place has a beauty of its own.", "beorn_garden.png", "relaxed"],
+      ["beorn_animal_yard", "Animal Yard", "The animal yard is quiet in a way that should feel impossible. Dogs, sheep, and great shaggy creatures keep their places with solemn attention, as though the household runs on law rather than habit.", "beorn_animal_yard.png", "relaxed"],
+      ["mirkwood_forest_path", "Forest Path", "A black forest path runs under close-packed boughs where little light survives to touch the roots. The air is dry, stale, and old, and every turn seems just a little too like the last.", "mirkwood_forest_path.png", "suspence"],
+      ["mirkwood_spider_grove", "Spider Grove", "The trees here are curtained with webbing from branch to branch, so that the grove looks wrapped in old frost though the air is warm and foul. Cocoon-shapes hang among the trunks where no fruit should grow.", "mirkwood_spider_grove.png", "suspence"],
+      ["mirkwood_dark_glade", "Dark Glade", "A dim glade opens unexpectedly beneath the trees, though it offers no comfort. The silence is wrong, the moss is too soft, and even the shafts of light that reach the ground seem unwilling to stay.", "mirkwood_dark_glade.png", "suspence"],
+      ["mirkwood_enchanted_stream", "Enchanted Stream", "A narrow dark stream winds through the wood, clear enough to tempt the thirsty and strange enough to warn the wise. It runs without song, as though afraid of being overheard.", "mirkwood_enchanted_stream.png", "suspence"],
+      ["mirkwood_deer_trail", "Deer Trail", "A pale trail, hardly more than bent grass and delicate prints, slips among the trees here. It feels like the work of swift clean creatures from a brighter wood than this one.", "mirkwood_deer_trail.png", "suspence"],
+      ["mirkwood_fallen_tree_crossing", "Fallen Tree Crossing", "A mighty trunk has fallen across a murky runnel, making a crossing too narrow for comfort and too useful to ignore. Bark peels from it in long strips like weathered skin.", "mirkwood_fallen_tree_crossing.png", "suspence"],
+      ["mirkwood_ruined_clearing", "Ruined Clearing", "Broken stones and choked foundations lie in this clearing, half swallowed by root and fern. Whatever stood here belonged to another age, and the wood has taken it back with ill grace.", "mirkwood_ruined_clearing.png", "suspence"],
       ["elven_prison_cells", "Prison Cells", "Rows of stout wooden cells stand here under lantern-light, each built more for dignity than cruelty but still secure enough to smother hope. The smell of damp wood and river-water clings to the place.", "elvenkings.jpeg", "suspence"],
       ["elven_guard_post", "Guard Post", "A narrow post looks out over a junction of ways through the halls. Spears, lanterns, and a small gaming board suggest long watches kept by folk who dislike being surprised.", "elvenkings.jpeg", "suspence"],
       ["elven_feast_hall", "Feast Hall", "Long tables, carved pillars, and hanging lamps give the feast hall a secret splendor. Even empty, it feels one song away from laughter, wine, and a company entirely too alert to be called careless.", "elvenkings.jpeg", "relaxed"],
@@ -1649,6 +1649,12 @@
       ["laketown_merchant", "merchant", { friendly: "neutral", strength: 4 }],
       ["laketown_fisherman", "fisherman", { friendly: "neutral", strength: 4 }],
       ["laketown_guard", "town guard", { friendly: "neutral", strength: 6 }],
+      ["tunnel_hulking_goblin", "hulking goblin", {
+        friendly: false,
+        strength: 16,
+        visible: false,
+        examineText: "A broad-shouldered goblin brute with a cleaver-like blade, knotty arms, and the foul confidence of something used to killing in narrow places.",
+      }],
       ["lane_hobbit", "passing hobbit", {
         friendly: true,
         strength: 3,
@@ -6420,6 +6426,182 @@
       return "You ask 'What have I got in my pocket?' Gollum freezes, then hisses wild guesses: 'Knife? String? Handses?' At last he slips away to fetch what he meant to give you, and the cave seems to hold its breath. Then he discovers that his ring is gone. He comes back shrieking for his precious, and the little ring in your pocket suddenly feels heavier than gold.";
     }
 
+    goblinTunnelGoblin() {
+      return this.game.characters.tunnel_hulking_goblin || null;
+    }
+
+    goblinTunnelEncounterState() {
+      const game = this.game;
+      return {
+        active: Boolean(game.flags.goblintunnelambushactive),
+        roomId: game.flags.goblintunnelambushroom || "",
+        victimId: game.flags.goblintunnelambushvictim || "",
+        attackers: Array.isArray(game.flags.goblintunnelambushattackers) ? game.flags.goblintunnelambushattackers : [],
+        turns: Math.max(0, Number(game.flags.goblintunnelambushturns) || 0),
+      };
+    }
+
+    goblinTunnelVictim() {
+      const victimId = this.goblinTunnelEncounterState().victimId;
+      return victimId ? this.game.characters[victimId] || null : null;
+    }
+
+    isGoblinTunnelEncounterActive(roomId = this.game.currentRoom) {
+      const goblin = this.goblinTunnelGoblin();
+      const state = this.goblinTunnelEncounterState();
+      return Boolean(state.active && goblin && goblin.visible !== false && goblin.position === roomId && state.roomId === roomId);
+    }
+
+    goblinTunnelAttackerIds() {
+      return new Set(this.goblinTunnelEncounterState().attackers);
+    }
+
+    setGoblinTunnelAttackerIds(ids) {
+      this.game.flags.goblintunnelambushattackers = [...new Set(ids)].filter(Boolean);
+    }
+
+    chooseGoblinTunnelVictim() {
+      const game = this.game;
+      const priority = ["ori", "bombur", "dori", "nori", "bofur", "bifur", "oin", "gloin", "fili", "kili", "balin", "dwalin", "thorin", "gandalf"];
+      const candidates = game.peopleInRoom().filter((character) => (
+        character.id !== game.player.id
+        && character.visible !== false
+        && character.friendly === true
+      ));
+      for (const id of priority) {
+        const preferred = candidates.find((character) => character.id === id);
+        if (preferred) return preferred;
+      }
+      return candidates[0] || null;
+    }
+
+    bestGoblinTunnelHelper() {
+      const game = this.game;
+      const state = this.goblinTunnelEncounterState();
+      const attackers = this.goblinTunnelAttackerIds();
+      const victimId = state.victimId;
+      const priority = ["thorin", "gandalf", "dwalin", "balin", "dori", "kili", "fili", "oin", "gloin", "bofur", "bifur", "nori", "ori", "bombur"];
+      const companions = game.peopleInRoom().filter((character) => (
+        character.id !== game.player.id
+        && character.id !== victimId
+        && character.visible !== false
+        && character.friendly === true
+      ));
+      for (const id of priority) {
+        const preferred = companions.find((character) => character.id === id && !attackers.has(id));
+        if (preferred) return preferred;
+      }
+      return companions.find((character) => !attackers.has(character.id)) || companions[0] || null;
+    }
+
+    triggerGoblinTunnelEncounter() {
+      const game = this.game;
+      if (game.currentRoom !== "dark_stuffy_passage_14") return false;
+      if (game.visitedRooms.has("deep_dark_lake")) return false;
+      if (game.flags.goblintunnelambushresolved || this.isGoblinTunnelEncounterActive()) return false;
+      const goblin = this.goblinTunnelGoblin();
+      const victim = this.chooseGoblinTunnelVictim();
+      if (!goblin || !victim) return false;
+      game.recordAutosave("before the goblin ambush in the upper tunnels", {
+        key: "hazard:goblins:tunnel-ambush",
+      });
+      game.flags.goblintunnelambushactive = true;
+      game.flags.goblintunnelambushresolved = false;
+      game.flags.goblintunnelambushroom = game.currentRoom;
+      game.flags.goblintunnelambushvictim = victim.id;
+      game.flags.goblintunnelambushturns = 0;
+      game.flags.goblintunnelambushattackers = [];
+      goblin.position = game.currentRoom;
+      goblin.visible = true;
+      goblin.friendly = false;
+      goblin.attackFlag = 0;
+      victim.position = game.currentRoom;
+      game.print("A hulking goblin drops out of a crack above and crashes into the company before anyone can shout warning.");
+      game.print(`${victim.name} goes down under it with a cry, pinned in the foul dark while the brute hacks and claws for the kill.`);
+      game.print("The thing is too strong to bring down in one rush. Bilbo must join the attack, and at least one companion must strike with him.");
+      return true;
+    }
+
+    advanceGoblinTunnelEncounter() {
+      const game = this.game;
+      if (!this.isGoblinTunnelEncounterActive()) return false;
+      const goblin = this.goblinTunnelGoblin();
+      const victim = this.goblinTunnelVictim();
+      const attackers = this.goblinTunnelAttackerIds();
+      const turns = this.goblinTunnelEncounterState().turns + 1;
+      game.flags.goblintunnelambushturns = turns;
+      if (turns === 1) {
+        if (attackers.has(game.player.id)) {
+          game.print(`${victim?.name || "Your companion"} is not free yet. The hulking goblin reels under Bilbo's stroke, but another of the company must fall on it now.`);
+        } else {
+          game.print(`${victim?.name || "Your companion"} is still trapped beneath the brute, and the narrow tunnel gives no time for hesitation.`);
+        }
+        return true;
+      }
+      if (turns === 2) {
+        game.print(`The hulking goblin bears ${victim?.name || "your companion"} hard against the stones, snarling for the throat. One more heartbeat of delay will be too late.`, "danger");
+        return true;
+      }
+      game.flags.goblintunnelambushactive = false;
+      game.flags.goblintunnelambushresolved = true;
+      game.flags.goblintunnelambushattackers = [];
+      if (goblin) {
+        goblin.visible = false;
+        goblin.position = game.currentRoom;
+      }
+      game.endGame(`The hulking goblin butchers ${victim?.name || "one of the company"} before you can tear it loose, and the cries that follow bring more goblins out of the dark. The tunnels close over the whole company.`, { fatal: true });
+      return true;
+    }
+
+    handleGoblinTunnelAutoAttack(character) {
+      return Boolean(character?.id === "tunnel_hulking_goblin" && this.isGoblinTunnelEncounterActive(character.position));
+    }
+
+    handleGoblinTunnelAttack(attacker, target, weapon = null) {
+      const game = this.game;
+      const goblin = this.goblinTunnelGoblin();
+      if (!goblin || !this.isGoblinTunnelEncounterActive()) return null;
+      if (target?.id !== goblin.id || attacker?.id === goblin.id) return null;
+
+      const victim = this.goblinTunnelVictim();
+      const attackers = this.goblinTunnelAttackerIds();
+      attackers.add(attacker.id);
+      this.setGoblinTunnelAttackerIds(attackers);
+
+      const hasBilbo = attackers.has(game.player.id);
+      const hasCompanion = [...attackers].some((id) => id !== game.player.id);
+      if (hasBilbo && hasCompanion) {
+        const supporterId = [...attackers].find((id) => id !== game.player.id) || "";
+        const supporter = game.characters[supporterId] || attacker;
+        const supporterName = displayCharacterName(supporter);
+        const victimName = victim?.name || "your companion";
+        const sequence = game.combatNarrativeSequence();
+        const finish = game.combatPick([
+          `Bilbo darts in again as ${supporterName} crashes into the brute from the flank; together they drag it off ${victimName} and bring it down among the stones.`,
+          `${supporterName} strikes as Bilbo keeps the hulking goblin off balance, and between them the creature is hacked down before it can recover its grip on ${victimName}.`,
+          `Bilbo's desperate stroke opens the moment ${supporterName} needs. The hulking goblin lurches clear of ${victimName}, stumbles, and is finished there in the tunnel dust.`,
+        ], `goblin-ambush-finish:${supporter.id}:${victim?.id || "none"}`, sequence);
+        const environment = game.combatEnvironmentLine("goblin", sequence);
+        game.flags.goblintunnelambushactive = false;
+        game.flags.goblintunnelambushresolved = true;
+        game.flags.goblintunnelambushturns = 0;
+        game.dropInventory(goblin);
+        goblin.visible = false;
+        game.aftermath?.registerCharacterDeath(goblin);
+        attacker.attackFlag = 0;
+        return `${finish} ${environment}`;
+      }
+
+      if (attacker.id === game.player.id) {
+        const lead = weapon
+          ? `Bilbo's ${weapon.name} flashes in the dark and tears the hulking goblin half away from ${victim?.name || "its prey"} for one precious instant.`
+          : `Bilbo hurls himself at the hulking goblin and wrenches it half away from ${victim?.name || "its prey"} for one precious instant.`;
+        return `${lead} But the brute is too strong to finish alone; another of the company must strike now.`;
+      }
+
+      return `${sentenceDisplayCharacterName(attacker)} hits the hulking goblin hard enough to stagger it, but the brute clings on with murderous strength. Bilbo must be in the fight if ${victim?.name || "the trapped companion"} is to be saved.`;
+    }
+
     handleGollumSpeech(text) {
       const game = this.game;
       const normalized = normalize(text);
@@ -6568,8 +6750,13 @@
 
     checkSpecialSituations() {
       this.checkGollumEncounter();
+      this.checkGoblinTunnelEncounter();
       this.checkKidnapping();
       this.checkTrollsClearing();
+    }
+
+    checkGoblinTunnelEncounter() {
+      this.game.encounters?.triggerGoblinTunnelEncounter();
     }
 
     checkGollumEncounter() {
@@ -6630,6 +6817,7 @@
       const hazardMap = {
         deep_dark_lake: { label: "before meeting Gollum", key: "hazard:gollum:room" },
         trolls_clearing: { label: "before facing the trolls", key: "hazard:trolls:room" },
+        dark_stuffy_passage_14: { label: "before the goblin ambush in the tunnels", key: "hazard:goblins:tunnel-ambush" },
         west_bank: { label: "before testing the fast river", key: "hazard:river:west-bank" },
         cellar: { label: "before the barrel escape", key: "hazard:river:cellar" },
         forest_road_2: { label: "before crossing the spider-haunted road", key: "hazard:spiders:forest-road-2" },
@@ -6903,6 +7091,17 @@
       if (beforeDragonDefeat && game.currentRoom === "deep_dark_lake" && game.gollumState?.pocketQuestionAsked) {
         if (game.player.noticeable !== false) return "wear ring";
         return "north";
+      }
+
+      if (beforeDragonDefeat && game.encounters?.isGoblinTunnelEncounterActive()) {
+        const goblin = game.encounters.goblinTunnelGoblin();
+        const attackers = game.encounters.goblinTunnelAttackerIds();
+        if (!attackers.has(game.player.id)) {
+          return this.autoplayHas("majestic sword") ? `kill ${goblin.name} with sword` : `kill ${goblin.name}`;
+        }
+        const helper = game.encounters.bestGoblinTunnelHelper();
+        if (helper && !attackers.has(helper.id)) return `ask ${normalize(helper.name)} to attack ${goblin.name}`;
+        return this.autoplayHas("majestic sword") ? `kill ${goblin.name} with sword` : `kill ${goblin.name}`;
       }
 
       const hostile = game.peopleInRoom().find((character) => character.visible && character.friendly === false && !matches(character.name, "dragon"));
@@ -10440,13 +10639,14 @@
     }
 
     attack(command) {
+      const actor = this.player;
       const targetName = command.split(" with ")[0];
       const weaponName = command.includes(" with ") ? command.split(" with ").slice(1).join(" with ") : "";
       const target = this.resolveCharacterTarget(targetName);
       if (!target) return this.print(`There is no one named ${targetName} here to attack.`);
-      const weapon = weaponName ? this.findInInventory(weaponName) : null;
-      if (weaponName && !weapon) return this.print(this.heldItemMessage(weaponName) || `${this.player.name} does not have the ${weaponName}.`);
-      const result = this.attackCharacter(this.player, target, weapon);
+      const weapon = weaponName ? this.findCharacterItem(actor, weaponName)?.item : null;
+      if (weaponName && !weapon) return this.print(this.heldItemMessage(weaponName) || `${actor.name} does not have the ${weaponName}.`);
+      const result = this.attackCharacter(actor, target, weapon);
       if (!this.endgame) this.print(result, target.id === this.data.player ? "danger" : "");
     }
 
@@ -11299,6 +11499,8 @@
       this.updateRingTimers();
       this.updateLanternTimer();
       this.progressGreenDragonPony();
+      this.encounters?.advanceGoblinTunnelEncounter();
+      if (this.endgame) return;
       if (!forceMove) this.advanceOffscreenTurnTimers();
       for (const character of this.peopleInRoom()) {
         if (character.id !== this.player.id) character.attackFlag = (character.attackFlag || 0) + 1;
@@ -11336,6 +11538,7 @@
     }
 
     maybeCharacterInitiative(character) {
+      if (this.encounters?.isGoblinTunnelEncounterActive() && character.position === this.currentRoom) return false;
       if (!character.visible || character.carriedBy || character.position !== this.currentRoom) return false;
       if (character.id === this.player.id || character.friendly === false) return false;
       if (this.player.noticeable === false) {
@@ -11383,6 +11586,7 @@
     }
 
     maybeAmbientCharacterSpeech(character) {
+      if (this.encounters?.isGoblinTunnelEncounterActive() && character.position === this.currentRoom) return false;
       if (!character.visible || character.carriedBy || character.position !== this.currentRoom) return false;
       if (character.id === this.player.id || this.player.noticeable === false) return false;
 
@@ -11652,7 +11856,7 @@
 
     preferredBeornMountainAdvance() {
       const priority = {
-        narrow_place: this.beornMountainStormActive() ? "large_dry_cave" : "narrow_dangerous_path",
+        narrow_place: "narrow_dangerous_path",
         narrow_dangerous_path: "beorns_house",
         treeless_opening: "beorns_house",
         great_river: "beorns_house",
@@ -11781,6 +11985,7 @@
     }
 
     maybeAutoAttack(character) {
+      if (this.encounters?.handleGoblinTunnelAutoAttack(character)) return true;
       if (!character.visible || character.position !== this.currentRoom) return false;
       if (
         this.currentRoom === "trolls_clearing"
@@ -11825,6 +12030,7 @@
 
     decideCharacterMovement(character, options = {}) {
       const { forceMove = false } = options;
+      if (this.encounters?.isGoblinTunnelEncounterActive() && character.position === this.currentRoom) return;
       if (!character.visible || character.carriedBy || character.movementMode === "never") return;
       if (this.isLooseFollower(character)) return this.decideLooseFollowerMovement(character, { forceMove });
       if (character.movementMode === "on_first_meet" && !character.hasMetPlayer) {
@@ -11967,6 +12173,8 @@
       if (attacker.friendly === true && target.friendly === true) return `${attacker.name} should not attack ${target.name}.`;
       if (attacker.friendly === "neutral" && !options.forced) return `${attacker.name} ignores your request.`;
       if (!target.visible) return `${actorSubject(attacker, true)} ${actorVerb(attacker, "try")} to attack ${target.name}, but ${target.name} is already dead.`;
+      const specialEncounterResult = this.encounters?.handleGoblinTunnelAttack(attacker, target, weapon);
+      if (specialEncounterResult != null) return specialEncounterResult;
 
       const attackStrength = (attacker.strength || 1) + (weapon ? (weapon.weight || 0) : 0);
       const targetStrength = target.strength || 1;

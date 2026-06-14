@@ -4363,6 +4363,84 @@ const gameCases = [
     expectedIncluded: ["Combat lines differ: yes"],
   },
   {
+    name: "tunnel ambush goblin requires bilbo and a companion to finish it",
+    setup(game) {
+      movePlayerTo(game, "dark_stuffy_passage_14");
+      placeCharacterWithPlayer(game, "thorin");
+      placeCharacterWithPlayer(game, "gandalf");
+      giveItemToCharacter(game, "majestic_sword", game.player.id);
+      giveItemToCharacter(game, "brass_lantern", game.player.id);
+      game.flags.lanternon = true;
+      game.flags.lanternturns = 20;
+      game.checkSpecialSituations();
+    },
+    inputs: ["attack hulking goblin with majestic sword", "ask gandalf to attack hulking goblin", "look"],
+    expectedIncluded: [
+      "Thorin goes down under it with a cry",
+      "another of the company must strike now",
+      /(drag it off Thorin|creature is hacked down before it can recover its grip on Thorin|is finished there in the tunnel dust)/,
+      "The body of the hulking goblin lies here.",
+    ],
+  },
+  {
+    name: "tunnel ambush goblin kills the company if bilbo delays too long",
+    setup(game) {
+      movePlayerTo(game, "dark_stuffy_passage_14");
+      placeCharacterWithPlayer(game, "thorin");
+      placeCharacterWithPlayer(game, "gandalf");
+      giveItemToCharacter(game, "majestic_sword", game.player.id);
+      game.checkSpecialSituations();
+    },
+    drive(game) {
+      game.execute("look");
+      game.execute("wait");
+      game.execute("wait");
+      game.print(`Goblin ambush endgame: ${game.pendingEndgameChoice || "none"}`);
+    },
+    expectedIncluded: [
+      "One more heartbeat of delay will be too late.",
+      "Goblin ambush endgame: death",
+    ],
+  },
+  {
+    name: "autoplay handles tunnel ambush goblin with a companion order",
+    setup(game) {
+      movePlayerTo(game, "dark_stuffy_passage_14");
+      placeCharacterWithPlayer(game, "thorin");
+      placeCharacterWithPlayer(game, "gandalf");
+      game.flags.seenpony = true;
+      game.visitedRooms.add("dreary");
+      game.visitedTrollsClearing = true;
+      game.trollsTransformed = true;
+      game.flags.mapread = true;
+      game.flags.largekeyspent = true;
+      giveItemToCharacter(game, "firestone", game.player.id);
+      giveItemToCharacter(game, "sturdy_key", game.player.id);
+      giveItemToCharacter(game, "brass_lantern", game.player.id);
+      giveItemToCharacter(game, "majestic_sword", game.player.id);
+      giveItemToCharacter(game, "sturdy_rope", game.player.id);
+      game.checkSpecialSituations();
+    },
+    drive(game) {
+      const issued = [];
+      for (let step = 0; step < 4 && game.flags.goblintunnelambushactive && !game.endgame; step += 1) {
+        const command = game.nextAutoplayCommand();
+        if (!command) throw new Error(`Expected autoplay command during goblin ambush at step ${step}.`);
+        issued.push(command);
+        game.execute(command);
+      }
+      if (game.flags.goblintunnelambushactive) {
+        throw new Error(`Autoplay failed to resolve goblin ambush. Commands: ${issued.join(" | ")}`);
+      }
+      game.execute("look");
+      game.print(`Autoplay goblin ambush path: ${issued.join(" -> ")}`);
+    },
+    expectedIncluded: [
+      "The body of the hulking goblin lies here.",
+      "Autoplay goblin ambush path: light lantern -> kill hulking goblin with sword -> ask gandalf to attack hulking goblin",
+    ],
+  },
+  {
     name: "dead warg examination and attack text use coherent singular grammar",
     setup(game) {
       movePlayerTo(game, "treeless_opening");
