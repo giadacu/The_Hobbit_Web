@@ -4239,6 +4239,28 @@ const gameCases = [
     expectedIncluded: ["Combat lines differ: yes"],
   },
   {
+    name: "dead warg examination and attack text use coherent singular grammar",
+    setup(game) {
+      movePlayerTo(game, "treeless_opening");
+      addHostileTestCharacter(game, "test_warg", { name: "vicious warg", strength: 6 });
+      game.characters.test_warg.visible = false;
+      game.characters.test_warg.friendly = false;
+    },
+    drive(game) {
+      game.examineCharacter(game.characters.test_warg);
+      game.print(game.attackCharacter(game.player, game.characters.test_warg));
+    },
+    expectedIncluded: [
+      "You examine the vicious warg. It is carrying nothing. It is wearing nothing. The vicious warg looks dangerous.",
+      "You try to attack vicious warg, but vicious warg is already dead.",
+    ],
+    notExpectedIncluded: [
+      "He is carrying nothing.",
+      "They look dangerous.",
+      "You tries to attack",
+    ],
+  },
+  {
     name: "gollum riddle path grants escape with ring",
     setup(game) {
       game.currentRoom = "dark_stuffy_passage_13";

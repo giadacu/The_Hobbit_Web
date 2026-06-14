@@ -8817,11 +8817,19 @@
       if (matches(character.name, "bard") && !carriedLabels.some((label) => normalize(label).includes("quiver"))) {
         carriedLabels.push("a quiver");
       }
-      const subject = options.explicitSubject ? displayCharacterName(character) : "He";
+      const subject = options.explicitSubject ? displayCharacterName(character) : this.characterLoadoutSubject(character);
       if (options.includeEmpty && !carriedLabels.length && !worn.length) return `${subject} is carrying nothing. ${subject} is wearing nothing.`;
       const carriedText = carriedLabels.length ? `${subject} is carrying ${carriedLabels.join(", ")}.` : "";
       const wornText = worn.length ? `${subject} is wearing ${worn.map((item) => itemLabel(item.name)).join(", ")}.` : "";
       return [carriedText, wornText].filter(Boolean).join(" ");
+    }
+
+    characterLoadoutSubject(character) {
+      return this.characterUsesItPronoun(character) ? "It" : "He";
+    }
+
+    characterUsesItPronoun(character) {
+      return ["wolf", "spider", "dragon"].includes(this.combatFoeKind(character));
     }
 
     visibleSearch(objectName, options = {}) {
@@ -9068,7 +9076,7 @@
 
     examineCharacter(character) {
       const loadout = this.characterLoadoutText(character, { includeEmpty: true });
-      const temperament = character.friendly === false ? "They look dangerous." : "";
+      const temperament = character.friendly === false ? `${capitalize(displayCharacterName(character))} looks dangerous.` : "";
       const customSummary = characterConfiguredExamineText(character);
       const companionSummary = this.unexpectedParty?.isAmbientDwarf(character) ? this.unexpectedParty.describeCharacter(character) : "";
       const gollumSummary = matches(character.name, "gollum") ? this.gollumRoomNarrative() : "";
@@ -11532,7 +11540,7 @@
       if (target.noticeable === false) return attacker.name === "You" ? `You cannot see ${target.name} to attack them.` : `${attacker.name} cannot see ${target.name} to attack.`;
       if (attacker.friendly === true && target.friendly === true) return `${attacker.name} should not attack ${target.name}.`;
       if (attacker.friendly === "neutral" && !options.forced) return `${attacker.name} ignores your request.`;
-      if (!target.visible) return `${attacker.name} tries to attack ${target.name}, but ${target.name} is already dead.`;
+      if (!target.visible) return `${actorSubject(attacker, true)} ${actorVerb(attacker, "try")} to attack ${target.name}, but ${target.name} is already dead.`;
 
       const attackStrength = (attacker.strength || 1) + (weapon ? (weapon.weight || 0) : 0);
       const targetStrength = target.strength || 1;
