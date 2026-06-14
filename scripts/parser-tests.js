@@ -744,6 +744,78 @@ cases.push(...originalListCases.map(([input, expected], index) => ({
   expected,
 })));
 
+const compoundDelegationRecipients = [
+  "Gandalf",
+  "Thorin",
+  "Bard",
+  "Beorn",
+  "Balin",
+  "Dori",
+  "Nori",
+  "Ori",
+  "Bombur",
+  "Bofur",
+];
+
+const compoundDelegationTemplates = [
+  {
+    label: "give map read",
+    input: (name) => `Give the map to ${name} and ask him to read it.`,
+    expected: (name) => [`give map to ${name.toLowerCase()}`, `ask ${name.toLowerCase()} to read it`],
+  },
+  {
+    label: "give key unlock",
+    input: (name) => `Give the key to ${name} and ask him to unlock the door.`,
+    expected: (name) => [`give key to ${name.toLowerCase()}`, `ask ${name.toLowerCase()} to unlock door`],
+  },
+  {
+    label: "show map explain",
+    input: (name) => `Show the map to ${name} and ask him to explain it.`,
+    expected: (name) => [`show map to ${name.toLowerCase()}`, `ask ${name.toLowerCase()} to explain it`],
+  },
+  {
+    label: "hand lantern light",
+    input: (name) => `Hand the lantern to ${name} and tell him to light it.`,
+    expected: (name) => [`hand lantern to ${name.toLowerCase()}`, `ask ${name.toLowerCase()} to light it`],
+  },
+  {
+    label: "pass rope carry",
+    input: (name) => `Pass the rope to ${name} and ask him to carry it.`,
+    expected: (name) => [`pass rope to ${name.toLowerCase()}`, `ask ${name.toLowerCase()} to carry it`],
+  },
+  {
+    label: "deliver note keep",
+    input: (name) => `Deliver the note to ${name} and ask him to keep it safe.`,
+    expected: (name) => [`deliver note to ${name.toLowerCase()}`, `ask ${name.toLowerCase()} to keep it safe`],
+  },
+  {
+    label: "bring sword examine",
+    input: (name) => `Bring the sword to ${name} and ask him to examine it.`,
+    expected: (name) => [`bring sword to ${name.toLowerCase()}`, `ask ${name.toLowerCase()} to examine it`],
+  },
+  {
+    label: "send book aloud",
+    input: (name) => `Send the book to ${name} and ask him to read it aloud.`,
+    expected: (name) => [`send book to ${name.toLowerCase()}`, `ask ${name.toLowerCase()} to read it aloud`],
+  },
+  {
+    label: "return pipe later",
+    input: (name) => `Return the pipe to ${name} and ask him to smoke it later.`,
+    expected: (name) => [`return pipe to ${name.toLowerCase()}`, `ask ${name.toLowerCase()} to smoke it later`],
+  },
+  {
+    label: "give rope follow",
+    input: (name) => `Give the rope to ${name} and tell him to follow me.`,
+    expected: (name) => [`give rope to ${name.toLowerCase()}`, `ask ${name.toLowerCase()} to follow me`],
+  },
+];
+
+cases.push(...compoundDelegationRecipients.flatMap((name) => compoundDelegationTemplates.map((template) => ({
+  name: `compound delegation ${name.toLowerCase()} ${template.label}`,
+  input: template.input(name),
+  expected: template.expected(name),
+}))));
+
 const dialogueCases = [
   ["BILBO: Gandalf, are you certain this is the right path?", "Gandalf says 'It is the safest path available to us.'"],
   ["BILBO: Thorin, what lies beyond those hills?", "Thorin says 'The road to our homeland, if fortune favors us.'"],
@@ -1671,6 +1743,21 @@ const gameCases = [
       "You light the elegant lamp. Its engraved metal catches the warm glow.",
       "You unstopper the dark glass inkwell.",
       "You stopper the dark glass inkwell.",
+    ],
+  },
+  {
+    name: "give then ask elrond to read it keeps map context",
+    drive(game) {
+      game.execute("jump rivendell");
+      game.execute("give map to elrond and ask him to read it");
+    },
+    expectedIncluded: [
+      "You give the curious map to Elrond.",
+      "Elrond studies the curious map and says 'Its lines are patient. So should be the one who seeks them.'",
+      "Elrond examines the curious map.",
+    ],
+    notExpectedIncluded: [
+      "I don't see that here.",
     ],
   },
   {

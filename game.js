@@ -1503,6 +1503,20 @@
 
   class CommandSplitter {
     constructor(data) {
+      const parserOnlyCharacterNames = [
+        "Dwalin",
+        "Balin",
+        "Fili",
+        "Kili",
+        "Dori",
+        "Nori",
+        "Ori",
+        "Oin",
+        "Gloin",
+        "Bifur",
+        "Bofur",
+        "Bombur",
+      ];
       this.verbs = [...new Set([...(data.parser.verbs || []), ...NATURAL_VERBS])];
       this.directions = [
         "north", "south", "east", "west", "north east", "north west",
@@ -1527,14 +1541,17 @@
         tell: "ask",
       };
       this.adverbs = (data.parser.adverbs || []).filter((adverb) => adverb !== "next");
-      this.knownCharacterNames = Object.values(data.characters || {})
-        .map((character) => normalize(character?.name))
+      this.knownCharacterNames = [...new Set([
+        ...Object.values(data.characters || {}).map((character) => normalize(character?.name)),
+        ...parserOnlyCharacterNames.map((name) => normalize(name)),
+      ])]
         .filter((name) => name && name !== "you")
         .sort((a, b) => b.length - a.length);
       this.lastAdverb = null;
       this.lastObject = null;
       this.lastDirectObject = null;
       this.lastTargetObject = null;
+      this.commandContexts = [];
     }
 
     split(text) {
@@ -1562,6 +1579,7 @@
         .replace(/\s+/g, " ")
         .trim();
 
+      this.commandContexts = [];
       const raw = splitCommandParts(command);
       const result = [];
       let lastVerb = null;
@@ -1578,7 +1596,7 @@
             if (this.lastTargetObject || this.lastDirectObject) return this.lastTargetObject || this.lastDirectObject;
           }
           if (["it", "one"].includes(word) && (this.lastDirectObject || this.lastTargetObject)) {
-            const directVerbs = new Set(["take", "get", "retrieve", "wear", "remove", "eat", "drink", "catch", "borrow", "give", "show", "hand", "pass", "bring", "send", "return", "deliver", "put", "drop", "leave", "place", "set", "store", "hide", "open", "close", "throw", "combine"]);
+            const directVerbs = new Set(["take", "get", "retrieve", "wear", "remove", "eat", "drink", "catch", "borrow", "give", "show", "hand", "pass", "bring", "send", "return", "deliver", "put", "drop", "leave", "place", "set", "store", "hide", "open", "close", "read", "throw", "combine"]);
             if (word === "one" || directVerbs.has(currentVerb)) return this.lastDirectObject || this.lastTargetObject;
             return this.lastTargetObject || this.lastDirectObject;
           }
@@ -1604,6 +1622,13 @@
           result.push(object);
         }
         if (object) this.rememberObjects(verb, object);
+        if (verb || object) {
+          this.commandContexts.push({
+            lastObject: this.lastObject,
+            lastDirectObject: this.lastDirectObject,
+            lastTargetObject: this.lastTargetObject,
+          });
+        }
       }
       return result.length ? result : [command];
     }
@@ -7361,10 +7386,14 @@
         }
 
         const commands = this.splitter.split(rawCommand);
+        const commandContexts = this.splitter.commandContexts || [];
         let forceNpcMovement = false;
-        for (const command of commands) {
+        for (const [index, command] of commands.entries()) {
           if (normalize(command) === "wait") forceNpcMovement = true;
           const moved = this.processCommand(command);
+          if (this.shouldRememberSharedDelegatedContext(command)) {
+            this.rememberSharedDelegatedContext(commandContexts[index]);
+          }
           if (moved || this.pendingClarification) break;
         }
         if (!this.endgame && !this.pendingClarification) this.advanceCharacterTurn({ forceMove: forceNpcMovement });
@@ -7372,6 +7401,21 @@
       } finally {
         this.scheduleIdleAdvance();
       }
+    }
+
+    rememberSharedDelegatedContext(context = null) {
+      if (!context) return;
+      this.sharedDelegatedContext = {
+        lastObject: context.lastObject || this.sharedDelegatedContext.lastObject,
+        lastDirectObject: context.lastDirectObject || this.sharedDelegatedContext.lastDirectObject,
+        lastTargetObject: context.lastTargetObject || this.sharedDelegatedContext.lastTargetObject,
+      };
+    }
+
+    shouldRememberSharedDelegatedContext(command = "") {
+      const text = normalize(command);
+      if (!text) return false;
+      return !/^(?:ask|talk|speak|say|whisper|yell)\b/.test(text);
     }
 
     processCommand(command, actor = this.player) {
