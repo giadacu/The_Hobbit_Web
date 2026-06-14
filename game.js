@@ -19,13 +19,11 @@
   const form = $("command-form");
   const gameShell = $("game-shell");
   const roomImage = $("room-image");
-  const scenePanel = roomImage?.closest(".scene") || null;
   const imageReveal = $("image-reveal");
   const imageRevealOutline = $("image-reveal-outline");
   const imageRevealFill = $("image-reveal-fill");
   const sceneMapOverlay = $("scene-map-overlay");
   const sceneMapImage = $("scene-map-image");
-  const mobileSceneHandle = $("mobile-scene-handle");
   const musicPlayer = $("music-player");
   const sceneCompass = $("scene-compass");
   const sceneCompassRose = $("scene-compass-rose");
@@ -5424,10 +5422,9 @@
       game.layoutSwitchHideTimer = null;
       game.layoutSwitchAutoHide = this.shouldAutoHideLayoutSwitch();
       game.layoutResizeCleanup = null;
-      game.mobileSceneDrawerCleanup = null;
       game.mobileSceneHeight = null;
       game.mobileSceneExpandedHeight = 0;
-      game.mobileSceneDragMoved = false;
+      game.mobileSceneInputActive = false;
       game.layoutMouseAnchor = null;
       game.layoutModePreference = this.loadLayoutModePreference();
       game.layoutMode = "1";
@@ -5436,7 +5433,7 @@
       this.applyLayoutMode(game.layoutModePreference);
       this.initializeLayoutSwitchVisibility();
       this.initializeLayoutDivider();
-      this.initializeMobileSceneDrawer();
+      this.syncMobileSceneDrawer();
     }
 
     render() {
@@ -5635,7 +5632,6 @@
       document.documentElement?.style?.setProperty?.("--mobile-scene-current-height", `${next}px`);
       document.body?.setAttribute("data-mobile-scene-collapsed", collapsed ? "true" : "false");
       document.documentElement?.setAttribute?.("data-mobile-scene-collapsed", collapsed ? "true" : "false");
-      if (mobileSceneHandle) mobileSceneHandle.setAttribute("aria-expanded", collapsed ? "false" : "true");
       if (game.outputPinnedToBottom) game.scheduleOutputScroll(true);
       return next;
     }
@@ -5652,7 +5648,6 @@
       document.documentElement?.style?.removeProperty?.("--mobile-scene-peek-height");
       document.body?.removeAttribute?.("data-mobile-scene-collapsed");
       document.documentElement?.removeAttribute?.("data-mobile-scene-collapsed");
-      if (mobileSceneHandle) mobileSceneHandle.setAttribute("aria-expanded", "true");
     }
 
     syncMobileSceneDrawer(options = {}) {
@@ -5662,7 +5657,7 @@
         return;
       }
       const { min, max } = this.mobileSceneBounds();
-      const preferCollapsed = options.preferCollapsed === true;
+      const preferCollapsed = options.preferCollapsed === true || game.mobileSceneInputActive;
       const next = options.forceExpanded
         ? max
         : Number.isFinite(game.mobileSceneHeight)
@@ -5671,75 +5666,8 @@
       this.applyMobileSceneHeight(next, { preferCollapsed });
     }
 
-    toggleMobileSceneDrawer(expanded = null) {
-      if (!this.isDedicatedMobileLayout()) return;
-      const { min, max } = this.mobileSceneBounds();
-      const current = Number.isFinite(this.game.mobileSceneHeight) ? this.game.mobileSceneHeight : max;
-      const shouldExpand = expanded == null ? current <= min + ((max - min) / 2) : Boolean(expanded);
-      this.applyMobileSceneHeight(shouldExpand ? max : min);
-    }
-
-    stopMobileSceneDrag() {
-      const cleanup = this.game.mobileSceneDrawerCleanup;
-      if (typeof cleanup === "function") cleanup();
-      this.game.mobileSceneDrawerCleanup = null;
-    }
-
-    initializeMobileSceneDrawer() {
-      const game = this.game;
-      if (!scenePanel || !mobileSceneHandle) return;
-
-      mobileSceneHandle.addEventListener("click", (event) => {
-        if (!this.isDedicatedMobileLayout()) return;
-        if (game.mobileSceneDragMoved) {
-          game.mobileSceneDragMoved = false;
-          event.preventDefault();
-          return;
-        }
-        this.toggleMobileSceneDrawer();
-      });
-
-      scenePanel.addEventListener("pointerdown", (event) => {
-        if (!this.isDedicatedMobileLayout()) return;
-        if (event.pointerType === "mouse" && event.button !== 0) return;
-        if (!Number.isFinite(event.clientY)) return;
-        event.preventDefault();
-        this.stopMobileSceneDrag();
-        const startY = event.clientY;
-        const startHeight = Number.isFinite(game.mobileSceneHeight) ? game.mobileSceneHeight : this.mobileSceneBounds().max;
-        game.mobileSceneDragMoved = false;
-
-        const move = (moveEvent) => {
-          if (!Number.isFinite(moveEvent.clientY)) return;
-          const delta = moveEvent.clientY - startY;
-          if (Math.abs(delta) > 6) game.mobileSceneDragMoved = true;
-          this.applyMobileSceneHeight(startHeight + delta);
-        };
-
-        const finish = () => {
-          const { min, max } = this.mobileSceneBounds();
-          const current = Number.isFinite(game.mobileSceneHeight) ? game.mobileSceneHeight : max;
-          const midpoint = min + ((max - min) / 2);
-          const moved = game.mobileSceneDragMoved;
-          this.applyMobileSceneHeight(current > midpoint ? max : min);
-          this.stopMobileSceneDrag();
-          if (moved) {
-            window.setTimeout(() => {
-              game.mobileSceneDragMoved = false;
-            }, 0);
-          }
-        };
-
-        document.addEventListener("pointermove", move);
-        document.addEventListener("pointerup", finish, { once: true });
-        document.addEventListener("pointercancel", finish, { once: true });
-        game.mobileSceneDrawerCleanup = () => {
-          document.removeEventListener("pointermove", move);
-          document.removeEventListener("pointerup", finish);
-          document.removeEventListener("pointercancel", finish);
-        };
-      });
-
+    setMobileSceneInputActive(active) {
+      this.game.mobileSceneInputActive = Boolean(active);
       this.syncMobileSceneDrawer();
     }
 
@@ -8611,11 +8539,6 @@
           this.cancelLayoutSwitchHide();
         });
         layoutSwitch.addEventListener("focusout", () => this.scheduleLayoutSwitchHide(900));
-        input?.addEventListener("focus", () => {
-          this.pendingInitialCommandFocus = false;
-          this.hideLayoutSwitch();
-          this.scheduleIdleAdvance();
-        });
         input?.addEventListener("input", () => {
           this.hideLayoutSwitch();
           this.scheduleIdleAdvance();
@@ -8624,13 +8547,22 @@
           if (document.activeElement === input) this.hideLayoutSwitch();
         });
       }
+      input?.addEventListener("focus", () => {
+        this.pendingInitialCommandFocus = false;
+        this.hideLayoutSwitch();
+        this.setMobileSceneInputActive(true);
+        this.scheduleIdleAdvance();
+      });
       if (output) {
         output.addEventListener("pointerdown", () => this.handleOutputInteraction(), { passive: true });
         output.addEventListener("wheel", () => this.handleOutputInteraction(), { passive: true });
         output.addEventListener("touchstart", () => this.handleOutputInteraction(), { passive: true });
         output.addEventListener("scroll", () => this.handleOutputScroll(), { passive: true });
       }
-      input?.addEventListener("blur", () => this.scheduleIdleAdvance());
+      input?.addEventListener("blur", () => {
+        this.setMobileSceneInputActive(false);
+        this.scheduleIdleAdvance();
+      });
       if (this.layoutSwitchAutoHide && layoutDivider) {
         layoutDivider.addEventListener("mouseenter", () => this.cancelLayoutSwitchHide());
         layoutDivider.addEventListener("mouseleave", () => this.scheduleLayoutSwitchHide(900));
