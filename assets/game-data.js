@@ -4807,8 +4807,8 @@ window.HOBBIT_DATA = {
       "Type 'close top drawer' to close something.",
       "Type 'look' to view the location and its contents.",
       "Type 'inventory' to see what you're carrying.",
-      "Type 'save gamename' to save your progress.",
-      "Type 'load gamename' to load a previous game state.",
+      "Safe moments are marked automatically after dangerous scenes.",
+      "Type 'load' to return to the latest safe moment.",
       "Type 'give box to gandalf' to give an item to another character.",
       "Type 'say to gandalf \"open door\"' to interact with characters.",
       "Type 'verbs' for al list of verbs and adverbs that you can use in the game."

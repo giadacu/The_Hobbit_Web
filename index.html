@@ -24,7 +24,7 @@
       }
 
     </style>
-    <link rel="stylesheet" href="style.css?v=20260614-1515">
+    <link rel="stylesheet" href="style.css?v=20260615-1625">
   </head>
   <body class="booting notranslate" translate="no">
     <div id="layout-switch" class="layout-switch" aria-label="Layout">
@@ -92,47 +92,19 @@
     </main>
 
     <div id="save-panel" class="save-panel" hidden>
-      <button id="save-panel-backdrop" class="save-panel__backdrop" type="button" aria-label="Close save panel"></button>
+      <button id="save-panel-backdrop" class="save-panel__backdrop" type="button" aria-label="Close safe moments panel"></button>
       <section class="save-panel__dialog" role="dialog" aria-modal="true" aria-labelledby="save-panel-title">
         <header class="save-panel__header">
-          <div>
-            <p id="save-panel-eyebrow" class="save-panel__eyebrow">Saved In This Browser</p>
-            <h2 id="save-panel-title" class="save-panel__title">Save Game</h2>
-          </div>
+          <h2 id="save-panel-title" class="save-panel__title">Safe Moments</h2>
           <button id="save-panel-close" class="save-panel__close" type="button" aria-label="Close">Close</button>
         </header>
 
-        <div class="save-panel__tabs" role="tablist" aria-label="Save or load">
-          <button id="save-panel-tab-save" class="save-panel__tab" type="button" role="tab" aria-selected="true">Save</button>
-          <button id="save-panel-tab-load" class="save-panel__tab" type="button" role="tab" aria-selected="false">Load</button>
-        </div>
-
         <div class="save-panel__body">
-          <section class="save-panel__primary">
-            <p id="save-panel-storage-note" class="save-panel__storage-note">Your saves stay in this browser on this device.</p>
-            <label id="save-panel-name-label" class="save-panel__label" for="save-panel-name">Save Name</label>
-            <input id="save-panel-name" class="save-panel__input" type="text" maxlength="64" autocomplete="off" spellcheck="false">
-            <p id="save-panel-status" class="save-panel__status" aria-live="polite"></p>
-            <div class="save-panel__actions">
-              <button id="save-panel-primary" class="save-panel__button save-panel__button--primary" type="button">Save</button>
-              <button id="save-panel-latest-autosave" class="save-panel__button" type="button">Load Latest Autosave</button>
-            </div>
-          </section>
-
           <section class="save-panel__lists">
-            <div class="save-panel__list-block">
-              <div class="save-panel__list-heading">
-                <h3>Manual Saves</h3>
-                <span id="save-panel-manual-count" class="save-panel__count">0</span>
-              </div>
-              <div id="save-panel-manual-list" class="save-panel__list" role="list"></div>
+            <div class="save-panel__actions">
+              <button id="save-panel-latest-autosave" class="save-panel__button save-panel__button--primary" type="button">Resume Latest</button>
             </div>
-
             <div class="save-panel__list-block">
-              <div class="save-panel__list-heading">
-                <h3>Autosaves</h3>
-                <span id="save-panel-autosave-count" class="save-panel__count">0</span>
-              </div>
               <div id="save-panel-autosave-list" class="save-panel__list" role="list"></div>
             </div>
           </section>
@@ -140,7 +112,7 @@
       </section>
     </div>
 
-    <script src="assets/game-data.js?v=20260614-1515"></script>
-    <script src="game.js?v=20260614-1515"></script>
+    <script src="assets/game-data.js?v=20260615-1625"></script>
+    <script src="game.js?v=20260615-1625"></script>
   </body>
 </html>

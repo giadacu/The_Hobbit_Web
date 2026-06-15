@@ -982,7 +982,7 @@ const gameCases = [
     inputs: ["help"],
     expectedIncluded: [
       'Try simple commands such as "look", "exits", "inventory", "take map from Gandalf", or "open door".',
-      'For guidance, type "tips". To see recognized verbs, type "commands" or "verbs". To save, type "save name".',
+      'For guidance, type "tips". To see recognized verbs, type "commands" or "verbs". Safe moments are marked automatically; type "load" to open them.',
     ],
     notExpectedIncluded: ["Please specify your action and the object."],
   },
@@ -1162,8 +1162,23 @@ const gameCases = [
   {
     name: "undo command gives friendly unsupported message",
     inputs: ["undo"],
-    expectedIncluded: ["Undo is not available here. If you need safety, use 'save name' or 'load autosave'."],
+    expectedIncluded: ["Undo is not available here. If you need safety, use 'load' to open your safe moments."],
     notExpectedIncluded: ["Please specify your action and the object."],
+  },
+  {
+    name: "save command explains autosave-only flow",
+    drive(game) {
+      game.execute("save");
+      game.print(`Save panel: ${game.savePanelState?.open ? "open" : "closed"}`);
+    },
+    expectedIncluded: [
+      "Safe moments are marked automatically after dangerous scenes.",
+      "Type 'load' to choose one.",
+      "Save panel: closed",
+    ],
+    notExpectedIncluded: [
+      "Named saves are no longer used.",
+    ],
   },
   {
     name: "speak with gandalf maps to talk",
@@ -2945,21 +2960,21 @@ const gameCases = [
     ],
   },
   {
-    name: "remembered ambiguous reference survives save and load",
+    name: "remembered ambiguous reference survives autosave restore",
     drive(game) {
       game.execute("open drawer");
       game.execute("top");
-      game.save("clarification-memory");
+      game.recordAutosave("clarification memory", { key: "test:clarification-memory", force: true });
       game.execute("open bottom drawer");
-      game.load("clarification-memory");
+      game.execute("autosave");
       game.execute("close drawer");
       const clarificationCount = outputLines.filter((line) => line.includes("Do you mean") && line.includes("drawer")).length;
-      game.print(`Drawer clarification count across save load: ${clarificationCount}`);
+      game.print(`Drawer clarification count across autosave restore: ${clarificationCount}`);
     },
     expectedIncluded: [
-      'Game "clarification-memory" loaded.',
+      "You take up the thread again: clarification memory.",
       "You close the top drawer.",
-      "Drawer clarification count across save load: 0",
+      "Drawer clarification count across autosave restore: 0",
     ],
   },
   {
@@ -3436,6 +3451,22 @@ const gameCases = [
     ],
     notExpectedIncluded: [
       "A safe moment is marked here: before facing the trolls.",
+    ],
+  },
+  {
+    name: "surviving the trolls marks a post-danger autosave",
+    drive(game) {
+      game.execute("jump trolls");
+      outputLines.length = 0;
+      game.execute("carefully take large key and south west");
+      game.execute("wait");
+      game.execute("wait");
+      game.execute("wait");
+      game.print(`Troll survival autosave: ${game.autosaveMeta?.label || "none"}`);
+    },
+    expectedIncluded: [
+      "Day dawns.",
+      "Troll survival autosave: after outlasting the trolls",
     ],
   },
   {
@@ -4326,12 +4357,14 @@ const gameCases = [
     },
     drive(game) {
       game.triggerRivendellPreparationRevelation();
+      game.print(`Rivendell milestone autosave: ${game.autosaveMeta?.label || "none"}`);
       game.print(`Temporary image file active: ${game.temporaryImage?.file || "none"}`);
       game.execute("look");
       game.print(`Temporary image after next command: ${/Thrors_map\\.jpg/i.test(game.currentImageSrc) ? "yes" : "no"}`);
     },
     expectedIncluded: [
       "Elrond spreads the weathered parchment before the Company, and all draw close while the Lord of Rivendell studies the ancient markings.",
+      "Rivendell milestone autosave: after Elrond reveals the way forward",
       "Temporary image file active: Thrors_map.jpg",
       "Temporary image after next command: no",
     ],
@@ -4444,13 +4477,19 @@ const gameCases = [
       game.flags.lanternturns = 20;
       game.checkSpecialSituations();
     },
-    inputs: ["attack hulking goblin with majestic sword", "ask gandalf to attack hulking goblin", "look"],
+    drive(game) {
+      game.execute("attack hulking goblin with majestic sword");
+      game.execute("ask gandalf to attack hulking goblin");
+      game.execute("look");
+      game.print(`Goblin ambush milestone autosave: ${game.autosaveMeta?.label || "none"}`);
+    },
     expectedIncluded: [
       "Thorin goes down under it with a cry",
       "another of the company must strike now",
       /(Bilbo darts in again as Gandalf crashes into the brute from the flank|Gandalf strikes as Bilbo keeps the hulking goblin off balance|Bilbo's desperate stroke opens the moment Gandalf needs)/,
       /(drag it off Thorin|creature is hacked down before it can recover its grip on Thorin|is finished there in the tunnel dust)/,
       "The body of the hulking goblin lies here.",
+      "Goblin ambush milestone autosave: after surviving the goblin ambush in the upper tunnels",
     ],
     notExpectedIncluded: [
       "as you crashes into the brute from the flank",
@@ -4553,6 +4592,7 @@ const gameCases = [
       game.execute("wear ring");
       game.execute("north");
       game.execute("wait");
+      game.print(`Gollum escape autosave: ${game.autosaveMeta?.label || "none"}`);
       game.print(`Ring flag after Gollum: ${game.flags.bilbo_has_ring ? "yes" : "no"}`);
     },
     expectedIncluded: [
@@ -4561,6 +4601,7 @@ const gameCases = [
       /You (?:wear the golden ring and become unnoticeable\.|slip the golden ring on and fade from notice\.|draw the golden ring onto your finger and pass from sight\.)/,
       /(?:Invisible under the ring, you slip past Gollum as he claws wildly about for his precious\.|Hidden by the ring, you edge past Gollum while he gropes and hisses for his precious\.|Unseen beneath the ring, you steal by Gollum while his hands scrabble desperately in the dark\.)/,
       /(?:Close behind, Gollum's scream tears through the black passages|The dark carries Gollum's grief too well here|Somewhere in the deep ways Gollum gives a choking wail|A wet shriek races the walls behind you)/,
+      "Gollum escape autosave: after escaping Gollum",
       "Ring flag after Gollum: yes",
     ],
   },
@@ -4744,9 +4785,11 @@ const gameCases = [
     },
     drive(game) {
       game.execute("lead ponies forward");
+      game.print(`Beorn arrival autosave: ${game.autosaveMeta?.label || "none"}`);
       game.print(`Arrival room: ${game.currentRoom}`);
     },
     expectedIncluded: [
+      "Beorn arrival autosave: after reaching Beorn's house",
       "Arrival room: beorns_house",
       "The weather does not wholly clear, but the worst of its fury passes as you come down at last toward Beorn's lands, leaving only torn cloud and a bitter wind behind you on the heights.",
     ],
@@ -4860,7 +4903,7 @@ const gameCases = [
       /Gollum.*(Wrong|False|dark|water|stones)/,
       "Death choice: death",
       "Autosave room: deep_dark_lake",
-      "Type 'load autosave' to return to the last safe moment in Deep Dark Lake, or 'restart' to begin the tale again.",
+      "Type 'load' to open your safe moments in Deep Dark Lake, or 'restart' to begin the tale again.",
     ],
   },
   {
@@ -4885,7 +4928,7 @@ const gameCases = [
     ],
   },
   {
-    name: "load autosave after troll death restores the troll scene opening",
+    name: "load after troll death opens the safe moments panel",
     drive(game) {
       game.execute("jump trolls");
       outputLines.length = 0;
@@ -4893,14 +4936,14 @@ const gameCases = [
       game.execute("wait");
       game.execute("wait");
       game.execute("wait");
-      game.execute("load autosave");
+      game.execute("load");
+      game.print(`Load panel: ${game.savePanelState?.open ? "open" : "closed"}`);
     },
     expectedIncluded: [
+      "Load panel: open",
+    ],
+    notExpectedIncluded: [
       "You take up the thread again: before facing the trolls.",
-      "You are in the trolls' clearing.",
-      "You crouch low behind a mossy boulder, heart pounding, as the trolls argue by the flickering campfire in the moonlit clearing.",
-      "What shall us do with him?",
-      "Roast him!",
     ],
   },
   {
@@ -4936,7 +4979,7 @@ const gameCases = [
     expectedIncluded: [
       "River autosave room: west_bank",
       "River death choice: death",
-      "Type 'load autosave' to return to the last safe moment in West Bank, or 'restart' to begin the tale again.",
+      "Type 'load' to open your safe moments in West Bank, or 'restart' to begin the tale again.",
     ],
   },
   {
@@ -4952,7 +4995,7 @@ const gameCases = [
       "You jump into the river.",
       "The river takes you at once, spinning you among the rocks before any hand can save you.",
       /So ends this thread of the tale\. You have mastered \d+\.\d+% of this adventure\./,
-      "Type 'load autosave' to return to the last safe moment in West Bank, or 'restart' to begin the tale again.",
+      "Type 'load' to open your safe moments in West Bank, or 'restart' to begin the tale again.",
     ],
     notExpectedIncluded: [
       "The tale goes no farther from here.",
@@ -4961,9 +5004,14 @@ const gameCases = [
   {
     name: "autosave without a marked safe moment reports clearly",
     drive(game) {
+      for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+        const key = localStorage.key(index);
+        if (key && key.startsWith("hobbit-web-save:")) localStorage.removeItem(key);
+      }
       game.endgame = true;
       game.pendingEndgameChoice = "death";
       game.autosaveSnapshot = null;
+      game.autosaveMeta = null;
       game.execute("autosave");
     },
     expectedIncluded: [

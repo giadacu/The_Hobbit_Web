@@ -2,7 +2,7 @@
   const DATA = applyImmersionExpansion(window.HOBBIT_DATA);
   const IMAGE_ROOT = "assets/local-images/";
   const MUSIC_ROOT = "assets/local-music/";
-  const ASSET_VERSION = "20260612-1338";
+  const ASSET_VERSION = "20260615-1200";
   const ASSET_QUERY_SUFFIX = window.location.protocol === "file:" ? "" : `?v=${ASSET_VERSION}`;
   const TEMPORARY_IMAGE_ALIASES = {
     "thrors-map": "Thrors_map.jpg",
@@ -43,21 +43,11 @@
   const savePanel = $("save-panel");
   const savePanelBackdrop = $("save-panel-backdrop");
   const savePanelClose = $("save-panel-close");
-  const savePanelEyebrow = $("save-panel-eyebrow");
   const savePanelTitle = $("save-panel-title");
-  const savePanelTabSave = $("save-panel-tab-save");
-  const savePanelTabLoad = $("save-panel-tab-load");
-  const savePanelStorageNote = $("save-panel-storage-note");
-  const savePanelNameLabel = $("save-panel-name-label");
-  const savePanelNameInput = $("save-panel-name");
-  const savePanelStatus = $("save-panel-status");
-  const savePanelPrimaryButton = $("save-panel-primary");
   const savePanelLatestAutosaveButton = $("save-panel-latest-autosave");
-  const savePanelManualCount = $("save-panel-manual-count");
-  const savePanelAutosaveCount = $("save-panel-autosave-count");
-  const savePanelManualList = $("save-panel-manual-list");
   const savePanelAutosaveList = $("save-panel-autosave-list");
-  $("mobile-scene-handle")?.remove();
+  const mobileSceneHandle = $("mobile-scene-handle");
+  if (mobileSceneHandle && typeof mobileSceneHandle.remove === "function") mobileSceneHandle.remove();
   const SCENE_COMPASS_POINTS = {
     "north": $("scene-compass-north"),
     "north east": $("scene-compass-north-east"),
@@ -5916,10 +5906,6 @@
       game.autosaveCounter = 0;
       game.savePanelState = {
         open: false,
-        mode: "save",
-        selectedStorageKey: "",
-        status: "",
-        pendingOverwriteName: "",
       };
       this.bindPanel();
       this.refreshLatestAutosaveState();
@@ -5930,20 +5916,10 @@
       this.boundPanel = true;
       savePanelBackdrop?.addEventListener("click", () => this.closePanel());
       savePanelClose?.addEventListener("click", () => this.closePanel());
-      savePanelTabSave?.addEventListener("click", () => this.openPanel("save"));
-      savePanelTabLoad?.addEventListener("click", () => this.openPanel("load"));
-      savePanelPrimaryButton?.addEventListener("click", () => this.handlePanelPrimaryAction());
       savePanelLatestAutosaveButton?.addEventListener("click", () => {
         const latest = this.latestAutosaveEntry();
         if (!latest) return;
         this.loadEntry(latest, { announceAutosave: true, closePanel: true });
-      });
-      savePanelNameInput?.addEventListener("input", () => this.handlePanelNameInput());
-      savePanelNameInput?.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          this.handlePanelPrimaryAction();
-        }
       });
       savePanel?.addEventListener("keydown", (event) => {
         if (event.key !== "Escape") return;
@@ -5956,23 +5932,13 @@
       return Boolean(this.game.savePanelState?.open);
     }
 
-    openPanel(mode = "save") {
+    openPanel() {
       const game = this.game;
       if (!savePanel) return false;
-      const normalizedMode = mode === "load" ? "load" : "save";
       game.savePanelState.open = true;
-      game.savePanelState.mode = normalizedMode;
-      game.savePanelState.selectedStorageKey = "";
-      game.savePanelState.status = "";
-      game.savePanelState.pendingOverwriteName = "";
       savePanel.removeAttribute("hidden");
-      if (savePanelNameInput) {
-        if (normalizedMode === "load") savePanelNameInput.value = "";
-        else if (!savePanelNameInput.value.trim()) savePanelNameInput.value = this.defaultManualSaveName();
-      }
       this.renderPanel();
-      savePanelNameInput?.focus({ preventScroll: true });
-      savePanelNameInput?.select?.();
+      savePanelLatestAutosaveButton?.focus({ preventScroll: true });
       return true;
     }
 
@@ -5981,26 +5947,13 @@
       const game = this.game;
       if (!savePanel || !this.isPanelOpen()) return false;
       game.savePanelState.open = false;
-      game.savePanelState.status = "";
-      game.savePanelState.pendingOverwriteName = "";
       savePanel.setAttribute("hidden", "hidden");
       if (focusInput) game.focusCommandInput({ defer: true, force: true });
       return true;
     }
 
-    defaultManualSaveName() {
-      const room = this.game.room();
-      const roomName = roomDisplayName(room?.name || room?.id || this.game.currentRoom || "Adventure");
-      const turn = Math.max(0, Number(this.game.turnCount) || 0);
-      return `${roomName} - turn ${turn}`;
-    }
-
     normalizeSaveName(name) {
       return String(name || "").replace(/\s+/g, " ").trim().slice(0, 64);
-    }
-
-    storageKeyForManual(name) {
-      return `${SAVE_PREFIX}${name}`;
     }
 
     storageKeyForAutosave(id) {
@@ -6087,7 +6040,10 @@
 
     listSaveEntries() {
       const entries = [];
-      for (const storageKey of Object.keys(localStorage)) {
+      const total = Number(localStorage?.length) || 0;
+      for (let index = 0; index < total; index += 1) {
+        const storageKey = localStorage.key(index);
+        if (!storageKey) continue;
         if (!storageKey.startsWith(SAVE_PREFIX)) continue;
         const entry = this.parseStoredEntry(storageKey, localStorage.getItem(storageKey));
         if (entry) entries.push(entry);
@@ -6100,22 +6056,12 @@
       });
     }
 
-    manualSaveEntries() {
-      return this.listSaveEntries().filter((entry) => entry.kind === "manual");
-    }
-
     autosaveEntries() {
       return this.listSaveEntries().filter((entry) => entry.kind === "autosave");
     }
 
     latestAutosaveEntry() {
       return this.autosaveEntries()[0] || null;
-    }
-
-    findManualEntry(name) {
-      const normalized = normalize(this.normalizeSaveName(name));
-      if (!normalized) return null;
-      return this.manualSaveEntries().find((entry) => normalize(entry.name) === normalized) || null;
     }
 
     refreshLatestAutosaveState() {
@@ -6158,32 +6104,31 @@
       return parts.join(" • ");
     }
 
-    buildEmptyState(kind = "manual") {
+    buildEmptyState(kind = "autosave") {
       const empty = document.createElement("div");
       empty.className = "save-panel__empty";
       empty.textContent = kind === "autosave"
-        ? "Autosaves will appear here as the adventure marks safe moments."
-        : "No manual saves yet. Use the field on the left to name and store one.";
+        ? "No safe moments yet."
+        : "No safe moments are available yet.";
       return empty;
     }
 
-    createEntryButton(entry) {
-      const game = this.game;
+    createEntryButton(entry, options = {}) {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "save-panel__entry";
-      if (game.savePanelState?.selectedStorageKey === entry.storageKey) button.classList.add("is-selected");
+      if (options.isLatest) button.classList.add("is-selected");
 
       const title = document.createElement("div");
       title.className = "save-panel__entry-title";
       const name = document.createElement("span");
       name.className = "save-panel__entry-name";
-      name.textContent = entry.name || (entry.kind === "autosave" ? "Autosave" : "Unnamed save");
+      name.textContent = entry.label || entry.name || "Safe moment";
       title.append(name);
-      if (entry.kind === "autosave") {
+      if (options.isLatest) {
         const badge = document.createElement("span");
         badge.className = "save-panel__badge";
-        badge.textContent = "Autosave";
+        badge.textContent = "Latest";
         title.append(badge);
       }
 
@@ -6197,22 +6142,7 @@
 
       button.append(title, meta, time);
       button.addEventListener("click", () => {
-        game.savePanelState.selectedStorageKey = entry.storageKey;
-        game.savePanelState.pendingOverwriteName = "";
-        if (game.savePanelState.mode === "save" && entry.kind === "manual") {
-          savePanelNameInput.value = entry.name || "";
-          game.savePanelState.status = `Saving now will replace "${entry.name}".`;
-          savePanelNameInput.focus({ preventScroll: true });
-          savePanelNameInput.select?.();
-        } else if (game.savePanelState.mode === "save") {
-          game.savePanelState.status = "Autosaves are loaded from the list below. To keep a permanent named save, use the field above.";
-        } else if (game.savePanelState.mode === "load") {
-          savePanelNameInput.value = entry.kind === "manual" ? entry.name || "" : "";
-          game.savePanelState.status = entry.kind === "autosave"
-            ? `Load this autosave from ${this.formatTimestamp(entry.savedAt)}.`
-            : `Load "${entry.name}".`;
-        }
-        this.renderPanel();
+        this.loadEntry(entry, { announceAutosave: true, closePanel: true });
       });
       return button;
     }
@@ -6223,7 +6153,7 @@
         container.replaceChildren(this.buildEmptyState(kind));
         return;
       }
-      container.replaceChildren(...entries.map((entry) => this.createEntryButton(entry)));
+      container.replaceChildren(...entries.map((entry, index) => this.createEntryButton(entry, { isLatest: index === 0 })));
     }
 
     renderPanel() {
@@ -6233,127 +6163,41 @@
         savePanel.setAttribute("hidden", "hidden");
         return;
       }
-      const mode = game.savePanelState.mode === "load" ? "load" : "save";
-      const manualEntries = this.manualSaveEntries();
       const autosaveEntries = this.autosaveEntries();
       const latestAutosave = autosaveEntries[0] || null;
       savePanel.removeAttribute("hidden");
-      if (savePanelEyebrow) savePanelEyebrow.textContent = mode === "save" ? "Saved In This Browser" : "Return To A Saved Moment";
-      if (savePanelTitle) savePanelTitle.textContent = mode === "save" ? "Save Game" : "Load Game";
-      if (savePanelStorageNote) {
-        savePanelStorageNote.textContent = mode === "save"
-          ? "Your saves stay in this browser on this device. Pick a clear name or tap an existing save to overwrite it."
-          : "Choose a manual save or an autosave from this browser on this device.";
-      }
-      if (savePanelNameLabel) savePanelNameLabel.textContent = mode === "save" ? "Save Name" : "Saved Game Name";
-      if (savePanelPrimaryButton) savePanelPrimaryButton.textContent = mode === "save" ? "Save" : "Load Selected";
-      if (savePanelTabSave) savePanelTabSave.setAttribute("aria-selected", mode === "save" ? "true" : "false");
-      if (savePanelTabLoad) savePanelTabLoad.setAttribute("aria-selected", mode === "load" ? "true" : "false");
+      if (savePanelTitle) savePanelTitle.textContent = "Safe Moments";
       if (savePanelLatestAutosaveButton) {
-        savePanelLatestAutosaveButton.hidden = mode !== "load";
         savePanelLatestAutosaveButton.disabled = !latestAutosave;
+        savePanelLatestAutosaveButton.hidden = !latestAutosave;
         savePanelLatestAutosaveButton.textContent = latestAutosave
-          ? `Load Latest Autosave${latestAutosave.roomName ? ` (${roomDisplayName(latestAutosave.roomName)})` : ""}`
-          : "Load Latest Autosave";
+          ? `Resume Latest${latestAutosave.roomName ? ` (${roomDisplayName(latestAutosave.roomName)})` : ""}`
+          : "Resume Latest";
       }
-      if (savePanelManualCount) savePanelManualCount.textContent = String(manualEntries.length);
-      if (savePanelAutosaveCount) savePanelAutosaveCount.textContent = String(autosaveEntries.length);
-      if (savePanelStatus) savePanelStatus.textContent = game.savePanelState.status || (mode === "save"
-        ? "Choose a name to store the current adventure state."
-        : "Tap an entry below, or type the name of a manual save.");
-      this.renderEntryList(savePanelManualList, manualEntries, "manual");
       this.renderEntryList(savePanelAutosaveList, autosaveEntries, "autosave");
-    }
-
-    handlePanelNameInput() {
-      const game = this.game;
-      const typedName = this.normalizeSaveName(savePanelNameInput?.value || "");
-      game.savePanelState.pendingOverwriteName = "";
-      game.savePanelState.selectedStorageKey = "";
-      if (!typedName) {
-        game.savePanelState.status = game.savePanelState.mode === "save"
-          ? "Choose a name to store the current adventure state."
-          : "Tap an entry below, or type the name of a manual save.";
-        this.renderPanel();
-        return;
-      }
-      const matchingManual = this.findManualEntry(typedName);
-      if (matchingManual) game.savePanelState.selectedStorageKey = matchingManual.storageKey;
-      if (game.savePanelState.mode === "save") {
-        game.savePanelState.status = matchingManual
-          ? `"${matchingManual.name}" already exists. Saving now will replace it.`
-          : "This will create a new manual save in this browser on this device.";
-      } else {
-        game.savePanelState.status = matchingManual
-          ? `Ready to load "${matchingManual.name}".`
-          : "No manual save matches that name yet.";
-      }
-      this.renderPanel();
-    }
-
-    handlePanelPrimaryAction() {
-      const mode = this.game.savePanelState?.mode === "load" ? "load" : "save";
-      if (mode === "save") {
-        this.save(savePanelNameInput?.value || "", { fromPanel: true });
-        return;
-      }
-      const selected = this.listSaveEntries().find((entry) => entry.storageKey === this.game.savePanelState?.selectedStorageKey) || null;
-      if (selected) {
-        this.loadEntry(selected, { announceAutosave: selected.kind === "autosave", closePanel: true });
-        return;
-      }
-      this.load(savePanelNameInput?.value || "", { fromPanel: true });
     }
 
     save(name, options = {}) {
       const game = this.game;
-      const normalizedName = this.normalizeSaveName(name);
-      if (!normalizedName) {
-        if (options.fromPanel) {
-          game.savePanelState.status = "Enter a name before saving.";
-          this.renderPanel();
-          return false;
-        }
-        this.openPanel("save");
-        return false;
-      }
-      const record = this.createRecord({ name: normalizedName, kind: "manual" });
-      localStorage.setItem(this.storageKeyForManual(normalizedName), JSON.stringify(record));
-      game.print(`Game saved as "${normalizedName}".`, "system");
-      if (options.fromPanel) {
-        game.savePanelState.selectedStorageKey = this.storageKeyForManual(normalizedName);
-        game.savePanelState.status = `Saved as "${normalizedName}".`;
-        game.savePanelState.pendingOverwriteName = "";
-        this.closePanel();
-      }
-      this.renderPanel();
-      return true;
+      const message = "Safe moments are marked automatically after dangerous scenes. Type 'load' to choose one.";
+      game.print(message, "system");
+      return false;
     }
 
     load(name, options = {}) {
       const game = this.game;
-      const normalizedName = this.normalizeSaveName(name);
-      if (!normalizedName) {
-        this.openPanel("load");
+      const latest = this.refreshLatestAutosaveState();
+      if (!latest || !game.autosaveSnapshot) {
+        game.print(noAutosaveText(), "system");
         return false;
       }
-      if (normalize(normalizedName) === "autosave") return this.resumeFromAutosave({ closePanel: options.fromPanel !== false });
-      const entry = this.findManualEntry(normalizedName);
-      if (!entry) {
-        if (options.fromPanel) {
-          game.savePanelState.status = `No manual save named "${normalizedName}" was found.`;
-          this.renderPanel();
-          return false;
-        }
-        game.print(`No saved game named "${normalizedName}" was found.`, "system");
-        return false;
-      }
-      return this.loadEntry(entry, { closePanel: options.fromPanel !== false });
+      if (!options.fromPanel) this.openPanel();
+      return false;
     }
 
     listSaves() {
-      this.openPanel("load");
-      return this.listSaveEntries();
+      this.openPanel();
+      return this.autosaveEntries();
     }
 
     loadEntry(entry, options = {}) {
@@ -6361,7 +6205,6 @@
       if (!entry?.snapshot) return false;
       this.restoreSnapshot(clone(entry.snapshot));
       if (entry.kind === "autosave" || options.announceAutosave) game.print(autosaveResumedText(entry.label || entry.name), "system");
-      else game.print(`Game "${entry.name}" loaded.`, "system");
       game.describeRoom({ full: true });
       game.checkSpecialSituations();
       if (options.closePanel !== false) this.closePanel();
@@ -7136,6 +6979,11 @@
         game.dropInventory(goblin);
         goblin.visible = false;
         game.aftermath?.registerCharacterDeath(goblin);
+        game.recordProgressAutosave(
+          "autosave_milestone_goblin_ambush_survived",
+          "after surviving the goblin ambush in the upper tunnels",
+          "milestone:goblins:tunnel-ambush-survived",
+        );
         attacker.attackFlag = 0;
         return `${finish} ${environment}`;
       }
@@ -7188,6 +7036,10 @@
   class HazardDirector {
     constructor(game) {
       this.game = game;
+    }
+
+    recordMilestoneAutosave(flag, label, key) {
+      return this.game.recordProgressAutosave(flag, label, `milestone:${key}`);
     }
 
     advanceOffscreenTurnTimers() {
@@ -7376,6 +7228,47 @@
       return game.recordAutosave(hazard.label, { key: hazard.key });
     }
 
+    maybeProgressAutosave(previousRoom = "", currentRoom = this.game.currentRoom) {
+      const game = this.game;
+      if (!currentRoom) return false;
+      if (currentRoom === "rivendell" && previousRoom === "hidden_valley_path") {
+        return this.recordMilestoneAutosave(
+          "autosave_milestone_rivendell_arrival",
+          "after reaching Rivendell",
+          "rivendell:arrival",
+        );
+      }
+      if (currentRoom === "beorns_house" && (BEORN_MOUNTAIN_APPROACH_ROOMS.has(previousRoom) || previousRoom === "forest_road")) {
+        return this.recordMilestoneAutosave(
+          "autosave_milestone_beorn_arrival",
+          "after reaching Beorn's house",
+          "beorn:arrival",
+        );
+      }
+      if (currentRoom === "wooden_town" && ["long_lake", "strong_river"].includes(previousRoom)) {
+        return this.recordMilestoneAutosave(
+          "autosave_milestone_laketown_arrival",
+          "after the barrel escape into Lake-town",
+          "laketown:arrival",
+        );
+      }
+      if (currentRoom === "front_gate" && ["little_steep_bay", "stoe_of_ravenhill", "ruins_of_the_town_of_dale", "bleak_barren_land"].includes(previousRoom)) {
+        return this.recordMilestoneAutosave(
+          "autosave_milestone_front_gate_arrival",
+          "after reaching the Front Gate",
+          "front-gate:arrival",
+        );
+      }
+      if (previousRoom === "deep_dark_lake" && currentRoom !== "deep_dark_lake" && game.gollumState?.escaped) {
+        return this.recordMilestoneAutosave(
+          "autosave_milestone_gollum_escape",
+          "after escaping Gollum",
+          "gollum:escape",
+        );
+      }
+      return false;
+    }
+
     transformTrolls() {
       const game = this.game;
       if (game.trollsTransformed) return;
@@ -7391,6 +7284,11 @@
       const room = game.rooms.trolls_clearing;
       if (room?.transformedImage) room.image = room.transformedImage;
       if (game.currentRoom === "trolls_clearing") game.print("You see the stone remains of the trolls.");
+      this.recordMilestoneAutosave(
+        "autosave_milestone_trolls_survived",
+        "after outlasting the trolls",
+        "trolls:survived",
+      );
     }
 
     checkKidnapping() {
@@ -8375,9 +8273,11 @@
           if (actionEndsGame) {
             game.endGame(action.desc2 || "The tale goes no farther from here.", { fatal: true });
           } else if (game.roomByName(action.destination)) {
+            const previousRoom = game.currentRoom;
             game.currentRoom = game.roomByName(action.destination).id;
             game.player.position = game.currentRoom;
             game.describeRoom();
+            game.hazards?.maybeProgressAutosave(previousRoom, game.currentRoom);
             game.maybeAutosaveForRoom(game.currentRoom);
             game.checkSpecialSituations();
           }
@@ -8963,7 +8863,11 @@
         event.preventDefault();
         if (this.pendingEndgameChoice) {
           const key = normalize(event.key);
-          if (["1", "a", "autosave", "resume", "continue"].includes(key)) {
+          if (["1", "l", "load"].includes(key)) {
+            this.load("");
+            return;
+          }
+          if (["a", "autosave", "resume", "continue"].includes(key)) {
             this.resumeFromAutosave();
             return;
           }
@@ -9169,6 +9073,10 @@
         if (this.endgame) {
           const normalizedEndgame = normalize(lower);
           if (this.pendingEndgameChoice) {
+            if (normalizedEndgame === "load") {
+              this.load("");
+              return;
+            }
             if (["autosave", "resume", "continue", "checkpoint", "load autosave"].includes(normalizedEndgame)) {
               this.resumeFromAutosave();
               return;
@@ -9359,10 +9267,10 @@
         get: "What would you like to take?",
         give: "What would you like to give, and to whom?",
         grab: "What would you like to take?",
-        load: "Please name the saved game you want to load, or type 'load autosave'.",
+        load: "Type 'load' to open your safe moments.",
         open: "Open what?",
         read: "Read what?",
-        save: "Please name the saved game. For example: 'save bag-end'.",
+        save: "Safe moments are marked automatically now. Type 'load' when you want to choose one.",
         take: "What would you like to take?",
         unlock: "Unlock what?",
         use: "What would you like to use?",
@@ -9681,7 +9589,7 @@
       if (this.roomIsDark()) {
         this.print("It is pitch dark here. You cannot see the room, its exits, or anything else. You can only feel your way and move by guesswork.");
         if (config.initial) {
-          this.print('Type "tips" for a hint, "commands" or "verbs" for recognized words, "save name" to save.', "system");
+          this.print('Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.', "system");
         }
         this.render();
         return;
@@ -9734,7 +9642,7 @@
         person.justEntered = false;
       }
       if (config.initial) {
-        this.print('Type "tips" for a hint, "commands" or "verbs" for recognized words, "save name" to save.', "system");
+        this.print('Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.', "system");
       }
       this.render();
     }
@@ -10498,7 +10406,7 @@
 
     showHelp() {
       this.print('Try simple commands such as "look", "exits", "inventory", "take map from Gandalf", or "open door".');
-      this.print('For guidance, type "tips". To see recognized verbs, type "commands" or "verbs". To save, type "save name".');
+      this.print('For guidance, type "tips". To see recognized verbs, type "commands" or "verbs". Safe moments are marked automatically; type "load" to open them.');
     }
 
     showStatus() {
@@ -10569,7 +10477,12 @@
         return false;
       }
       this.prepareJumpState();
-      preset.apply(this);
+      this.debugJumpInProgress = true;
+      try {
+        preset.apply(this);
+      } finally {
+        this.debugJumpInProgress = false;
+      }
       this.pendingClarification = null;
       this.forcedChoice = null;
       this.pendingEndgameChoice = null;
@@ -10816,7 +10729,7 @@
     }
 
     undoUnavailable() {
-      this.print("Undo is not available here. If you need safety, use 'save name' or 'load autosave'.", "system");
+      this.print("Undo is not available here. If you need safety, use 'load' to open your safe moments.", "system");
     }
 
     pauseGame() {
@@ -10833,6 +10746,16 @@
 
     recordAutosave(label, options = {}) {
       return this.storage.recordAutosave(label, options);
+    }
+
+    recordProgressAutosave(flag, label, key, options = {}) {
+      if (!flag || !label || !key || this.endgame) return false;
+      if (this.debugJumpInProgress) return false;
+      if (this.flags[flag]) return false;
+      this.flags[flag] = true;
+      const saved = this.recordAutosave(label, { key, force: true, ...options });
+      if (!saved) this.flags[flag] = false;
+      return saved;
     }
 
     resumeFromAutosave() {
@@ -11821,6 +11744,7 @@
         else if (distance <= 9) this.print(actorizeSecondPerson(this.player, `You follow a remembered route across some distance until ${name} rises before you once more.`));
         else this.print(actorizeSecondPerson(this.player, `The way to ${name} is long and winding, but memory carries you through every turn until at last you arrive.`));
       }
+      const previousRoom = this.currentRoom;
       this.currentRoom = roomId;
       this.player.position = roomId;
       if (delegated) {
@@ -11828,6 +11752,7 @@
         return true;
       }
       this.describeRoom();
+      this.hazards?.maybeProgressAutosave(previousRoom, roomId);
       this.maybeAutosaveForRoom(roomId);
       this.checkSpecialSituations();
       return true;
@@ -11957,6 +11882,7 @@
       if (transitionNarrative) this.print(transitionNarrative);
       this.describeRoom();
       this.triggerSpiderEyesEncounter(previousRoom, connection.to, direction);
+      this.hazards?.maybeProgressAutosave(previousRoom, connection.to);
       this.maybeAutosaveForRoom(connection.to);
       this.checkSpecialSituations();
       return true;
@@ -12572,6 +12498,11 @@
       this.print("Beneath Rivendell's light he studies the weathered parchment until pale moon-letters begin to answer him.");
       this.print("When he speaks again, it is only to mark a narrow western door, and the season and light by which it may be found.");
       this.print("Gandalf seems satisfied. Thorin straightens, and a steadier purpose settles over the company. The time for departure has finally come.");
+      this.recordProgressAutosave(
+        "autosave_milestone_rivendell_ready",
+        "after Elrond reveals the way forward",
+        "milestone:rivendell:ready",
+      );
       return true;
     }
 
@@ -14049,7 +13980,7 @@
 
   function autosaveChoiceText(roomName = "") {
     const roomText = roomName ? ` in ${roomDisplayName(roomName)}` : "";
-    return `Type 'load autosave' to return to the last safe moment${roomText}, or 'restart' to begin the tale again.`;
+    return `Type 'load' to open your safe moments${roomText}, or 'restart' to begin the tale again.`;
   }
 
   function restartChoiceText() {
