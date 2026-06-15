@@ -10,6 +10,8 @@
     "thrors_map": "Thrors_map.jpg",
   };
   const SAVE_PREFIX = "hobbit-web-save:";
+  const SAVE_AUTOSAVE_PREFIX = `${SAVE_PREFIX}autosave:`;
+  const MAX_AUTOSAVE_ENTRIES = 12;
   const LAYOUT_PREF_KEY = "hobbit-web-layout-mode";
   const MOBILE_LAYOUT_MAX_WIDTH = 860;
 
@@ -38,6 +40,23 @@
   const layoutDivider = $("layout-divider");
   const layoutMode1Button = $("layout-mode-1");
   const layoutMode2Button = $("layout-mode-2");
+  const savePanel = $("save-panel");
+  const savePanelBackdrop = $("save-panel-backdrop");
+  const savePanelClose = $("save-panel-close");
+  const savePanelEyebrow = $("save-panel-eyebrow");
+  const savePanelTitle = $("save-panel-title");
+  const savePanelTabSave = $("save-panel-tab-save");
+  const savePanelTabLoad = $("save-panel-tab-load");
+  const savePanelStorageNote = $("save-panel-storage-note");
+  const savePanelNameLabel = $("save-panel-name-label");
+  const savePanelNameInput = $("save-panel-name");
+  const savePanelStatus = $("save-panel-status");
+  const savePanelPrimaryButton = $("save-panel-primary");
+  const savePanelLatestAutosaveButton = $("save-panel-latest-autosave");
+  const savePanelManualCount = $("save-panel-manual-count");
+  const savePanelAutosaveCount = $("save-panel-autosave-count");
+  const savePanelManualList = $("save-panel-manual-list");
+  const savePanelAutosaveList = $("save-panel-autosave-list");
   $("mobile-scene-handle")?.remove();
   const SCENE_COMPASS_POINTS = {
     "north": $("scene-compass-north"),
@@ -130,6 +149,7 @@
   const DEBUG_JUMP_PRESETS = [
     {
       key: "before_green_dragon",
+      shortcut: "green",
       label: "Before Green Dragon",
       description: "On the road outside the inn, just before entering the Green Dragon for the first time.",
       aliases: ["before green dragon", "green dragon outside", "outside green dragon", "before_green_dragon"],
@@ -141,6 +161,7 @@
     },
     {
       key: "green_dragon",
+      shortcut: "inn",
       label: "Green Dragon Inn",
       description: "After Bag End, before the pony sequence at the inn.",
       aliases: ["green dragon", "green dragon inn", "inn", "green_dragon"],
@@ -152,6 +173,7 @@
     },
     {
       key: "trolls",
+      shortcut: "trolls",
       label: "Trolls Clearing",
       description: "Past the pony sequence, on the road to the trolls.",
       aliases: ["trolls", "troll clearing", "trolls clearing", "clearing"],
@@ -166,6 +188,7 @@
     },
     {
       key: "rivendell",
+      shortcut: "rivendell",
       label: "Rivendell",
       description: "After the trolls, ready to continue from Rivendell.",
       aliases: ["rivendell", "elrond"],
@@ -184,6 +207,7 @@
     },
     {
       key: "after_trolls_cave",
+      shortcut: "cave",
       label: "After Trolls Cave",
       description: "After looting the trolls' cave, on the road toward Rivendell.",
       aliases: ["after trolls cave", "trolls cave", "after_trolls_cave", "post trolls cave"],
@@ -198,6 +222,7 @@
     },
     {
       key: "gollum",
+      shortcut: "gollum",
       label: "Deep Dark Lake",
       description: "Just before the Gollum encounter and riddle contest.",
       aliases: ["gollum", "lake", "deep dark lake", "deep_dark_lake"],
@@ -216,6 +241,7 @@
     },
     {
       key: "beorn",
+      shortcut: "beorn",
       label: "Beorn's House",
       description: "After the goblins and Gollum, with the ring already found.",
       aliases: ["beorn", "beorns house", "beorn house", "house"],
@@ -234,6 +260,7 @@
     },
     {
       key: "mirkwood",
+      shortcut: "mirkwood",
       label: "Mirkwood",
       description: "At the forest path after Beorn, with core adventure gear.",
       aliases: ["mirkwood", "forest", "forest path", "mirkwood forest path"],
@@ -252,6 +279,7 @@
     },
     {
       key: "laketown",
+      shortcut: "lake",
       label: "Lake-town",
       description: "After the elves, ready to continue from Lake-town.",
       aliases: ["laketown", "lake town", "wooden town", "town"],
@@ -271,6 +299,7 @@
     },
     {
       key: "front_gate",
+      shortcut: "gate",
       label: "Front Gate",
       description: "At the Lonely Mountain, with the key and map already in hand.",
       aliases: ["front gate", "gate", "erebor", "lonely mountain"],
@@ -290,6 +319,7 @@
     },
     {
       key: "smaug",
+      shortcut: "smaug",
       label: "Smaug",
       description: "In Erebor with Bard present, ready for the dragon endgame.",
       aliases: ["smaug", "dragon", "lower halls", "lower_halls"],
@@ -5873,6 +5903,10 @@
   class SaveSystem {
     constructor(game) {
       this.game = game;
+      this.boundPanel = false;
+      this.timeFormatter = typeof Intl !== "undefined" && Intl.DateTimeFormat
+        ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" })
+        : null;
     }
 
     initialize() {
@@ -5880,30 +5914,466 @@
       game.autosaveSnapshot = null;
       game.autosaveMeta = null;
       game.autosaveCounter = 0;
+      game.savePanelState = {
+        open: false,
+        mode: "save",
+        selectedStorageKey: "",
+        status: "",
+        pendingOverwriteName: "",
+      };
+      this.bindPanel();
+      this.refreshLatestAutosaveState();
     }
 
-    save(name) {
-      const game = this.game;
-      if (!name) return game.print("Error: You must specify a filename to save.");
-      localStorage.setItem(SAVE_PREFIX + name, JSON.stringify(this.createSnapshot()));
-      game.print(`Game saved as "${name}".`);
+    bindPanel() {
+      if (this.boundPanel || !savePanel) return;
+      this.boundPanel = true;
+      savePanelBackdrop?.addEventListener("click", () => this.closePanel());
+      savePanelClose?.addEventListener("click", () => this.closePanel());
+      savePanelTabSave?.addEventListener("click", () => this.openPanel("save"));
+      savePanelTabLoad?.addEventListener("click", () => this.openPanel("load"));
+      savePanelPrimaryButton?.addEventListener("click", () => this.handlePanelPrimaryAction());
+      savePanelLatestAutosaveButton?.addEventListener("click", () => {
+        const latest = this.latestAutosaveEntry();
+        if (!latest) return;
+        this.loadEntry(latest, { announceAutosave: true, closePanel: true });
+      });
+      savePanelNameInput?.addEventListener("input", () => this.handlePanelNameInput());
+      savePanelNameInput?.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          this.handlePanelPrimaryAction();
+        }
+      });
+      savePanel?.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        this.closePanel();
+      });
     }
 
-    load(name) {
+    isPanelOpen() {
+      return Boolean(this.game.savePanelState?.open);
+    }
+
+    openPanel(mode = "save") {
       const game = this.game;
-      if (!name) return game.print("Error: You must specify a filename to load.");
-      const raw = localStorage.getItem(SAVE_PREFIX + name);
-      if (!raw) return game.print(`No saved game named "${name}" was found.`);
-      const save = JSON.parse(raw);
-      this.restoreSnapshot(save);
-      game.print(`Game "${name}" loaded.`);
-      game.describeRoom({ full: true });
+      if (!savePanel) return false;
+      const normalizedMode = mode === "load" ? "load" : "save";
+      game.savePanelState.open = true;
+      game.savePanelState.mode = normalizedMode;
+      game.savePanelState.selectedStorageKey = "";
+      game.savePanelState.status = "";
+      game.savePanelState.pendingOverwriteName = "";
+      savePanel.removeAttribute("hidden");
+      if (savePanelNameInput) {
+        if (normalizedMode === "load") savePanelNameInput.value = "";
+        else if (!savePanelNameInput.value.trim()) savePanelNameInput.value = this.defaultManualSaveName();
+      }
+      this.renderPanel();
+      savePanelNameInput?.focus({ preventScroll: true });
+      savePanelNameInput?.select?.();
+      return true;
+    }
+
+    closePanel(options = {}) {
+      const { focusInput = true } = options;
+      const game = this.game;
+      if (!savePanel || !this.isPanelOpen()) return false;
+      game.savePanelState.open = false;
+      game.savePanelState.status = "";
+      game.savePanelState.pendingOverwriteName = "";
+      savePanel.setAttribute("hidden", "hidden");
+      if (focusInput) game.focusCommandInput({ defer: true, force: true });
+      return true;
+    }
+
+    defaultManualSaveName() {
+      const room = this.game.room();
+      const roomName = roomDisplayName(room?.name || room?.id || this.game.currentRoom || "Adventure");
+      const turn = Math.max(0, Number(this.game.turnCount) || 0);
+      return `${roomName} - turn ${turn}`;
+    }
+
+    normalizeSaveName(name) {
+      return String(name || "").replace(/\s+/g, " ").trim().slice(0, 64);
+    }
+
+    storageKeyForManual(name) {
+      return `${SAVE_PREFIX}${name}`;
+    }
+
+    storageKeyForAutosave(id) {
+      return `${SAVE_AUTOSAVE_PREFIX}${id}`;
+    }
+
+    generateRecordId(kind = "manual") {
+      const suffix = Math.random().toString(36).slice(2, 8);
+      return `${kind}:${Date.now()}:${Math.max(0, Number(this.game.turnCount) || 0)}:${suffix}`;
+    }
+
+    createRecord({ name, kind = "manual", label = "", key = "", snapshot = null, id = "" }) {
+      const nextSnapshot = clone(snapshot || this.createSnapshot());
+      const roomId = nextSnapshot.currentRoom || this.game.currentRoom || this.game.data.startRoom;
+      const roomName = this.roomNameForId(roomId);
+      return {
+        version: 2,
+        type: "hobbit-save-record",
+        id: id || this.generateRecordId(kind),
+        kind,
+        name: String(name || "").trim(),
+        label: String(label || "").trim(),
+        key: String(key || "").trim(),
+        savedAt: Date.now(),
+        roomId,
+        roomName,
+        turnCount: Math.max(0, Number(nextSnapshot.turnCount) || 0),
+        storyRunCount: Math.max(0, Number(nextSnapshot.storyRunCount) || 0),
+        snapshot: nextSnapshot,
+      };
+    }
+
+    roomNameForId(roomId = "") {
+      const resolved = this.game.data.rooms?.[roomId] || this.game.rooms?.[roomId] || { id: roomId, name: roomId };
+      return resolved?.name || roomId || "Unknown location";
+    }
+
+    parseStoredEntry(storageKey, raw) {
+      if (!storageKey?.startsWith(SAVE_PREFIX) || !raw) return null;
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        return null;
+      }
+      if (!parsed || typeof parsed !== "object") return null;
+      if (parsed.type === "hobbit-save-record" && parsed.snapshot) {
+        return {
+          storageKey,
+          id: parsed.id || storageKey,
+          kind: parsed.kind === "autosave" ? "autosave" : "manual",
+          name: this.normalizeSaveName(parsed.name || ""),
+          label: String(parsed.label || "").trim(),
+          key: String(parsed.key || "").trim(),
+          savedAt: Number(parsed.savedAt) || 0,
+          roomId: parsed.roomId || parsed.snapshot.currentRoom || "",
+          roomName: parsed.roomName || this.roomNameForId(parsed.roomId || parsed.snapshot.currentRoom || ""),
+          turnCount: Math.max(0, Number(parsed.turnCount) || Number(parsed.snapshot.turnCount) || 0),
+          storyRunCount: Math.max(0, Number(parsed.storyRunCount) || Number(parsed.snapshot.storyRunCount) || 0),
+          snapshot: parsed.snapshot,
+          legacy: false,
+        };
+      }
+      const name = storageKey.startsWith(SAVE_AUTOSAVE_PREFIX)
+        ? "Autosave"
+        : storageKey.slice(SAVE_PREFIX.length);
+      const roomId = parsed.currentRoom || "";
+      return {
+        storageKey,
+        id: storageKey,
+        kind: storageKey.startsWith(SAVE_AUTOSAVE_PREFIX) ? "autosave" : "manual",
+        name,
+        label: storageKey.startsWith(SAVE_AUTOSAVE_PREFIX) ? name : "",
+        key: "",
+        savedAt: 0,
+        roomId,
+        roomName: this.roomNameForId(roomId),
+        turnCount: Math.max(0, Number(parsed.turnCount) || 0),
+        storyRunCount: Math.max(0, Number(parsed.storyRunCount) || 0),
+        snapshot: parsed,
+        legacy: true,
+      };
+    }
+
+    listSaveEntries() {
+      const entries = [];
+      for (const storageKey of Object.keys(localStorage)) {
+        if (!storageKey.startsWith(SAVE_PREFIX)) continue;
+        const entry = this.parseStoredEntry(storageKey, localStorage.getItem(storageKey));
+        if (entry) entries.push(entry);
+      }
+      return entries.sort((left, right) => {
+        const rightTime = Number(right.savedAt) || 0;
+        const leftTime = Number(left.savedAt) || 0;
+        if (rightTime !== leftTime) return rightTime - leftTime;
+        return String(left.name || "").localeCompare(String(right.name || ""));
+      });
+    }
+
+    manualSaveEntries() {
+      return this.listSaveEntries().filter((entry) => entry.kind === "manual");
+    }
+
+    autosaveEntries() {
+      return this.listSaveEntries().filter((entry) => entry.kind === "autosave");
+    }
+
+    latestAutosaveEntry() {
+      return this.autosaveEntries()[0] || null;
+    }
+
+    findManualEntry(name) {
+      const normalized = normalize(this.normalizeSaveName(name));
+      if (!normalized) return null;
+      return this.manualSaveEntries().find((entry) => normalize(entry.name) === normalized) || null;
+    }
+
+    refreshLatestAutosaveState() {
+      const game = this.game;
+      const latest = this.latestAutosaveEntry();
+      if (!latest) {
+        game.autosaveSnapshot = null;
+        game.autosaveMeta = null;
+        return null;
+      }
+      game.autosaveSnapshot = clone(latest.snapshot);
+      game.autosaveMeta = {
+        id: latest.id,
+        key: latest.key || latest.storageKey,
+        label: latest.label || latest.name,
+        roomId: latest.roomId,
+        roomName: latest.roomName,
+        turnCount: latest.turnCount,
+        storageKey: latest.storageKey,
+        savedAt: latest.savedAt,
+      };
+      return latest;
+    }
+
+    formatTimestamp(savedAt = 0) {
+      if (!savedAt) return "Saved earlier";
+      try {
+        return this.timeFormatter ? this.timeFormatter.format(new Date(savedAt)) : new Date(savedAt).toLocaleString();
+      } catch {
+        return "Saved earlier";
+      }
+    }
+
+    entryMetaText(entry) {
+      const parts = [];
+      const roomLabel = roomDisplayName(entry.roomName || entry.roomId || "somewhere");
+      if (roomLabel) parts.push(roomLabel);
+      if (Number.isFinite(entry.turnCount)) parts.push(`Turn ${entry.turnCount}`);
+      if (entry.kind === "autosave" && entry.label) parts.push(entry.label);
+      return parts.join(" • ");
+    }
+
+    buildEmptyState(kind = "manual") {
+      const empty = document.createElement("div");
+      empty.className = "save-panel__empty";
+      empty.textContent = kind === "autosave"
+        ? "Autosaves will appear here as the adventure marks safe moments."
+        : "No manual saves yet. Use the field on the left to name and store one.";
+      return empty;
+    }
+
+    createEntryButton(entry) {
+      const game = this.game;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "save-panel__entry";
+      if (game.savePanelState?.selectedStorageKey === entry.storageKey) button.classList.add("is-selected");
+
+      const title = document.createElement("div");
+      title.className = "save-panel__entry-title";
+      const name = document.createElement("span");
+      name.className = "save-panel__entry-name";
+      name.textContent = entry.name || (entry.kind === "autosave" ? "Autosave" : "Unnamed save");
+      title.append(name);
+      if (entry.kind === "autosave") {
+        const badge = document.createElement("span");
+        badge.className = "save-panel__badge";
+        badge.textContent = "Autosave";
+        title.append(badge);
+      }
+
+      const meta = document.createElement("div");
+      meta.className = "save-panel__entry-meta";
+      meta.textContent = this.entryMetaText(entry);
+
+      const time = document.createElement("div");
+      time.className = "save-panel__entry-time";
+      time.textContent = this.formatTimestamp(entry.savedAt);
+
+      button.append(title, meta, time);
+      button.addEventListener("click", () => {
+        game.savePanelState.selectedStorageKey = entry.storageKey;
+        game.savePanelState.pendingOverwriteName = "";
+        if (game.savePanelState.mode === "save" && entry.kind === "manual") {
+          savePanelNameInput.value = entry.name || "";
+          game.savePanelState.status = `Saving now will replace "${entry.name}".`;
+          savePanelNameInput.focus({ preventScroll: true });
+          savePanelNameInput.select?.();
+        } else if (game.savePanelState.mode === "save") {
+          game.savePanelState.status = "Autosaves are loaded from the list below. To keep a permanent named save, use the field above.";
+        } else if (game.savePanelState.mode === "load") {
+          savePanelNameInput.value = entry.kind === "manual" ? entry.name || "" : "";
+          game.savePanelState.status = entry.kind === "autosave"
+            ? `Load this autosave from ${this.formatTimestamp(entry.savedAt)}.`
+            : `Load "${entry.name}".`;
+        }
+        this.renderPanel();
+      });
+      return button;
+    }
+
+    renderEntryList(container, entries, kind) {
+      if (!container) return;
+      if (!entries.length) {
+        container.replaceChildren(this.buildEmptyState(kind));
+        return;
+      }
+      container.replaceChildren(...entries.map((entry) => this.createEntryButton(entry)));
+    }
+
+    renderPanel() {
+      const game = this.game;
+      if (!savePanel) return;
+      if (!this.isPanelOpen()) {
+        savePanel.setAttribute("hidden", "hidden");
+        return;
+      }
+      const mode = game.savePanelState.mode === "load" ? "load" : "save";
+      const manualEntries = this.manualSaveEntries();
+      const autosaveEntries = this.autosaveEntries();
+      const latestAutosave = autosaveEntries[0] || null;
+      savePanel.removeAttribute("hidden");
+      if (savePanelEyebrow) savePanelEyebrow.textContent = mode === "save" ? "Saved In This Browser" : "Return To A Saved Moment";
+      if (savePanelTitle) savePanelTitle.textContent = mode === "save" ? "Save Game" : "Load Game";
+      if (savePanelStorageNote) {
+        savePanelStorageNote.textContent = mode === "save"
+          ? "Your saves stay in this browser on this device. Pick a clear name or tap an existing save to overwrite it."
+          : "Choose a manual save or an autosave from this browser on this device.";
+      }
+      if (savePanelNameLabel) savePanelNameLabel.textContent = mode === "save" ? "Save Name" : "Saved Game Name";
+      if (savePanelPrimaryButton) savePanelPrimaryButton.textContent = mode === "save" ? "Save" : "Load Selected";
+      if (savePanelTabSave) savePanelTabSave.setAttribute("aria-selected", mode === "save" ? "true" : "false");
+      if (savePanelTabLoad) savePanelTabLoad.setAttribute("aria-selected", mode === "load" ? "true" : "false");
+      if (savePanelLatestAutosaveButton) {
+        savePanelLatestAutosaveButton.hidden = mode !== "load";
+        savePanelLatestAutosaveButton.disabled = !latestAutosave;
+        savePanelLatestAutosaveButton.textContent = latestAutosave
+          ? `Load Latest Autosave${latestAutosave.roomName ? ` (${roomDisplayName(latestAutosave.roomName)})` : ""}`
+          : "Load Latest Autosave";
+      }
+      if (savePanelManualCount) savePanelManualCount.textContent = String(manualEntries.length);
+      if (savePanelAutosaveCount) savePanelAutosaveCount.textContent = String(autosaveEntries.length);
+      if (savePanelStatus) savePanelStatus.textContent = game.savePanelState.status || (mode === "save"
+        ? "Choose a name to store the current adventure state."
+        : "Tap an entry below, or type the name of a manual save.");
+      this.renderEntryList(savePanelManualList, manualEntries, "manual");
+      this.renderEntryList(savePanelAutosaveList, autosaveEntries, "autosave");
+    }
+
+    handlePanelNameInput() {
+      const game = this.game;
+      const typedName = this.normalizeSaveName(savePanelNameInput?.value || "");
+      game.savePanelState.pendingOverwriteName = "";
+      game.savePanelState.selectedStorageKey = "";
+      if (!typedName) {
+        game.savePanelState.status = game.savePanelState.mode === "save"
+          ? "Choose a name to store the current adventure state."
+          : "Tap an entry below, or type the name of a manual save.";
+        this.renderPanel();
+        return;
+      }
+      const matchingManual = this.findManualEntry(typedName);
+      if (matchingManual) game.savePanelState.selectedStorageKey = matchingManual.storageKey;
+      if (game.savePanelState.mode === "save") {
+        game.savePanelState.status = matchingManual
+          ? `"${matchingManual.name}" already exists. Saving now will replace it.`
+          : "This will create a new manual save in this browser on this device.";
+      } else {
+        game.savePanelState.status = matchingManual
+          ? `Ready to load "${matchingManual.name}".`
+          : "No manual save matches that name yet.";
+      }
+      this.renderPanel();
+    }
+
+    handlePanelPrimaryAction() {
+      const mode = this.game.savePanelState?.mode === "load" ? "load" : "save";
+      if (mode === "save") {
+        this.save(savePanelNameInput?.value || "", { fromPanel: true });
+        return;
+      }
+      const selected = this.listSaveEntries().find((entry) => entry.storageKey === this.game.savePanelState?.selectedStorageKey) || null;
+      if (selected) {
+        this.loadEntry(selected, { announceAutosave: selected.kind === "autosave", closePanel: true });
+        return;
+      }
+      this.load(savePanelNameInput?.value || "", { fromPanel: true });
+    }
+
+    save(name, options = {}) {
+      const game = this.game;
+      const normalizedName = this.normalizeSaveName(name);
+      if (!normalizedName) {
+        if (options.fromPanel) {
+          game.savePanelState.status = "Enter a name before saving.";
+          this.renderPanel();
+          return false;
+        }
+        this.openPanel("save");
+        return false;
+      }
+      const record = this.createRecord({ name: normalizedName, kind: "manual" });
+      localStorage.setItem(this.storageKeyForManual(normalizedName), JSON.stringify(record));
+      game.print(`Game saved as "${normalizedName}".`, "system");
+      if (options.fromPanel) {
+        game.savePanelState.selectedStorageKey = this.storageKeyForManual(normalizedName);
+        game.savePanelState.status = `Saved as "${normalizedName}".`;
+        game.savePanelState.pendingOverwriteName = "";
+        this.closePanel();
+      }
+      this.renderPanel();
+      return true;
+    }
+
+    load(name, options = {}) {
+      const game = this.game;
+      const normalizedName = this.normalizeSaveName(name);
+      if (!normalizedName) {
+        this.openPanel("load");
+        return false;
+      }
+      if (normalize(normalizedName) === "autosave") return this.resumeFromAutosave({ closePanel: options.fromPanel !== false });
+      const entry = this.findManualEntry(normalizedName);
+      if (!entry) {
+        if (options.fromPanel) {
+          game.savePanelState.status = `No manual save named "${normalizedName}" was found.`;
+          this.renderPanel();
+          return false;
+        }
+        game.print(`No saved game named "${normalizedName}" was found.`, "system");
+        return false;
+      }
+      return this.loadEntry(entry, { closePanel: options.fromPanel !== false });
     }
 
     listSaves() {
+      this.openPanel("load");
+      return this.listSaveEntries();
+    }
+
+    loadEntry(entry, options = {}) {
       const game = this.game;
-      const saves = Object.keys(localStorage).filter((key) => key.startsWith(SAVE_PREFIX)).map((key) => key.slice(SAVE_PREFIX.length));
-      game.print(saves.length ? `Saved games:\n${saves.join("\n")}` : "No saved games found.");
+      if (!entry?.snapshot) return false;
+      this.restoreSnapshot(clone(entry.snapshot));
+      if (entry.kind === "autosave" || options.announceAutosave) game.print(autosaveResumedText(entry.label || entry.name), "system");
+      else game.print(`Game "${entry.name}" loaded.`, "system");
+      game.describeRoom({ full: true });
+      game.checkSpecialSituations();
+      if (options.closePanel !== false) this.closePanel();
+      this.refreshLatestAutosaveState();
+      return true;
+    }
+
+    pruneAutosaves() {
+      const autosaves = this.autosaveEntries();
+      for (const stale of autosaves.slice(MAX_AUTOSAVE_ENTRIES)) {
+        localStorage.removeItem(stale.storageKey);
+      }
     }
 
     createSnapshot() {
@@ -5981,31 +6451,28 @@
       const turnCount = Number(game.turnCount) || 0;
       const previous = game.autosaveMeta;
       if (!options.force && previous?.key === key && previous?.turnCount === turnCount) return false;
-      game.autosaveSnapshot = this.createSnapshot();
-      game.autosaveCounter += 1;
-      game.autosaveMeta = {
-        id: game.autosaveCounter,
-        key,
+      const record = this.createRecord({
+        name: label || roomDisplayName(game.room()?.name || game.currentRoom),
+        kind: "autosave",
         label,
-        roomId: game.currentRoom,
-        roomName: game.room()?.name || game.currentRoom,
-        turnCount,
-      };
+        key,
+      });
+      localStorage.setItem(this.storageKeyForAutosave(record.id), JSON.stringify(record));
+      this.pruneAutosaves();
+      this.refreshLatestAutosaveState();
       game.print(autosaveMarkedText(label), "system");
+      this.renderPanel();
       return true;
     }
 
-    resumeFromAutosave() {
+    resumeFromAutosave(options = {}) {
       const game = this.game;
-      if (!game.autosaveSnapshot) {
+      const latest = this.refreshLatestAutosaveState();
+      if (!latest || !game.autosaveSnapshot) {
         game.print(noAutosaveText(), "system");
         return false;
       }
-      this.restoreSnapshot(clone(game.autosaveSnapshot));
-      game.print(autosaveResumedText(game.autosaveMeta?.label), "system");
-      game.describeRoom({ full: true });
-      game.checkSpecialSituations();
-      return true;
+      return this.loadEntry(latest, { announceAutosave: true, closePanel: options.closePanel !== false });
     }
   }
 
@@ -8491,6 +8958,7 @@
         this.execute(command);
       });
       document.addEventListener("keydown", (event) => {
+        if (this.storage?.isPanelOpen?.()) return;
         if (!this.endgameRestartArmed) return;
         event.preventDefault();
         if (this.pendingEndgameChoice) {
@@ -8508,6 +8976,7 @@
         this.restartGame();
       });
       document.addEventListener("click", () => {
+        if (this.storage?.isPanelOpen?.()) return;
         if (!this.endgameRestartArmed) return;
         if (this.pendingEndgameChoice) return;
         this.restartGame();
@@ -10072,9 +10541,18 @@
       return this.storage.listSaves();
     }
 
+    jumpCheckpointCommand(preset) {
+      return String(preset.shortcut || "").trim()
+        || (preset.aliases || []).find((alias) => !String(alias).includes("_") && !String(alias).includes(" "))
+        || preset.key.replace(/_/g, " ");
+    }
+
     listJumpCheckpoints() {
-      const lines = DEBUG_JUMP_PRESETS.map((preset) => `${preset.key}: ${preset.description}`);
-      this.print(`Jump checkpoints: ${lines.join(" ")}`, "system");
+      const lines = [
+        'Jump checkpoints: type "jump <name>".',
+        ...DEBUG_JUMP_PRESETS.map((preset) => `- ${this.jumpCheckpointCommand(preset)}: ${preset.description}`),
+      ];
+      this.print(lines.join("\n"), "system");
     }
 
     handleJumpCommand(target = "") {
@@ -10083,7 +10561,7 @@
         this.listJumpCheckpoints();
         return true;
       }
-      const preset = DEBUG_JUMP_PRESETS.find((entry) => [entry.key, ...(entry.aliases || [])]
+      const preset = DEBUG_JUMP_PRESETS.find((entry) => [entry.key, entry.shortcut, ...(entry.aliases || [])]
         .map((alias) => normalize(alias))
         .includes(normalizedTarget));
       if (!preset) {

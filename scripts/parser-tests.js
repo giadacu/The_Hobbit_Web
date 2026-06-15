@@ -3094,11 +3094,11 @@ const gameCases = [
       game.execute("jumps");
     },
     expectedIncluded: [
-      "Jump checkpoints:",
-      "before_green_dragon",
-      "green_dragon",
-      "after_trolls_cave",
-      "smaug",
+      'Jump checkpoints: type "jump <name>".',
+      "green: On the road outside the inn",
+      "inn: After Bag End",
+      "cave: After looting the trolls' cave",
+      "smaug: In Erebor with Bard present",
     ],
   },
   {

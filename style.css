@@ -671,6 +671,289 @@ li.empty {
   border-bottom: 0;
 }
 
+.save-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.save-panel[hidden] {
+  display: none !important;
+}
+
+.save-panel__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background:
+    linear-gradient(180deg, rgba(5, 6, 4, 0.78), rgba(5, 6, 4, 0.92)),
+    radial-gradient(circle at top, rgba(216, 182, 95, 0.08), rgba(0, 0, 0, 0));
+}
+
+.save-panel__dialog {
+  position: relative;
+  z-index: 1;
+  width: min(1040px, 100%);
+  max-height: min(88dvh, 900px);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(25, 27, 19, 0.98), rgba(17, 18, 13, 0.98));
+  border: 1px solid rgba(216, 182, 95, 0.28);
+  border-radius: 22px;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.48);
+}
+
+.save-panel__header,
+.save-panel__body {
+  min-width: 0;
+}
+
+.save-panel__header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 24px 14px;
+}
+
+.save-panel__eyebrow {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.save-panel__title {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(1.4rem, 2vw, 2rem);
+}
+
+.save-panel__close,
+.save-panel__tab,
+.save-panel__button,
+.save-panel__entry {
+  border: 1px solid rgba(216, 182, 95, 0.22);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text);
+}
+
+.save-panel__close,
+.save-panel__button {
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 999px;
+}
+
+.save-panel__tabs {
+  display: inline-flex;
+  gap: 8px;
+  padding: 0 24px 18px;
+}
+
+.save-panel__tab {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+}
+
+.save-panel__tab[aria-selected="true"] {
+  background: var(--accent);
+  color: #15140d;
+  border-color: var(--accent);
+}
+
+.save-panel__body {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.95fr) minmax(360px, 1.25fr);
+  gap: 22px;
+  min-height: 0;
+  padding: 0 24px 24px;
+}
+
+.save-panel__primary,
+.save-panel__lists {
+  min-height: 0;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+}
+
+.save-panel__primary {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 18px;
+}
+
+.save-panel__storage-note,
+.save-panel__status {
+  margin: 0;
+}
+
+.save-panel__storage-note {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.save-panel__label {
+  color: var(--accent-2);
+  font-size: 0.84rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.save-panel__input {
+  width: 100%;
+  min-height: 50px;
+  padding: 0 14px;
+  color: var(--text);
+  background: rgba(6, 7, 5, 0.9);
+  border: 1px solid rgba(216, 182, 95, 0.18);
+  border-radius: 14px;
+  outline: 0;
+}
+
+.save-panel__input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(216, 182, 95, 0.16);
+}
+
+.save-panel__status {
+  min-height: 2.8em;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.save-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.save-panel__button--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #15140d;
+  font-weight: 700;
+}
+
+.save-panel__button[disabled] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.save-panel__lists {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  padding: 16px;
+  overflow: hidden;
+}
+
+.save-panel__list-block {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.save-panel__list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.save-panel__list-heading h3 {
+  margin: 0;
+  color: var(--accent-2);
+  font-size: 0.92rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.save-panel__count {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.save-panel__list {
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding-right: 4px;
+}
+
+.save-panel__entry {
+  width: 100%;
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 16px;
+  text-align: left;
+}
+
+.save-panel__entry:hover,
+.save-panel__entry:focus-visible {
+  border-color: rgba(216, 182, 95, 0.55);
+  background: rgba(216, 182, 95, 0.08);
+  outline: 0;
+}
+
+.save-panel__entry.is-selected {
+  border-color: var(--accent);
+  background: rgba(216, 182, 95, 0.12);
+}
+
+.save-panel__entry-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 1rem;
+}
+
+.save-panel__entry-name {
+  font-weight: 700;
+}
+
+.save-panel__badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(116, 165, 138, 0.16);
+  color: var(--accent-2);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.save-panel__entry-meta,
+.save-panel__entry-time {
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.save-panel__empty {
+  padding: 16px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 body[data-layout="2"] .game-shell {
   --layout-2-scene-clamped: clamp(36%, var(--layout-2-scene-width), 72%);
   grid-template-columns:
@@ -712,6 +995,46 @@ body[data-layout="2"] .sidebar {
 }
 
 @media (max-width: 860px) {
+  .save-panel {
+    padding: 0;
+    place-items: end stretch;
+  }
+
+  .save-panel__dialog {
+    width: 100%;
+    max-height: min(92dvh, 100%);
+    border-radius: 22px 22px 0 0;
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
+  .save-panel__header {
+    padding: 18px 16px 12px;
+  }
+
+  .save-panel__tabs {
+    padding: 0 16px 14px;
+  }
+
+  .save-panel__body {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 0 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .save-panel__primary {
+    padding: 16px;
+  }
+
+  .save-panel__lists {
+    grid-template-rows: auto auto;
+    overflow-y: auto;
+    padding: 14px;
+  }
+
+  .save-panel__list {
+    max-height: min(28dvh, 260px);
+  }
+
   .game-shell,
   body[data-layout="2"] .game-shell {
     grid-template-columns: 1fr;
