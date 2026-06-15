@@ -249,23 +249,126 @@ body.is-resizing-layout * {
   background:
     linear-gradient(180deg, rgba(7, 8, 6, 0.82), rgba(7, 8, 6, 0.58)),
     radial-gradient(circle at center, rgba(216, 182, 95, 0.08), rgba(0, 0, 0, 0));
-  pointer-events: none;
+  pointer-events: auto;
 }
 
-.scene-map-overlay img {
-  position: relative;
-  inset: auto;
-  width: min(100%, 980px);
-  height: auto;
-  max-height: 100%;
-  object-fit: contain;
-  object-position: center;
+.scene-map-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(100%, 1280px);
+  height: min(100%, 820px);
   border: 1px solid rgba(129, 120, 83, 0.34);
   border-radius: 18px;
   box-shadow:
     0 18px 40px rgba(0, 0, 0, 0.38),
     0 0 0 1px rgba(9, 10, 8, 0.42) inset;
-  background: rgba(9, 10, 8, 0.36);
+  background:
+    linear-gradient(180deg, rgba(245, 234, 204, 0.98), rgba(234, 219, 184, 0.96)),
+    rgba(9, 10, 8, 0.36);
+  overflow: hidden;
+}
+
+.scene-map-toolbar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(120, 101, 64, 0.24);
+  background: linear-gradient(180deg, rgba(91, 68, 35, 0.12), rgba(255, 255, 255, 0));
+}
+
+.scene-map-toolbar__meta {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.scene-map-toolbar__meta strong {
+  color: #3a2b16;
+  font-size: 1rem;
+  letter-spacing: 0.03em;
+}
+
+.scene-map-toolbar__meta span {
+  color: #6d5731;
+  font-size: 0.85rem;
+}
+
+.scene-map-toolbar__actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.scene-map-toolbar button {
+  appearance: none;
+  border: 1px solid rgba(106, 80, 42, 0.34);
+  background: rgba(251, 246, 232, 0.94);
+  color: #3d2b12;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.scene-map-toolbar button:hover {
+  background: rgba(255, 251, 240, 1);
+}
+
+.scene-map-scroll {
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: rgba(126, 94, 39, 0.68) rgba(90, 71, 39, 0.18);
+  scrollbar-width: thin;
+  padding: 18px;
+}
+
+.scene-map-canvas {
+  position: relative;
+  min-width: max-content;
+  min-height: max-content;
+  --scene-map-scale: 1;
+  --scene-map-base-width: 0px;
+  --scene-map-base-height: 0px;
+}
+
+.scene-map-stage {
+  position: relative;
+  width: var(--scene-map-base-width);
+  height: var(--scene-map-base-height);
+  transform-origin: top left;
+  transform: scale(var(--scene-map-scale));
+}
+
+.scene-map-render {
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+.scene-map-hotspots {
+  position: absolute;
+  inset: 0;
+}
+
+.scene-map-hotspot {
+  position: absolute;
+  border: none;
+  border-radius: 10px;
+  background: rgba(214, 169, 67, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(124, 90, 35, 0.14);
+  cursor: pointer;
+}
+
+.scene-map-hotspot:hover {
+  background: rgba(214, 169, 67, 0.12);
+  box-shadow:
+    inset 0 0 0 2px rgba(124, 90, 35, 0.34),
+    0 0 0 1px rgba(240, 215, 159, 0.42);
 }
 
 .image-reveal::before {

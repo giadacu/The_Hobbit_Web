@@ -25,6 +25,14 @@
   const imageRevealOutline = $("image-reveal-outline");
   const imageRevealFill = $("image-reveal-fill");
   const sceneMapOverlay = $("scene-map-overlay");
+  const sceneMapBack = $("scene-map-back");
+  const sceneMapTitle = $("scene-map-title");
+  const sceneMapSubtitle = $("scene-map-subtitle");
+  const sceneMapZoomOut = $("scene-map-zoom-out");
+  const sceneMapZoomReset = $("scene-map-zoom-reset");
+  const sceneMapZoomIn = $("scene-map-zoom-in");
+  const sceneMapScroll = $("scene-map-scroll");
+  const sceneMapCanvas = $("scene-map-canvas");
   const sceneMapImage = $("scene-map-image");
   const musicPlayer = $("music-player");
   const sceneCompass = $("scene-compass");
@@ -146,7 +154,7 @@
       apply(game) {
         game.debugCompleteUnexpectedParty();
         game.debugGiveStandardLoadout({ map: true, key: true, pipe: true });
-        game.debugMovePlayer("green_dragon_inn_outside");
+        game.debugMovePlayer("green_dragon_inn_outside", { markRoute: true });
       },
     },
     {
@@ -158,7 +166,7 @@
       apply(game) {
         game.debugCompleteUnexpectedParty();
         game.debugGiveStandardLoadout({ map: true, key: true, pipe: true });
-        game.debugMovePlayer("green_dragon_inn");
+        game.debugMovePlayer("green_dragon_inn", { markRoute: true });
       },
     },
     {
@@ -172,7 +180,7 @@
         game.debugMarkPonyProgress();
         game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true });
         game.flags.seenpony = true;
-        game.debugMovePlayer("trolls_clearing");
+        game.debugMovePlayer("trolls_clearing", { markRoute: true });
         game.waitCounter = 0;
       },
     },
@@ -191,7 +199,7 @@
         game.flags.rivendell_preparations_complete = false;
         game.flags.mapread = false;
         game.debugGiveJourneyCheckpointLoadout();
-        game.debugMovePlayer("rivendell");
+        game.debugMovePlayer("rivendell", { markRoute: true });
         game.debugSetCharacterRoom("elrond", "rivendell");
       },
     },
@@ -207,7 +215,7 @@
         game.debugMarkTrollRoadProgress();
         game.transformTrolls();
         game.debugGiveJourneyCheckpointLoadout();
-        game.debugMovePlayer("trollshaws_road");
+        game.debugMovePlayer("trollshaws_road", { markRoute: true });
       },
     },
     {
@@ -220,12 +228,14 @@
         game.debugCompleteUnexpectedParty();
         game.debugMarkPonyProgress();
         game.debugMarkTrollRoadProgress();
+        game.debugMarkMountainProgress();
+        game.debugMarkGoblinTunnelProgress();
         game.transformTrolls();
         game.flags.mapread = true;
         game.flags.rivendell_preparations_complete = true;
         game.flags.rivendellropesecured = true;
         game.debugGiveJourneyCheckpointLoadout();
-        game.debugMovePlayer("deep_dark_lake");
+        game.debugMovePlayer("deep_dark_lake", { markRoute: true });
         game.debugSetCharacterRoom("gollum", "deep_dark_lake");
       },
     },
@@ -239,12 +249,15 @@
         game.debugCompleteUnexpectedParty();
         game.debugMarkPonyProgress();
         game.debugMarkTrollRoadProgress();
+        game.debugMarkMountainProgress();
+        game.debugMarkGoblinTunnelProgress();
+        game.debugMarkGoblinEscapeProgress();
         game.transformTrolls();
         game.flags.mapread = true;
         game.flags.rivendell_preparations_complete = true;
         game.flags.rivendellropesecured = true;
         game.debugGiveJourneyCheckpointLoadout({ ring: true });
-        game.debugMovePlayer("beorns_house");
+        game.debugMovePlayer("beorns_house", { markRoute: true });
         game.debugSetCharacterRoom("beorn", "beorns_house");
       },
     },
@@ -258,13 +271,16 @@
         game.debugCompleteUnexpectedParty();
         game.debugMarkPonyProgress();
         game.debugMarkTrollRoadProgress();
+        game.debugMarkMountainProgress();
+        game.debugMarkGoblinTunnelProgress();
+        game.debugMarkGoblinEscapeProgress();
         game.transformTrolls();
         game.flags.mapread = true;
         game.flags.rivendell_preparations_complete = true;
         game.flags.rivendellropesecured = true;
         game.debugGiveJourneyCheckpointLoadout({ ring: true });
         game.debugMarkBeornRecovery();
-        game.debugMovePlayer("mirkwood_forest_path");
+        game.debugMovePlayer("mirkwood_forest_path", { markRoute: true });
       },
     },
     {
@@ -277,13 +293,16 @@
         game.debugCompleteUnexpectedParty();
         game.debugMarkPonyProgress();
         game.debugMarkTrollRoadProgress();
+        game.debugMarkMountainProgress();
+        game.debugMarkGoblinTunnelProgress();
+        game.debugMarkGoblinEscapeProgress();
         game.transformTrolls();
         game.flags.mapread = true;
         game.flags.rivendell_preparations_complete = true;
         game.flags.rivendellropesecured = true;
         game.debugGiveJourneyCheckpointLoadout({ ring: true });
         game.debugMarkBeornRecovery();
-        game.debugMovePlayer("wooden_town");
+        game.debugMovePlayer("wooden_town", { markRoute: true });
         game.debugSetCharacterRoom("bard", "wooden_town");
       },
     },
@@ -297,13 +316,16 @@
         game.debugCompleteUnexpectedParty();
         game.debugMarkPonyProgress();
         game.debugMarkTrollRoadProgress();
+        game.debugMarkMountainProgress();
+        game.debugMarkGoblinTunnelProgress();
+        game.debugMarkGoblinEscapeProgress();
         game.transformTrolls();
         game.flags.mapread = true;
         game.flags.rivendell_preparations_complete = true;
         game.flags.rivendellropesecured = true;
         game.debugGiveJourneyCheckpointLoadout({ ring: true });
         game.debugMarkBeornRecovery();
-        game.debugMovePlayer("front_gate");
+        game.debugMovePlayer("front_gate", { markRoute: true });
         game.debugSetCharacterRoom("bard", "front_gate");
       },
     },
@@ -317,6 +339,9 @@
         game.debugCompleteUnexpectedParty();
         game.debugMarkPonyProgress();
         game.debugMarkTrollRoadProgress();
+        game.debugMarkMountainProgress();
+        game.debugMarkGoblinTunnelProgress();
+        game.debugMarkGoblinEscapeProgress();
         game.transformTrolls();
         game.flags.mapread = true;
         game.flags.rivendell_preparations_complete = true;
@@ -324,7 +349,7 @@
         game.flags.rivendellropesecured = true;
         game.debugGiveJourneyCheckpointLoadout({ ring: true });
         game.debugMarkBeornRecovery();
-        game.debugMovePlayer("lower_halls");
+        game.debugMovePlayer("lower_halls", { markRoute: true });
         game.debugSetCharacterRoom("bard", "lower_halls");
         game.debugGiveCharacterItem("bow", "bard");
         game.debugGiveCharacterItem("strong arrow", "bard");
@@ -5547,14 +5572,177 @@
 
     renderSceneMap() {
       const game = this.game;
-      if (!sceneMapOverlay || !sceneMapImage) return;
+      if (!sceneMapOverlay || !sceneMapCanvas) return;
       if (!game.sceneMapVisible) {
         sceneMapOverlay.setAttribute("hidden", "hidden");
-        sceneMapImage.removeAttribute("src");
+        sceneMapCanvas.textContent = "";
+        sceneMapCanvas.style.width = "";
+        sceneMapCanvas.style.height = "";
+        sceneMapImage?.removeAttribute("src");
+        game.sceneMapViewportAnchor = null;
         return;
       }
-      sceneMapImage.src = assetUrl(IMAGE_ROOT, "map.jpeg");
+      const cacheKey = buildSceneMapCacheKey(game, game.sceneMapScope || "world");
+      if (!game.sceneMapRenderCache || game.sceneMapRenderCache.key !== cacheKey) {
+        const baseState = buildExplorationMapState(game, {
+          scope: game.sceneMapScope || "world",
+        });
+        if (!baseState?.svg) {
+          sceneMapOverlay.setAttribute("hidden", "hidden");
+          sceneMapCanvas.textContent = "";
+          sceneMapImage?.removeAttribute("src");
+          return;
+        }
+        game.sceneMapRenderCache = {
+          key: cacheKey,
+          state: baseState,
+        };
+        sceneMapCanvas.innerHTML = buildSceneMapMarkup(baseState);
+        if (sceneMapImage) {
+          sceneMapImage.src = baseState.imageSrc;
+          sceneMapImage.alt = baseState.accessibleLabel || "Explored map of the journey so far";
+        }
+      }
+      const baseMapState = game.sceneMapRenderCache?.state || null;
+      if (!baseMapState?.svg) {
+        sceneMapOverlay.setAttribute("hidden", "hidden");
+        sceneMapCanvas.textContent = "";
+        sceneMapImage?.removeAttribute("src");
+        return;
+      }
+      const mapState = scaleSceneMapState(baseMapState, game.sceneMapZoom || 1);
+      this.applySceneMapZoomPresentation(mapState);
+      if (sceneMapTitle) sceneMapTitle.textContent = baseMapState.title || "Explored Map";
+      if (sceneMapSubtitle) sceneMapSubtitle.textContent = baseMapState.subtitle || "";
+      if (sceneMapBack) sceneMapBack.hidden = !baseMapState.parentScope;
+      if (sceneMapZoomReset) sceneMapZoomReset.textContent = `${Math.round((game.sceneMapZoom || 1) * 100)}%`;
       sceneMapOverlay.removeAttribute("hidden");
+      if (!this.restoreSceneMapViewport(mapState)) this.centerSceneMapOnRoom(mapState);
+      game.sceneMapViewportAnchor = null;
+    }
+
+    applySceneMapZoomPresentation(mapState = null) {
+      if (!sceneMapCanvas || !mapState) return;
+      sceneMapCanvas.style.width = `${mapState.width}px`;
+      sceneMapCanvas.style.height = `${mapState.height}px`;
+      sceneMapCanvas.style.setProperty("--scene-map-base-width", `${mapState.baseWidth || mapState.width}px`);
+      sceneMapCanvas.style.setProperty("--scene-map-base-height", `${mapState.baseHeight || mapState.height}px`);
+      sceneMapCanvas.style.setProperty("--scene-map-scale", String(mapState.zoom || 1));
+    }
+
+    centerSceneMapOnRoom(mapState = null) {
+      if (!sceneMapScroll) return;
+      const target = mapState?.currentRoomCenter || mapState?.defaultCenter || null;
+      if (!target) return;
+      const viewportWidth = Number(sceneMapScroll.clientWidth) || 0;
+      const viewportHeight = Number(sceneMapScroll.clientHeight) || 0;
+      if (!viewportWidth || !viewportHeight) return;
+      const targetLeft = Math.max(0, target.x - (viewportWidth / 2));
+      const targetTop = Math.max(0, target.y - (viewportHeight / 2));
+      sceneMapScroll.scrollLeft = targetLeft;
+      sceneMapScroll.scrollTop = targetTop;
+    }
+
+    restoreSceneMapViewport(mapState = null) {
+      if (!sceneMapScroll || !mapState) return false;
+      const anchor = this.game.sceneMapViewportAnchor;
+      if (!anchor || anchor.scope !== (this.game.sceneMapScope || "world")) return false;
+      const viewportWidth = Number(sceneMapScroll.clientWidth) || 0;
+      const viewportHeight = Number(sceneMapScroll.clientHeight) || 0;
+      if (!viewportWidth || !viewportHeight) return false;
+      const zoom = Number(this.game.sceneMapZoom) || 1;
+      const targetLeft = Math.max(0, Math.min(
+        Math.round((anchor.mapX * zoom) - anchor.offsetX),
+        Math.max(0, mapState.width - viewportWidth),
+      ));
+      const targetTop = Math.max(0, Math.min(
+        Math.round((anchor.mapY * zoom) - anchor.offsetY),
+        Math.max(0, mapState.height - viewportHeight),
+      ));
+      sceneMapScroll.scrollLeft = targetLeft;
+      sceneMapScroll.scrollTop = targetTop;
+      return true;
+    }
+
+    captureSceneMapViewportAnchor(options = {}) {
+      if (!sceneMapScroll || !this.game.sceneMapVisible) return false;
+      const rect = sceneMapScroll.getBoundingClientRect?.() || { left: 0, top: 0, width: 0, height: 0 };
+      const viewportWidth = Number(sceneMapScroll.clientWidth) || Number(rect.width) || 0;
+      const viewportHeight = Number(sceneMapScroll.clientHeight) || Number(rect.height) || 0;
+      if (!viewportWidth || !viewportHeight) return false;
+      const zoom = Number(this.game.sceneMapZoom) || 1;
+      const offsetX = Number.isFinite(options.offsetX)
+        ? options.offsetX
+        : (Number.isFinite(options.clientX) ? options.clientX - rect.left : viewportWidth / 2);
+      const offsetY = Number.isFinite(options.offsetY)
+        ? options.offsetY
+        : (Number.isFinite(options.clientY) ? options.clientY - rect.top : viewportHeight / 2);
+      this.game.sceneMapViewportAnchor = {
+        scope: this.game.sceneMapScope || "world",
+        mapX: (sceneMapScroll.scrollLeft + offsetX) / zoom,
+        mapY: (sceneMapScroll.scrollTop + offsetY) / zoom,
+        offsetX,
+        offsetY,
+      };
+      return true;
+    }
+
+    sceneMapBack() {
+      if (!this.game.sceneMapVisible || this.game.sceneMapScope === "world") return false;
+      this.game.sceneMapViewportAnchor = null;
+      this.game.sceneMapScope = "world";
+      this.renderSceneMap();
+      return true;
+    }
+
+    adjustSceneMapZoom(delta = 0, options = {}) {
+      if (!this.game.sceneMapVisible) return false;
+      if (!options.skipCapture) this.captureSceneMapViewportAnchor();
+      const next = Math.max(0.6, Math.min(2.4, Number((this.game.sceneMapZoom || 1) + delta).toFixed(2)));
+      if (next === this.game.sceneMapZoom) return false;
+      this.game.sceneMapZoom = next;
+      this.renderSceneMap();
+      return true;
+    }
+
+    resetSceneMapZoom() {
+      if (!this.game.sceneMapVisible) return false;
+      this.captureSceneMapViewportAnchor();
+      this.game.sceneMapZoom = 1;
+      this.renderSceneMap();
+      return true;
+    }
+
+    openSceneMapScope(scope = "world") {
+      const normalized = String(scope || "world").trim() || "world";
+      if (normalized !== "world" && !MAP_REGION_DEFINITIONS[normalized]) return false;
+      this.game.sceneMapViewportAnchor = null;
+      this.game.sceneMapScope = normalized;
+      this.renderSceneMap();
+      return true;
+    }
+
+    handleSceneMapClick(event) {
+      if (!this.game.sceneMapVisible) return false;
+      const target = event?.target;
+      const regionId = target?.closest?.("[data-map-open-region]")?.getAttribute?.("data-map-open-region");
+      if (!regionId) return false;
+      return this.openSceneMapScope(regionId);
+    }
+
+    handleSceneMapWheel(event) {
+      if (!this.game.sceneMapVisible || !event) return false;
+      const lineWheel = Number(event.deltaMode) === 1;
+      const pinchLike = Boolean(event.ctrlKey);
+      const modifierZoom = Boolean(event.metaKey || event.altKey);
+      if (!lineWheel && !pinchLike && !modifierZoom) return false;
+      const direction = Number(event.deltaY) < 0 ? 0.1 : -0.1;
+      this.captureSceneMapViewportAnchor({
+        clientX: Number(event.clientX),
+        clientY: Number(event.clientY),
+      });
+      if (typeof event.preventDefault === "function") event.preventDefault();
+      return this.adjustSceneMapZoom(direction, { skipCapture: true });
     }
 
     swapRoomImage(scene, nextSrc) {
@@ -6265,6 +6453,10 @@
       game.trollsTransformed = Boolean(save.trollsTransformed);
       game.trollsDefeated = Boolean(save.trollsDefeated);
       game.sceneMapVisible = false;
+      game.sceneMapScope = "world";
+      game.sceneMapZoom = 1;
+      game.sceneMapViewportAnchor = null;
+      game.sceneMapRenderCache = null;
       game.spiderEyesState = save.spiderEyesState || null;
       game.gollumState = game.restoreGollumState(save.gollumState);
       game.turnCount = Number(save.turnCount) || 0;
@@ -7807,6 +7999,10 @@
       game.trollsTransformed = false;
       game.trollsDefeated = false;
       game.sceneMapVisible = false;
+      game.sceneMapScope = "world";
+      game.sceneMapZoom = 1;
+      game.sceneMapViewportAnchor = null;
+      game.sceneMapRenderCache = null;
       game.visitedRooms = new Set();
       game.tipsEnabled = false;
       game.tipIndex = 0;
@@ -8073,8 +8269,12 @@
         game.print("No location has been visited yet. The map cannot be displayed.");
         return;
       }
+      game.sceneMapScope = "world";
+      game.sceneMapZoom = 1;
       game.sceneMapVisible = true;
-      game.print("You study the map of Wilderland.");
+      game.sceneMapViewportAnchor = null;
+      game.sceneMapRenderCache = null;
+      game.print("You study the paths already traced across Wilderland.");
       game.render();
     }
 
@@ -8618,6 +8818,10 @@
       this.trollsTransformed = false;
       this.trollsDefeated = false;
       this.sceneMapVisible = false;
+      this.sceneMapScope = "world";
+      this.sceneMapZoom = 1;
+      this.sceneMapViewportAnchor = null;
+      this.sceneMapRenderCache = null;
       this.visitedRooms = new Set();
       this.tipsEnabled = false;
       this.tipIndex = 0;
@@ -8903,6 +9107,12 @@
       };
       bindLayoutButton(layoutMode1Button, "1");
       bindLayoutButton(layoutMode2Button, "2");
+      sceneMapBack?.addEventListener("click", () => this.layout.sceneMapBack());
+      sceneMapZoomOut?.addEventListener("click", () => this.layout.adjustSceneMapZoom(-0.2));
+      sceneMapZoomReset?.addEventListener("click", () => this.layout.resetSceneMapZoom());
+      sceneMapZoomIn?.addEventListener("click", () => this.layout.adjustSceneMapZoom(0.2));
+      sceneMapCanvas?.addEventListener("click", (event) => this.layout.handleSceneMapClick(event));
+      sceneMapScroll?.addEventListener("wheel", (event) => this.layout.handleSceneMapWheel(event), { passive: false });
       if (this.layoutSwitchAutoHide && layoutSwitch) {
         document.addEventListener("mousemove", (event) => this.handleLayoutMouseActivity(event), { passive: true });
         document.addEventListener("mousedown", (event) => this.handleLayoutMouseDown(event), { passive: true });
@@ -9112,7 +9322,13 @@
         }
         rawCommand = this.normalizeConversationalQuestion(rawCommand);
         const normalizedCommand = normalizeNaturalCommand(rawCommand.toLowerCase());
-        if (normalizedCommand !== "map") this.sceneMapVisible = false;
+        if (normalizedCommand !== "map") {
+          this.sceneMapVisible = false;
+          this.sceneMapScope = "world";
+          this.sceneMapZoom = 1;
+          this.sceneMapViewportAnchor = null;
+          this.sceneMapRenderCache = null;
+        }
         if (this.isUnsupportedConditional(normalizedCommand)) {
           this.print("Conditional commands are not supported yet. Try the action when the condition is true.", "system");
           return;
@@ -9492,6 +9708,7 @@
       return this.endgame
         || this.autoplayRunning
         || this.pendingClarification
+        || this.sceneMapVisible
         || Boolean(String(input?.value || "").trim())
         || !this.outputPinnedToBottom;
     }
@@ -9706,6 +9923,10 @@
       };
       this.temporaryImageDismissOnNextCommand = options.dismissOnNextCommand !== false;
       this.sceneMapVisible = false;
+      this.sceneMapScope = "world";
+      this.sceneMapZoom = 1;
+      this.sceneMapViewportAnchor = null;
+      this.sceneMapRenderCache = null;
       this.render();
       return true;
     }
@@ -10553,12 +10774,36 @@
         || null;
     }
 
-    debugMovePlayer(roomId) {
+    debugMovePlayer(roomId, options = {}) {
       if (!this.rooms[roomId]) return false;
+      const { markRoute = false, fromRoom = this.currentRoom || this.data.startRoom } = options;
+      if (markRoute) {
+        const route = this.debugShortestPath(fromRoom, roomId);
+        for (const step of route) this.visitedRooms.add(step);
+      }
       this.currentRoom = roomId;
       this.player.position = roomId;
       this.visitedRooms.add(roomId);
       return true;
+    }
+
+    debugShortestPath(fromRoom, toRoom) {
+      if (!fromRoom || !toRoom || !this.rooms[fromRoom] || !this.rooms[toRoom]) return [];
+      if (fromRoom === toRoom) return [fromRoom];
+      const queue = [{ room: fromRoom, path: [fromRoom] }];
+      const seen = new Set([fromRoom]);
+      while (queue.length) {
+        const current = queue.shift();
+        for (const connection of this.connectionsFrom(current.room)) {
+          if (connection.requiredFlag && !this.flags[connection.requiredFlag]) continue;
+          if (seen.has(connection.to)) continue;
+          const path = [...current.path, connection.to];
+          if (connection.to === toRoom) return path;
+          seen.add(connection.to);
+          queue.push({ room: connection.to, path });
+        }
+      }
+      return [fromRoom, toRoom];
     }
 
     debugSetCharacterRoom(characterNameOrId, roomId, options = {}) {
@@ -10615,14 +10860,69 @@
       this.flags.ponysequencecompleted = true;
       this.flags.ponypassageopen = true;
       this.flags.ponyreadyannounced = true;
+      this.visitedRooms.add("green_dragon_inn_outside");
+      this.visitedRooms.add("green_dragon_inn");
       if (this.items.calm_pony) this.items.calm_pony.visible = false;
     }
 
     debugMarkTrollRoadProgress() {
       this.visitedRooms.add("dreary");
       this.visitedRooms.add("trolls_clearing");
+      this.visitedRooms.add("hidden_path");
       this.visitedRooms.add("trolls_cave");
       this.visitedTrollsClearing = true;
+    }
+
+    debugMarkVisitedPath(roomIds = []) {
+      const route = Array.isArray(roomIds) ? roomIds.filter((roomId) => this.rooms[roomId]) : [];
+      if (!route.length) return;
+      this.visitedRooms.add(route[0]);
+      for (let index = 1; index < route.length; index += 1) {
+        const segment = this.debugShortestPath(route[index - 1], route[index]);
+        for (const step of segment) this.visitedRooms.add(step);
+      }
+    }
+
+    debugMarkMountainProgress() {
+      this.debugMarkVisitedPath([
+        "misty_mountain",
+        "narrow_path_7",
+        "narrow_path_6",
+        "narrow_path_4",
+        "narrow_path_1",
+        "narrow_path_2",
+        "narrow_path_3",
+        "narrow_path_5",
+        "narrow_place",
+        "large_dry_cave",
+        "narrow_path_8",
+        "narrow_path_9",
+        "narrow_path_10",
+      ]);
+    }
+
+    debugMarkGoblinTunnelProgress() {
+      this.debugMarkVisitedPath([
+        "large_dry_cave",
+        "dark_stuffy_passage_5",
+        "dark_stuffy_passage_6",
+        "dark_stuffy_passage_14",
+        "deep_dark_lake",
+      ]);
+    }
+
+    debugMarkGoblinEscapeProgress() {
+      this.debugMarkVisitedPath([
+        "deep_dark_lake",
+        "dark_stuffy_passage_13",
+        "dark_stuffy_passage_14",
+        "dark_stuffy_passage_15",
+        "dark_stuffy_passage_4",
+        "inside_goblins_gate",
+        "outside_goblins_gate",
+        "treeless_opening",
+        "beorns_house",
+      ]);
     }
 
     debugMarkBeornRecovery() {
@@ -14265,6 +14565,1087 @@
 
   function assetUrl(root, file) {
     return `${root}${String(file).split("/").map(encodeURIComponent).join("/")}${ASSET_QUERY_SUFFIX}`;
+  }
+
+  const MAP_REGION_DEFINITIONS = {
+    bilbo_home: {
+      label: "Bilbo's Home",
+      rooms: [
+        "hobbit_hole",
+        "bilbos_garden",
+        "bag_end_parlour",
+        "bag_end_study",
+        "bag_end_dining_room",
+        "bag_end_pantry",
+        "bag_end_kitchen",
+        "bag_end_guest_room",
+        "bag_end_cellar_room",
+      ],
+      positions: {
+        hobbit_hole: { x: 0, y: 0 },
+        bilbos_garden: { x: 1.25, y: 0 },
+        bag_end_parlour: { x: -1.2, y: 0 },
+        bag_end_study: { x: 1.2, y: -1.1 },
+        bag_end_dining_room: { x: 0, y: 1.15 },
+        bag_end_pantry: { x: 1.25, y: 1.15 },
+        bag_end_kitchen: { x: 2.5, y: 1.15 },
+        bag_end_guest_room: { x: -1.2, y: -1.1 },
+        bag_end_cellar_room: { x: -1.2, y: 1.15 },
+      },
+    },
+    green_dragon: {
+      label: "Green Dragon Inn",
+      rooms: ["green_dragon_inn_outside", "green_dragon_inn"],
+      positions: {
+        green_dragon_inn_outside: { x: 0, y: 0.8 },
+        green_dragon_inn: { x: 0, y: -0.8 },
+      },
+    },
+    rivendell: {
+      label: "Rivendell",
+      rooms: [
+        "rivendell",
+        "rivendell_courtyard",
+        "rivendell_library",
+        "rivendell_hall_of_fire",
+        "rivendell_guest_chambers",
+        "rivendell_terrace",
+        "rivendell_bridge",
+      ],
+      positions: {
+        rivendell: { x: 0, y: 0 },
+        rivendell_bridge: { x: -1.2, y: 0 },
+        rivendell_terrace: { x: -1.2, y: -1.15 },
+        rivendell_courtyard: { x: 0, y: -1.15 },
+        rivendell_library: { x: 1.2, y: -1.15 },
+        rivendell_hall_of_fire: { x: 0, y: -2.3 },
+        rivendell_guest_chambers: { x: 1.2, y: -2.3 },
+      },
+    },
+    beorn: {
+      label: "Beorn's House",
+      rooms: [
+        "beorns_house",
+        "beorn_great_hall",
+        "beorn_stable",
+        "beorn_garden",
+        "beorn_animal_yard",
+      ],
+      positions: {
+        beorns_house: { x: 0, y: 0 },
+        beorn_great_hall: { x: 1.2, y: 0 },
+        beorn_stable: { x: 1.2, y: 1.15 },
+        beorn_garden: { x: 1.2, y: -1.15 },
+        beorn_animal_yard: { x: 2.4, y: 0 },
+      },
+    },
+    goblin_tunnels: {
+      label: "Goblin Tunnels",
+      rooms: [
+        "goblins_dungeon",
+        "dark_winding_passage",
+        "big_cavern",
+        "dark_stuffy_passage_1",
+        "dark_stuffy_passage_2",
+        "dark_stuffy_passage_3",
+        "dark_stuffy_passage_4",
+        "dark_stuffy_passage_5",
+        "dark_stuffy_passage_6",
+        "dark_stuffy_passage_7",
+        "dark_stuffy_passage_8",
+        "dark_stuffy_passage_9",
+        "dark_stuffy_passage_10",
+        "dark_stuffy_passage_11",
+        "dark_stuffy_passage_12",
+        "dark_stuffy_passage_13",
+        "dark_stuffy_passage_14",
+        "dark_stuffy_passage_15",
+        "inside_goblins_gate",
+        "outside_goblins_gate",
+        "deep_dark_lake",
+      ],
+      positions: {
+        goblins_dungeon: { x: -4.3, y: -0.65 },
+        dark_winding_passage: { x: -3.25, y: 0 },
+        big_cavern: { x: -3.25, y: -1.95 },
+        dark_stuffy_passage_1: { x: -2.25, y: -0.65 },
+        dark_stuffy_passage_2: { x: -1.2, y: 0.9 },
+        dark_stuffy_passage_3: { x: -1.15, y: -1.95 },
+        dark_stuffy_passage_4: { x: -2.3, y: -2.75 },
+        dark_stuffy_passage_5: { x: 0, y: 1.4 },
+        dark_stuffy_passage_6: { x: 0, y: 0 },
+        dark_stuffy_passage_7: { x: 0, y: -1.25 },
+        dark_stuffy_passage_8: { x: 2.7, y: -0.1 },
+        dark_stuffy_passage_9: { x: 1.75, y: -0.1 },
+        dark_stuffy_passage_10: { x: 2.7, y: 1 },
+        dark_stuffy_passage_11: { x: 3.75, y: 1.65 },
+        dark_stuffy_passage_12: { x: 1.75, y: 1.65 },
+        dark_stuffy_passage_13: { x: 1.75, y: -1.2 },
+        deep_dark_lake: { x: 2.7, y: -2 },
+        dark_stuffy_passage_14: { x: 0.7, y: -1.2 },
+        dark_stuffy_passage_15: { x: -1.3, y: -1.2 },
+        inside_goblins_gate: { x: -2.3, y: -3.85 },
+        outside_goblins_gate: { x: -2.3, y: -5 },
+      },
+    },
+  };
+
+  const WORLD_OVERVIEW_PINNED_POSITIONS = {
+    "region:bilbo_home": { x: 0.2, y: 0 },
+    "room:lane_beneath_hill": { x: 1.3, y: 0 },
+    "room:party_field": { x: 2.4, y: 0 },
+    "room:bywater_bridge": { x: 3.5, y: 0 },
+    "region:green_dragon": { x: 4.6, y: 0 },
+    "room:dreary": { x: 5.75, y: 0 },
+    "room:trolls_clearing": { x: 6.85, y: -1.1 },
+    "room:hidden_path": { x: 6.85, y: -2.25 },
+    "room:trolls_cave": { x: 6.85, y: -3.4 },
+    "room:trollshaws_road": { x: 7.95, y: 0 },
+    "room:hidden_valley_path": { x: 9.05, y: 0 },
+    "region:rivendell": { x: 10.2, y: 0 },
+    "room:misty_mountain": { x: 11.45, y: 0 },
+    "room:narrow_path_1": { x: 12.35, y: -1.15 },
+    "room:narrow_path_2": { x: 13.45, y: -2.25 },
+    "room:narrow_path_3": { x: 14.55, y: -3.35 },
+    "room:narrow_path_4": { x: 12.35, y: -2.35 },
+    "room:narrow_path_5": { x: 15.65, y: -4.45 },
+    "room:narrow_path_6": { x: 12.35, y: -3.55 },
+    "room:narrow_path_7": { x: 11.2, y: -3.55 },
+    "room:narrow_path_8": { x: 12.35, y: 1.1 },
+    "room:narrow_path_9": { x: 13.45, y: 1.1 },
+    "room:narrow_path_10": { x: 14.55, y: 0 },
+    "room:narrow_place": { x: 15.75, y: 0 },
+    "room:large_dry_cave": { x: 15.75, y: -1.2 },
+    "room:narrow_dangerous_path": { x: 16.9, y: 0 },
+    "region:beorn": { x: 18.15, y: 0.25 },
+    "room:great_river": { x: 18.15, y: -1.15 },
+    "room:gate_to_mirkwood": { x: 19.3, y: -1.15 },
+    "room:forest_road": { x: 18.15, y: 1.45 },
+    "room:treeless_opening": { x: 16.9, y: 1.45 },
+  };
+
+  const WORLD_MAP_LABEL_OVERRIDES = {
+    hidden_path: "Trolls Path",
+    large_dry_cave: "Dry Cave",
+    goblins_dungeon: "Goblin Dungeon",
+    dark_winding_passage: "Winding Passage",
+    inside_goblins_gate: "Goblin Gate In",
+    outside_goblins_gate: "Goblin Gate Out",
+    ...Object.fromEntries(Array.from({ length: 10 }, (_entry, index) => [`narrow_path_${index + 1}`, `Path ${index + 1}`])),
+    ...Object.fromEntries(Array.from({ length: 15 }, (_entry, index) => [`dark_stuffy_passage_${index + 1}`, `Tunnel ${index + 1}`])),
+  };
+
+  const WORLD_INLINE_REGION_HOSTS = {
+    goblin_tunnels: "large_dry_cave",
+  };
+
+  const ROOM_TO_MAP_REGION = Object.fromEntries(
+    Object.entries(MAP_REGION_DEFINITIONS)
+      .flatMap(([regionId, region]) => region.rooms.map((roomId) => [roomId, regionId]))
+  );
+
+  function buildExplorationMapState(game, options = {}) {
+    const scope = String(options.scope || "world").trim() || "world";
+    const roomOrder = new Map((game.data?.roomOrder || Object.keys(game.rooms || {})).map((roomId, index) => [roomId, index]));
+    const visitedRooms = [...(game?.visitedRooms || [])].filter((roomId) => game.rooms?.[roomId]);
+    if (!visitedRooms.length) return null;
+
+    const model = scope === "world"
+      ? buildWorldMapModel(game, visitedRooms, roomOrder)
+      : buildRegionMapModel(game, visitedRooms, roomOrder, scope);
+    if (!model?.nodes?.length) return null;
+
+    const positionOrder = new Map(model.nodes.map((node, index) => [node.id, index]));
+    const positions = computeExplorationMapPositions(
+      model.nodes.map((node) => node.id),
+      model.edges,
+      model.currentNodeId || model.nodes[0].id,
+      positionOrder,
+      model.pinnedPositions || {},
+    );
+
+    return renderExplorationMapSvg(model, positions, {
+      worldScope: scope === "world",
+    });
+  }
+
+  function buildSceneMapCacheKey(game, scope = "world") {
+    const normalizedScope = String(scope || "world").trim() || "world";
+    const visitedRooms = [...(game?.visitedRooms || [])]
+      .filter((roomId) => game.rooms?.[roomId])
+      .sort();
+    return [
+      normalizedScope,
+      game.currentRoom || "",
+      visitedRooms.join("|"),
+    ].join("::");
+  }
+
+  function scaleSceneMapState(mapState, zoom = 1) {
+    if (!mapState) return null;
+    const safeZoom = Math.max(0.6, Math.min(2.4, Number(zoom) || 1));
+    const scalePoint = (point) => (point
+      ? {
+          x: Math.round(point.x * safeZoom),
+          y: Math.round(point.y * safeZoom),
+        }
+      : null);
+    return {
+      ...mapState,
+      zoom: safeZoom,
+      width: Math.round((mapState.baseWidth || mapState.width || 0) * safeZoom),
+      height: Math.round((mapState.baseHeight || mapState.height || 0) * safeZoom),
+      currentRoomCenter: scalePoint(mapState.currentRoomCenterBase || mapState.currentRoomCenter || null),
+      defaultCenter: scalePoint(mapState.defaultCenterBase || mapState.defaultCenter || null),
+    };
+  }
+
+  function buildSceneMapMarkup(mapState) {
+    if (!mapState?.imageSrc) return "";
+    const hotspotMarkup = (mapState.hotspots || [])
+      .map((hotspot) => (
+        `<button class="scene-map-hotspot" type="button" data-map-open-region="${escapeXml(hotspot.openRegion)}" aria-label="Open ${escapeXml(hotspot.label)}" title="${escapeXml(hotspot.label)}" style="left:${hotspot.x}px;top:${hotspot.y}px;width:${hotspot.width}px;height:${hotspot.height}px;"></button>`
+      ))
+      .join("");
+    return `<div class="scene-map-stage" style="width:${mapState.baseWidth}px;height:${mapState.baseHeight}px;">
+      <img class="scene-map-render" src="${mapState.imageSrc}" alt="${escapeXml(mapState.accessibleLabel || mapState.title || "Explored map")}">
+      <div class="scene-map-hotspots">${hotspotMarkup}</div>
+    </div>`;
+  }
+
+  function buildWorldMapModel(game, visitedRooms, roomOrder) {
+    const nodes = [];
+    const nodeMap = new Map();
+    const visitedSet = new Set(visitedRooms);
+    const sortedRooms = visitedRooms.slice().sort((left, right) => (roomOrder.get(left) ?? 0) - (roomOrder.get(right) ?? 0));
+
+    for (const roomId of sortedRooms) {
+      const regionId = ROOM_TO_MAP_REGION[roomId];
+      if (regionId && WORLD_INLINE_REGION_HOSTS[regionId]) continue;
+      const nodeId = regionId ? `region:${regionId}` : `room:${roomId}`;
+      if (nodeMap.has(nodeId)) continue;
+      if (regionId) {
+        const region = MAP_REGION_DEFINITIONS[regionId];
+        const label = region?.label || roomDisplayName(game.rooms[roomId] || roomId);
+        const node = { id: nodeId, label, kind: "region", openRegion: regionId };
+        nodeMap.set(nodeId, node);
+        nodes.push(node);
+        continue;
+      }
+      const node = {
+        id: `room:${roomId}`,
+        label: WORLD_MAP_LABEL_OVERRIDES[roomId] || roomDisplayName(game.rooms[roomId] || roomId),
+        kind: "room",
+        roomId,
+      };
+      nodeMap.set(node.id, node);
+      nodes.push(node);
+    }
+
+    for (const [regionId, hostRoomId] of Object.entries(WORLD_INLINE_REGION_HOSTS)) {
+      const hostNode = nodeMap.get(`room:${hostRoomId}`);
+      const region = MAP_REGION_DEFINITIONS[regionId];
+      if (!hostNode || !region) continue;
+      const visitedRegionRooms = region.rooms.filter((roomId) => visitedSet.has(roomId));
+      if (!visitedRegionRooms.length) continue;
+      hostNode.inlinePortal = {
+        openRegion: regionId,
+        label: region.label,
+        direction: "down",
+      };
+    }
+
+    const edges = buildMapEdges(game, visitedSet, {
+      mapRoom: (roomId) => {
+        const regionId = ROOM_TO_MAP_REGION[roomId];
+        if (regionId && WORLD_INLINE_REGION_HOSTS[regionId]) return "";
+        return regionId ? `region:${regionId}` : `room:${roomId}`;
+      },
+      allowedNodeIds: new Set(nodes.map((node) => node.id)),
+    });
+
+    const currentRoomId = game.currentRoom;
+    const currentRegionId = ROOM_TO_MAP_REGION[currentRoomId] || "";
+    const currentNodeId = currentRegionId
+      ? (WORLD_INLINE_REGION_HOSTS[currentRegionId] ? `room:${WORLD_INLINE_REGION_HOSTS[currentRegionId]}` : `region:${currentRegionId}`)
+      : `room:${currentRoomId}`;
+    return {
+      nodes,
+      edges,
+      currentNodeId,
+      parentScope: "",
+      title: "Explored Map",
+      subtitle: `World overview • current: ${roomDisplayName(game.rooms[currentRoomId] || currentRoomId)}`,
+      accessibleLabel: "World overview of explored locations",
+      pinnedPositions: WORLD_OVERVIEW_PINNED_POSITIONS,
+    };
+  }
+
+  function buildRegionMapModel(game, visitedRooms, roomOrder, scope) {
+    const region = MAP_REGION_DEFINITIONS[scope];
+    if (!region) return null;
+    const visitedRegionRooms = region.rooms
+      .filter((roomId) => visitedRooms.includes(roomId))
+      .sort((left, right) => (roomOrder.get(left) ?? 0) - (roomOrder.get(right) ?? 0));
+    if (!visitedRegionRooms.length) return null;
+
+    const nodes = visitedRegionRooms.map((roomId) => ({
+      id: `room:${roomId}`,
+      label: WORLD_MAP_LABEL_OVERRIDES[roomId] || roomDisplayName(game.rooms[roomId] || roomId),
+      kind: "room",
+      roomId,
+    }));
+
+    const edges = buildMapEdges(game, new Set(visitedRegionRooms), {
+      mapRoom: (roomId) => `room:${roomId}`,
+      allowedNodeIds: new Set(nodes.map((node) => node.id)),
+    });
+
+    const currentNodeId = region.rooms.includes(game.currentRoom) ? `room:${game.currentRoom}` : "";
+    const pinnedPositions = Object.fromEntries(
+      Object.entries(region.positions || {}).map(([roomId, point]) => [`room:${roomId}`, point])
+    );
+    return {
+      nodes,
+      edges,
+      currentNodeId,
+      parentScope: "world",
+      title: region.label,
+      subtitle: "Local map • use Back to return to the world overview",
+      accessibleLabel: `${region.label} local map`,
+      pinnedPositions,
+    };
+  }
+
+  function buildMapEdges(game, visitedSet, options = {}) {
+    const mapRoom = typeof options.mapRoom === "function" ? options.mapRoom : ((roomId) => roomId);
+    const allowedNodeIds = options.allowedNodeIds || null;
+    const edges = [];
+    const edgeMap = new Map();
+
+    for (const connection of game.connections || []) {
+      if (!visitedSet.has(connection.from) || !visitedSet.has(connection.to)) continue;
+      const fromId = mapRoom(connection.from);
+      const toId = mapRoom(connection.to);
+      if (!fromId || !toId || fromId === toId) continue;
+      if (allowedNodeIds && (!allowedNodeIds.has(fromId) || !allowedNodeIds.has(toId))) continue;
+
+      const left = fromId < toId ? fromId : toId;
+      const right = left === fromId ? toId : fromId;
+      const key = `${left}|${right}`;
+      let entry = edgeMap.get(key);
+      if (!entry) {
+        entry = { from: left, to: right, links: [] };
+        edgeMap.set(key, entry);
+        edges.push(entry);
+      }
+      entry.links.push({
+        from: fromId,
+        to: toId,
+        direction: compassDirectionKey(connection.direction) || normalize(connection.direction),
+      });
+    }
+
+    return edges;
+  }
+
+  function renderExplorationMapSvg(model, positions, options = {}) {
+    const worldScope = options.worldScope !== false;
+    const boxSize = worldScope ? 98 : 92;
+    const unitX = worldScope ? 170 : 156;
+    const unitY = worldScope ? 170 : 156;
+    const padding = worldScope ? 128 : 110;
+    const minWidth = worldScope ? 1680 : 1100;
+    const minHeight = worldScope ? 1020 : 760;
+    const titleSpace = 126;
+    const currentNodeId = model.currentNodeId || model.nodes[0]?.id || "";
+    const current = positions.get(currentNodeId) || positions.get(model.nodes[0]?.id) || { x: 0, y: 0 };
+
+    let minX = current.x;
+    let maxX = current.x;
+    let minY = current.y;
+    let maxY = current.y;
+    for (const point of positions.values()) {
+      minX = Math.min(minX, point.x);
+      maxX = Math.max(maxX, point.x);
+      minY = Math.min(minY, point.y);
+      maxY = Math.max(maxY, point.y);
+    }
+
+    const contentWidth = Math.round(((maxX - minX) * unitX) + (padding * 2) + boxSize);
+    const contentHeight = Math.round(((maxY - minY) * unitY) + (padding * 2) + boxSize + titleSpace);
+    const width = Math.max(minWidth, contentWidth);
+    const height = Math.max(minHeight, contentHeight);
+    const offsetX = Math.max(0, (width - contentWidth) / 2);
+    const offsetY = Math.max(0, (height - contentHeight) / 2);
+    const nodePixels = new Map();
+
+    for (const node of model.nodes) {
+      const point = positions.get(node.id) || { x: 0, y: 0 };
+      nodePixels.set(node.id, {
+        x: offsetX + padding + ((point.x - minX) * unitX) + (boxSize / 2),
+        y: offsetY + padding + ((point.y - minY) * unitY) + (boxSize / 2),
+      });
+    }
+
+    const lineMarkup = model.edges.map((edge) => {
+      const from = nodePixels.get(edge.from);
+      const to = nodePixels.get(edge.to);
+      if (!from || !to) return "";
+      const twoWay = edge.links.some((link) => link.from === edge.from && link.to === edge.to)
+        && edge.links.some((link) => link.from === edge.to && link.to === edge.from);
+      const fromDirection = resolveMapEdgeDirection(edge.links, edge.from, edge.to, from, to);
+      const toDirection = resolveMapEdgeDirection(edge.links, edge.to, edge.from, to, from);
+      return buildMapConnectorMarkup(
+        mapBoxAnchorPoint(from, fromDirection, boxSize, to),
+        mapBoxAnchorPoint(to, toDirection, boxSize, from),
+        { fromDirection, toDirection },
+        {
+          boxSize,
+          twoWay,
+          stroke: twoWay ? "#7f6641" : "#a17a4b",
+          strokeWidth: worldScope ? 4.8 : 4.2,
+        }
+      );
+    }).join("");
+
+    const nodeMarkup = model.nodes.map((node) => {
+      const point = nodePixels.get(node.id) || { x: padding, y: padding };
+      const x = point.x - (boxSize / 2);
+      const y = point.y - (boxSize / 2);
+      const currentNode = node.id === currentNodeId;
+      const clickable = Boolean(node.openRegion);
+      const inlinePortal = node.inlinePortal || null;
+      const lines = wrapMapLabel(node.label, worldScope ? 13 : 12, 3);
+      const lineHeight = worldScope ? 15 : 14;
+      const startY = inlinePortal
+        ? point.y - 23
+        : point.y - (((lines.length - 1) * lineHeight) / 2) + 1;
+      const labelMarkup = lines
+        .map((line, index) => `<tspan x="${point.x.toFixed(1)}" y="${(startY + (index * lineHeight)).toFixed(1)}">${escapeXml(line)}</tspan>`)
+        .join("");
+      const badgeMarkup = clickable
+        ? `<text x="${point.x.toFixed(1)}" y="${(y + boxSize + 20).toFixed(1)}" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="12" font-weight="700" fill="#7a5b26">click to open</text>`
+        : "";
+      const regionAttr = clickable ? ` data-map-open-region="${escapeXml(node.openRegion)}"` : "";
+      const inlinePortalMarkup = inlinePortal
+        ? `<text x="${point.x.toFixed(1)}" y="${(y + 57).toFixed(1)}" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="13" font-weight="700" fill="#7a5b26">↓</text>
+        <text x="${point.x.toFixed(1)}" y="${(y + 78).toFixed(1)}" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="11.2" font-weight="600" fill="#2f2412">${escapeXml(inlinePortal.label)}</text>`
+        : "";
+      return `<g${regionAttr}>
+        ${currentNode ? `<rect x="${(x - 9).toFixed(1)}" y="${(y - 9).toFixed(1)}" width="${(boxSize + 18).toFixed(1)}" height="${(boxSize + 18).toFixed(1)}" rx="15" fill="none" stroke="#d4a64a" stroke-width="5" />` : ""}
+        <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${boxSize}" height="${boxSize}" rx="10" fill="${currentNode ? "#f0d79f" : clickable ? "#f2dfb0" : "#f5ecd5"}" stroke="${currentNode ? "#6c4d18" : clickable ? "#7c5a23" : "#6f5a35"}" stroke-width="${currentNode ? "3.1" : "2.5"}" />
+        <text x="${point.x.toFixed(1)}" y="${point.y.toFixed(1)}" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="${worldScope ? "13.5" : "13"}" font-weight="${clickable ? "700" : "600"}" fill="#2f2412">${labelMarkup}</text>
+        ${inlinePortalMarkup}
+        ${badgeMarkup}
+      </g>`;
+    }).join("");
+    const hotspots = model.nodes
+      .flatMap((node) => {
+        const point = nodePixels.get(node.id) || { x: padding, y: padding };
+        const items = [];
+        if (node.openRegion) {
+          items.push({
+            openRegion: node.openRegion,
+            label: node.label,
+            x: Math.round(point.x - (boxSize / 2)),
+            y: Math.round(point.y - (boxSize / 2)),
+            width: boxSize,
+            height: boxSize,
+          });
+        }
+        if (node.inlinePortal) {
+          items.push({
+            openRegion: node.inlinePortal.openRegion,
+            label: node.inlinePortal.label,
+            x: Math.round(point.x - 42),
+            y: Math.round(point.y + 11),
+            width: 84,
+            height: 24,
+          });
+        }
+        return items;
+      });
+
+    const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(model.accessibleLabel || model.title || "Explored map")}">
+  <defs>
+    <filter id="mapShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000000" flood-opacity="0.18" />
+    </filter>
+    <pattern id="mapPaper" width="18" height="18" patternUnits="userSpaceOnUse">
+      <path d="M0 9H18M9 0V18" stroke="#e6d7b8" stroke-opacity="0.28" stroke-width="0.7" />
+    </pattern>
+  </defs>
+  <rect x="8" y="8" width="${width - 16}" height="${height - 16}" rx="24" fill="#efe3c6" stroke="#8c7550" stroke-width="2.5" filter="url(#mapShadow)" />
+  <rect x="8" y="8" width="${width - 16}" height="${height - 16}" rx="24" fill="url(#mapPaper)" />
+  <text x="40" y="48" font-family="Georgia, 'Times New Roman', serif" font-size="28" font-weight="700" fill="#3a2b16">${escapeXml(model.title || "Explored Map")}</text>
+  <text x="40" y="78" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="17" fill="#6f5733">${escapeXml(model.subtitle || "")}</text>
+  <text x="${width - 40}" y="48" text-anchor="end" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="15" font-weight="700" fill="#7b6033">${worldScope ? "Click marked locations for local maps" : "Back returns to the world overview"}</text>
+  <text x="${width - 40}" y="74" text-anchor="end" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="15" font-weight="700" fill="#7b6033">Wheel, pinch, or buttons to zoom</text>
+  <g>${lineMarkup}</g>
+  <g>${nodeMarkup}</g>
+</svg>`;
+    const currentRoomCenter = currentNodeId && nodePixels.get(currentNodeId)
+      ? {
+          x: Math.round(nodePixels.get(currentNodeId).x),
+          y: Math.round(nodePixels.get(currentNodeId).y),
+        }
+      : null;
+    const defaultCenter = { x: Math.round(width / 2), y: Math.round(height / 2) };
+    const imageSrc = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+
+    return {
+      svg,
+      imageSrc,
+      hotspots,
+      baseWidth: width,
+      baseHeight: height,
+      width,
+      height,
+      title: model.title,
+      subtitle: model.subtitle,
+      parentScope: model.parentScope,
+      accessibleLabel: model.accessibleLabel,
+      currentRoomCenterBase: currentRoomCenter,
+      defaultCenterBase: defaultCenter,
+      currentRoomCenter,
+      defaultCenter,
+    };
+  }
+
+  function computeExplorationMapPositions(nodeIds, directionalEdges, currentNodeId, orderMap, pinnedPositions = {}) {
+    const adjacency = new Map(nodeIds.map((nodeId) => [nodeId, []]));
+    for (const edge of directionalEdges) {
+      const direction = edge.links?.[0]?.direction || "";
+      const reverse = oppositeDirection(direction) || direction;
+      adjacency.get(edge.from)?.push({ to: edge.to, direction });
+      adjacency.get(edge.to)?.push({ to: edge.from, direction: reverse });
+    }
+
+    for (const [nodeId, neighbors] of adjacency.entries()) {
+      neighbors.sort((left, right) => {
+        const leftIndex = orderMap.get(left.to);
+        const rightIndex = orderMap.get(right.to);
+        if (leftIndex !== rightIndex) return (leftIndex ?? Number.MAX_SAFE_INTEGER) - (rightIndex ?? Number.MAX_SAFE_INTEGER);
+        return left.to.localeCompare(right.to);
+      });
+      adjacency.set(nodeId, neighbors);
+    }
+
+    const positions = new Map();
+    const lockedRoots = new Set(Object.keys(pinnedPositions).filter((nodeId) => nodeIds.includes(nodeId)));
+    const componentAnchors = new Map([...lockedRoots].map((nodeId) => [nodeId, { ...pinnedPositions[nodeId] }]));
+    for (const nodeId of lockedRoots) positions.set(nodeId, { ...pinnedPositions[nodeId] });
+
+    const components = [];
+    const seen = new Set();
+    const preferredRoots = [currentNodeId, ...nodeIds.filter((nodeId) => nodeId !== currentNodeId)];
+    for (const root of preferredRoots) {
+      if (!root || seen.has(root)) continue;
+      const stack = [root];
+      const component = [];
+      seen.add(root);
+      while (stack.length) {
+        const nodeId = stack.pop();
+        component.push(nodeId);
+        for (const neighbor of adjacency.get(nodeId) || []) {
+          if (seen.has(neighbor.to)) continue;
+          seen.add(neighbor.to);
+          stack.push(neighbor.to);
+        }
+      }
+      components.push(component);
+    }
+
+    const offsets = [
+      { x: 0, y: 0 },
+      { x: 8, y: 0 },
+      { x: -8, y: 0 },
+      { x: 0, y: 7 },
+      { x: 0, y: -7 },
+      { x: 8, y: 7 },
+      { x: -8, y: 7 },
+      { x: 8, y: -7 },
+      { x: -8, y: -7 },
+    ];
+
+    components.forEach((component, index) => {
+      const root = component.find((nodeId) => lockedRoots.has(nodeId)) || currentNodeId || component[0];
+      const anchor = componentAnchors.get(root) || offsets[index] || { x: index * 8, y: 0 };
+      componentAnchors.set(root, anchor);
+      if (!positions.has(root)) positions.set(root, { ...anchor });
+      lockedRoots.add(root);
+      const queue = [root];
+      while (queue.length) {
+        const nodeId = queue.shift();
+        const base = positions.get(nodeId) || anchor;
+        for (const neighbor of adjacency.get(nodeId) || []) {
+          if (positions.has(neighbor.to)) continue;
+          const vector = mapDirectionVector(neighbor.direction);
+          positions.set(neighbor.to, {
+            x: base.x + (vector.x * 1.6),
+            y: base.y + (vector.y * 1.45),
+          });
+          queue.push(neighbor.to);
+        }
+      }
+    });
+
+    for (const nodeId of nodeIds) {
+      if (!positions.has(nodeId)) positions.set(nodeId, offsets[0]);
+    }
+
+    for (let iteration = 0; iteration < 140; iteration += 1) {
+      const deltas = new Map(nodeIds.map((nodeId) => [nodeId, { x: 0, y: 0 }]));
+
+      for (const edge of directionalEdges) {
+        const direction = edge.links?.[0]?.direction || "";
+        const vector = mapDirectionVector(direction);
+        const from = positions.get(edge.from) || { x: 0, y: 0 };
+        const to = positions.get(edge.to) || { x: 0, y: 0 };
+        const targetX = from.x + (vector.x * 1.8);
+        const targetY = from.y + (vector.y * 1.55);
+        const errorX = targetX - to.x;
+        const errorY = targetY - to.y;
+        if (!lockedRoots.has(edge.to)) {
+          deltas.get(edge.to).x += errorX * 0.14;
+          deltas.get(edge.to).y += errorY * 0.14;
+        }
+        if (!lockedRoots.has(edge.from)) {
+          deltas.get(edge.from).x -= errorX * 0.08;
+          deltas.get(edge.from).y -= errorY * 0.08;
+        }
+      }
+
+      for (let index = 0; index < nodeIds.length; index += 1) {
+        for (let other = index + 1; other < nodeIds.length; other += 1) {
+          const leftId = nodeIds[index];
+          const rightId = nodeIds[other];
+          const left = positions.get(leftId) || { x: 0, y: 0 };
+          const right = positions.get(rightId) || { x: 0, y: 0 };
+          let dx = right.x - left.x;
+          let dy = right.y - left.y;
+          let distanceSquared = (dx * dx) + (dy * dy);
+          if (distanceSquared === 0) {
+            dx = 0.01;
+            dy = 0.01;
+            distanceSquared = 0.0002;
+          }
+          if (distanceSquared > 5.8) continue;
+          const distance = Math.sqrt(distanceSquared);
+          const force = (2.45 - Math.min(distance, 2.45)) * 0.055;
+          const pushX = (dx / distance) * force;
+          const pushY = (dy / distance) * force;
+          if (!lockedRoots.has(leftId)) {
+            deltas.get(leftId).x -= pushX;
+            deltas.get(leftId).y -= pushY;
+          }
+          if (!lockedRoots.has(rightId)) {
+            deltas.get(rightId).x += pushX;
+            deltas.get(rightId).y += pushY;
+          }
+        }
+      }
+
+      for (const nodeId of nodeIds) {
+        const point = positions.get(nodeId) || { x: 0, y: 0 };
+        if (lockedRoots.has(nodeId)) {
+          const anchor = pinnedPositions[nodeId] || componentAnchors.get(nodeId);
+          positions.set(nodeId, anchor ? { ...anchor } : point);
+          continue;
+        }
+        const delta = deltas.get(nodeId) || { x: 0, y: 0 };
+        positions.set(nodeId, {
+          x: point.x + Math.max(-0.42, Math.min(0.42, delta.x)),
+          y: point.y + Math.max(-0.42, Math.min(0.42, delta.y)),
+        });
+      }
+    }
+
+    for (const [nodeId, point] of Object.entries(pinnedPositions)) {
+      if (!nodeIds.includes(nodeId)) continue;
+      positions.set(nodeId, { ...point });
+    }
+
+    return alignExplorationMapPositions(positions, nodeIds);
+  }
+
+  function alignExplorationMapPositions(positions, nodeIds) {
+    const aligned = new Map();
+    for (const nodeId of nodeIds) {
+      const point = positions.get(nodeId);
+      if (!point) continue;
+      aligned.set(nodeId, { x: point.x, y: point.y });
+    }
+    snapMapAxis(aligned, nodeIds, "x", 0.14);
+    snapMapAxis(aligned, nodeIds, "y", 0.14);
+    return aligned;
+  }
+
+  function snapMapAxis(positions, nodeIds, axis = "x", threshold = 0.14) {
+    const values = nodeIds
+      .map((nodeId) => positions.get(nodeId)?.[axis])
+      .filter((value) => Number.isFinite(value))
+      .sort((left, right) => left - right);
+    if (!values.length) return;
+
+    const groups = [];
+    let currentGroup = [values[0]];
+    for (let index = 1; index < values.length; index += 1) {
+      const value = values[index];
+      if (Math.abs(value - currentGroup[currentGroup.length - 1]) <= threshold) {
+        currentGroup.push(value);
+        continue;
+      }
+      groups.push(currentGroup);
+      currentGroup = [value];
+    }
+    groups.push(currentGroup);
+
+    const representatives = groups
+      .filter((group) => group.length > 1)
+      .map((group) => roundMapCoordinate(group.reduce((sum, value) => sum + value, 0) / group.length));
+    if (!representatives.length) return;
+
+    for (const nodeId of nodeIds) {
+      const point = positions.get(nodeId);
+      if (!point || !Number.isFinite(point[axis])) continue;
+      const snapped = representatives.find((value) => Math.abs(point[axis] - value) <= threshold);
+      if (snapped == null) continue;
+      point[axis] = snapped;
+    }
+  }
+
+  function roundMapCoordinate(value) {
+    return Math.round(value * 20) / 20;
+  }
+
+  function mapBoxAnchorPoint(center, direction = "", boxSize = 96, target = null) {
+    const half = boxSize / 2;
+    const normalized = compassDirectionKey(direction) || normalize(direction);
+    const diagonalInset = Math.max(3, Math.min(half * 0.12, 6));
+    const diagonalVerticalNudge = Math.max(1, Math.min(half * 0.05, 2.5));
+    const anchored = {
+      north: { x: center.x, y: center.y - half },
+      "north east": { x: center.x + half - diagonalInset, y: center.y - half + diagonalVerticalNudge },
+      east: { x: center.x + half, y: center.y },
+      "south east": { x: center.x + half - diagonalInset, y: center.y + half - diagonalVerticalNudge },
+      south: { x: center.x, y: center.y + half },
+      "south west": { x: center.x - half + diagonalInset, y: center.y + half - diagonalVerticalNudge },
+      west: { x: center.x - half, y: center.y },
+      "north west": { x: center.x - half + diagonalInset, y: center.y - half + diagonalVerticalNudge },
+      up: { x: center.x, y: center.y - half },
+      down: { x: center.x, y: center.y + half },
+      inside: { x: center.x, y: center.y - half },
+      outside: { x: center.x, y: center.y + half },
+      forward: { x: center.x + half, y: center.y },
+      back: { x: center.x - half, y: center.y },
+    }[normalized];
+    if (anchored) return anchored;
+    if (!target) return { x: center.x, y: center.y };
+    const dx = target.x - center.x;
+    const dy = target.y - center.y;
+    if (!dx && !dy) return { x: center.x, y: center.y };
+    const scale = half / Math.max(Math.abs(dx), Math.abs(dy), 1);
+    return {
+      x: center.x + (dx * scale),
+      y: center.y + (dy * scale),
+    };
+  }
+
+  function resolveMapEdgeDirection(links, fromId, toId, fromPoint, toPoint) {
+    const candidates = (links || []).filter((link) => link.from === fromId && link.to === toId);
+    if (!candidates.length) {
+      const reverse = (links || []).find((link) => link.from === toId && link.to === fromId);
+      return reverse ? (oppositeDirection(reverse.direction) || reverse.direction) : "";
+    }
+    if (candidates.length === 1 || !fromPoint || !toPoint) return candidates[0].direction || "";
+
+    const dx = toPoint.x - fromPoint.x;
+    const dy = toPoint.y - fromPoint.y;
+    let bestDirection = candidates[0].direction || "";
+    let bestScore = Number.NEGATIVE_INFINITY;
+    for (const candidate of candidates) {
+      const vector = mapDirectionVector(candidate.direction);
+      const magnitude = Math.hypot(vector.x, vector.y) || 1;
+      const score = ((dx * vector.x) + (dy * vector.y)) / magnitude;
+      if (score > bestScore) {
+        bestScore = score;
+        bestDirection = candidate.direction || "";
+      }
+    }
+    return bestDirection;
+  }
+
+  function buildMapConnectorMarkup(fromAnchor, toAnchor, directions = {}, options = {}) {
+    const stroke = options.stroke || "#7f6641";
+    const strokeWidth = Number(options.strokeWidth) || 4.4;
+    const points = buildMapConnectorPoints(fromAnchor, toAnchor, directions, options.boxSize || 96);
+    const connectorMarkup = points.length <= 2
+      ? `<line x1="${points[0].x.toFixed(1)}" y1="${points[0].y.toFixed(1)}" x2="${points[1].x.toFixed(1)}" y2="${points[1].y.toFixed(1)}" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round" />`
+      : `<polyline points="${points.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ")}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" />`;
+    const arrowMarkup = options.twoWay ? "" : buildMapConnectorArrowMarkup(points, { stroke, strokeWidth });
+    const levelBadge = buildMapLevelConnectorBadge(fromAnchor, toAnchor, directions, options);
+    return `<g>${connectorMarkup}${arrowMarkup}${levelBadge}</g>`;
+  }
+
+  function buildMapConnectorArrowMarkup(points = [], options = {}) {
+    if (!Array.isArray(points) || points.length < 2) return "";
+    const end = points[points.length - 1];
+    let previous = null;
+    for (let index = points.length - 2; index >= 0; index -= 1) {
+      const candidate = points[index];
+      if (Math.abs(candidate.x - end.x) >= 0.1 || Math.abs(candidate.y - end.y) >= 0.1) {
+        previous = candidate;
+        break;
+      }
+    }
+    if (!previous) return "";
+    const dx = end.x - previous.x;
+    const dy = end.y - previous.y;
+    const magnitude = Math.hypot(dx, dy);
+    if (magnitude < 0.1) return "";
+    const unitX = dx / magnitude;
+    const unitY = dy / magnitude;
+    const stroke = options.stroke || "#7f6641";
+    const strokeWidth = Number(options.strokeWidth) || 4.4;
+    const arrowLength = Math.max(13, strokeWidth * 2.8);
+    const arrowWidth = Math.max(4.8, strokeWidth * 1.05);
+    const tipX = end.x;
+    const tipY = end.y;
+    const baseX = tipX - (unitX * arrowLength);
+    const baseY = tipY - (unitY * arrowLength);
+    const perpX = -unitY;
+    const perpY = unitX;
+    const leftX = baseX + (perpX * arrowWidth);
+    const leftY = baseY + (perpY * arrowWidth);
+    const rightX = baseX - (perpX * arrowWidth);
+    const rightY = baseY - (perpY * arrowWidth);
+    return `<polygon points="${leftX.toFixed(1)},${leftY.toFixed(1)} ${tipX.toFixed(1)},${tipY.toFixed(1)} ${rightX.toFixed(1)},${rightY.toFixed(1)}" fill="${stroke}" />`;
+  }
+
+  function buildMapLevelConnectorBadge(fromAnchor, toAnchor, directions = {}, options = {}) {
+    const fromLevel = isMapLevelDirection(directions.fromDirection);
+    const toLevel = isMapLevelDirection(directions.toDirection);
+    if (!fromLevel && !toLevel) return "";
+    const label = options.twoWay ? "U/D" : (normalize(directions.fromDirection) === "down" ? "D" : "U");
+    const centerX = (fromAnchor.x + toAnchor.x) / 2;
+    const centerY = (fromAnchor.y + toAnchor.y) / 2;
+    return `<g transform="translate(${centerX.toFixed(1)} ${centerY.toFixed(1)})">
+      <rect x="-16" y="-11.5" width="32" height="19" rx="7" fill="#efe3c6" stroke="#8c7550" stroke-width="1.5" />
+      <text x="0" y="3.6" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="10.5" font-weight="700" fill="#5b4522">${label}</text>
+    </g>`;
+  }
+
+  function isMapLevelDirection(direction = "") {
+    const normalized = compassDirectionKey(direction) || normalize(direction);
+    return normalized === "up" || normalized === "down";
+  }
+
+  function buildMapConnectorPoints(fromAnchor, toAnchor, directions = {}, boxSize = 96) {
+    const dx = toAnchor.x - fromAnchor.x;
+    const dy = toAnchor.y - fromAnchor.y;
+    if (Math.abs(dx) < 0.5 || Math.abs(dy) < 0.5) return [fromAnchor, toAnchor];
+
+    const fromDirection = compassDirectionKey(directions.fromDirection) || normalize(directions.fromDirection);
+    const toDirection = compassDirectionKey(directions.toDirection) || normalize(directions.toDirection);
+    const fromHorizontal = ["east", "west", "forward", "back"].includes(fromDirection);
+    const fromVertical = ["north", "south", "up", "down", "inside", "outside"].includes(fromDirection);
+    const fromLevel = isMapLevelDirection(fromDirection);
+    const toLevel = isMapLevelDirection(toDirection);
+    const fromDiagonal = ["north east", "north west", "south east", "south west"].includes(fromDirection);
+    const toDiagonal = ["north east", "north west", "south east", "south west"].includes(toDirection);
+    const useBentSegment = fromDiagonal || toDiagonal || fromLevel || toLevel || (Math.abs(dx) > boxSize * 0.7 && Math.abs(dy) > boxSize * 0.7);
+    if (!useBentSegment) return [fromAnchor, toAnchor];
+
+    if (fromLevel || toLevel) {
+      const levelLead = Math.max(18, Math.min(boxSize * 0.42, (Math.abs(dy) * 0.24) + 8));
+      return compactMapConnectorPoints([
+        fromAnchor,
+        ...(fromLevel ? [{ x: fromAnchor.x, y: fromAnchor.y + (Math.sign(dy) * levelLead) }] : []),
+        ...(toLevel ? [{ x: toAnchor.x, y: toAnchor.y - (Math.sign(dy) * levelLead) }] : []),
+        toAnchor,
+      ]);
+    }
+
+    const lead = Math.max(18, Math.min(boxSize * 0.42, Math.min(Math.abs(dx), Math.abs(dy)) * 0.34));
+    const diagonalLead = Math.max(12, Math.min(boxSize * 0.26, Math.min(Math.abs(dx), Math.abs(dy)) * 0.22));
+    const fromDiagonalPoint = fromDiagonal
+      ? {
+          x: fromAnchor.x + (Math.sign(dx) * diagonalLead),
+          y: fromAnchor.y + (Math.sign(dy) * diagonalLead),
+        }
+      : null;
+    const toDiagonalPoint = toDiagonal
+      ? {
+          x: toAnchor.x - (Math.sign(dx) * diagonalLead),
+          y: toAnchor.y - (Math.sign(dy) * diagonalLead),
+        }
+      : null;
+    if (fromDiagonalPoint || toDiagonalPoint) {
+      return compactMapConnectorPoints([
+        fromAnchor,
+        ...(fromDiagonalPoint ? [fromDiagonalPoint] : []),
+        ...(toDiagonalPoint ? [toDiagonalPoint] : []),
+        toAnchor,
+      ]);
+    }
+    const startHorizontal = fromHorizontal || (!fromVertical && !fromDiagonal && Math.abs(dx) >= Math.abs(dy));
+
+    if (startHorizontal) {
+      return compactMapConnectorPoints([
+        fromAnchor,
+        { x: fromAnchor.x + (Math.sign(dx) * lead), y: fromAnchor.y },
+        toAnchor,
+      ]);
+    }
+
+    if (fromVertical) {
+      return compactMapConnectorPoints([
+        fromAnchor,
+        { x: fromAnchor.x, y: fromAnchor.y + (Math.sign(dy) * lead) },
+        toAnchor,
+      ]);
+    }
+
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      return compactMapConnectorPoints([
+        fromAnchor,
+        { x: toAnchor.x - (Math.sign(dx) * lead), y: toAnchor.y },
+        toAnchor,
+      ]);
+    }
+
+    return compactMapConnectorPoints([
+      fromAnchor,
+      { x: toAnchor.x, y: toAnchor.y - (Math.sign(dy) * lead) },
+      toAnchor,
+    ]);
+  }
+
+  function compactMapConnectorPoints(points = []) {
+    const compact = [];
+    for (const point of points) {
+      const rounded = {
+        x: Math.round(point.x * 10) / 10,
+        y: Math.round(point.y * 10) / 10,
+      };
+      const previous = compact[compact.length - 1];
+      if (previous && Math.abs(previous.x - rounded.x) < 0.1 && Math.abs(previous.y - rounded.y) < 0.1) continue;
+      compact.push(rounded);
+    }
+    if (compact.length <= 2) return compact;
+
+    const pruned = [compact[0]];
+    for (let index = 1; index < compact.length - 1; index += 1) {
+      const prev = pruned[pruned.length - 1];
+      const current = compact[index];
+      const next = compact[index + 1];
+      const sameX = Math.abs(prev.x - current.x) < 0.1 && Math.abs(current.x - next.x) < 0.1;
+      const sameY = Math.abs(prev.y - current.y) < 0.1 && Math.abs(current.y - next.y) < 0.1;
+      if (sameX || sameY) continue;
+      pruned.push(current);
+    }
+    pruned.push(compact[compact.length - 1]);
+    return pruned;
+  }
+
+  function mapDirectionVector(direction = "") {
+    const normalized = compassDirectionKey(direction) || normalize(direction);
+    return {
+      north: { x: 0, y: -1 },
+      "north east": { x: 1, y: -1 },
+      east: { x: 1, y: 0 },
+      "south east": { x: 1, y: 1 },
+      south: { x: 0, y: 1 },
+      "south west": { x: -1, y: 1 },
+      west: { x: -1, y: 0 },
+      "north west": { x: -1, y: -1 },
+      up: { x: 0, y: -1.25 },
+      down: { x: 0, y: 1.25 },
+      inside: { x: 0, y: -1 },
+      outside: { x: 0, y: 1 },
+      forward: { x: 1, y: 0 },
+      back: { x: -1, y: 0 },
+    }[normalized] || { x: 1, y: 0 };
+  }
+
+  function oppositeDirection(direction = "") {
+    const normalized = compassDirectionKey(direction) || normalize(direction);
+    return {
+      north: "south",
+      "north east": "south west",
+      east: "west",
+      "south east": "north west",
+      south: "north",
+      "south west": "north east",
+      west: "east",
+      "north west": "south east",
+      up: "down",
+      down: "up",
+      inside: "outside",
+      outside: "inside",
+      forward: "back",
+      back: "forward",
+    }[normalized] || "";
+  }
+
+  function wrapMapLabel(text = "", maxChars = 12, maxLines = 3) {
+    const softLimit = Math.max(4, maxChars - 1);
+    const words = String(text || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .split(" ")
+      .filter(Boolean)
+      .flatMap((word) => splitLongMapWord(word, softLimit));
+    if (!words.length) return ["Unknown"];
+    const lines = [];
+    let current = "";
+    for (const word of words) {
+      const proposal = current ? `${current} ${word}` : word;
+      if (proposal.length <= softLimit || !current) {
+        current = proposal;
+        continue;
+      }
+      lines.push(current);
+      current = word;
+    }
+    if (current) lines.push(current);
+    const trimmed = lines.slice(0, maxLines);
+    if (lines.length > maxLines) {
+      trimmed[maxLines - 1] = ellipsize(trimmed[maxLines - 1], maxChars);
+    }
+    return trimmed;
+  }
+
+  function splitLongMapWord(word = "", limit = 12) {
+    const value = String(word || "").trim();
+    if (!value) return [];
+    if (value.length <= limit) return [value];
+    const parts = [];
+    let index = 0;
+    while (index < value.length) {
+      parts.push(value.slice(index, index + limit));
+      index += limit;
+    }
+    return parts;
+  }
+
+  function ellipsize(text = "", limit = 12) {
+    const value = String(text || "");
+    if (value.length <= limit) return value;
+    if (limit <= 1) return value.slice(0, limit);
+    return `${value.slice(0, limit - 1)}…`;
+  }
+
+  function escapeXml(text = "") {
+    return String(text)
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   }
 
   function compassDirectionKey(direction) {

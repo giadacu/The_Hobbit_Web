@@ -8,8 +8,13 @@ function makeElement(id = "") {
     id,
     value: "",
     textContent: "",
+    innerHTML: "",
     className: "",
     children: [],
+    disabled: false,
+    hidden: false,
+    scrollLeft: 0,
+    scrollTop: 0,
     style: {
       setProperty() {},
       removeProperty() {},
@@ -34,9 +39,12 @@ function makeElement(id = "") {
     closest() { return makeElement("scene"); },
     contains() { return false; },
     getBoundingClientRect() { return { width: 800, height: 500 }; },
+    get clientWidth() { return 800; },
+    get clientHeight() { return 500; },
     play() { return Promise.resolve(); },
     pause() {},
     load() {},
+    remove() {},
     get offsetHeight() { return 1; },
     set src(value) { this.attributes.src = value; },
     get src() { return this.attributes.src || ""; },
@@ -55,6 +63,14 @@ function bootGame() {
     "image-reveal-outline",
     "image-reveal-fill",
     "scene-map-overlay",
+    "scene-map-back",
+    "scene-map-title",
+    "scene-map-subtitle",
+    "scene-map-zoom-out",
+    "scene-map-zoom-reset",
+    "scene-map-zoom-in",
+    "scene-map-scroll",
+    "scene-map-canvas",
     "scene-map-image",
     "scene-compass",
     "scene-compass-rose",
@@ -71,12 +87,20 @@ function bootGame() {
     "scene-compass-down",
     "music-player",
     "inventory-list",
+    "inventory-status",
     "exits-list",
     "people-list",
     "layout-switch",
     "layout-divider",
     "layout-mode-1",
     "layout-mode-2",
+    "save-panel",
+    "save-panel-backdrop",
+    "save-panel-close",
+    "save-panel-title",
+    "save-panel-latest-autosave",
+    "save-panel-autosave-list",
+    "mobile-scene-handle",
   ]) {
     elements.set(id, makeElement(id));
   }
@@ -3086,21 +3110,99 @@ const gameCases = [
     name: "map command shows the game map overlay",
     drive(game) {
       const overlay = document.getElementById("scene-map-overlay");
+      const canvas = document.getElementById("scene-map-canvas");
       const image = document.getElementById("scene-map-image");
       game.execute("map");
       const visible = Object.prototype.hasOwnProperty.call(overlay.attributes, "hidden") ? "no" : "yes";
       const src = image.getAttribute("src") || "";
       game.print(`Map overlay visible: ${visible}`);
-      game.print(`Map image loaded: ${src.includes("map.jpeg") ? "yes" : "no"}`);
+      game.print(`Map image loaded: ${src.startsWith("data:image/svg+xml") ? "yes" : "no"}`);
+      game.print(`Map has clickable regions: ${canvas.innerHTML.includes("data-map-open-region") ? "yes" : "no"}`);
       game.execute("exits");
       const hiddenAfter = Object.prototype.hasOwnProperty.call(overlay.attributes, "hidden") ? "yes" : "no";
       game.print(`Map overlay hidden after exits: ${hiddenAfter}`);
     },
     expectedIncluded: [
-      "You study the map of Wilderland.",
+      "You study the paths already traced across Wilderland.",
       "Map overlay visible: yes",
       "Map image loaded: yes",
+      "Map has clickable regions: yes",
       "Map overlay hidden after exits: yes",
+    ],
+  },
+  {
+    name: "map supports zoom and local region drilldown",
+    drive(game) {
+      const title = document.getElementById("scene-map-title");
+      const subtitle = document.getElementById("scene-map-subtitle");
+      const zoomReset = document.getElementById("scene-map-zoom-reset");
+      const backButton = document.getElementById("scene-map-back");
+      const canvas = document.getElementById("scene-map-canvas");
+      const image = document.getElementById("scene-map-image");
+      game.execute("jump beorn");
+      game.execute("map");
+      const beforeZoomSrc = image.getAttribute("src") || "";
+      const decodedMapImage = decodeURIComponent(beforeZoomSrc);
+      game.print(`World map has green dragon region: ${canvas.innerHTML.includes('data-map-open-region="green_dragon"') ? "yes" : "no"}`);
+      game.print(`World map has beorn region: ${canvas.innerHTML.includes('data-map-open-region="beorn"') ? "yes" : "no"}`);
+      game.print(`World map has tunnel access: ${canvas.innerHTML.includes('data-map-open-region="goblin_tunnels"') ? "yes" : "no"}`);
+      game.print(`World map shows Dry Cave: ${decodedMapImage.includes("Dry Cave") ? "yes" : "no"}`);
+      game.print(`World map shows tunnel portal label: ${decodedMapImage.includes("Goblin Tunnels") ? "yes" : "no"}`);
+      game.print(`World map hides tunnel internals: ${decodedMapImage.includes("Deep Dark Lake") || decodedMapImage.includes("Tunnel 14") ? "no" : "yes"}`);
+      game.layout.adjustSceneMapZoom(0.4);
+      game.print(`Zoom label after zoom in: ${zoomReset.textContent}`);
+      game.print(`Map image reused after zoom: ${(image.getAttribute("src") || "") === beforeZoomSrc ? "yes" : "no"}`);
+      game.layout.openSceneMapScope("goblin_tunnels");
+      const tunnelMapImage = decodeURIComponent(image.getAttribute("src") || "");
+      game.print(`Local map title: ${title.textContent}`);
+      game.print(`Local map subtitle: ${subtitle.textContent}`);
+      game.print(`Tunnel map shows Deep Dark Lake: ${tunnelMapImage.includes("Deep") && tunnelMapImage.includes("Dark") && tunnelMapImage.includes("Lake") ? "yes" : "no"}`);
+      game.print(`Tunnel map shows a tunnel node: ${tunnelMapImage.includes("Tunnel 14") ? "yes" : "no"}`);
+      game.print(`Back visible in local map: ${backButton.hidden ? "no" : "yes"}`);
+      game.layout.sceneMapBack();
+      game.print(`World map title after back: ${title.textContent}`);
+      game.layout.resetSceneMapZoom();
+      game.print(`Zoom label after reset: ${zoomReset.textContent}`);
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "World map has green dragon region: yes",
+      "World map has beorn region: yes",
+      "World map has tunnel access: yes",
+      "World map shows Dry Cave: yes",
+      "World map shows tunnel portal label: yes",
+      "World map hides tunnel internals: yes",
+      "Zoom label after zoom in: 140%",
+      "Map image reused after zoom: yes",
+      "Local map title: Goblin Tunnels",
+      "Local map subtitle: Local map • use Back to return to the world overview",
+      "Tunnel map shows Deep Dark Lake: yes",
+      "Tunnel map shows a tunnel node: yes",
+      "Back visible in local map: yes",
+      "World map title after back: Explored Map",
+      "Zoom label after reset: 100%",
+    ],
+  },
+  {
+    name: "map zoom also responds to wheel and touchpad-style pinch events",
+    drive(game) {
+      const zoomReset = document.getElementById("scene-map-zoom-reset");
+      let prevented = false;
+      game.execute("map");
+      game.layout.handleSceneMapWheel({
+        deltaY: -120,
+        ctrlKey: true,
+        clientX: 280,
+        clientY: 220,
+        preventDefault() { prevented = true; },
+      });
+      game.print(`Wheel zoom label: ${zoomReset.textContent}`);
+      game.print(`Wheel zoom prevented default: ${prevented ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "Wheel zoom label: 110%",
+      "Wheel zoom prevented default: yes",
     ],
   },
   {
@@ -3411,6 +3513,12 @@ const gameCases = [
       game.print(`Has ring: ${game.findInInventory("golden ring") ? "yes" : "no"}`);
       game.print(`Beorn here: ${game.characters.beorn?.position === game.currentRoom ? "yes" : "no"}`);
       game.print(`Strength at Beorn: ${game.player.strength}`);
+      game.print(`Visited Green Dragon Inn: ${game.visitedRooms.has("green_dragon_inn") ? "yes" : "no"}`);
+      game.print(`Visited Hidden Path: ${game.visitedRooms.has("hidden_path") ? "yes" : "no"}`);
+      game.print(`Visited Trolls Cave: ${game.visitedRooms.has("trolls_cave") ? "yes" : "no"}`);
+      game.print(`Visited Dry Cave: ${game.visitedRooms.has("large_dry_cave") ? "yes" : "no"}`);
+      game.print(`Visited Deep Dark Lake: ${game.visitedRooms.has("deep_dark_lake") ? "yes" : "no"}`);
+      game.print(`Visited Goblins Gate Outside: ${game.visitedRooms.has("outside_goblins_gate") ? "yes" : "no"}`);
       game.print(`Autoplay next at Beorn: ${game.nextAutoplayCommand()}`);
     },
     expectedIncluded: [
@@ -3419,6 +3527,12 @@ const gameCases = [
       "Has ring: yes",
       "Beorn here: yes",
       "Strength at Beorn: 5",
+      "Visited Green Dragon Inn: yes",
+      "Visited Hidden Path: yes",
+      "Visited Trolls Cave: yes",
+      "Visited Dry Cave: yes",
+      "Visited Deep Dark Lake: yes",
+      "Visited Goblins Gate Outside: yes",
       "Autoplay next at Beorn: open curtain",
     ],
   },
@@ -3875,6 +3989,23 @@ const gameCases = [
       "Turn delta while typing: 0",
     ],
     notExpectedIncluded: [
+      "You wait.",
+    ],
+  },
+  {
+    name: "idle advance is suspended while the map is open",
+    drive(game) {
+      game.execute("map");
+      const beforeTurn = game.turnCount;
+      game.executeIdleWait();
+      game.print(`Turn delta while map open: ${game.turnCount - beforeTurn}`);
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "Turn delta while map open: 0",
+    ],
+    notExpectedIncluded: [
+      "Time passes...",
       "You wait.",
     ],
   },
