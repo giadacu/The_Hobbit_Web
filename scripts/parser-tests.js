@@ -3143,11 +3143,16 @@ const gameCases = [
       game.execute("map");
       const beforeZoomSrc = image.getAttribute("src") || "";
       const decodedMapImage = decodeURIComponent(beforeZoomSrc);
-      game.print(`World map has green dragon region: ${canvas.innerHTML.includes('data-map-open-region="green_dragon"') ? "yes" : "no"}`);
+      game.print(`World map has green dragon drilldown: ${canvas.innerHTML.includes('data-map-open-region="green_dragon"') ? "yes" : "no"}`);
+      game.print(`World map shows Green Dragon outside node: ${decodedMapImage.includes('data-node-label=\"outside the Green Dragon Inn\"') ? "yes" : "no"}`);
+      game.print(`World map shows Green Dragon inn node: ${decodedMapImage.includes('data-node-label=\"Green Dragon Inn\"') ? "yes" : "no"}`);
       game.print(`World map has beorn region: ${canvas.innerHTML.includes('data-map-open-region="beorn"') ? "yes" : "no"}`);
+      game.print(`World map has rivendell region: ${canvas.innerHTML.includes('data-map-open-region="rivendell"') ? "yes" : "no"}`);
       game.print(`World map has tunnel access: ${canvas.innerHTML.includes('data-map-open-region="goblin_tunnels"') ? "yes" : "no"}`);
+      game.print(`World map shows Hidden Valley Path node: ${decodedMapImage.includes('data-node-label=\"Hidden Valley Path\"') ? "yes" : "no"}`);
       game.print(`World map shows Dry Cave: ${decodedMapImage.includes("Dry Cave") ? "yes" : "no"}`);
-      game.print(`World map shows tunnel portal label: ${decodedMapImage.includes("Goblin Tunnels") ? "yes" : "no"}`);
+      game.print(`World map shows Goblin Tunnels node: ${decodedMapImage.includes('data-node-label=\"Goblin Tunnels\"') ? "yes" : "no"}`);
+      game.print(`World map shows Goblin Tunnels connector badge: ${decodedMapImage.includes(">U/D<") ? "yes" : "no"}`);
       game.print(`World map hides tunnel internals: ${decodedMapImage.includes("Deep Dark Lake") || decodedMapImage.includes("Tunnel 14") ? "no" : "yes"}`);
       game.layout.adjustSceneMapZoom(0.4);
       game.print(`Zoom label after zoom in: ${zoomReset.textContent}`);
@@ -3166,13 +3171,18 @@ const gameCases = [
     },
     expectedIncluded: [
       "You study the paths already traced across Wilderland.",
-      "World map has green dragon region: yes",
+      "World map has green dragon drilldown: no",
+      "World map shows Green Dragon outside node: yes",
+      "World map shows Green Dragon inn node: yes",
       "World map has beorn region: yes",
+      "World map has rivendell region: yes",
       "World map has tunnel access: yes",
+      "World map shows Hidden Valley Path node: yes",
       "World map shows Dry Cave: yes",
-      "World map shows tunnel portal label: yes",
+      "World map shows Goblin Tunnels node: yes",
+      "World map shows Goblin Tunnels connector badge: yes",
       "World map hides tunnel internals: yes",
-      "Zoom label after zoom in: 140%",
+      "Zoom label after zoom in: 100%",
       "Map image reused after zoom: yes",
       "Local map title: Goblin Tunnels",
       "Local map subtitle: Local map • use Back to return to the world overview",
@@ -3180,7 +3190,7 @@ const gameCases = [
       "Tunnel map shows a tunnel node: yes",
       "Back visible in local map: yes",
       "World map title after back: Explored Map",
-      "Zoom label after reset: 100%",
+      "Zoom label after reset: 60%",
     ],
   },
   {
@@ -3201,8 +3211,88 @@ const gameCases = [
     },
     expectedIncluded: [
       "You study the paths already traced across Wilderland.",
-      "Wheel zoom label: 110%",
+      "Wheel zoom label: 70%",
       "Wheel zoom prevented default: yes",
+    ],
+  },
+  {
+    name: "map supports nested local drilldown from cellar to long lake",
+    drive(game) {
+      const title = document.getElementById("scene-map-title");
+      const subtitle = document.getElementById("scene-map-subtitle");
+      const backButton = document.getElementById("scene-map-back");
+      const canvas = document.getElementById("scene-map-canvas");
+      const image = document.getElementById("scene-map-image");
+      game.execute("jump smaug");
+      game.execute("map");
+      const worldMapImage = decodeURIComponent(image.getAttribute("src") || "");
+      game.print(`World map has elven halls region: ${canvas.innerHTML.includes('data-map-open-region="elven_halls"') ? "yes" : "no"}`);
+      game.print(`World map has standalone Long Lake region: ${canvas.innerHTML.includes('data-map-open-region="long_lake"') ? "yes" : "no"}`);
+      game.print(`World map hides Bleak Barren Land detail: ${worldMapImage.includes("Bleak Barren Land") ? "no" : "yes"}`);
+      game.layout.openSceneMapScope("elven_halls");
+      const hallsMapImage = decodeURIComponent(image.getAttribute("src") || "");
+      game.print(`Elven halls title: ${title.textContent}`);
+      game.print(`Elven halls has long lake portal: ${canvas.innerHTML.includes('data-map-open-region="long_lake"') ? "yes" : "no"}`);
+      game.print(`Elven halls shows long lake portal label: ${hallsMapImage.includes("Long Lake") ? "yes" : "no"}`);
+      game.print(`Elven halls hides Wooden Town internals: ${hallsMapImage.includes("Wooden Town") ? "no" : "yes"}`);
+      game.layout.openSceneMapScope("long_lake");
+      const longLakeMapImage = decodeURIComponent(image.getAttribute("src") || "");
+      game.print(`Long Lake title: ${title.textContent}`);
+      game.print(`Long Lake subtitle: ${subtitle.textContent}`);
+      game.print(`Long Lake map shows Lower Halls: ${longLakeMapImage.includes("Lower Halls") ? "yes" : "no"}`);
+      game.print(`Back visible in nested local map: ${backButton.hidden ? "no" : "yes"}`);
+      game.layout.sceneMapBack();
+      game.print(`Title after one back: ${title.textContent}`);
+      game.layout.sceneMapBack();
+      game.print(`Title after second back: ${title.textContent}`);
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "World map has elven halls region: yes",
+      "World map has standalone Long Lake region: no",
+      "World map hides Bleak Barren Land detail: yes",
+      "Elven halls title: Elvenking's Halls",
+      "Elven halls has long lake portal: yes",
+      "Elven halls shows long lake portal label: yes",
+      "Elven halls hides Wooden Town internals: yes",
+      "Long Lake title: Long Lake",
+      "Long Lake subtitle: Local map • use Back to return to Elvenking's Halls",
+      "Long Lake map shows Lower Halls: yes",
+      "Back visible in nested local map: yes",
+      "Title after one back: Elvenking's Halls",
+      "Title after second back: Explored Map",
+    ],
+  },
+  {
+    name: "complete map shows every room without altering visited progress",
+    drive(game) {
+      const overlay = document.getElementById("scene-map-overlay");
+      const canvas = document.getElementById("scene-map-canvas");
+      const image = document.getElementById("scene-map-image");
+      const scroll = document.getElementById("scene-map-scroll");
+      const visitedBefore = game.visitedRooms.size;
+      game.execute("complete map");
+      const visible = Object.prototype.hasOwnProperty.call(overlay.attributes, "hidden") ? "no" : "yes";
+      const worldMapImage = decodeURIComponent(image.getAttribute("src") || "");
+      game.print(`Complete map overlay visible: ${visible}`);
+      game.print(`Complete map opens away from far left: ${Number(scroll.scrollLeft) > 0 ? "yes" : "no"}`);
+      game.print(`Complete map has Elven halls region: ${canvas.innerHTML.includes('data-map-open-region="elven_halls"') ? "yes" : "no"}`);
+      game.print(`Complete map world view hides Lower Halls detail: ${worldMapImage.includes("Lower Halls") ? "no" : "yes"}`);
+      game.layout.openSceneMapScope("long_lake");
+      const longLakeMapImage = decodeURIComponent(image.getAttribute("src") || "");
+      game.print(`Complete map long lake shows Lower Halls: ${longLakeMapImage.includes("Lower Halls") ? "yes" : "no"}`);
+      game.print(`Complete map long lake shows Front Gate: ${longLakeMapImage.includes("Front Gate") ? "yes" : "no"}`);
+      game.print(`Visited rooms unchanged: ${game.visitedRooms.size === visitedBefore ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You unfurl a complete test map of Wilderland, with every known place marked upon it.",
+      "Complete map overlay visible: yes",
+      "Complete map opens away from far left: yes",
+      "Complete map has Elven halls region: yes",
+      "Complete map world view hides Lower Halls detail: yes",
+      "Complete map long lake shows Lower Halls: yes",
+      "Complete map long lake shows Front Gate: yes",
+      "Visited rooms unchanged: yes",
     ],
   },
   {
@@ -3254,6 +3344,25 @@ const gameCases = [
       "Has pipe: yes",
       "Pony sequence started: no",
       "Autoplay next at inn: open weathered oak door",
+    ],
+  },
+  {
+    name: "green dragon outside and inside stay connected for relative travel",
+    drive(game) {
+      game.execute("jump green_dragon");
+      game.execute("go outside");
+      game.print(`Room after outside: ${game.currentRoom}`);
+      game.execute("go inside");
+      game.print(`Room after inside: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "Jumped to Green Dragon Inn.",
+      "Room after outside: green_dragon_inn_outside",
+      "Room after inside: green_dragon_inn",
+    ],
+    notExpectedIncluded: [
+      "You are already inside.",
+      "You can't go that way.",
     ],
   },
   {
@@ -3534,6 +3643,33 @@ const gameCases = [
       "Visited Deep Dark Lake: yes",
       "Visited Goblins Gate Outside: yes",
       "Autoplay next at Beorn: open curtain",
+    ],
+  },
+  {
+    name: "beorn and mirkwood connectors follow the manual-map structure",
+    drive(game) {
+      game.execute("jump beorn");
+      const beornExits = game.roomConnections().map((connection) => `${connection.direction}:${connection.to}`).sort().join(" | ");
+      game.print(`Beorn exits: ${beornExits}`);
+      game.execute("north");
+      const riverExits = game.roomConnections().map((connection) => `${connection.direction}:${connection.to}`).sort().join(" | ");
+      game.print(`Great River exits: ${riverExits}`);
+      game.execute("east");
+      game.print(`Gate room after river crossing: ${game.currentRoom}`);
+      game.execute("south");
+      game.print(`Forest approach room: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "Beorn exits: east:beorn_great_hall | north:great_river | south west:narrow_dangerous_path",
+      "Great River exits: east:gate_to_mirkwood | south:beorns_house",
+      "Gate room after river crossing: gate_to_mirkwood",
+      "Forest approach room: forest_road",
+    ],
+    notExpectedIncluded: [
+      "north east:gate_to_mirkwood",
+      "north west:gate_to_mirkwood",
+      "south:forest_road",
+      "south west:misty_mountain",
     ],
   },
   {

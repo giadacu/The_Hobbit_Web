@@ -13,7 +13,12 @@
   const SAVE_AUTOSAVE_PREFIX = `${SAVE_PREFIX}autosave:`;
   const MAX_AUTOSAVE_ENTRIES = 12;
   const LAYOUT_PREF_KEY = "hobbit-web-layout-mode";
+  const MAP_LAYOUT_OVERRIDE_KEY = "hobbit-web-map-layout-overrides";
+  const MAP_EDITOR_SNAP_PREF_KEY = "hobbit-web-map-editor-snap";
   const MOBILE_LAYOUT_MAX_WIDTH = 860;
+  const DEFAULT_SCENE_MAP_ZOOM = 0.6;
+  const MIN_SCENE_MAP_ZOOM = 0.4;
+  const MAX_SCENE_MAP_ZOOM = 1;
 
   const $ = (id) => document.getElementById(id);
   const output = $("output");
@@ -28,9 +33,16 @@
   const sceneMapBack = $("scene-map-back");
   const sceneMapTitle = $("scene-map-title");
   const sceneMapSubtitle = $("scene-map-subtitle");
+  const sceneMapEditInfo = $("scene-map-edit-info");
   const sceneMapZoomOut = $("scene-map-zoom-out");
   const sceneMapZoomReset = $("scene-map-zoom-reset");
   const sceneMapZoomIn = $("scene-map-zoom-in");
+  const sceneMapEditToggle = $("scene-map-edit-toggle");
+  const sceneMapEditSave = $("scene-map-edit-save");
+  const sceneMapEditCommit = $("scene-map-edit-commit");
+  const sceneMapEditSnap = $("scene-map-edit-snap");
+  const sceneMapEditCancel = $("scene-map-edit-cancel");
+  const sceneMapEditReset = $("scene-map-edit-reset");
   const sceneMapScroll = $("scene-map-scroll");
   const sceneMapCanvas = $("scene-map-canvas");
   const sceneMapImage = $("scene-map-image");
@@ -1407,6 +1419,7 @@
     ensureTwoWay("lane_beneath_hill", "east", "party_field", "west");
     ensureTwoWay("party_field", "east", "bywater_bridge", "west");
     ensureTwoWay("bywater_bridge", "east", "green_dragon_inn_outside", "west");
+    ensureTwoWay("green_dragon_inn_outside", "inside", "green_dragon_inn", "outside");
     ensureTwoWay("trolls_clearing", "south east", "trollshaws_road", "north west", 2);
     ensureTwoWay("trollshaws_road", "east", "hidden_valley_path", "west", 1);
     ensureTwoWay("hidden_valley_path", "east", "rivendell", "west", 1);
@@ -1449,6 +1462,15 @@
     ensureTwoWay("wooden_town", "south west", "laketown_bridges", "north east");
     ensureTwoWay("laketown_marketplace", "south", "laketown_warehouses", "north");
     ensureTwoWay("laketown_bridges", "south", "laketown_tavern", "north");
+    data.connections = data.connections.filter((connection) => !(
+      (connection.from === "beorns_house" && ["gate_to_mirkwood", "forest_road"].includes(connection.to))
+      || (connection.to === "beorns_house" && ["gate_to_mirkwood", "forest_road"].includes(connection.from))
+      || (connection.from === "great_river" && connection.to === "misty_mountain")
+      || (connection.from === "misty_mountain" && connection.to === "great_river")
+    ));
+    ensureTwoWay("beorns_house", "north", "great_river", "south");
+    ensureTwoWay("great_river", "east", "gate_to_mirkwood", "west");
+    ensureTwoWay("gate_to_mirkwood", "south", "forest_road", "north");
     ensureTwoWay("front_gate", "north east", "erebor_hidden_door", "south west");
     ensureTwoWay("erebor_hidden_door", "east", "erebor_watch_chamber", "west");
     data.connections.forEach((connection) => {
@@ -5475,6 +5497,7 @@
       game.layoutModePreference = this.loadLayoutModePreference();
       game.layoutMode = "1";
       game.layout2SceneWidth = this.loadLayout2SceneWidthPreference();
+      game.sceneMapEditSnap = loadMapEditorSnapPreference();
       this.applyLayout2SceneWidth(game.layout2SceneWidth, { persist: false });
       this.applyLayoutMode(game.layoutModePreference);
       this.initializeLayoutSwitchVisibility();
@@ -5580,6 +5603,7 @@
         sceneMapCanvas.style.height = "";
         sceneMapImage?.removeAttribute("src");
         game.sceneMapViewportAnchor = null;
+        this.updateSceneMapEditorControls();
         return;
       }
       const cacheKey = buildSceneMapCacheKey(game, game.sceneMapScope || "world");
@@ -5610,15 +5634,348 @@
         sceneMapImage?.removeAttribute("src");
         return;
       }
-      const mapState = scaleSceneMapState(baseMapState, game.sceneMapZoom || 1);
+      const mapState = scaleSceneMapState(baseMapState, game.sceneMapZoom || DEFAULT_SCENE_MAP_ZOOM);
       this.applySceneMapZoomPresentation(mapState);
       if (sceneMapTitle) sceneMapTitle.textContent = baseMapState.title || "Explored Map";
       if (sceneMapSubtitle) sceneMapSubtitle.textContent = baseMapState.subtitle || "";
       if (sceneMapBack) sceneMapBack.hidden = !baseMapState.parentScope;
-      if (sceneMapZoomReset) sceneMapZoomReset.textContent = `${Math.round((game.sceneMapZoom || 1) * 100)}%`;
+      if (sceneMapZoomReset) sceneMapZoomReset.textContent = `${Math.round((game.sceneMapZoom || DEFAULT_SCENE_MAP_ZOOM) * 100)}%`;
       sceneMapOverlay.removeAttribute("hidden");
+      this.updateSceneMapEditorControls(baseMapState);
+      this.renderSceneMapEditorOverlay(baseMapState);
       if (!this.restoreSceneMapViewport(mapState)) this.centerSceneMapOnRoom(mapState);
       game.sceneMapViewportAnchor = null;
+    }
+
+    updateSceneMapEditorControls(baseMapState = null) {
+      const editing = Boolean(this.game.sceneMapEditMode && this.game.sceneMapVisible);
+      if (sceneMapEditToggle) {
+        sceneMapEditToggle.hidden = !this.game.sceneMapVisible || editing;
+        sceneMapEditToggle.textContent = "Edit";
+      }
+      if (sceneMapEditSave) sceneMapEditSave.hidden = !editing;
+      if (sceneMapEditCommit) sceneMapEditCommit.hidden = !editing;
+      if (sceneMapEditSnap) {
+        sceneMapEditSnap.hidden = !editing;
+        sceneMapEditSnap.textContent = this.game.sceneMapEditSnap ? "Snap On" : "Snap Off";
+        sceneMapEditSnap.setAttribute("aria-pressed", this.game.sceneMapEditSnap ? "true" : "false");
+      }
+      if (sceneMapEditCancel) sceneMapEditCancel.hidden = !editing;
+      if (sceneMapEditReset) sceneMapEditReset.hidden = !editing;
+      if (sceneMapBack) sceneMapBack.disabled = editing;
+      if (sceneMapZoomOut) sceneMapZoomOut.disabled = editing;
+      if (sceneMapZoomReset) sceneMapZoomReset.disabled = editing;
+      if (sceneMapZoomIn) sceneMapZoomIn.disabled = editing;
+      if (sceneMapEditInfo) {
+        if (!editing || !baseMapState?.editorMeta) {
+          sceneMapEditInfo.hidden = true;
+          sceneMapEditInfo.innerHTML = "";
+        } else {
+          sceneMapEditInfo.hidden = false;
+          sceneMapEditInfo.innerHTML = this.sceneMapEditorInfoMarkup(baseMapState.editorMeta);
+        }
+      }
+      if (sceneMapSubtitle && editing && baseMapState?.title) {
+        sceneMapSubtitle.textContent = `${baseMapState.subtitle || ""} • drag nodes, then Save`;
+      }
+    }
+
+    sceneMapEditorInfoMarkup(meta) {
+      const selectedNodeId = this.game.sceneMapEditSelectedNodeId || meta.currentNodeId || meta.nodes?.[0]?.id || "";
+      const node = (meta.nodes || []).find((candidate) => candidate.id === selectedNodeId) || null;
+      const exits = uniqueMapEditorExits(meta, selectedNodeId);
+      const nodeText = node?.label || "No selection";
+      const snapMarkup = `<span class="scene-map-edit-pill"><strong>Snap</strong> ${this.game.sceneMapEditSnap ? "On" : "Off"}</span>`;
+      const exitMarkup = exits.length
+        ? exits.map((exit) => `<span class="scene-map-edit-pill"><strong>${escapeXml(exit.badge)}</strong> ${escapeXml(exit.toLabel)}</span>`).join("")
+        : `<span class="scene-map-edit-pill"><strong>Exits</strong> none</span>`;
+      return `<span class="scene-map-edit-pill"><strong>Selected</strong> ${escapeXml(nodeText)}</span>${snapMarkup}${exitMarkup}`;
+    }
+
+    toggleSceneMapEditSnap() {
+      this.game.sceneMapEditSnap = !this.game.sceneMapEditSnap;
+      saveMapEditorSnapPreference(this.game.sceneMapEditSnap);
+      this.updateSceneMapEditorControls(this.game.sceneMapRenderCache?.state || null);
+      this.renderSceneMapEditorOverlay(this.game.sceneMapRenderCache?.state || null);
+      return true;
+    }
+
+    sceneMapEditorLayer() {
+      return sceneMapCanvas?.querySelector?.(".scene-map-editor-layer") || null;
+    }
+
+    startSceneMapEditing() {
+      if (!this.game.sceneMapVisible) return false;
+      const scope = this.game.sceneMapScope || "world";
+      const state = this.game.sceneMapRenderCache?.state || null;
+      if (!state?.editorMeta?.nodes?.length) return false;
+      this.game.sceneMapEditMode = true;
+      this.game.sceneMapEditScope = scope;
+      this.game.sceneMapEditDraft = cloneMapPointMap(state.editorMeta.nodeCenters || {});
+      this.game.sceneMapEditDrag = null;
+      this.game.sceneMapEditSelectedNodeId = state.editorMeta.currentNodeId || state.editorMeta.nodes?.[0]?.id || "";
+      this.renderSceneMap();
+      return true;
+    }
+
+    cancelSceneMapEditing(options = {}) {
+      const preserveScope = options.preserveScope === true;
+      this.game.sceneMapEditMode = false;
+      this.game.sceneMapEditDraft = null;
+      this.game.sceneMapEditDrag = null;
+      this.game.sceneMapEditSelectedNodeId = "";
+      if (!preserveScope) this.game.sceneMapEditScope = "";
+      this.renderSceneMap();
+      return true;
+    }
+
+    resetSceneMapEditingScope() {
+      const scope = this.game.sceneMapScope || "world";
+      clearMapLayoutScopeOverrides(scope);
+      this.game.sceneMapRenderCache = null;
+      this.game.sceneMapEditMode = false;
+      this.game.sceneMapEditDraft = null;
+      this.game.sceneMapEditDrag = null;
+      this.game.sceneMapEditScope = "";
+      this.game.sceneMapEditSelectedNodeId = "";
+      this.renderSceneMap();
+      return true;
+    }
+
+    saveSceneMapEditing() {
+      const scope = this.game.sceneMapScope || "world";
+      const state = this.game.sceneMapRenderCache?.state || null;
+      const meta = state?.editorMeta || null;
+      const draft = this.game.sceneMapEditDraft || null;
+      if (!meta || !draft) return false;
+      const savedPoints = {};
+      for (const node of meta.nodes || []) {
+        const center = draft[node.id];
+        if (!center) continue;
+        savedPoints[node.id] = {
+          x: roundMapCoordinate(((center.x - meta.offsetX - meta.padding - (meta.boxSize / 2)) / meta.unitX) + meta.minX),
+          y: roundMapCoordinate(((center.y - meta.offsetY - meta.padding - (meta.boxSize / 2)) / meta.unitY) + meta.minY),
+        };
+      }
+      saveMapLayoutScopeOverrides(scope, savedPoints);
+      this.game.sceneMapRenderCache = null;
+      this.game.sceneMapEditMode = false;
+      this.game.sceneMapEditDraft = null;
+      this.game.sceneMapEditDrag = null;
+      this.game.sceneMapEditScope = "";
+      this.game.sceneMapEditSelectedNodeId = "";
+      this.renderSceneMap();
+      this.game.print(`Saved map layout for ${state?.title || scope}.`);
+      return true;
+    }
+
+    sceneMapEditingSourcePositions(scope = "world") {
+      const state = this.game.sceneMapRenderCache?.state || null;
+      const meta = state?.editorMeta || null;
+      const draft = this.game.sceneMapEditDraft || null;
+      if (!meta || !draft) return {};
+      const savedPoints = {};
+      for (const node of meta.nodes || []) {
+        const center = draft[node.id];
+        if (!center) continue;
+        savedPoints[node.id] = {
+          x: roundMapCoordinate(((center.x - meta.offsetX - meta.padding - (meta.boxSize / 2)) / meta.unitX) + meta.minX),
+          y: roundMapCoordinate(((center.y - meta.offsetY - meta.padding - (meta.boxSize / 2)) / meta.unitY) + meta.minY),
+        };
+      }
+      return {
+        ...sourceMapPinnedPositionsForScope(scope),
+        ...savedPoints,
+      };
+    }
+
+    async commitSceneMapEditingToSource() {
+      const scope = this.game.sceneMapScope || "world";
+      const points = this.sceneMapEditingSourcePositions(scope);
+      if (!Object.keys(points).length) return false;
+      const picker = typeof window.showOpenFilePicker === "function" ? window.showOpenFilePicker : null;
+      if (picker) {
+        try {
+          const [handle] = await picker({
+            multiple: false,
+            types: [{ description: "JavaScript files", accept: { "text/javascript": [".js"] } }],
+            excludeAcceptAllOption: false,
+          });
+          if (!handle) return false;
+          const file = await handle.getFile();
+          const sourceText = await file.text();
+          const patched = patchGameJsMapPositions(sourceText, scope, points);
+          const writable = await handle.createWritable();
+          await writable.write(patched);
+          await writable.close();
+          this.game.print(`Wrote ${scope === "world" ? "world map" : `${scope} map`} positions into ${file.name}.`);
+          return true;
+        } catch (error) {
+          if (error?.name === "AbortError") return false;
+        }
+      }
+
+      try {
+        const sourceText = await fetch("game.js").then((response) => response.text());
+        const patched = patchGameJsMapPositions(sourceText, scope, points);
+        const blob = new Blob([patched], { type: "text/javascript;charset=utf-8" });
+        const downloadUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = downloadUrl;
+        anchor.download = "game.js";
+        anchor.click();
+        setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+        this.game.print("Downloaded a patched game.js. Replace the project file with that copy to make the layout permanent in source.");
+        return true;
+      } catch (_error) {
+        const snippet = mapSourceReplacementSnippet(scope, points);
+        try {
+          await navigator.clipboard?.writeText?.(snippet);
+        } catch (_clipboardError) {
+          // ignore clipboard failures and still provide a download
+        }
+        const blob = new Blob([snippet], { type: "text/plain;charset=utf-8" });
+        const downloadUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = downloadUrl;
+        anchor.download = `${scope}-map-layout-snippet.txt`;
+        anchor.click();
+        setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+        this.game.print("The browser could not rewrite game.js directly, so I downloaded a ready-to-paste source snippet instead.");
+        return true;
+      }
+    }
+
+    renderSceneMapEditorOverlay(baseMapState = null) {
+      const layer = this.sceneMapEditorLayer();
+      if (!layer || !sceneMapCanvas) return;
+      const editing = Boolean(this.game.sceneMapEditMode);
+      sceneMapCanvas.classList.toggle("is-editing", editing);
+      if (!editing || !baseMapState?.editorMeta) {
+        layer.setAttribute("hidden", "hidden");
+        layer.innerHTML = "";
+        return;
+      }
+      const meta = baseMapState.editorMeta;
+      const centers = this.game.sceneMapEditDraft || meta.nodeCenters || {};
+      const selectedNodeId = this.game.sceneMapEditSelectedNodeId || meta.currentNodeId || meta.nodes?.[0]?.id || "";
+      if (sceneMapEditInfo) {
+        sceneMapEditInfo.hidden = false;
+        sceneMapEditInfo.innerHTML = this.sceneMapEditorInfoMarkup(meta);
+      }
+      const lines = (meta.edges || []).map((edge) => {
+        const geometry = mapEdgeRenderGeometry(edge, centers, meta.boxSize);
+        if (!geometry) return "";
+        return buildMapConnectorMarkup(
+          geometry.fromAnchor,
+          geometry.toAnchor,
+          { fromDirection: geometry.fromDirection, toDirection: geometry.toDirection },
+          {
+            boxSize: meta.boxSize,
+            twoWay: geometry.twoWay,
+            stroke: geometry.twoWay ? "#7f6641" : "#a17a4b",
+            strokeWidth: 4.8,
+          }
+        );
+      }).join("");
+      const stubMarkup = (meta.exitStubs || []).map((stub) => {
+        const center = centers[stub.nodeId];
+        const geometry = buildMapStubGeometry(center, stub.direction, meta.boxSize, 36);
+        if (!geometry) return "";
+        return `<line x1="${geometry.from.x.toFixed(1)}" y1="${geometry.from.y.toFixed(1)}" x2="${geometry.to.x.toFixed(1)}" y2="${geometry.to.y.toFixed(1)}" stroke="#b08b52" stroke-width="4" stroke-linecap="round" stroke-dasharray="10 8" opacity="0.95" />`;
+      }).join("");
+      const badgeMarkup = uniqueMapEditorExits(meta, selectedNodeId).map((exit) => {
+        let centerX = 0;
+        let centerY = 0;
+        if (exit.toId) {
+          const from = centers[selectedNodeId];
+          const to = centers[exit.toId];
+          if (!from || !to) return "";
+          centerX = (from.x + to.x) / 2;
+          centerY = (from.y + to.y) / 2;
+        } else {
+          const stub = (meta.exitStubs || []).find((candidate) => candidate.nodeId === selectedNodeId && candidate.direction === exit.direction);
+          const geometry = buildMapStubGeometry(centers[selectedNodeId], exit.direction, meta.boxSize, 36);
+          if (!stub || !geometry) return "";
+          centerX = (geometry.from.x + geometry.to.x) / 2;
+          centerY = (geometry.from.y + geometry.to.y) / 2;
+        }
+        return `<g class="scene-map-editor-badge" transform="translate(${centerX.toFixed(1)} ${centerY.toFixed(1)})">
+          <rect x="-16" y="-11.5" width="32" height="20" rx="7"></rect>
+          <text x="0" y="3.8" text-anchor="middle">${escapeXml(exit.badge)}</text>
+        </g>`;
+      }).join("");
+      const nodeMarkup = (meta.nodes || []).map((node) => {
+        const center = centers[node.id];
+        if (!center) return "";
+        const current = node.id === meta.currentNodeId;
+        const classes = ["scene-map-editor-node"];
+        if (current) classes.push("is-current");
+        if (node.id === selectedNodeId) classes.push("is-selected");
+        if (this.game.sceneMapEditDrag?.nodeId === node.id) classes.push("is-dragging");
+        return `<button class="${classes.join(" ")}" type="button" data-editor-node="${escapeXml(node.id)}" style="left:${center.x.toFixed(1)}px;top:${center.y.toFixed(1)}px;">${escapeXml(node.label)}</button>`;
+      }).join("");
+      layer.innerHTML = `<svg class="scene-map-editor-svg" viewBox="0 0 ${baseMapState.baseWidth} ${baseMapState.baseHeight}" aria-hidden="true"><g>${lines}${stubMarkup}</g><g>${badgeMarkup}</g></svg>${nodeMarkup}`;
+      layer.removeAttribute("hidden");
+    }
+
+    beginSceneMapEditorDrag(event) {
+      if (!this.game.sceneMapEditMode || !event) return false;
+      const handle = event.target?.closest?.("[data-editor-node]");
+      if (!handle) return false;
+      const stage = sceneMapCanvas?.querySelector?.(".scene-map-stage");
+      if (!stage) return false;
+      const rect = stage.getBoundingClientRect?.();
+      if (!rect) return false;
+      const nodeId = handle.getAttribute("data-editor-node");
+      const point = this.game.sceneMapEditDraft?.[nodeId];
+      if (!nodeId || !point) return false;
+      event.preventDefault?.();
+      this.game.sceneMapEditSelectedNodeId = nodeId;
+      this.game.sceneMapEditDrag = {
+        nodeId,
+        stageLeft: rect.left,
+        stageTop: rect.top,
+        stageWidth: rect.width || 1,
+        stageHeight: rect.height || 1,
+        baseWidth: this.game.sceneMapRenderCache?.state?.baseWidth || 1,
+        baseHeight: this.game.sceneMapRenderCache?.state?.baseHeight || 1,
+      };
+      this.renderSceneMapEditorOverlay(this.game.sceneMapRenderCache?.state || null);
+      return true;
+    }
+
+    updateSceneMapEditorDrag(event) {
+      const drag = this.game.sceneMapEditDrag;
+      if (!drag || !this.game.sceneMapEditDraft) return false;
+      event.preventDefault?.();
+      let x = ((event.clientX - drag.stageLeft) / drag.stageWidth) * drag.baseWidth;
+      let y = ((event.clientY - drag.stageTop) / drag.stageHeight) * drag.baseHeight;
+      if (this.game.sceneMapEditSnap) {
+        const state = this.game.sceneMapRenderCache?.state || null;
+        const meta = state?.editorMeta || null;
+        if (meta) {
+          const sourceX = ((x - meta.offsetX - meta.padding - (meta.boxSize / 2)) / meta.unitX) + meta.minX;
+          const sourceY = ((y - meta.offsetY - meta.padding - (meta.boxSize / 2)) / meta.unitY) + meta.minY;
+          const snappedX = Math.round(sourceX * 5) / 5;
+          const snappedY = Math.round(sourceY * 5) / 5;
+          x = meta.offsetX + meta.padding + ((snappedX - meta.minX) * meta.unitX) + (meta.boxSize / 2);
+          y = meta.offsetY + meta.padding + ((snappedY - meta.minY) * meta.unitY) + (meta.boxSize / 2);
+        }
+      }
+      this.game.sceneMapEditDraft[drag.nodeId] = {
+        x: Math.max(32, Math.min(drag.baseWidth - 32, x)),
+        y: Math.max(140, Math.min(drag.baseHeight - 32, y)),
+      };
+      this.renderSceneMapEditorOverlay(this.game.sceneMapRenderCache?.state || null);
+      return true;
+    }
+
+    endSceneMapEditorDrag() {
+      if (!this.game.sceneMapEditDrag) return false;
+      this.game.sceneMapEditDrag = null;
+      this.renderSceneMapEditorOverlay(this.game.sceneMapRenderCache?.state || null);
+      return true;
     }
 
     applySceneMapZoomPresentation(mapState = null) {
@@ -5632,7 +5989,9 @@
 
     centerSceneMapOnRoom(mapState = null) {
       if (!sceneMapScroll) return;
-      const target = mapState?.currentRoomCenter || mapState?.defaultCenter || null;
+      const target = (this.game.sceneMapShowAll && (this.game.sceneMapScope || "world") === "world")
+        ? (mapState?.defaultCenter || mapState?.currentRoomCenter || null)
+        : (mapState?.currentRoomCenter || mapState?.defaultCenter || null);
       if (!target) return;
       const viewportWidth = Number(sceneMapScroll.clientWidth) || 0;
       const viewportHeight = Number(sceneMapScroll.clientHeight) || 0;
@@ -5650,7 +6009,7 @@
       const viewportWidth = Number(sceneMapScroll.clientWidth) || 0;
       const viewportHeight = Number(sceneMapScroll.clientHeight) || 0;
       if (!viewportWidth || !viewportHeight) return false;
-      const zoom = Number(this.game.sceneMapZoom) || 1;
+      const zoom = Number(this.game.sceneMapZoom) || DEFAULT_SCENE_MAP_ZOOM;
       const targetLeft = Math.max(0, Math.min(
         Math.round((anchor.mapX * zoom) - anchor.offsetX),
         Math.max(0, mapState.width - viewportWidth),
@@ -5670,7 +6029,7 @@
       const viewportWidth = Number(sceneMapScroll.clientWidth) || Number(rect.width) || 0;
       const viewportHeight = Number(sceneMapScroll.clientHeight) || Number(rect.height) || 0;
       if (!viewportWidth || !viewportHeight) return false;
-      const zoom = Number(this.game.sceneMapZoom) || 1;
+      const zoom = Number(this.game.sceneMapZoom) || DEFAULT_SCENE_MAP_ZOOM;
       const offsetX = Number.isFinite(options.offsetX)
         ? options.offsetX
         : (Number.isFinite(options.clientX) ? options.clientX - rect.left : viewportWidth / 2);
@@ -5689,16 +6048,19 @@
 
     sceneMapBack() {
       if (!this.game.sceneMapVisible || this.game.sceneMapScope === "world") return false;
+      if (this.game.sceneMapEditMode) return false;
+      const parentScope = this.game.sceneMapRenderCache?.state?.parentScope || "world";
       this.game.sceneMapViewportAnchor = null;
-      this.game.sceneMapScope = "world";
+      this.game.sceneMapScope = parentScope || "world";
       this.renderSceneMap();
       return true;
     }
 
     adjustSceneMapZoom(delta = 0, options = {}) {
       if (!this.game.sceneMapVisible) return false;
+      if (this.game.sceneMapEditMode) return false;
       if (!options.skipCapture) this.captureSceneMapViewportAnchor();
-      const next = Math.max(0.6, Math.min(2.4, Number((this.game.sceneMapZoom || 1) + delta).toFixed(2)));
+      const next = Math.max(MIN_SCENE_MAP_ZOOM, Math.min(MAX_SCENE_MAP_ZOOM, Number((this.game.sceneMapZoom || DEFAULT_SCENE_MAP_ZOOM) + delta).toFixed(2)));
       if (next === this.game.sceneMapZoom) return false;
       this.game.sceneMapZoom = next;
       this.renderSceneMap();
@@ -5707,8 +6069,9 @@
 
     resetSceneMapZoom() {
       if (!this.game.sceneMapVisible) return false;
+      if (this.game.sceneMapEditMode) return false;
       this.captureSceneMapViewportAnchor();
-      this.game.sceneMapZoom = 1;
+      this.game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       this.renderSceneMap();
       return true;
     }
@@ -5716,6 +6079,7 @@
     openSceneMapScope(scope = "world") {
       const normalized = String(scope || "world").trim() || "world";
       if (normalized !== "world" && !MAP_REGION_DEFINITIONS[normalized]) return false;
+      if (this.game.sceneMapEditMode) return false;
       this.game.sceneMapViewportAnchor = null;
       this.game.sceneMapScope = normalized;
       this.renderSceneMap();
@@ -5724,6 +6088,7 @@
 
     handleSceneMapClick(event) {
       if (!this.game.sceneMapVisible) return false;
+      if (this.game.sceneMapEditMode) return false;
       const target = event?.target;
       const regionId = target?.closest?.("[data-map-open-region]")?.getAttribute?.("data-map-open-region");
       if (!regionId) return false;
@@ -5732,6 +6097,7 @@
 
     handleSceneMapWheel(event) {
       if (!this.game.sceneMapVisible || !event) return false;
+      if (this.game.sceneMapEditMode) return false;
       const lineWheel = Number(event.deltaMode) === 1;
       const pinchLike = Boolean(event.ctrlKey);
       const modifierZoom = Boolean(event.metaKey || event.altKey);
@@ -6454,9 +6820,14 @@
       game.trollsDefeated = Boolean(save.trollsDefeated);
       game.sceneMapVisible = false;
       game.sceneMapScope = "world";
-      game.sceneMapZoom = 1;
+      game.sceneMapShowAll = false;
+      game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       game.sceneMapViewportAnchor = null;
       game.sceneMapRenderCache = null;
+      game.sceneMapEditMode = false;
+      game.sceneMapEditDraft = null;
+      game.sceneMapEditScope = "";
+      game.sceneMapEditSelectedNodeId = "";
       game.spiderEyesState = save.spiderEyesState || null;
       game.gollumState = game.restoreGollumState(save.gollumState);
       game.turnCount = Number(save.turnCount) || 0;
@@ -8000,9 +8371,14 @@
       game.trollsDefeated = false;
       game.sceneMapVisible = false;
       game.sceneMapScope = "world";
-      game.sceneMapZoom = 1;
+      game.sceneMapShowAll = false;
+      game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       game.sceneMapViewportAnchor = null;
       game.sceneMapRenderCache = null;
+      game.sceneMapEditMode = false;
+      game.sceneMapEditDraft = null;
+      game.sceneMapEditScope = "";
+      game.sceneMapEditSelectedNodeId = "";
       game.visitedRooms = new Set();
       game.tipsEnabled = false;
       game.tipIndex = 0;
@@ -8270,11 +8646,36 @@
         return;
       }
       game.sceneMapScope = "world";
-      game.sceneMapZoom = 1;
+      game.sceneMapShowAll = false;
+      game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       game.sceneMapVisible = true;
       game.sceneMapViewportAnchor = null;
       game.sceneMapRenderCache = null;
+      game.sceneMapEditMode = false;
+      game.sceneMapEditDraft = null;
+      game.sceneMapEditScope = "";
+      game.sceneMapEditSelectedNodeId = "";
       game.print("You study the paths already traced across Wilderland.");
+      game.render();
+    }
+
+    showCompleteMap() {
+      const game = this.game;
+      if (!game.rooms || !Object.keys(game.rooms).length) {
+        game.print("No location is available for the map.");
+        return;
+      }
+      game.sceneMapScope = "world";
+      game.sceneMapShowAll = true;
+      game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
+      game.sceneMapVisible = true;
+      game.sceneMapViewportAnchor = null;
+      game.sceneMapRenderCache = null;
+      game.sceneMapEditMode = false;
+      game.sceneMapEditDraft = null;
+      game.sceneMapEditScope = "";
+      game.sceneMapEditSelectedNodeId = "";
+      game.print("You unfurl a complete test map of Wilderland, with every known place marked upon it.");
       game.render();
     }
 
@@ -8819,9 +9220,14 @@
       this.trollsDefeated = false;
       this.sceneMapVisible = false;
       this.sceneMapScope = "world";
-      this.sceneMapZoom = 1;
+      this.sceneMapShowAll = false;
+      this.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       this.sceneMapViewportAnchor = null;
       this.sceneMapRenderCache = null;
+      this.sceneMapEditMode = false;
+      this.sceneMapEditDraft = null;
+      this.sceneMapEditScope = "";
+      this.sceneMapEditSelectedNodeId = "";
       this.visitedRooms = new Set();
       this.tipsEnabled = false;
       this.tipIndex = 0;
@@ -9108,10 +9514,20 @@
       bindLayoutButton(layoutMode1Button, "1");
       bindLayoutButton(layoutMode2Button, "2");
       sceneMapBack?.addEventListener("click", () => this.layout.sceneMapBack());
+      sceneMapEditToggle?.addEventListener("click", () => this.layout.startSceneMapEditing());
+      sceneMapEditSave?.addEventListener("click", () => this.layout.saveSceneMapEditing());
+      sceneMapEditCommit?.addEventListener("click", () => this.layout.commitSceneMapEditingToSource());
+      sceneMapEditSnap?.addEventListener("click", () => this.layout.toggleSceneMapEditSnap());
+      sceneMapEditCancel?.addEventListener("click", () => this.layout.cancelSceneMapEditing());
+      sceneMapEditReset?.addEventListener("click", () => this.layout.resetSceneMapEditingScope());
       sceneMapZoomOut?.addEventListener("click", () => this.layout.adjustSceneMapZoom(-0.2));
       sceneMapZoomReset?.addEventListener("click", () => this.layout.resetSceneMapZoom());
       sceneMapZoomIn?.addEventListener("click", () => this.layout.adjustSceneMapZoom(0.2));
       sceneMapCanvas?.addEventListener("click", (event) => this.layout.handleSceneMapClick(event));
+      sceneMapCanvas?.addEventListener("pointerdown", (event) => this.layout.beginSceneMapEditorDrag(event));
+      document.addEventListener("pointermove", (event) => this.layout.updateSceneMapEditorDrag(event));
+      document.addEventListener("pointerup", () => this.layout.endSceneMapEditorDrag());
+      document.addEventListener("pointercancel", () => this.layout.endSceneMapEditorDrag());
       sceneMapScroll?.addEventListener("wheel", (event) => this.layout.handleSceneMapWheel(event), { passive: false });
       if (this.layoutSwitchAutoHide && layoutSwitch) {
         document.addEventListener("mousemove", (event) => this.handleLayoutMouseActivity(event), { passive: true });
@@ -9322,12 +9738,21 @@
         }
         rawCommand = this.normalizeConversationalQuestion(rawCommand);
         const normalizedCommand = normalizeNaturalCommand(rawCommand.toLowerCase());
-        if (normalizedCommand !== "map") {
+        if (!["map", "complete map"].includes(normalizedCommand)) {
           this.sceneMapVisible = false;
           this.sceneMapScope = "world";
-          this.sceneMapZoom = 1;
+          this.sceneMapShowAll = false;
+          this.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
           this.sceneMapViewportAnchor = null;
           this.sceneMapRenderCache = null;
+          this.sceneMapEditMode = false;
+          this.sceneMapEditDraft = null;
+          this.sceneMapEditScope = "";
+          this.sceneMapEditSelectedNodeId = "";
+        }
+        if (normalizedCommand === "complete map") {
+          this.showCompleteMap();
+          return;
         }
         if (this.isUnsupportedConditional(normalizedCommand)) {
           this.print("Conditional commands are not supported yet. Try the action when the condition is true.", "system");
@@ -9924,9 +10349,14 @@
       this.temporaryImageDismissOnNextCommand = options.dismissOnNextCommand !== false;
       this.sceneMapVisible = false;
       this.sceneMapScope = "world";
-      this.sceneMapZoom = 1;
+      this.sceneMapShowAll = false;
+      this.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       this.sceneMapViewportAnchor = null;
       this.sceneMapRenderCache = null;
+      this.sceneMapEditMode = false;
+      this.sceneMapEditDraft = null;
+      this.sceneMapEditScope = "";
+      this.sceneMapEditSelectedNodeId = "";
       this.render();
       return true;
     }
@@ -11066,6 +11496,10 @@
       return this.exploration.showMap();
     }
 
+    showCompleteMap() {
+      return this.exploration.showCompleteMap();
+    }
+
     showExits() {
       return this.exploration.showExits();
     }
@@ -12010,7 +12444,7 @@
       const insideTerms = ["inside", "indoors", "back inside"];
       const outsideTerms = ["outside", "outdoors", "back outside", "out"];
       const preferred = insideTerms.includes(text)
-        ? ["inside", "interior", "hall", "home", "house", "hole", "room", "tunnel"]
+        ? ["inside", "interior", "hall", "home", "house", "hole", "room", "tunnel", "inn", "tavern"]
         : outsideTerms.includes(text)
           ? ["outside", "garden", "yard", "path", "road", "forest", "exterior"]
           : null;
@@ -14590,7 +15024,7 @@
         bag_end_pantry: { x: 1.25, y: 1.15 },
         bag_end_kitchen: { x: 2.5, y: 1.15 },
         bag_end_guest_room: { x: -1.2, y: -1.1 },
-        bag_end_cellar_room: { x: -1.2, y: 1.15 },
+        bag_end_cellar_room: { x: 0, y: 2.3 },
       },
     },
     green_dragon: {
@@ -14619,7 +15053,7 @@
         rivendell_courtyard: { x: 0, y: -1.15 },
         rivendell_library: { x: 1.2, y: -1.15 },
         rivendell_hall_of_fire: { x: 0, y: -2.3 },
-        rivendell_guest_chambers: { x: 1.2, y: -2.3 },
+        rivendell_guest_chambers: { x: -2.4, y: -1.9 },
       },
     },
     beorn: {
@@ -14637,6 +15071,32 @@
         beorn_stable: { x: 1.2, y: 1.15 },
         beorn_garden: { x: 1.2, y: -1.15 },
         beorn_animal_yard: { x: 2.4, y: 0 },
+      },
+    },
+    mountains: {
+      label: "Misty Mountains",
+      rooms: [...IMMERSION_MOUNTAIN_ROOMS].filter((roomId) => !["large_dry_cave", "trollshaws_road", "hidden_valley_path"].includes(roomId)),
+      positions: {
+        misty_mountain: { x: 1.2, y: 0 },
+        narrow_place: { x: 2.4, y: 0 },
+        narrow_ledge: { x: -1.2, y: -1.2 },
+        mountain_lookout: { x: -2.4, y: -1.2 },
+        storm_shelter: { x: -2.4, y: 0 },
+        narrow_path_1: { x: 3.6, y: -0.8 },
+        narrow_path_2: { x: 4.8, y: -1.4 },
+        narrow_path_3: { x: 6, y: -2 },
+        narrow_path_4: { x: 3.6, y: 0.4 },
+        narrow_path_5: { x: 7.2, y: -2.6 },
+        narrow_path_6: { x: 3.6, y: 1.6 },
+        narrow_path_7: { x: 2.4, y: 1.6 },
+        narrow_path_8: { x: 3.6, y: -2 },
+        narrow_path_9: { x: 4.8, y: -2.8 },
+        narrow_path_10: { x: 6, y: -3.6 },
+        steep_path_6: { x: 7.2, y: -3.6 },
+        steep_path_7: { x: 8.4, y: -3.6 },
+        steep_path_8: { x: 9.6, y: -3.6 },
+        deep_misty_valley_1: { x: 7.2, y: -1.2 },
+        deep_misty_valley_2: { x: 8.4, y: -1.2 },
       },
     },
     goblin_tunnels: {
@@ -14665,27 +15125,170 @@
         "deep_dark_lake",
       ],
       positions: {
-        goblins_dungeon: { x: -4.3, y: -0.65 },
-        dark_winding_passage: { x: -3.25, y: 0 },
-        big_cavern: { x: -3.25, y: -1.95 },
-        dark_stuffy_passage_1: { x: -2.25, y: -0.65 },
-        dark_stuffy_passage_2: { x: -1.2, y: 0.9 },
-        dark_stuffy_passage_3: { x: -1.15, y: -1.95 },
-        dark_stuffy_passage_4: { x: -2.3, y: -2.75 },
-        dark_stuffy_passage_5: { x: 0, y: 1.4 },
-        dark_stuffy_passage_6: { x: 0, y: 0 },
-        dark_stuffy_passage_7: { x: 0, y: -1.25 },
-        dark_stuffy_passage_8: { x: 2.7, y: -0.1 },
-        dark_stuffy_passage_9: { x: 1.75, y: -0.1 },
-        dark_stuffy_passage_10: { x: 2.7, y: 1 },
-        dark_stuffy_passage_11: { x: 3.75, y: 1.65 },
-        dark_stuffy_passage_12: { x: 1.75, y: 1.65 },
-        dark_stuffy_passage_13: { x: 1.75, y: -1.2 },
-        deep_dark_lake: { x: 2.7, y: -2 },
-        dark_stuffy_passage_14: { x: 0.7, y: -1.2 },
-        dark_stuffy_passage_15: { x: -1.3, y: -1.2 },
-        inside_goblins_gate: { x: -2.3, y: -3.85 },
-        outside_goblins_gate: { x: -2.3, y: -5 },
+        goblins_dungeon: { x: -6, y: 0.8 },
+        dark_winding_passage: { x: -4.5, y: 0.8 },
+        big_cavern: { x: -4.5, y: -0.8 },
+        dark_stuffy_passage_1: { x: -3, y: 2 },
+        dark_stuffy_passage_2: { x: -1.5, y: 0.8 },
+        dark_stuffy_passage_3: { x: -1.5, y: -0.8 },
+        dark_stuffy_passage_4: { x: -1.5, y: -2.4 },
+        dark_stuffy_passage_5: { x: 0, y: 0.8 },
+        dark_stuffy_passage_6: { x: 1.5, y: 0.8 },
+        dark_stuffy_passage_7: { x: 1.5, y: 2.4 },
+        dark_stuffy_passage_8: { x: 4.8, y: 4 },
+        dark_stuffy_passage_9: { x: 3.2, y: 4 },
+        dark_stuffy_passage_10: { x: 3.2, y: 2.4 },
+        dark_stuffy_passage_11: { x: 4.8, y: 2.4 },
+        dark_stuffy_passage_12: { x: -1.5, y: 2.4 },
+        dark_stuffy_passage_13: { x: 4.8, y: 0.8 },
+        deep_dark_lake: { x: 6.4, y: 0.8 },
+        dark_stuffy_passage_14: { x: 3.2, y: 0.8 },
+        dark_stuffy_passage_15: { x: 0, y: -2.4 },
+        inside_goblins_gate: { x: -1.5, y: -4 },
+        outside_goblins_gate: { x: -1.5, y: -5.4 },
+      },
+    },
+    mirkwood: {
+      label: "Mirkwood",
+      rooms: [
+        "gate_to_mirkwood",
+        "forest_road",
+        "forest_road_2",
+        "forest",
+        "waterfall",
+        "running_river",
+        "bewitched_gloomy_place",
+        "west_bank",
+        "east_bank",
+        "green_forest",
+        "place_of_black_spiders",
+        "forest_of_tangled_smothering_trees",
+        "deep_bog",
+        "mirkwood_forest_path",
+        "mirkwood_spider_grove",
+        "mirkwood_dark_glade",
+        "mirkwood_enchanted_stream",
+        "mirkwood_deer_trail",
+        "mirkwood_fallen_tree_crossing",
+        "mirkwood_ruined_clearing",
+      ],
+      positions: {
+        gate_to_mirkwood: { x: 0, y: 0 },
+        forest_road: { x: 1.2, y: 0.8 },
+        forest_road_2: { x: 2.4, y: 0.8 },
+        forest: { x: 3.6, y: 0.8 },
+        waterfall: { x: 3.6, y: -0.4 },
+        running_river: { x: 3.6, y: -1.6 },
+        bewitched_gloomy_place: { x: 1.2, y: -0.8 },
+        west_bank: { x: 2.4, y: -0.8 },
+        east_bank: { x: 4.8, y: -0.8 },
+        green_forest: { x: 6, y: -0.8 },
+        deep_bog: { x: 6, y: 0.8 },
+        mirkwood_forest_path: { x: 2.4, y: 2 },
+        mirkwood_dark_glade: { x: 3.6, y: 2 },
+        mirkwood_deer_trail: { x: 3.6, y: 0.8 },
+        mirkwood_enchanted_stream: { x: 4.8, y: 2 },
+        mirkwood_fallen_tree_crossing: { x: 4.8, y: 3.2 },
+        mirkwood_spider_grove: { x: 6, y: 3.2 },
+        mirkwood_ruined_clearing: { x: 6, y: 2 },
+        place_of_black_spiders: { x: 7.2, y: 2 },
+        forest_of_tangled_smothering_trees: { x: 7.2, y: 0.8 },
+      },
+    },
+    elven_halls: {
+      label: "Elvenking's Halls",
+      rooms: [
+        "elvish_clearing",
+        "elvenkings_halls",
+        "dark_dungeon",
+        "cellar",
+        "elven_prison_cells",
+        "elven_guard_post",
+        "elven_feast_hall",
+        "elven_underground_river",
+        "elven_storage_rooms",
+      ],
+      positions: {
+        elvish_clearing: { x: 0, y: 0 },
+        elvenkings_halls: { x: 1.2, y: 0 },
+        elven_guard_post: { x: 1.2, y: -1.2 },
+        elven_feast_hall: { x: 2.4, y: -1.2 },
+        dark_dungeon: { x: 1.2, y: 1.2 },
+        elven_prison_cells: { x: 1.2, y: 2.4 },
+        cellar: { x: 2.4, y: 1.2 },
+        elven_storage_rooms: { x: 3.6, y: 1.2 },
+        elven_underground_river: { x: 3.6, y: 2.4 },
+      },
+    },
+    long_lake: {
+      label: "Long Lake",
+      parentScope: "elven_halls",
+      hostRoomId: "cellar",
+      previewRooms: ["lower_halls"],
+      rooms: [
+        "long_lake",
+        "strong_river",
+        "wooden_town",
+        "laketown_marketplace",
+        "laketown_docks",
+        "laketown_town_square",
+        "laketown_bridges",
+        "laketown_warehouses",
+        "laketown_tavern",
+        "bleak_barren_land",
+        "ruins_of_the_town_of_dale",
+        "stoe_of_ravenhill",
+        "little_steep_bay",
+        "front_gate",
+        "lower_halls",
+      ],
+      positions: {
+        long_lake: { x: 0, y: 0 },
+        strong_river: { x: 1.2, y: 0 },
+        wooden_town: { x: 2.4, y: 0 },
+        laketown_marketplace: { x: 3.6, y: -1.2 },
+        laketown_docks: { x: 3.6, y: 1.2 },
+        laketown_town_square: { x: 2.4, y: -1.2 },
+        laketown_bridges: { x: 2.4, y: 1.2 },
+        laketown_warehouses: { x: 4.8, y: -1.2 },
+        laketown_tavern: { x: 3.6, y: 2.4 },
+        bleak_barren_land: { x: 4.8, y: 0 },
+        ruins_of_the_town_of_dale: { x: 6, y: 0 },
+        stoe_of_ravenhill: { x: 7.2, y: 0 },
+        little_steep_bay: { x: 8.4, y: 0.8 },
+        front_gate: { x: 8.4, y: -0.8 },
+        lower_halls: { x: 9.6, y: -0.8 },
+      },
+    },
+    erebor_inner: {
+      label: "Lower Halls",
+      parentScope: "long_lake",
+      hostRoomId: "front_gate",
+      rooms: [
+        "erebor_hidden_door",
+        "erebor_watch_chamber",
+        "erebor_upper_tunnels",
+        "erebor_ancient_armoury",
+        "erebor_abandoned_workshop",
+        "erebor_great_hall",
+        "erebor_treasure_approach",
+        "lower_halls",
+        "smooth_straight_passage",
+        "empty_place",
+        "lonely_mountain",
+      ],
+      positions: {
+        erebor_hidden_door: { x: 0, y: 0 },
+        erebor_watch_chamber: { x: 1.2, y: 0 },
+        erebor_upper_tunnels: { x: 2.4, y: 0 },
+        erebor_ancient_armoury: { x: 2.4, y: 1.2 },
+        erebor_abandoned_workshop: { x: 3.6, y: 0 },
+        erebor_great_hall: { x: 4.8, y: 0 },
+        erebor_treasure_approach: { x: 6, y: 0 },
+        lower_halls: { x: 7.2, y: 0 },
+        smooth_straight_passage: { x: 8.4, y: 0 },
+        empty_place: { x: 9.6, y: 0 },
+        lonely_mountain: { x: 10.8, y: 0 },
       },
     },
   };
@@ -14695,33 +15298,26 @@
     "room:lane_beneath_hill": { x: 1.3, y: 0 },
     "room:party_field": { x: 2.4, y: 0 },
     "room:bywater_bridge": { x: 3.5, y: 0 },
-    "region:green_dragon": { x: 4.6, y: 0 },
+    "room:green_dragon_inn_outside": { x: 4.6, y: 0 },
+    "room:green_dragon_inn": { x: 4.6, y: -1.05 },
     "room:dreary": { x: 5.75, y: 0 },
-    "room:trolls_clearing": { x: 6.85, y: -1.1 },
-    "room:hidden_path": { x: 6.85, y: -2.25 },
+    "room:trolls_clearing": { x: 6.85, y: -1.05 },
+    "room:hidden_path": { x: 6.85, y: -2.35 },
     "room:trolls_cave": { x: 6.85, y: -3.4 },
     "room:trollshaws_road": { x: 7.95, y: 0 },
     "room:hidden_valley_path": { x: 9.05, y: 0 },
     "region:rivendell": { x: 10.2, y: 0 },
-    "room:misty_mountain": { x: 11.45, y: 0 },
-    "room:narrow_path_1": { x: 12.35, y: -1.15 },
-    "room:narrow_path_2": { x: 13.45, y: -2.25 },
-    "room:narrow_path_3": { x: 14.55, y: -3.35 },
-    "room:narrow_path_4": { x: 12.35, y: -2.35 },
-    "room:narrow_path_5": { x: 15.65, y: -4.45 },
-    "room:narrow_path_6": { x: 12.35, y: -3.55 },
-    "room:narrow_path_7": { x: 11.2, y: -3.55 },
-    "room:narrow_path_8": { x: 12.35, y: 1.1 },
-    "room:narrow_path_9": { x: 13.45, y: 1.1 },
-    "room:narrow_path_10": { x: 14.55, y: 0 },
-    "room:narrow_place": { x: 15.75, y: 0 },
-    "room:large_dry_cave": { x: 15.75, y: -1.2 },
-    "room:narrow_dangerous_path": { x: 16.9, y: 0 },
-    "region:beorn": { x: 18.15, y: 0.25 },
-    "room:great_river": { x: 18.15, y: -1.15 },
-    "room:gate_to_mirkwood": { x: 19.3, y: -1.15 },
-    "room:forest_road": { x: 18.15, y: 1.45 },
-    "room:treeless_opening": { x: 16.9, y: 1.45 },
+    "region:mountains": { x: 11.4, y: 0 },
+    "room:large_dry_cave": { x: 11.4, y: -1.05 },
+    "room:narrow_dangerous_path": { x: 12.4, y: 0 },
+    "region:beorn": { x: 13.6, y: -1.05 },
+    "room:great_river": { x: 13.6, y: -2.35 },
+    "region:mirkwood": { x: 15.6, y: -1.05 },
+    "region:elven_halls": { x: 16.6, y: -1.8 },
+    "room:treeless_opening": { x: 12.4, y: -1.05 },
+    "room:mountains": { x: 14.6, y: -3.4 },
+    "room:forest_river": { x: 15.6, y: -2.35 },
+    "region:goblin_tunnels": { x: 11.4, y: 0.85 },
   };
 
   const WORLD_MAP_LABEL_OVERRIDES = {
@@ -14739,20 +15335,223 @@
     goblin_tunnels: "large_dry_cave",
   };
 
+  const WORLD_REGION_INLINE_IN_WORLD = new Set([
+    "green_dragon",
+  ]);
+
+  const WORLD_REGION_DRILLDOWN_DISABLED = new Set([
+    "green_dragon",
+  ]);
+
   const ROOM_TO_MAP_REGION = Object.fromEntries(
     Object.entries(MAP_REGION_DEFINITIONS)
       .flatMap(([regionId, region]) => region.rooms.map((roomId) => [roomId, regionId]))
   );
 
+  function cloneMapPointMap(points = {}) {
+    return Object.fromEntries(
+      Object.entries(points || {}).map(([id, point]) => [id, { x: Number(point?.x) || 0, y: Number(point?.y) || 0 }])
+    );
+  }
+
+  function loadMapLayoutOverrides() {
+    try {
+      const payload = JSON.parse(localStorage.getItem(MAP_LAYOUT_OVERRIDE_KEY) || "{}");
+      const scopes = payload && typeof payload === "object" && payload.scopes && typeof payload.scopes === "object"
+        ? payload.scopes
+        : {};
+      return {
+        scopes: Object.fromEntries(
+          Object.entries(scopes).map(([scope, points]) => [scope, cloneMapPointMap(points)])
+        ),
+      };
+    } catch (_error) {
+      return { scopes: {} };
+    }
+  }
+
+  function saveMapLayoutOverrides(overrides) {
+    try {
+      localStorage.setItem(MAP_LAYOUT_OVERRIDE_KEY, JSON.stringify({
+        scopes: Object.fromEntries(
+          Object.entries(overrides?.scopes || {}).map(([scope, points]) => [scope, cloneMapPointMap(points)])
+        ),
+      }));
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function mapLayoutScopeOverrides(scope = "world") {
+    return cloneMapPointMap(loadMapLayoutOverrides().scopes?.[scope] || {});
+  }
+
+  function saveMapLayoutScopeOverrides(scope = "world", points = {}) {
+    const payload = loadMapLayoutOverrides();
+    payload.scopes[scope] = cloneMapPointMap(points);
+    return saveMapLayoutOverrides(payload);
+  }
+
+  function clearMapLayoutScopeOverrides(scope = "world") {
+    const payload = loadMapLayoutOverrides();
+    delete payload.scopes[scope];
+    return saveMapLayoutOverrides(payload);
+  }
+
+  function mapLayoutScopeSignature(scope = "world") {
+    return JSON.stringify(mapLayoutScopeOverrides(scope));
+  }
+
+  function mergeMapPinnedPositions(basePoints = {}, scope = "world") {
+    return {
+      ...cloneMapPointMap(basePoints),
+      ...mapLayoutScopeOverrides(scope),
+    };
+  }
+
+  function loadMapEditorSnapPreference() {
+    const saved = String(localStorage.getItem(MAP_EDITOR_SNAP_PREF_KEY) || "").trim().toLowerCase();
+    if (saved === "off" || saved === "false" || saved === "0") return false;
+    return true;
+  }
+
+  function saveMapEditorSnapPreference(enabled) {
+    try {
+      localStorage.setItem(MAP_EDITOR_SNAP_PREF_KEY, enabled ? "on" : "off");
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function sourceMapPinnedPositionsForScope(scope = "world") {
+    if (scope === "world") return cloneMapPointMap(WORLD_OVERVIEW_PINNED_POSITIONS);
+    const region = MAP_REGION_DEFINITIONS[scope];
+    if (!region) return {};
+    return Object.fromEntries(
+      Object.entries(region.positions || {}).map(([roomId, point]) => [`room:${roomId}`, { x: Number(point?.x) || 0, y: Number(point?.y) || 0 }])
+    );
+  }
+
+  function effectiveMapPinnedPositionsForScope(scope = "world") {
+    return {
+      ...sourceMapPinnedPositionsForScope(scope),
+      ...mapLayoutScopeOverrides(scope),
+    };
+  }
+
+  function formatMapPointValue(value) {
+    const rounded = roundMapCoordinate(value);
+    if (Math.abs(rounded - Math.round(rounded)) < 0.0001) return String(Math.round(rounded));
+    return rounded.toFixed(2).replace(/\.?0+$/, "");
+  }
+
+  function formatMapSourcePositions(scope = "world", points = {}) {
+    if (scope === "world") {
+      return Object.entries(points)
+        .map(([nodeId, point]) => `    ${JSON.stringify(nodeId)}: { x: ${formatMapPointValue(point.x)}, y: ${formatMapPointValue(point.y)} },`)
+        .join("\n");
+    }
+    return Object.entries(points)
+      .map(([nodeId, point]) => `        ${nodeId.replace(/^room:/, "")}: { x: ${formatMapPointValue(point.x)}, y: ${formatMapPointValue(point.y)} },`)
+      .join("\n");
+  }
+
+  function patchGameJsMapPositions(sourceText, scope = "world", points = {}) {
+    const source = String(sourceText || "");
+    const replacementBody = formatMapSourcePositions(scope, points);
+    if (scope === "world") {
+      return source.replace(
+        /const WORLD_OVERVIEW_PINNED_POSITIONS = \{\n[\s\S]*?\n  \};/,
+        `const WORLD_OVERVIEW_PINNED_POSITIONS = {\n${replacementBody}\n  };`
+      );
+    }
+    const scopePattern = new RegExp(`(${escapeRegExp(scope)}:\\s*\\{[\\s\\S]*?positions:\\s*\\{\\n)([\\s\\S]*?)(\\n\\s*\\},\\n\\s*\\},)`);
+    return source.replace(scopePattern, `$1${replacementBody}$3`);
+  }
+
+  function mapSourceReplacementSnippet(scope = "world", points = {}) {
+    if (scope === "world") {
+      return `const WORLD_OVERVIEW_PINNED_POSITIONS = {\n${formatMapSourcePositions(scope, points)}\n  };`;
+    }
+    return `${scope}: {\n      ...\n      positions: {\n${formatMapSourcePositions(scope, points)}\n      },\n    },`;
+  }
+
+  function escapeRegExp(text = "") {
+    return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function formatMapDirectionBadge(direction = "") {
+    const normalized = compassDirectionKey(direction) || normalize(direction);
+    return {
+      north: "N",
+      "north east": "NE",
+      east: "E",
+      "south east": "SE",
+      south: "S",
+      "south west": "SW",
+      west: "W",
+      "north west": "NW",
+      up: "U",
+      down: "D",
+      inside: "IN",
+      outside: "OUT",
+      forward: "F",
+      back: "B",
+    }[normalized] || direction.toUpperCase();
+  }
+
+  function uniqueMapEditorExits(meta, nodeId) {
+    const exits = [];
+    const seen = new Set();
+    for (const edge of meta?.edges || []) {
+      for (const link of edge.links || []) {
+        if (link.from !== nodeId) continue;
+        const key = `${link.direction}|${link.to}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const targetNode = (meta.nodes || []).find((candidate) => candidate.id === link.to);
+        exits.push({
+          direction: link.direction || "",
+          badge: formatMapDirectionBadge(link.direction || ""),
+          toId: link.to,
+          toLabel: targetNode?.label || link.to,
+        });
+      }
+    }
+    for (const stub of meta?.exitStubs || []) {
+      if (stub.nodeId !== nodeId) continue;
+      const key = `${stub.direction}|unexplored`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      exits.push({
+        direction: stub.direction || "",
+        badge: formatMapDirectionBadge(stub.direction || ""),
+        toId: "",
+        toLabel: "Unexplored",
+      });
+    }
+    return exits;
+  }
+
   function buildExplorationMapState(game, options = {}) {
     const scope = String(options.scope || "world").trim() || "world";
     const roomOrder = new Map((game.data?.roomOrder || Object.keys(game.rooms || {})).map((roomId, index) => [roomId, index]));
-    const visitedRooms = [...(game?.visitedRooms || [])].filter((roomId) => game.rooms?.[roomId]);
-    if (!visitedRooms.length) return null;
+    const visibleRooms = (game?.sceneMapShowAll
+      ? Object.keys(game.rooms || {})
+      : [...(game?.visitedRooms || [])])
+      .filter((roomId) => (
+        roomId !== "flags"
+        && game.rooms?.[roomId]
+        && typeof game.rooms[roomId] === "object"
+        && (game.rooms[roomId].name || game.rooms[roomId].description)
+      ));
+    if (!visibleRooms.length) return null;
 
     const model = scope === "world"
-      ? buildWorldMapModel(game, visitedRooms, roomOrder)
-      : buildRegionMapModel(game, visitedRooms, roomOrder, scope);
+      ? buildWorldMapModel(game, visibleRooms, roomOrder)
+      : buildRegionMapModel(game, visibleRooms, roomOrder, scope);
     if (!model?.nodes?.length) return null;
 
     const positionOrder = new Map(model.nodes.map((node, index) => [node.id, index]));
@@ -14771,19 +15570,28 @@
 
   function buildSceneMapCacheKey(game, scope = "world") {
     const normalizedScope = String(scope || "world").trim() || "world";
-    const visitedRooms = [...(game?.visitedRooms || [])]
-      .filter((roomId) => game.rooms?.[roomId])
+    const visibleRooms = (game?.sceneMapShowAll
+      ? Object.keys(game.rooms || {})
+      : [...(game?.visitedRooms || [])])
+      .filter((roomId) => (
+        roomId !== "flags"
+        && game.rooms?.[roomId]
+        && typeof game.rooms[roomId] === "object"
+        && (game.rooms[roomId].name || game.rooms[roomId].description)
+      ))
       .sort();
     return [
       normalizedScope,
+      game?.sceneMapShowAll ? "all" : "visited",
+      mapLayoutScopeSignature(normalizedScope),
       game.currentRoom || "",
-      visitedRooms.join("|"),
+      visibleRooms.join("|"),
     ].join("::");
   }
 
   function scaleSceneMapState(mapState, zoom = 1) {
     if (!mapState) return null;
-    const safeZoom = Math.max(0.6, Math.min(2.4, Number(zoom) || 1));
+    const safeZoom = Math.max(MIN_SCENE_MAP_ZOOM, Math.min(MAX_SCENE_MAP_ZOOM, Number(zoom) || DEFAULT_SCENE_MAP_ZOOM));
     const scalePoint = (point) => (point
       ? {
           x: Math.round(point.x * safeZoom),
@@ -14810,6 +15618,7 @@
     return `<div class="scene-map-stage" style="width:${mapState.baseWidth}px;height:${mapState.baseHeight}px;">
       <img class="scene-map-render" src="${mapState.imageSrc}" alt="${escapeXml(mapState.accessibleLabel || mapState.title || "Explored map")}">
       <div class="scene-map-hotspots">${hotspotMarkup}</div>
+      <div class="scene-map-editor-layer" hidden></div>
     </div>`;
   }
 
@@ -14821,13 +15630,45 @@
 
     for (const roomId of sortedRooms) {
       const regionId = ROOM_TO_MAP_REGION[roomId];
-      if (regionId && WORLD_INLINE_REGION_HOSTS[regionId]) continue;
+      const region = regionId ? MAP_REGION_DEFINITIONS[regionId] : null;
+      if (region?.parentScope) continue;
+      if (regionId && WORLD_REGION_INLINE_IN_WORLD.has(regionId)) {
+        const node = {
+          id: `room:${roomId}`,
+          label: WORLD_MAP_LABEL_OVERRIDES[roomId] || roomDisplayName(game.rooms[roomId] || roomId),
+          kind: "room",
+          roomId,
+        };
+        if (nodeMap.has(node.id)) continue;
+        nodeMap.set(node.id, node);
+        nodes.push(node);
+        continue;
+      }
+      if (regionId && WORLD_INLINE_REGION_HOSTS[regionId]) {
+        const nodeId = `region:${regionId}`;
+        if (nodeMap.has(nodeId)) continue;
+        const node = {
+          id: nodeId,
+          label: region?.label || roomDisplayName(game.rooms[roomId] || roomId),
+          kind: "region",
+          openRegion: regionId,
+          portalHostRoomId: WORLD_INLINE_REGION_HOSTS[regionId],
+          portalDirection: "down",
+        };
+        nodeMap.set(nodeId, node);
+        nodes.push(node);
+        continue;
+      }
       const nodeId = regionId ? `region:${regionId}` : `room:${roomId}`;
       if (nodeMap.has(nodeId)) continue;
       if (regionId) {
-        const region = MAP_REGION_DEFINITIONS[regionId];
         const label = region?.label || roomDisplayName(game.rooms[roomId] || roomId);
-        const node = { id: nodeId, label, kind: "region", openRegion: regionId };
+        const node = {
+          id: nodeId,
+          label,
+          kind: "region",
+          openRegion: WORLD_REGION_DRILLDOWN_DISABLED.has(regionId) ? "" : regionId,
+        };
         nodeMap.set(nodeId, node);
         nodes.push(node);
         continue;
@@ -14842,50 +15683,65 @@
       nodes.push(node);
     }
 
-    for (const [regionId, hostRoomId] of Object.entries(WORLD_INLINE_REGION_HOSTS)) {
-      const hostNode = nodeMap.get(`room:${hostRoomId}`);
-      const region = MAP_REGION_DEFINITIONS[regionId];
-      if (!hostNode || !region) continue;
-      const visitedRegionRooms = region.rooms.filter((roomId) => visitedSet.has(roomId));
-      if (!visitedRegionRooms.length) continue;
-      hostNode.inlinePortal = {
-        openRegion: regionId,
-        label: region.label,
-        direction: "down",
-      };
-    }
-
     const edges = buildMapEdges(game, visitedSet, {
       mapRoom: (roomId) => {
         const regionId = ROOM_TO_MAP_REGION[roomId];
+        const region = regionId ? MAP_REGION_DEFINITIONS[regionId] : null;
+        if (region?.parentScope) return "";
+        if (regionId && WORLD_REGION_INLINE_IN_WORLD.has(regionId)) return `room:${roomId}`;
         if (regionId && WORLD_INLINE_REGION_HOSTS[regionId]) return "";
         return regionId ? `region:${regionId}` : `room:${roomId}`;
       },
       allowedNodeIds: new Set(nodes.map((node) => node.id)),
     });
+    const exitStubs = buildMapExitStubs(game, visitedSet, {
+      mapRoom: (roomId) => {
+        const regionId = ROOM_TO_MAP_REGION[roomId];
+        const region = regionId ? MAP_REGION_DEFINITIONS[regionId] : null;
+        if (region?.parentScope) return "";
+        if (regionId && WORLD_REGION_INLINE_IN_WORLD.has(regionId)) return `room:${roomId}`;
+        if (regionId && WORLD_INLINE_REGION_HOSTS[regionId]) return "";
+        return regionId ? `region:${regionId}` : `room:${roomId}`;
+      },
+      allowedNodeIds: new Set(nodes.map((node) => node.id)),
+    });
+    addMapPortalEdges(edges, nodes);
 
     const currentRoomId = game.currentRoom;
     const currentRegionId = ROOM_TO_MAP_REGION[currentRoomId] || "";
+    let topLevelRegionId = currentRegionId;
+    while (topLevelRegionId && MAP_REGION_DEFINITIONS[topLevelRegionId]?.parentScope) {
+      topLevelRegionId = MAP_REGION_DEFINITIONS[topLevelRegionId].parentScope;
+    }
     const currentNodeId = currentRegionId
-      ? (WORLD_INLINE_REGION_HOSTS[currentRegionId] ? `room:${WORLD_INLINE_REGION_HOSTS[currentRegionId]}` : `region:${currentRegionId}`)
+      ? (
+          WORLD_REGION_INLINE_IN_WORLD.has(topLevelRegionId)
+            ? `room:${currentRoomId}`
+            : `region:${topLevelRegionId}`
+        )
       : `room:${currentRoomId}`;
     return {
       nodes,
       edges,
+      exitStubs,
       currentNodeId,
       parentScope: "",
       title: "Explored Map",
       subtitle: `World overview • current: ${roomDisplayName(game.rooms[currentRoomId] || currentRoomId)}`,
       accessibleLabel: "World overview of explored locations",
-      pinnedPositions: WORLD_OVERVIEW_PINNED_POSITIONS,
+      pinnedPositions: mergeMapPinnedPositions(WORLD_OVERVIEW_PINNED_POSITIONS, "world"),
     };
   }
 
   function buildRegionMapModel(game, visitedRooms, roomOrder, scope) {
     const region = MAP_REGION_DEFINITIONS[scope];
     if (!region) return null;
+    const childRegions = Object.entries(MAP_REGION_DEFINITIONS)
+      .filter(([_regionId, candidate]) => candidate.parentScope === scope);
+    const previewRoomSet = new Set(region.previewRooms || []);
+    const childRoomIds = new Set(childRegions.flatMap(([_regionId, candidate]) => candidate.rooms || []));
     const visitedRegionRooms = region.rooms
-      .filter((roomId) => visitedRooms.includes(roomId))
+      .filter((roomId) => visitedRooms.includes(roomId) && (!childRoomIds.has(roomId) || previewRoomSet.has(roomId)))
       .sort((left, right) => (roomOrder.get(left) ?? 0) - (roomOrder.get(right) ?? 0));
     if (!visitedRegionRooms.length) return null;
 
@@ -14895,23 +15751,41 @@
       kind: "room",
       roomId,
     }));
+    const nodeMap = new Map(nodes.map((node) => [node.roomId, node]));
+
+    for (const [childRegionId, childRegion] of childRegions) {
+      const hostNode = nodeMap.get(childRegion.hostRoomId || "");
+      const visibleChildRooms = (childRegion.rooms || []).filter((roomId) => visitedRooms.includes(roomId));
+      if (!hostNode || !visibleChildRooms.length) continue;
+      hostNode.inlinePortal = {
+        openRegion: childRegionId,
+        label: childRegion.label,
+        direction: "down",
+      };
+    }
 
     const edges = buildMapEdges(game, new Set(visitedRegionRooms), {
       mapRoom: (roomId) => `room:${roomId}`,
       allowedNodeIds: new Set(nodes.map((node) => node.id)),
     });
+    const exitStubs = buildMapExitStubs(game, new Set(visitedRegionRooms), {
+      mapRoom: (roomId) => `room:${roomId}`,
+      allowedNodeIds: new Set(nodes.map((node) => node.id)),
+    });
 
     const currentNodeId = region.rooms.includes(game.currentRoom) ? `room:${game.currentRoom}` : "";
-    const pinnedPositions = Object.fromEntries(
+    const defaultPinnedPositions = Object.fromEntries(
       Object.entries(region.positions || {}).map(([roomId, point]) => [`room:${roomId}`, point])
     );
+    const pinnedPositions = mergeMapPinnedPositions(defaultPinnedPositions, scope);
     return {
       nodes,
       edges,
+      exitStubs,
       currentNodeId,
-      parentScope: "world",
+      parentScope: region.parentScope || "world",
       title: region.label,
-      subtitle: "Local map • use Back to return to the world overview",
+      subtitle: `Local map • use Back to return to ${region.parentScope ? (MAP_REGION_DEFINITIONS[region.parentScope]?.label || "the previous map") : "the world overview"}`,
       accessibleLabel: `${region.label} local map`,
       pinnedPositions,
     };
@@ -14947,6 +15821,111 @@
     }
 
     return edges;
+  }
+
+  function addMapPortalEdges(edges, nodes) {
+    for (const node of nodes || []) {
+      if (!node?.portalHostRoomId) continue;
+      const hostNodeId = `room:${node.portalHostRoomId}`;
+      if (!(nodes || []).some((candidate) => candidate.id === hostNodeId)) continue;
+      const direction = compassDirectionKey(node.portalDirection) || normalize(node.portalDirection) || "down";
+      const reverseDirection = oppositeDirection(direction) || "up";
+      const left = hostNodeId < node.id ? hostNodeId : node.id;
+      const right = left === hostNodeId ? node.id : hostNodeId;
+      edges.push({
+        from: left,
+        to: right,
+        links: [
+          { from: hostNodeId, to: node.id, direction },
+          { from: node.id, to: hostNodeId, direction: reverseDirection },
+        ],
+      });
+    }
+    return edges;
+  }
+
+  function buildMapExitStubs(game, visitedSet, options = {}) {
+    const mapRoom = typeof options.mapRoom === "function" ? options.mapRoom : ((roomId) => roomId);
+    const allowedNodeIds = options.allowedNodeIds || null;
+    const stubs = [];
+    const seen = new Set();
+
+    for (const connection of game.connections || []) {
+      if (!visitedSet.has(connection.from) || visitedSet.has(connection.to)) continue;
+      const nodeId = mapRoom(connection.from);
+      const targetNodeId = mapRoom(connection.to);
+      if (!nodeId) continue;
+      if (allowedNodeIds && !allowedNodeIds.has(nodeId)) continue;
+      if (targetNodeId && targetNodeId === nodeId) continue;
+      const direction = compassDirectionKey(connection.direction) || normalize(connection.direction);
+      if (!direction) continue;
+      const key = `${nodeId}|${direction}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      stubs.push({
+        nodeId,
+        direction,
+      });
+    }
+
+    return stubs;
+  }
+
+  function mapEdgeRenderGeometry(edge, centers, boxSize = 96) {
+    const links = edge?.links || [];
+    const twoWay = links.some((link) => link.from === edge?.from && link.to === edge?.to)
+      && links.some((link) => link.from === edge?.to && link.to === edge?.from);
+    if (twoWay) {
+      const from = centers[edge.from];
+      const to = centers[edge.to];
+      if (!from || !to) return null;
+      const fromDirection = resolveMapEdgeDirection(links, edge.from, edge.to, from, to);
+      const toDirection = resolveMapEdgeDirection(links, edge.to, edge.from, to, from);
+      return {
+        from,
+        to,
+        fromDirection,
+        toDirection,
+        twoWay: true,
+        fromAnchor: mapBoxAnchorPoint(from, fromDirection, boxSize, to),
+        toAnchor: mapBoxAnchorPoint(to, toDirection, boxSize, from),
+      };
+    }
+
+    const link = links[0] || null;
+    if (!link) return null;
+    const from = centers[link.from];
+    const to = centers[link.to];
+    if (!from || !to) return null;
+    const fromDirection = link.direction || resolveMapEdgeDirection(links, link.from, link.to, from, to);
+    const toDirection = oppositeDirection(fromDirection) || resolveMapEdgeDirection(links, link.to, link.from, to, from);
+    return {
+      from,
+      to,
+      fromDirection,
+      toDirection,
+      twoWay: false,
+      fromAnchor: mapBoxAnchorPoint(from, fromDirection, boxSize, to),
+      toAnchor: mapBoxAnchorPoint(to, toDirection, boxSize, from),
+    };
+  }
+
+  function buildMapStubGeometry(center, direction = "", boxSize = 96, length = 38) {
+    if (!center) return null;
+    const vector = mapDirectionVector(direction);
+    const magnitude = Math.hypot(vector.x, vector.y) || 1;
+    const unitX = vector.x / magnitude;
+    const unitY = vector.y / magnitude;
+    const target = {
+      x: center.x + (unitX * boxSize),
+      y: center.y + (unitY * boxSize),
+    };
+    const from = mapBoxAnchorPoint(center, direction, boxSize, target);
+    const to = {
+      x: from.x + (unitX * length),
+      y: from.y + (unitY * length),
+    };
+    return { from, to };
   }
 
   function renderExplorationMapSvg(model, positions, options = {}) {
@@ -14989,24 +15968,25 @@
     }
 
     const lineMarkup = model.edges.map((edge) => {
-      const from = nodePixels.get(edge.from);
-      const to = nodePixels.get(edge.to);
-      if (!from || !to) return "";
-      const twoWay = edge.links.some((link) => link.from === edge.from && link.to === edge.to)
-        && edge.links.some((link) => link.from === edge.to && link.to === edge.from);
-      const fromDirection = resolveMapEdgeDirection(edge.links, edge.from, edge.to, from, to);
-      const toDirection = resolveMapEdgeDirection(edge.links, edge.to, edge.from, to, from);
+      const geometry = mapEdgeRenderGeometry(edge, Object.fromEntries(nodePixels.entries()), boxSize);
+      if (!geometry) return "";
       return buildMapConnectorMarkup(
-        mapBoxAnchorPoint(from, fromDirection, boxSize, to),
-        mapBoxAnchorPoint(to, toDirection, boxSize, from),
-        { fromDirection, toDirection },
+        geometry.fromAnchor,
+        geometry.toAnchor,
+        { fromDirection: geometry.fromDirection, toDirection: geometry.toDirection },
         {
           boxSize,
-          twoWay,
-          stroke: twoWay ? "#7f6641" : "#a17a4b",
+          twoWay: geometry.twoWay,
+          stroke: geometry.twoWay ? "#7f6641" : "#a17a4b",
           strokeWidth: worldScope ? 4.8 : 4.2,
         }
       );
+    }).join("");
+    const stubMarkup = (model.exitStubs || []).map((stub) => {
+      const center = nodePixels.get(stub.nodeId);
+      const geometry = buildMapStubGeometry(center, stub.direction, boxSize, worldScope ? 42 : 36);
+      if (!geometry) return "";
+      return `<line x1="${geometry.from.x.toFixed(1)}" y1="${geometry.from.y.toFixed(1)}" x2="${geometry.to.x.toFixed(1)}" y2="${geometry.to.y.toFixed(1)}" stroke="#b08b52" stroke-width="${worldScope ? "4.1" : "3.6"}" stroke-linecap="round" stroke-dasharray="10 8" opacity="0.95" />`;
     }).join("");
 
     const nodeMarkup = model.nodes.map((node) => {
@@ -15028,11 +16008,12 @@
         ? `<text x="${point.x.toFixed(1)}" y="${(y + boxSize + 20).toFixed(1)}" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="12" font-weight="700" fill="#7a5b26">click to open</text>`
         : "";
       const regionAttr = clickable ? ` data-map-open-region="${escapeXml(node.openRegion)}"` : "";
+      const labelAttr = ` data-node-label="${escapeXml(node.label)}"`;
       const inlinePortalMarkup = inlinePortal
         ? `<text x="${point.x.toFixed(1)}" y="${(y + 57).toFixed(1)}" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="13" font-weight="700" fill="#7a5b26">↓</text>
         <text x="${point.x.toFixed(1)}" y="${(y + 78).toFixed(1)}" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="11.2" font-weight="600" fill="#2f2412">${escapeXml(inlinePortal.label)}</text>`
         : "";
-      return `<g${regionAttr}>
+      return `<g${regionAttr}${labelAttr}>
         ${currentNode ? `<rect x="${(x - 9).toFixed(1)}" y="${(y - 9).toFixed(1)}" width="${(boxSize + 18).toFixed(1)}" height="${(boxSize + 18).toFixed(1)}" rx="15" fill="none" stroke="#d4a64a" stroke-width="5" />` : ""}
         <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${boxSize}" height="${boxSize}" rx="10" fill="${currentNode ? "#f0d79f" : clickable ? "#f2dfb0" : "#f5ecd5"}" stroke="${currentNode ? "#6c4d18" : clickable ? "#7c5a23" : "#6f5a35"}" stroke-width="${currentNode ? "3.1" : "2.5"}" />
         <text x="${point.x.toFixed(1)}" y="${point.y.toFixed(1)}" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="${worldScope ? "13.5" : "13"}" font-weight="${clickable ? "700" : "600"}" fill="#2f2412">${labelMarkup}</text>
@@ -15083,7 +16064,7 @@
   <text x="40" y="78" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="17" fill="#6f5733">${escapeXml(model.subtitle || "")}</text>
   <text x="${width - 40}" y="48" text-anchor="end" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="15" font-weight="700" fill="#7b6033">${worldScope ? "Click marked locations for local maps" : "Back returns to the world overview"}</text>
   <text x="${width - 40}" y="74" text-anchor="end" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="15" font-weight="700" fill="#7b6033">Wheel, pinch, or buttons to zoom</text>
-  <g>${lineMarkup}</g>
+  <g>${lineMarkup}${stubMarkup}</g>
   <g>${nodeMarkup}</g>
 </svg>`;
     const currentRoomCenter = currentNodeId && nodePixels.get(currentNodeId)
@@ -15094,6 +16075,9 @@
       : null;
     const defaultCenter = { x: Math.round(width / 2), y: Math.round(height / 2) };
     const imageSrc = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    const editorNodeCenters = Object.fromEntries(
+      [...nodePixels.entries()].map(([nodeId, point]) => [nodeId, { x: point.x, y: point.y }])
+    );
 
     return {
       svg,
@@ -15111,6 +16095,30 @@
       defaultCenterBase: defaultCenter,
       currentRoomCenter,
       defaultCenter,
+      editorMeta: {
+        nodes: model.nodes.map((node) => ({
+          id: node.id,
+          label: node.label,
+          kind: node.kind,
+          roomId: node.roomId || "",
+        })),
+        edges: model.edges.map((edge) => ({
+          from: edge.from,
+          to: edge.to,
+          links: (edge.links || []).map((link) => ({ ...link })),
+        })),
+        exitStubs: (model.exitStubs || []).map((stub) => ({ ...stub })),
+        nodeCenters: editorNodeCenters,
+        currentNodeId,
+        boxSize,
+        unitX,
+        unitY,
+        padding,
+        minX,
+        minY,
+        offsetX,
+        offsetY,
+      },
     };
   }
 
@@ -15321,9 +16329,40 @@
     return Math.round(value * 20) / 20;
   }
 
+  function mapBoxSideCenter(center, side = "east", boxSize = 96) {
+    const half = boxSize / 2;
+    return {
+      north: { x: center.x, y: center.y - half },
+      east: { x: center.x + half, y: center.y },
+      south: { x: center.x, y: center.y + half },
+      west: { x: center.x - half, y: center.y },
+    }[side] || { x: center.x, y: center.y };
+  }
+
+  function mapNearestLevelSideCenter(center, target, boxSize = 96) {
+    if (!target) return mapBoxSideCenter(center, "south", boxSize);
+    const dx = target.x - center.x;
+    const dy = target.y - center.y;
+    const horizontalFromSide = dx >= 0 ? "east" : "west";
+    const horizontalToSide = dx >= 0 ? "west" : "east";
+    const verticalFromSide = dy >= 0 ? "south" : "north";
+    const verticalToSide = dy >= 0 ? "north" : "south";
+    const horizontalFrom = mapBoxSideCenter(center, horizontalFromSide, boxSize);
+    const horizontalTo = mapBoxSideCenter(target, horizontalToSide, boxSize);
+    const verticalFrom = mapBoxSideCenter(center, verticalFromSide, boxSize);
+    const verticalTo = mapBoxSideCenter(target, verticalToSide, boxSize);
+    const horizontalDistance = Math.hypot(horizontalTo.x - horizontalFrom.x, horizontalTo.y - horizontalFrom.y);
+    const verticalDistance = Math.hypot(verticalTo.x - verticalFrom.x, verticalTo.y - verticalFrom.y);
+    if (Math.abs(horizontalDistance - verticalDistance) < 0.01) {
+      return Math.abs(dx) >= Math.abs(dy) ? horizontalFrom : verticalFrom;
+    }
+    return horizontalDistance < verticalDistance ? horizontalFrom : verticalFrom;
+  }
+
   function mapBoxAnchorPoint(center, direction = "", boxSize = 96, target = null) {
     const half = boxSize / 2;
     const normalized = compassDirectionKey(direction) || normalize(direction);
+    if (isMapLevelDirection(normalized)) return mapNearestLevelSideCenter(center, target, boxSize);
     const diagonalInset = Math.max(3, Math.min(half * 0.12, 6));
     const diagonalVerticalNudge = Math.max(1, Math.min(half * 0.05, 2.5));
     const anchored = {
@@ -15335,8 +16374,6 @@
       "south west": { x: center.x - half + diagonalInset, y: center.y + half - diagonalVerticalNudge },
       west: { x: center.x - half, y: center.y },
       "north west": { x: center.x - half + diagonalInset, y: center.y - half + diagonalVerticalNudge },
-      up: { x: center.x, y: center.y - half },
-      down: { x: center.x, y: center.y + half },
       inside: { x: center.x, y: center.y - half },
       outside: { x: center.x, y: center.y + half },
       forward: { x: center.x + half, y: center.y },
@@ -15460,13 +16497,7 @@
     if (!useBentSegment) return [fromAnchor, toAnchor];
 
     if (fromLevel || toLevel) {
-      const levelLead = Math.max(18, Math.min(boxSize * 0.42, (Math.abs(dy) * 0.24) + 8));
-      return compactMapConnectorPoints([
-        fromAnchor,
-        ...(fromLevel ? [{ x: fromAnchor.x, y: fromAnchor.y + (Math.sign(dy) * levelLead) }] : []),
-        ...(toLevel ? [{ x: toAnchor.x, y: toAnchor.y - (Math.sign(dy) * levelLead) }] : []),
-        toAnchor,
-      ]);
+      return [fromAnchor, toAnchor];
     }
 
     const lead = Math.max(18, Math.min(boxSize * 0.42, Math.min(Math.abs(dx), Math.abs(dy)) * 0.34));
