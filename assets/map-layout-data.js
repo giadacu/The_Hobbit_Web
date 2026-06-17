@@ -4,8 +4,8 @@
   "world": {
     "nodes": {
       "region:bilbo_home": {
-        "x": 0.20359623015873018,
-        "y": 0.005394345238095238
+        "x": 0.21428571428571427,
+        "y": 0
       },
       "room:lane_beneath_hill": {
         "x": 1.3,
@@ -32,16 +32,16 @@
         "y": 0
       },
       "room:trolls_clearing": {
-        "x": 6.85,
-        "y": -1.05
+        "x": 6.785714285714286,
+        "y": -1.1428571428571428
       },
       "room:hidden_path": {
-        "x": 6.85,
-        "y": -2.35
+        "x": 6.785714285714286,
+        "y": -2.357142857142857
       },
       "room:trolls_cave": {
-        "x": 6.85,
-        "y": -3.4
+        "x": 6.785714285714286,
+        "y": -3.4285714285714284
       },
       "room:trollshaws_road": {
         "x": 7.95,
@@ -56,12 +56,12 @@
         "y": 0
       },
       "region:mountains": {
-        "x": 11.4,
+        "x": 11.285714285714285,
         "y": 0
       },
       "room:large_dry_cave": {
-        "x": 11.4,
-        "y": -1.05
+        "x": 11.285714285714285,
+        "y": -1.1428571428571428
       },
       "room:narrow_dangerous_path": {
         "x": 12.4,
@@ -96,8 +96,8 @@
         "y": -2.35
       },
       "region:goblin_tunnels": {
-        "x": 11.4,
-        "y": 0.85
+        "x": 11.285714285714285,
+        "y": -3.142857142857143
       }
     },
     "connectors": {
@@ -122,6 +122,72 @@
         "waypoints": [],
         "lanes": {
           "tw:room:dreary>room:trolls_clearing:east:south west": {
+            "route": "straight",
+            "sourceSide": "auto",
+            "targetSide": "auto",
+            "waypoints": []
+          },
+          "ow:room:dreary>room:trolls_clearing:north:south": {
+            "route": "auto",
+            "sourceSide": "auto",
+            "targetSide": "west",
+            "waypoints": []
+          },
+          "tw:room:dreary>room:trolls_clearing:north:south west": {
+            "route": "straight",
+            "sourceSide": "auto",
+            "targetSide": "auto",
+            "waypoints": []
+          },
+          "ow:room:dreary>room:trolls_clearing:east:west": {
+            "route": "auto",
+            "sourceSide": "auto",
+            "targetSide": "south",
+            "waypoints": []
+          }
+        }
+      },
+      "region:goblin_tunnels|room:large_dry_cave": {
+        "route": "auto",
+        "sourceSide": "auto",
+        "targetSide": "auto",
+        "waypoints": [],
+        "lanes": {
+          "tw:region:goblin_tunnels>room:large_dry_cave:up:down": {
+            "route": "auto",
+            "sourceSide": "south",
+            "targetSide": "north",
+            "waypoints": []
+          }
+        }
+      },
+      "room:forest_river|room:mountains": {
+        "route": "auto",
+        "sourceSide": "auto",
+        "targetSide": "auto",
+        "waypoints": [],
+        "lanes": {
+          "tw:room:forest_river>room:mountains:north west:south east": {
+            "route": "straight",
+            "sourceSide": "auto",
+            "targetSide": "auto",
+            "waypoints": []
+          },
+          "ow:room:forest_river>room:mountains:north:south": {
+            "route": "auto",
+            "sourceSide": "auto",
+            "targetSide": "east",
+            "waypoints": []
+          }
+        }
+      },
+      "room:great_river|room:mountains": {
+        "route": "auto",
+        "sourceSide": "auto",
+        "targetSide": "auto",
+        "waypoints": [],
+        "lanes": {
+          "ow:room:mountains>room:great_river:south west:north east": {
             "route": "straight",
             "sourceSide": "auto",
             "targetSide": "auto",

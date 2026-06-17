@@ -874,10 +874,20 @@
 
   function geometryBadgePlacement(geometry, direction, index = 0, total = 1) {
     if (!geometry?.points?.length) return null;
-    const startPoint = geometry.points[Math.max(0, Math.floor((geometry.points.length - 1) / 2))] || geometry.start;
-    const endPoint = geometry.points[Math.min(geometry.points.length - 1, Math.floor((geometry.points.length - 1) / 2) + 1)] || geometry.end;
-    const baseX = ((startPoint?.x || 0) + (endPoint?.x || 0)) / 2;
-    const baseY = ((startPoint?.y || 0) + (endPoint?.y || 0)) / 2;
+    const startPoint = geometry.start || geometry.points[0];
+    const nextPoint = geometry.points.find((point) => (
+      point
+      && startPoint
+      && (Math.abs(point.x - startPoint.x) >= 0.1 || Math.abs(point.y - startPoint.y) >= 0.1)
+    )) || geometry.end || startPoint;
+    const segmentDx = (nextPoint?.x || 0) - (startPoint?.x || 0);
+    const segmentDy = (nextPoint?.y || 0) - (startPoint?.y || 0);
+    const segmentMagnitude = Math.hypot(segmentDx, segmentDy) || 1;
+    const alongX = segmentDx / segmentMagnitude;
+    const alongY = segmentDy / segmentMagnitude;
+    const distanceFromNode = Math.min(22, Math.max(16, segmentMagnitude * 0.22));
+    const baseX = (startPoint?.x || 0) + (alongX * distanceFromNode);
+    const baseY = (startPoint?.y || 0) + (alongY * distanceFromNode);
     const side = exitBadgeSide(direction);
     const vector = directionVector(side);
     const magnitude = Math.hypot(vector.x, vector.y) || 1;
@@ -892,6 +902,40 @@
         y: baseY + (normalY * spread),
       },
     };
+  }
+
+  function reverseLaneView(lane) {
+    if (!lane) return null;
+    return {
+      ...lane,
+      startNodeId: lane.endNodeId,
+      endNodeId: lane.startNodeId,
+      sourceDirection: lane.targetDirection,
+      targetDirection: lane.sourceDirection,
+    };
+  }
+
+  function geometryForExitLink(edge, centers, lanes, link) {
+    const direction = normalizeDirection(link.direction);
+    if (!direction) return null;
+    const directLane = lanes.find((candidate) => (
+      candidate.startNodeId === link.from
+      && candidate.endNodeId === link.to
+      && normalizeDirection(candidate.sourceDirection) === direction
+    ));
+    if (directLane) {
+      const directStyle = connectorStyleForLane(edge.id, directLane.id);
+      return connectorGeometry(edge, centers, directStyle, directLane);
+    }
+    const reverseLane = lanes.find((candidate) => (
+      candidate.twoWay
+      && candidate.startNodeId === link.to
+      && candidate.endNodeId === link.from
+      && normalizeDirection(candidate.targetDirection) === direction
+    ));
+    if (!reverseLane) return null;
+    const reverseStyle = connectorStyleForLane(edge.id, reverseLane.id);
+    return connectorGeometry(edge, centers, reverseStyle, reverseLaneView(reverseLane));
   }
 
   function selectedNodeExitDecorations(edge, centers) {
@@ -909,12 +953,7 @@
       const key = `${direction}|${link.to}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const lane = lanes.find((candidate) => candidate.startNodeId === selectedNodeId && normalizeDirection(candidate.sourceDirection) === direction);
-      let geometry = null;
-      if (lane) {
-        const style = connectorStyleForLane(edge.id, lane.id);
-        geometry = connectorGeometry(edge, centers, style, lane);
-      }
+      const geometry = geometryForExitLink(edge, centers, lanes, link);
       exits.push({ direction, geometry });
     }
     if (!exits.length) return "";
@@ -1773,6 +1812,7 @@
       centers,
     } = computeCanvasMetrics(model);
     const lineEntries = [];
+    const exitBadgeEntries = [];
 
     const lineMarkup = model.edges.map((edge) => {
       const laneMarkup = buildDisplayLanes(edge, centers).map((lane) => {
@@ -1804,9 +1844,9 @@
       }).join("");
       if (!laneMarkup) return "";
       const exitBadges = selectedNodeExitDecorations(edge, centers);
+      if (exitBadges) exitBadgeEntries.push(exitBadges);
       return `<g data-edge-id="${edge.id}">
         ${laneMarkup}
-        ${exitBadges}
       </g>`;
     }).join("");
     const bridgeMap = computeLaneBridges(lineEntries);
@@ -1818,6 +1858,7 @@
         ${pathMarkup(entry.points, bridges, entry.stroke, entry.strokeWidth)}
       </g>`;
     }).join("");
+    const exitBadgeMarkup = exitBadgeEntries.join("");
 
     const nodeMarkup = model.nodes.map((node) => {
       const center = centers[node.id];
@@ -1836,7 +1877,7 @@
 
     canvas.innerHTML = `<div class="editor-stage-shell" style="width:${scaledWidth}px;height:${scaledHeight}px;">
       <div class="editor-stage" style="width:${width}px;height:${height}px;transform:scale(${state.zoom});">
-        <svg class="editor-svg" viewBox="0 0 ${width} ${height}" aria-hidden="true">${lineMarkup}${bridgeMarkup}</svg>
+        <svg class="editor-svg" viewBox="0 0 ${width} ${height}" aria-hidden="true">${lineMarkup}${bridgeMarkup}${exitBadgeMarkup}</svg>
         ${nodeMarkup}
       </div>
     </div>`;
