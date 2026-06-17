@@ -14617,7 +14617,7 @@
     return `${root}${String(file).split("/").map(encodeURIComponent).join("/")}${ASSET_QUERY_SUFFIX}`;
   }
 
-  const MAP_REGION_DEFINITIONS = {
+  const BASE_MAP_REGION_DEFINITIONS = {
     bilbo_home: {
       label: "Bilbo's Home",
       rooms: [
@@ -14840,7 +14840,6 @@
       label: "Long Lake",
       parentScope: "elven_halls",
       hostRoomId: "cellar",
-      previewRooms: ["lower_halls"],
       rooms: [
         "long_lake",
         "strong_river",
@@ -14856,7 +14855,6 @@
         "stoe_of_ravenhill",
         "little_steep_bay",
         "front_gate",
-        "lower_halls",
       ],
       positions: {
         long_lake: { x: 0, y: 0 },
@@ -14873,11 +14871,10 @@
         stoe_of_ravenhill: { x: 7.2, y: 0 },
         little_steep_bay: { x: 8.4, y: 0.8 },
         front_gate: { x: 8.4, y: -0.8 },
-        lower_halls: { x: 9.6, y: -0.8 },
       },
     },
     erebor_inner: {
-      label: "Lower Halls",
+      label: "Erebor",
       parentScope: "long_lake",
       hostRoomId: "front_gate",
       rooms: [
@@ -14910,6 +14907,37 @@
   };
 
   const MAP_LAYOUT_DATA = window.HOBBIT_MAP_LAYOUT || {};
+
+  function buildMapRegionDefinitions(baseDefinitions = {}, layoutData = {}) {
+    const merged = Object.fromEntries(
+      Object.entries(baseDefinitions || {}).map(([regionId, definition]) => [regionId, {
+        ...definition,
+        rooms: Array.isArray(definition?.rooms) ? [...definition.rooms] : [],
+        positions: cloneMapPointMap(definition?.positions || {}),
+      }])
+    );
+
+    for (const [regionId, layoutRegion] of Object.entries(layoutData?.regions || {})) {
+      const existing = merged[regionId] || {};
+      merged[regionId] = {
+        ...existing,
+        ...(layoutRegion?.label ? { label: layoutRegion.label } : {}),
+        ...(Array.isArray(layoutRegion?.rooms) ? { rooms: [...layoutRegion.rooms] } : {}),
+        ...(layoutRegion?.parentScope ? { parentScope: layoutRegion.parentScope } : {}),
+        ...((layoutRegion && Object.prototype.hasOwnProperty.call(layoutRegion, "hostRoomId"))
+          ? { hostRoomId: layoutRegion.hostRoomId || "" }
+          : {}),
+        ...((layoutRegion && Object.prototype.hasOwnProperty.call(layoutRegion, "previewRooms"))
+          ? { previewRooms: Array.isArray(layoutRegion.previewRooms) ? [...layoutRegion.previewRooms] : [] }
+          : {}),
+        positions: cloneMapPointMap(layoutRegion?.nodes || existing.positions || {}),
+      };
+    }
+
+    return merged;
+  }
+
+  const MAP_REGION_DEFINITIONS = buildMapRegionDefinitions(BASE_MAP_REGION_DEFINITIONS, MAP_LAYOUT_DATA);
   const WORLD_OVERVIEW_PINNED_POSITIONS = MAP_LAYOUT_DATA.world?.nodes || {};
   const WORLD_MAP_LABEL_OVERRIDES = MAP_LAYOUT_DATA.labelOverrides || {};
   const WORLD_INLINE_REGION_HOSTS = MAP_LAYOUT_DATA.inlineRegionHosts || {};
@@ -15554,6 +15582,24 @@
     };
   }
 
+  function inferMapConnectorSide(from, to) {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? "east" : "west";
+    return dy >= 0 ? "south" : "north";
+  }
+
+  function buildMapDirectionalLead(point, side = "") {
+    const vector = mapDirectionVector(side);
+    if (!vector.x && !vector.y) return null;
+    const magnitude = Math.hypot(vector.x, vector.y) || 1;
+    const lead = ["north east", "north west", "south east", "south west"].includes(side) ? 22 : 18;
+    return {
+      x: point.x + ((vector.x / magnitude) * lead),
+      y: point.y + ((vector.y / magnitude) * lead),
+    };
+  }
+
   function mapLaneRenderGeometry(edge, lane, centers, boxSize = 96, options = {}) {
     const overrideEntry = options.overrideEntry || null;
     const override = resolveMapConnectorEntryStyle(overrideEntry, lane.id);
@@ -15562,12 +15608,47 @@
     if (!from || !to) return null;
     const fromDirection = mapRenderDirectionTowardsTarget(lane.sourceDirection, from, to) || normalize(lane.sourceDirection);
     const toDirection = mapRenderDirectionTowardsTarget(lane.targetDirection, to, from) || normalize(lane.targetDirection);
-    const preferredSourceSide = sanitizeMapConnectorAnchor(override?.sourceSide || override?.startAnchor || fromDirection);
-    const preferredTargetSide = sanitizeMapConnectorAnchor(override?.targetSide || override?.endAnchor || toDirection);
+    const sourceOverride = lane.startNodeId === edge.from ? (override?.sourceSide || override?.startAnchor) : (override?.targetSide || override?.endAnchor);
+    const targetOverride = lane.endNodeId === edge.to ? (override?.targetSide || override?.endAnchor) : (override?.sourceSide || override?.startAnchor);
+    const inferredSourceSide = sanitizeMapConnectorAnchor(fromDirection);
+    const inferredTargetSide = sanitizeMapConnectorAnchor(toDirection);
+    const preferredSourceSide = (sourceOverride && sourceOverride !== "auto")
+      ? sanitizeMapConnectorAnchor(sourceOverride)
+      : (inferredSourceSide !== "auto" ? inferredSourceSide : inferMapConnectorSide(from, to));
+    const preferredTargetSide = (targetOverride && targetOverride !== "auto")
+      ? sanitizeMapConnectorAnchor(targetOverride)
+      : (inferredTargetSide !== "auto" ? inferredTargetSide : inferMapConnectorSide(to, from));
     const snappedSides = snapAlignedMapConnectorSides(from, to, preferredSourceSide, preferredTargetSide, {
-      sourceLocked: Boolean(override?.sourceSide || override?.startAnchor),
-      targetLocked: Boolean(override?.targetSide || override?.endAnchor),
+      sourceLocked: Boolean(sourceOverride && sourceOverride !== "auto"),
+      targetLocked: Boolean(targetOverride && targetOverride !== "auto"),
     });
+    const fromLevel = isMapLevelDirection(fromDirection);
+    const toLevel = isMapLevelDirection(toDirection);
+    const fromAnchor = fromLevel
+      ? mapLevelSidePoint(from, snappedSides.sourceSide, to, boxSize)
+      : resolveMapConnectorAnchor(from, snappedSides.sourceSide, fromDirection, boxSize, to);
+    const toAnchor = toLevel
+      ? mapLevelSidePoint(to, snappedSides.targetSide, from, boxSize)
+      : resolveMapConnectorAnchor(to, snappedSides.targetSide, toDirection, boxSize, from);
+    let points = [fromAnchor, toAnchor];
+    if (override?.route === "straight") {
+      points = [fromAnchor, toAnchor];
+    } else if (override?.waypoints?.length) {
+      points = compactMapConnectorPoints([fromAnchor, ...override.waypoints, toAnchor]);
+    } else if (!fromLevel && !toLevel) {
+      const sourceLead = buildMapDirectionalLead(fromAnchor, snappedSides.sourceSide);
+      const targetLead = buildMapDirectionalLead(toAnchor, snappedSides.targetSide);
+      const routeStart = sourceLead || fromAnchor;
+      const routeEnd = targetLead || toAnchor;
+      const horizontalFirst = ["east", "west"].includes(snappedSides.sourceSide)
+        || (["north east", "south east", "north west", "south west"].includes(snappedSides.sourceSide)
+          ? Math.abs(routeEnd.x - routeStart.x) >= Math.abs(routeEnd.y - routeStart.y)
+          : Math.abs(routeEnd.x - routeStart.x) >= Math.abs(routeEnd.y - routeStart.y));
+      const middle = horizontalFirst
+        ? { x: routeEnd.x, y: routeStart.y }
+        : { x: routeStart.x, y: routeEnd.y };
+      points = compactMapConnectorPoints([fromAnchor, sourceLead, middle, targetLead, toAnchor]);
+    }
     return {
       id: lane.id,
       from,
@@ -15575,8 +15656,11 @@
       fromDirection,
       toDirection,
       twoWay: lane.twoWay,
-      fromAnchor: resolveMapConnectorAnchor(from, snappedSides.sourceSide, fromDirection, boxSize, to),
-      toAnchor: resolveMapConnectorAnchor(to, snappedSides.targetSide, toDirection, boxSize, from),
+      fromAnchor,
+      toAnchor,
+      sourceSide: snappedSides.sourceSide,
+      targetSide: snappedSides.targetSide,
+      points,
       override,
     };
   }
@@ -15647,9 +15731,9 @@
         overrideEntry: connectorOverrides[edge.id],
       });
       if (!geometry) return "";
-      const stroke = geometry.twoWay ? "#7f6641" : "#a17a4b";
-      const strokeWidth = worldScope ? 4.8 : 4.2;
-      const points = buildMapConnectorPoints(
+      const stroke = "#87683c";
+      const strokeWidth = 4.4;
+      const points = geometry.points || buildMapConnectorPoints(
         geometry.fromAnchor,
         geometry.toAnchor,
         { fromDirection: geometry.fromDirection, toDirection: geometry.toDirection },
@@ -15726,8 +15810,9 @@
       const regionAttr = clickable ? ` data-map-open-region="${escapeXml(node.openRegion)}"` : "";
       const labelAttr = ` data-node-label="${escapeXml(node.label)}"`;
       const inlinePortalMarkup = inlinePortal
-        ? `<text x="${point.x.toFixed(1)}" y="${(y + 57).toFixed(1)}" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="13" font-weight="700" fill="#7a5b26">↓</text>
-        <text x="${point.x.toFixed(1)}" y="${(y + 78).toFixed(1)}" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="11.2" font-weight="600" fill="#2f2412">${escapeXml(inlinePortal.label)}</text>`
+        ? `<rect x="${(point.x - 54).toFixed(1)}" y="${(y + 48).toFixed(1)}" width="108" height="40" rx="12" fill="#efe1ba" stroke="#8c6a31" stroke-width="2" />
+        <text x="${point.x.toFixed(1)}" y="${(y + 63).toFixed(1)}" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="13" font-weight="700" fill="#7a5b26">↓ ${escapeXml(inlinePortal.label)}</text>
+        <text x="${point.x.toFixed(1)}" y="${(y + 80).toFixed(1)}" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="10.5" font-weight="700" fill="#5e4316">click to open map</text>`
         : "";
       return `<g${regionAttr}${labelAttr}>
         ${currentNode ? `<rect x="${(x - 9).toFixed(1)}" y="${(y - 9).toFixed(1)}" width="${(boxSize + 18).toFixed(1)}" height="${(boxSize + 18).toFixed(1)}" rx="15" fill="none" stroke="#d4a64a" stroke-width="5" />` : ""}
@@ -16447,6 +16532,7 @@
   function compactMapConnectorPoints(points = []) {
     const compact = [];
     for (const point of points) {
+      if (!point) continue;
       const rounded = {
         x: Math.round(point.x * 10) / 10,
         y: Math.round(point.y * 10) / 10,
@@ -16455,20 +16541,7 @@
       if (previous && Math.abs(previous.x - rounded.x) < 0.1 && Math.abs(previous.y - rounded.y) < 0.1) continue;
       compact.push(rounded);
     }
-    if (compact.length <= 2) return compact;
-
-    const pruned = [compact[0]];
-    for (let index = 1; index < compact.length - 1; index += 1) {
-      const prev = pruned[pruned.length - 1];
-      const current = compact[index];
-      const next = compact[index + 1];
-      const sameX = Math.abs(prev.x - current.x) < 0.1 && Math.abs(current.x - next.x) < 0.1;
-      const sameY = Math.abs(prev.y - current.y) < 0.1 && Math.abs(current.y - next.y) < 0.1;
-      if (sameX || sameY) continue;
-      pruned.push(current);
-    }
-    pruned.push(compact[compact.length - 1]);
-    return pruned;
+    return compact;
   }
 
   function mapDirectionVector(direction = "") {

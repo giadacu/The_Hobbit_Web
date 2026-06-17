@@ -3395,7 +3395,8 @@ const gameCases = [
       const longLakeMapImage = decodeURIComponent(image.getAttribute("src") || "");
       game.print(`Long Lake title: ${title.textContent}`);
       game.print(`Long Lake subtitle: ${subtitle.textContent}`);
-      game.print(`Long Lake map shows Lower Halls: ${longLakeMapImage.includes("Lower Halls") ? "yes" : "no"}`);
+      game.print(`Long Lake map shows Erebor portal: ${longLakeMapImage.includes("Erebor") ? "yes" : "no"}`);
+      game.print(`Long Lake map hides Lower Halls detail: ${longLakeMapImage.includes("Lower Halls") ? "no" : "yes"}`);
       game.print(`Back visible in nested local map: ${backButton.hidden ? "no" : "yes"}`);
       game.layout.sceneMapBack();
       game.print(`Title after one back: ${title.textContent}`);
@@ -3413,7 +3414,8 @@ const gameCases = [
       "Elven halls hides Wooden Town internals: yes",
       "Long Lake title: Long Lake",
       "Long Lake subtitle: Local map",
-      "Long Lake map shows Lower Halls: yes",
+      "Long Lake map shows Erebor portal: yes",
+      "Long Lake map hides Lower Halls detail: yes",
       "Back visible in nested local map: yes",
       "Title after one back: Elvenking's Halls",
       "Title after second back: Explored Map",
@@ -3436,7 +3438,8 @@ const gameCases = [
       game.print(`Complete map world view hides Lower Halls detail: ${worldMapImage.includes("Lower Halls") ? "no" : "yes"}`);
       game.layout.openSceneMapScope("long_lake");
       const longLakeMapImage = decodeURIComponent(image.getAttribute("src") || "");
-      game.print(`Complete map long lake shows Lower Halls: ${longLakeMapImage.includes("Lower Halls") ? "yes" : "no"}`);
+      game.print(`Complete map long lake shows Erebor portal: ${longLakeMapImage.includes("Erebor") ? "yes" : "no"}`);
+      game.print(`Complete map long lake hides Lower Halls detail: ${longLakeMapImage.includes("Lower Halls") ? "no" : "yes"}`);
       game.print(`Complete map long lake shows Front Gate: ${longLakeMapImage.includes("Front Gate") ? "yes" : "no"}`);
       game.print(`Visited rooms unchanged: ${game.visitedRooms.size === visitedBefore ? "yes" : "no"}`);
     },
@@ -3446,7 +3449,8 @@ const gameCases = [
       "Complete map opens away from far left: yes",
       "Complete map has Elven halls region: yes",
       "Complete map world view hides Lower Halls detail: yes",
-      "Complete map long lake shows Lower Halls: yes",
+      "Complete map long lake shows Erebor portal: yes",
+      "Complete map long lake hides Lower Halls detail: yes",
       "Complete map long lake shows Front Gate: yes",
       "Visited rooms unchanged: yes",
     ],

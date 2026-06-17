@@ -2,6 +2,7 @@
   const DATA = expandEditorData(window.HOBBIT_DATA || {});
   const deepClone = (value) => JSON.parse(JSON.stringify(value || {}));
   const INITIAL_LAYOUT = deepClone(window.HOBBIT_MAP_LAYOUT || {});
+  const INITIAL_LAYOUT_SIGNATURE = JSON.stringify(INITIAL_LAYOUT || {});
   const state = {
     layout: deepClone(INITIAL_LAYOUT),
     backups: [],
@@ -1700,6 +1701,7 @@
         updatedAt: new Date().toISOString(),
         scope: state.scope,
         layout: state.layout,
+        baseSignature: INITIAL_LAYOUT_SIGNATURE,
       };
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload));
       if (!options.silent) {
@@ -1722,6 +1724,7 @@
         updatedAt: parsed.updatedAt || "",
         scope: parsed.scope || "world",
         layout: deepClone(parsed.layout),
+        baseSignature: typeof parsed.baseSignature === "string" ? parsed.baseSignature : "",
       };
     } catch (_error) {
       return null;
@@ -2770,13 +2773,15 @@
 
   state.zoom = loadStoredZoom();
   const restoredDraft = loadLayoutDraft();
-  if (restoredDraft?.layout) {
+  if (restoredDraft?.layout && restoredDraft.baseSignature === INITIAL_LAYOUT_SIGNATURE) {
     state.layout = restoredDraft.layout;
     const restoredScope = restoredDraft.scope === "world" || state.layout.regions?.[restoredDraft.scope]
       ? restoredDraft.scope
       : "world";
     state.scope = restoredScope;
     setSaveStatus("Bozza locale ripristinata dal browser. Per applicare le modifiche al gioco, salva nel progetto oppure usa Salva file.", "warning");
+  } else if (restoredDraft?.layout) {
+    setSaveStatus("Bozza locale ignorata: il layout del progetto e cambiato. L'editor sta usando il file corrente.", "warning");
   }
   state.backups = loadBackups();
   renderBackupList();
