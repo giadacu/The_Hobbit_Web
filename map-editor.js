@@ -16,6 +16,7 @@
     lastNodeClick: null,
     drag: null,
     waypointDrag: null,
+    pendingFocus: null,
   };
 
   const SIDE_OPTIONS = ["auto", "north", "east", "south", "west", "north east", "north west", "south east", "south west"];
@@ -114,6 +115,19 @@
     const ensureTwoWay = (a, dirA, b, dirB = oppositeDirection(dirA), distance = 1) => {
       ensureConnection(a, dirA, b, distance);
       ensureConnection(b, dirB, a, distance);
+    };
+
+    const normalizeConnections = (connections = []) => {
+      const merged = new Map();
+      for (const connection of connections) {
+        const key = `${connection.from}|${connection.direction}`;
+        const existing = merged.get(key);
+        merged.set(key, {
+          ...connection,
+          door: existing?.door || connection.door || null,
+        });
+      }
+      return [...merged.values()];
     };
 
     [
@@ -242,6 +256,7 @@
       ["erebor_treasure_approach", "east", "lower_halls", "west"],
     ].forEach(([from, direction, to, reverseDirection, distance]) => ensureTwoWay(from, direction, to, reverseDirection, distance));
 
+    data.connections = normalizeConnections(data.connections);
     return data;
   }
 
@@ -994,6 +1009,73 @@
     return exits;
   }
 
+  function scopeNodeDescriptorForRoom(scope = "world", roomId = "") {
+    if (!roomId) return null;
+    if (scope === "world") {
+      const regionId = ROOM_TO_REGION[roomId];
+      const region = state.layout.regions?.[regionId];
+      if (region?.parentScope) return null;
+      if (regionId && (state.layout.inlineRegionsInWorld || []).includes(regionId)) {
+        return { id: `room:${roomId}`, label: roomName(roomId), scope: "world" };
+      }
+      if (regionId && state.layout.inlineRegionHosts?.[regionId]) return null;
+      if (regionId) {
+        return { id: `region:${regionId}`, label: region?.label || roomName(roomId), scope: "world" };
+      }
+      return { id: `room:${roomId}`, label: roomName(roomId), scope: "world" };
+    }
+    const region = state.layout.regions?.[scope];
+    if (!region) return null;
+    const childRegions = Object.entries(state.layout.regions || {}).filter(([_id, candidate]) => candidate.parentScope === scope);
+    const childRoomIds = new Set(childRegions.flatMap(([_id, child]) => child.rooms || []));
+    const previewRooms = new Set(region.previewRooms || []);
+    if (!(region.rooms || []).includes(roomId)) return null;
+    if (childRoomIds.has(roomId) && !previewRooms.has(roomId)) return null;
+    return { id: `room:${roomId}`, label: roomName(roomId), scope };
+  }
+
+  function externalScopeExits(model) {
+    if (!model || state.scope === "world") return [];
+    const parent = parentScope(state.scope);
+    const visibleRoomIds = new Set((model.nodes || []).map((node) => node.roomId).filter(Boolean));
+    const exits = [];
+    const seen = new Set();
+    for (const node of model.nodes || []) {
+      if (!node.roomId) continue;
+      for (const connection of DATA.connections || []) {
+        if (connection.from !== node.roomId) continue;
+        if (visibleRoomIds.has(connection.to)) continue;
+        const direction = normalizeDirection(connection.direction);
+        if (!direction) continue;
+        const parentTarget = scopeNodeDescriptorForRoom(parent, connection.to);
+        if (!parentTarget) continue;
+        const key = `${node.id}|${direction}|${parentTarget.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        exits.push({
+          id: key,
+          sourceNodeId: node.id,
+          direction,
+          destinationLabel: parentTarget.label,
+          parentNodeId: parentTarget.id,
+          parentScope: parentTarget.scope,
+        });
+      }
+    }
+    exits.sort((left, right) => {
+      if (left.sourceNodeId !== right.sourceNodeId) return left.sourceNodeId.localeCompare(right.sourceNodeId, "it");
+      const directionDelta = directionSortIndex(left.direction) - directionSortIndex(right.direction);
+      if (directionDelta) return directionDelta;
+      return left.destinationLabel.localeCompare(right.destinationLabel, "it");
+    });
+    return exits;
+  }
+
+  function selectedNodeExternalDestinations(model) {
+    if (!state.selectedNodeId) return [];
+    return externalScopeExits(model).filter((entry) => entry.sourceNodeId === state.selectedNodeId);
+  }
+
   function selectedLaneSummary(model) {
     if (!state.selectedLaneId) return null;
     const laneMatch = findLaneById(model, state.selectedLaneId);
@@ -1043,21 +1125,123 @@
       return;
     }
     const exits = selectedNodeDestinations(model);
-    const listMarkup = exits.length
-      ? `<div class="editor-corner-panel__list">${exits.map((entry) => `
-          <div class="editor-corner-panel__row">
-            <span class="editor-corner-panel__badge">${escapeHtml(directionBadge(entry.direction) || entry.direction)}</span>
-            <span class="editor-corner-panel__dest">${escapeHtml(entry.destinationLabel)}</span>
-          </div>
-        `).join("")}</div>`
-      : `<div class="editor-corner-panel__empty">Nessuna uscita disponibile da questa location.</div>`;
+    const externalExits = selectedNodeExternalDestinations(model);
+    const internalMarkup = exits.length
+      ? `<div class="editor-corner-panel__section">
+          <div class="editor-corner-panel__section-title">Interne</div>
+          <div class="editor-corner-panel__list">${exits.map((entry) => `
+            <div class="editor-corner-panel__row">
+              <span class="editor-corner-panel__badge">${escapeHtml(directionBadge(entry.direction) || entry.direction)}</span>
+              <span class="editor-corner-panel__dest">${escapeHtml(entry.destinationLabel)}</span>
+            </div>
+          `).join("")}</div>
+        </div>`
+      : "";
+    const externalMarkup = externalExits.length
+      ? `<div class="editor-corner-panel__section">
+          <div class="editor-corner-panel__section-title">Verso ${escapeHtml(backupScopeLabel(parentScope(state.scope)))}</div>
+          <div class="editor-corner-panel__list">${externalExits.map((entry) => `
+            <button
+              type="button"
+              class="editor-corner-panel__row editor-corner-panel__row--button"
+              data-parent-scope="${escapeHtml(entry.parentScope)}"
+              data-parent-node-id="${escapeHtml(entry.parentNodeId)}"
+            >
+              <span class="editor-corner-panel__badge">${escapeHtml(directionBadge(entry.direction) || entry.direction)}</span>
+              <span class="editor-corner-panel__dest">${escapeHtml(entry.destinationLabel)}</span>
+            </button>
+          `).join("")}</div>
+        </div>`
+      : "";
+    const emptyMarkup = (!internalMarkup && !externalMarkup)
+      ? `<div class="editor-corner-panel__empty">Nessuna uscita disponibile da questa location.</div>`
+      : "";
     nodeExitsPanel.innerHTML = `
       <div class="editor-corner-panel__title">Uscite</div>
       <div class="editor-corner-panel__body">
         <div class="editor-corner-panel__node">${escapeHtml(selectedNode.label || selectedNode.id)}</div>
-        ${listMarkup}
+        ${internalMarkup}
+        ${externalMarkup}
+        ${emptyMarkup}
       </div>
     `;
+  }
+
+  function centerCanvasOnPoint(point) {
+    if (!point) return;
+    canvas.scrollLeft = Math.max(0, (point.x * state.zoom) - (canvas.clientWidth / 2));
+    canvas.scrollTop = Math.max(0, (point.y * state.zoom) - (canvas.clientHeight / 2));
+  }
+
+  function jumpToScopeNode(scope = "world", nodeId = "") {
+    state.scope = scope;
+    state.selectedNodeId = nodeId;
+    state.selectedEdgeId = "";
+    state.selectedLaneId = "";
+    state.lastNodeClick = null;
+    state.pendingFocus = { scope, nodeId };
+    render();
+  }
+
+  function externalExitPlacement(center, direction, index = 0, total = 1) {
+    const side = exitBadgeSide(direction);
+    const label = directionBadge(direction);
+    if (!side || !label) return null;
+    const vector = directionVector(side);
+    const magnitude = Math.hypot(vector.x, vector.y) || 1;
+    const alongX = vector.x / magnitude;
+    const alongY = vector.y / magnitude;
+    const normalX = -alongY;
+    const normalY = alongX;
+    const spread = total > 1 ? (index - ((total - 1) / 2)) * 28 : 0;
+    const halfHeight = BOX_HEIGHT / 2;
+    const quarterOffset = BOX_WIDTH * 0.25;
+    let anchorPoint = anchor(center, side);
+    if (direction === "up") anchorPoint = { x: center.x - quarterOffset, y: center.y - halfHeight };
+    if (direction === "down") anchorPoint = { x: center.x + quarterOffset, y: center.y + halfHeight };
+    anchorPoint = {
+      x: anchorPoint.x + (normalX * spread),
+      y: anchorPoint.y + (normalY * spread),
+    };
+    const stubEnd = {
+      x: anchorPoint.x + (alongX * 32),
+      y: anchorPoint.y + (alongY * 32),
+    };
+    return {
+      label,
+      anchorPoint,
+      stubEnd,
+      directionVector: { x: alongX, y: alongY },
+    };
+  }
+
+  function externalExitMarkup(entry, placement, selected = false) {
+    if (!placement) return "";
+    const destinationText = entry.destinationLabel;
+    const badgeWidth = Math.max(18, (placement.label.length * 7) + 10);
+    const labelWidth = Math.max(74, Math.min(210, (destinationText.length * 6.7) + 20));
+    const pillWidth = badgeWidth + labelWidth + 10;
+    const pillHeight = 22;
+    const pillGap = 10;
+    const centerX = placement.stubEnd.x + (placement.directionVector.x * ((pillWidth / 2) + pillGap));
+    const centerY = placement.stubEnd.y + (placement.directionVector.y * ((pillHeight / 2) + pillGap));
+    const pillX = centerX - (pillWidth / 2);
+    const pillY = centerY - (pillHeight / 2);
+    const badgeX = pillX + 4;
+    const textX = badgeX + badgeWidth + 8;
+    return `<g
+      class="editor-external-exit${selected ? " is-selected" : ""}"
+      data-parent-scope="${escapeHtml(entry.parentScope)}"
+      data-parent-node-id="${escapeHtml(entry.parentNodeId)}"
+      data-external-exit-id="${escapeHtml(entry.id)}"
+    >
+      <path class="editor-external-exit__line" d="M ${placement.anchorPoint.x.toFixed(1)} ${placement.anchorPoint.y.toFixed(1)} L ${placement.stubEnd.x.toFixed(1)} ${placement.stubEnd.y.toFixed(1)}"></path>
+      <rect class="editor-external-exit__hit" x="${(pillX - 6).toFixed(1)}" y="${(pillY - 6).toFixed(1)}" width="${(pillWidth + 12).toFixed(1)}" height="${(pillHeight + 12).toFixed(1)}" rx="10"></rect>
+      <rect class="editor-external-exit__pill" x="${pillX.toFixed(1)}" y="${pillY.toFixed(1)}" width="${pillWidth.toFixed(1)}" height="${pillHeight}" rx="11"></rect>
+      <rect class="editor-external-exit__badge" x="${badgeX.toFixed(1)}" y="${(pillY + 3).toFixed(1)}" width="${badgeWidth.toFixed(1)}" height="${(pillHeight - 6).toFixed(1)}" rx="8"></rect>
+      <text class="editor-external-exit__badge-text" x="${(badgeX + (badgeWidth / 2)).toFixed(1)}" y="${(centerY + 3.2).toFixed(1)}" text-anchor="middle">${escapeHtml(placement.label)}</text>
+      <text class="editor-external-exit__label" x="${textX.toFixed(1)}" y="${(centerY + 3.2).toFixed(1)}">${escapeHtml(destinationText)}</text>
+    </g>`;
   }
 
   function axisAlignedSegments(points = []) {
@@ -1813,6 +1997,7 @@
     } = computeCanvasMetrics(model);
     const lineEntries = [];
     const exitBadgeEntries = [];
+    const scopeExternalExits = externalScopeExits(model);
 
     const lineMarkup = model.edges.map((edge) => {
       const laneMarkup = buildDisplayLanes(edge, centers).map((lane) => {
@@ -1859,6 +2044,22 @@
       </g>`;
     }).join("");
     const exitBadgeMarkup = exitBadgeEntries.join("");
+    const groupedExternalExits = scopeExternalExits.reduce((map, entry) => {
+      const key = `${entry.sourceNodeId}|${exitBadgeSide(entry.direction) || entry.direction}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(entry);
+      return map;
+    }, new Map());
+    const externalExitMarkupText = Array.from(groupedExternalExits.entries()).map(([groupKey, entries]) => {
+      const [sourceNodeId] = groupKey.split("|");
+      const center = centers[sourceNodeId];
+      if (!center) return "";
+      return entries.map((entry, index) => externalExitMarkup(
+        entry,
+        externalExitPlacement(center, entry.direction, index, entries.length),
+        state.selectedNodeId === sourceNodeId,
+      )).join("");
+    }).join("");
 
     const nodeMarkup = model.nodes.map((node) => {
       const center = centers[node.id];
@@ -1877,13 +2078,18 @@
 
     canvas.innerHTML = `<div class="editor-stage-shell" style="width:${scaledWidth}px;height:${scaledHeight}px;">
       <div class="editor-stage" style="width:${width}px;height:${height}px;transform:scale(${state.zoom});">
-        <svg class="editor-svg" viewBox="0 0 ${width} ${height}" aria-hidden="true">${lineMarkup}${bridgeMarkup}${exitBadgeMarkup}</svg>
+        <svg class="editor-svg" viewBox="0 0 ${width} ${height}" aria-hidden="true">${lineMarkup}${bridgeMarkup}${exitBadgeMarkup}${externalExitMarkupText}</svg>
         ${nodeMarkup}
       </div>
     </div>`;
     scopeTitle.textContent = model.title;
     if (scopeSubtitle) scopeSubtitle.textContent = `Zoom ${currentZoomLabel()} • trascina i nodi, seleziona un connettore e rifiniscilo con i punti.`;
     renderCornerPanel(model);
+    if (state.pendingFocus?.scope === state.scope && state.pendingFocus?.nodeId) {
+      const focusPoint = centers[state.pendingFocus.nodeId];
+      if (focusPoint) centerCanvasOnPoint(focusPoint);
+      state.pendingFocus = null;
+    }
     updateScopeNavigationUi();
     updateZoomUi();
     syncSidebar();
@@ -1895,6 +2101,7 @@
     state.selectedEdgeId = "";
     state.selectedLaneId = "";
     state.lastNodeClick = null;
+    state.pendingFocus = null;
     render();
   }
 
@@ -1971,6 +2178,11 @@
 
   scopeSelect.innerHTML = [`<option value="world">world</option>`, ...Object.keys(state.layout.regions || {}).map((scope) => `<option value="${scope}">${scope}</option>`)].join("");
   scopeSelect.addEventListener("change", (event) => setScope(event.target.value));
+  nodeExitsPanel.addEventListener("click", (event) => {
+    const trigger = event.target.closest("[data-parent-scope][data-parent-node-id]");
+    if (!trigger) return;
+    jumpToScopeNode(trigger.getAttribute("data-parent-scope") || "world", trigger.getAttribute("data-parent-node-id") || "");
+  });
   if (scopeBackButton) {
     scopeBackButton.addEventListener("click", () => {
       if (state.scope === "world") return;
@@ -2075,6 +2287,14 @@
   });
 
   canvas.addEventListener("pointerdown", (event) => {
+    const externalExit = event.target.closest("[data-parent-scope][data-parent-node-id]");
+    if (externalExit) {
+      event.preventDefault();
+      state.drag = null;
+      state.waypointDrag = null;
+      jumpToScopeNode(externalExit.getAttribute("data-parent-scope") || "world", externalExit.getAttribute("data-parent-node-id") || "");
+      return;
+    }
     const waypointHandle = event.target.closest("[data-waypoint-index]");
     if (waypointHandle) {
       state.waypointDrag = {
