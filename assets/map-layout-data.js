@@ -4,8 +4,8 @@
   "world": {
     "nodes": {
       "region:bilbo_home": {
-        "x": 0.2,
-        "y": 0
+        "x": 0.20359623015873018,
+        "y": 0.005394345238095238
       },
       "room:lane_beneath_hill": {
         "x": 1.3,
@@ -28,7 +28,7 @@
         "y": -1.05
       },
       "room:dreary": {
-        "x": 5.75,
+        "x": 5.752074748168498,
         "y": 0
       },
       "room:trolls_clearing": {
@@ -232,34 +232,63 @@
       "nodes": {
         "rivendell": {
           "x": 0,
-          "y": 0
+          "y": -1.7142857142857142
         },
         "rivendell_bridge": {
-          "x": -1.2,
-          "y": 0
+          "x": 0.8571428571428571,
+          "y": -4.428571428571428
         },
         "rivendell_terrace": {
-          "x": -1.2,
-          "y": -1.15
+          "x": 0.8571428571428571,
+          "y": -3.5
         },
         "rivendell_courtyard": {
           "x": 0,
-          "y": -1.15
+          "y": -3.5
         },
         "rivendell_library": {
-          "x": 1.2,
-          "y": -1.15
+          "x": 0.8571428571428571,
+          "y": -2.642857142857143
         },
         "rivendell_hall_of_fire": {
           "x": 0,
-          "y": -2.3
+          "y": -0.5
         },
         "rivendell_guest_chambers": {
-          "x": -2.4,
-          "y": -1.9
+          "x": -1.0396949404761906,
+          "y": -2.644574652777778
         }
       },
-      "connectors": {}
+      "connectors": {
+        "room:rivendell|room:rivendell_guest_chambers": {
+          "route": "auto",
+          "sourceSide": "auto",
+          "targetSide": "auto",
+          "waypoints": [],
+          "lanes": {
+            "tw:room:rivendell>room:rivendell_guest_chambers:north west:south east": {
+              "route": "straight",
+              "sourceSide": "auto",
+              "targetSide": "auto",
+              "waypoints": []
+            }
+          }
+        },
+        "room:rivendell|room:rivendell_library": {
+          "route": "auto",
+          "sourceSide": "auto",
+          "targetSide": "auto",
+          "waypoints": [],
+          "lanes": {
+            "tw:room:rivendell>room:rivendell_library:north east:south west": {
+              "route": "straight",
+              "sourceSide": "auto",
+              "targetSide": "auto",
+              "waypoints": []
+            }
+          }
+        }
+      }
     },
     "beorn": {
       "label": "Beorn's House",
@@ -320,87 +349,200 @@
       ],
       "nodes": {
         "misty_mountain": {
-          "x": 1.2,
-          "y": 0
+          "x": -0.2857142857142857,
+          "y": 1
         },
         "narrow_place": {
-          "x": 2.4,
-          "y": 0
+          "x": 1,
+          "y": 1
         },
         "narrow_ledge": {
-          "x": -1.2,
-          "y": -1.2
+          "x": -1.2142857142857142,
+          "y": 0
         },
         "mountain_lookout": {
-          "x": -2.4,
-          "y": -1.2
+          "x": -1.2142857142857142,
+          "y": -1.1428571428571428
         },
         "storm_shelter": {
           "x": -2.4,
           "y": 0
         },
         "narrow_path_1": {
-          "x": 3.6,
-          "y": -0.8
+          "x": -0.2857142857142857,
+          "y": -0.7142857142857142
         },
         "narrow_path_2": {
-          "x": 4.8,
-          "y": -1.4
+          "x": 1,
+          "y": -1.7857142857142856
         },
         "narrow_path_3": {
-          "x": 6,
-          "y": -2
+          "x": 1,
+          "y": -2.7857142857142856
         },
         "narrow_path_4": {
-          "x": 3.6,
-          "y": 0.4
+          "x": 3.571428571428571,
+          "y": 0.42857142857142855
         },
         "narrow_path_5": {
-          "x": 7.2,
-          "y": -2.6
+          "x": 5.142857142857142,
+          "y": -0.8571428571428571
         },
         "narrow_path_6": {
-          "x": 3.6,
-          "y": 1.6
+          "x": 3.571428571428571,
+          "y": 1.9285714285714284
         },
         "narrow_path_7": {
-          "x": 2.4,
-          "y": 1.6
+          "x": 1,
+          "y": 1.9285714285714284
         },
         "narrow_path_8": {
-          "x": 3.6,
-          "y": -2
+          "x": -0.2857142857142857,
+          "y": 2.4285714285714284
         },
         "narrow_path_9": {
-          "x": 4.8,
-          "y": -2.8
+          "x": 5.142857142857142,
+          "y": -2.142857142857143
         },
         "narrow_path_10": {
-          "x": 6,
-          "y": -3.6
+          "x": 5.142857142857142,
+          "y": -3.3571428571428568
         },
         "steep_path_6": {
-          "x": 7.2,
-          "y": -3.6
+          "x": 5.142857142857142,
+          "y": 0.07142857142857142
         },
         "steep_path_7": {
-          "x": 8.4,
-          "y": -3.6
+          "x": 5.142857142857142,
+          "y": 0.9285714285714285
         },
         "steep_path_8": {
-          "x": 9.6,
-          "y": -3.6
+          "x": 5.142857142857142,
+          "y": 1.7857142857142856
         },
         "deep_misty_valley_1": {
-          "x": 7.2,
-          "y": -1.2
+          "x": 5.142857142857142,
+          "y": 3.5
         },
         "deep_misty_valley_2": {
-          "x": 8.4,
-          "y": -1.2
+          "x": 3.571428571428571,
+          "y": 2.9285714285714284
         }
       },
-      "connectors": {}
+      "connectors": {
+        "room:misty_mountain|room:narrow_path_2": {
+          "route": "auto",
+          "sourceSide": "auto",
+          "targetSide": "auto",
+          "waypoints": [],
+          "lanes": {
+            "ow:room:narrow_path_2>room:misty_mountain:south:north": {
+              "route": "auto",
+              "sourceSide": "north east",
+              "targetSide": "south",
+              "waypoints": []
+            }
+          }
+        },
+        "room:narrow_path_1|room:narrow_path_2": {
+          "route": "auto",
+          "sourceSide": "auto",
+          "targetSide": "auto",
+          "waypoints": [],
+          "lanes": {
+            "ow:room:narrow_path_1>room:narrow_path_2:north east:south west": {
+              "route": "straight",
+              "sourceSide": "auto",
+              "targetSide": "auto",
+              "waypoints": []
+            }
+          }
+        },
+        "room:misty_mountain|room:narrow_ledge": {
+          "route": "auto",
+          "sourceSide": "auto",
+          "targetSide": "auto",
+          "waypoints": [],
+          "lanes": {
+            "tw:room:misty_mountain>room:narrow_ledge:north west:south east": {
+              "route": "straight",
+              "sourceSide": "auto",
+              "targetSide": "auto",
+              "waypoints": []
+            }
+          }
+        },
+        "room:misty_mountain|room:narrow_path_7": {
+          "route": "auto",
+          "sourceSide": "auto",
+          "targetSide": "auto",
+          "waypoints": [],
+          "lanes": {
+            "ow:room:narrow_path_7>room:misty_mountain:north:south": {
+              "route": "straight",
+              "sourceSide": "south east",
+              "targetSide": "auto",
+              "waypoints": []
+            }
+          }
+        },
+        "room:narrow_path_1|room:narrow_path_10": {
+          "route": "auto",
+          "sourceSide": "auto",
+          "targetSide": "auto",
+          "waypoints": [],
+          "lanes": {
+            "ow:room:narrow_path_10>room:narrow_path_1:west:east": {
+              "route": "auto",
+              "sourceSide": "north",
+              "targetSide": "auto",
+              "waypoints": []
+            }
+          }
+        },
+        "room:narrow_path_4|room:narrow_path_5": {
+          "route": "auto",
+          "sourceSide": "auto",
+          "targetSide": "auto",
+          "waypoints": [],
+          "lanes": {
+            "ow:room:narrow_path_5>room:narrow_path_4:south west:north east": {
+              "route": "straight",
+              "sourceSide": "auto",
+              "targetSide": "auto",
+              "waypoints": []
+            }
+          }
+        },
+        "room:narrow_path_3|room:narrow_path_5": {
+          "route": "auto",
+          "sourceSide": "auto",
+          "targetSide": "auto",
+          "waypoints": [],
+          "lanes": {
+            "tw:room:narrow_path_3>room:narrow_path_5:south east:north west": {
+              "route": "straight",
+              "sourceSide": "auto",
+              "targetSide": "auto",
+              "waypoints": []
+            }
+          }
+        },
+        "room:deep_misty_valley_1|room:deep_misty_valley_2": {
+          "route": "auto",
+          "sourceSide": "auto",
+          "targetSide": "auto",
+          "waypoints": [],
+          "lanes": {
+            "tw:room:deep_misty_valley_1>room:deep_misty_valley_2:east:west": {
+              "route": "auto",
+              "sourceSide": "auto",
+              "targetSide": "west",
+              "waypoints": []
+            }
+          }
+        }
+      }
     },
     "goblin_tunnels": {
       "label": "Goblin Tunnels",

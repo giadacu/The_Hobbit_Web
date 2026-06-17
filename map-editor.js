@@ -23,6 +23,10 @@
   const BOX_HEIGHT = 106;
   const UNIT = 168;
   const PADDING = 120;
+  const NODE_SNAP_STEP = 1 / 14;
+  const BRIDGE_RADIUS = 10;
+  const BRIDGE_LIFT = 8;
+  const BRIDGE_BACKGROUND = "rgba(239, 227, 198, 0.98)";
   const MIN_ZOOM = 0.45;
   const MAX_ZOOM = 1.75;
   const ZOOM_STEP = 0.1;
@@ -49,6 +53,7 @@
   const targetSideSelect = document.getElementById("connector-target-side");
   const addWaypointButton = document.getElementById("add-waypoint");
   const clearWaypointsButton = document.getElementById("clear-waypoints");
+  const connectorPanel = document.getElementById("connector-panel");
   const resetScopeButton = document.getElementById("reset-scope");
   const saveLayoutButton = document.getElementById("save-layout");
   const chooseBackupFolderButton = document.getElementById("choose-backup-folder");
@@ -61,6 +66,7 @@
   const zoomResetButton = document.getElementById("zoom-reset");
   const zoomInButton = document.getElementById("zoom-in");
   const scopeBackButton = document.getElementById("scope-back");
+  const nodeExitsPanel = document.getElementById("node-exits-panel");
 
   function expandEditorData(rawData) {
     const data = JSON.parse(JSON.stringify(rawData || {}));
@@ -483,6 +489,28 @@
     }[normalized] || "";
   }
 
+  function directionSortIndex(direction = "") {
+    return {
+      north: 0,
+      "north east": 1,
+      east: 2,
+      "south east": 3,
+      south: 4,
+      "south west": 5,
+      west: 6,
+      "north west": 7,
+      up: 8,
+      down: 9,
+      inside: 10,
+      outside: 11,
+    }[normalizeDirection(direction)] ?? 99;
+  }
+
+  function snapNodeCoordinate(value, snapEnabled = true) {
+    if (!snapEnabled) return value;
+    return Math.round((value / NODE_SNAP_STEP)) * NODE_SNAP_STEP;
+  }
+
   function exitBadgeSide(direction = "") {
     const normalized = normalizeDirection(direction);
     if (normalized === "up") return "north";
@@ -614,6 +642,16 @@
     return dy >= 0 ? "south" : "north";
   }
 
+  function levelSidePoint(center, side = "south", target = null) {
+    const halfHeight = BOX_HEIGHT / 2;
+    const quarterOffset = BOX_WIDTH * 0.25;
+    const dx = (target?.x || center.x) - center.x;
+    const horizontalOffset = dx > 0 ? quarterOffset : -quarterOffset;
+    if (side === "north") return { x: center.x + horizontalOffset, y: center.y - halfHeight };
+    if (side === "south") return { x: center.x + horizontalOffset, y: center.y + halfHeight };
+    return center;
+  }
+
   function anchor(center, side = "auto") {
     const halfWidth = BOX_WIDTH / 2;
     const halfHeight = BOX_HEIGHT / 2;
@@ -690,8 +728,14 @@
       sourceLocked: sourceOverride && sourceOverride !== "auto",
       targetLocked: targetOverride && targetOverride !== "auto",
     });
-    const start = anchor(startCenter, snappedSides.sourceSide);
-    const end = anchor(endCenter, snappedSides.targetSide);
+    const sourceIsLevel = ["up", "down"].includes(sourceDirection);
+    const targetIsLevel = ["up", "down"].includes(targetDirection);
+    const start = sourceIsLevel
+      ? levelSidePoint(startCenter, snappedSides.sourceSide, endCenter)
+      : anchor(startCenter, snappedSides.sourceSide);
+    const end = targetIsLevel
+      ? levelSidePoint(endCenter, snappedSides.targetSide, startCenter)
+      : anchor(endCenter, snappedSides.targetSide);
     if (style.route === "straight") {
       return {
         points: [start, end],
@@ -828,25 +872,310 @@
     </g>`;
   }
 
+  function geometryBadgePlacement(geometry, direction, index = 0, total = 1) {
+    if (!geometry?.points?.length) return null;
+    const startPoint = geometry.points[Math.max(0, Math.floor((geometry.points.length - 1) / 2))] || geometry.start;
+    const endPoint = geometry.points[Math.min(geometry.points.length - 1, Math.floor((geometry.points.length - 1) / 2) + 1)] || geometry.end;
+    const baseX = ((startPoint?.x || 0) + (endPoint?.x || 0)) / 2;
+    const baseY = ((startPoint?.y || 0) + (endPoint?.y || 0)) / 2;
+    const side = exitBadgeSide(direction);
+    const vector = directionVector(side);
+    const magnitude = Math.hypot(vector.x, vector.y) || 1;
+    const normalX = -vector.y / magnitude;
+    const normalY = vector.x / magnitude;
+    const spread = total > 1 ? (index - ((total - 1) / 2)) * 16 : 0;
+    return {
+      side,
+      label: directionBadge(direction),
+      badgePoint: {
+        x: baseX + (normalX * spread),
+        y: baseY + (normalY * spread),
+      },
+    };
+  }
+
   function selectedNodeExitDecorations(edge, centers) {
     const selectedNodeId = state.selectedNodeId;
     if (!selectedNodeId || (selectedNodeId !== edge.from && selectedNodeId !== edge.to)) return "";
     const nodeCenter = centers[selectedNodeId];
     if (!nodeCenter) return "";
-    const directions = [];
+    const exits = [];
     const seen = new Set();
+    const lanes = buildDisplayLanes(edge, centers);
     for (const link of edge.links || []) {
       if (link.from !== selectedNodeId) continue;
-      const key = normalizeDirection(link.direction);
-      if (!key || seen.has(key)) continue;
+      const direction = normalizeDirection(link.direction);
+      if (!direction) continue;
+      const key = `${direction}|${link.to}`;
+      if (seen.has(key)) continue;
       seen.add(key);
-      directions.push(key);
+      const lane = lanes.find((candidate) => candidate.startNodeId === selectedNodeId && normalizeDirection(candidate.sourceDirection) === direction);
+      let geometry = null;
+      if (lane) {
+        const style = connectorStyleForLane(edge.id, lane.id);
+        geometry = connectorGeometry(edge, centers, style, lane);
+      }
+      exits.push({ direction, geometry });
     }
-    if (!directions.length) return "";
-    return directions.map((direction, index) => {
-      const placement = exitBadgePlacement(nodeCenter, direction, index, directions.length);
+    if (!exits.length) return "";
+    return exits.map((entry, index) => {
+      const placement = ["up", "down"].includes(entry.direction)
+        ? geometryBadgePlacement(entry.geometry, entry.direction, index, exits.length)
+        : exitBadgePlacement(nodeCenter, entry.direction, index, exits.length);
       return exitBadgeMarkup(placement);
     }).join("");
+  }
+
+  function selectedNodeDestinations(model) {
+    const selectedNodeId = state.selectedNodeId;
+    if (!selectedNodeId) return [];
+    const nodeMap = new Map((model.nodes || []).map((node) => [node.id, node]));
+    const seen = new Set();
+    const exits = [];
+    for (const edge of model.edges || []) {
+      for (const link of edge.links || []) {
+        if (link.from !== selectedNodeId) continue;
+        const direction = normalizeDirection(link.direction);
+        const destination = nodeMap.get(link.to);
+        if (!direction || !destination) continue;
+        const key = `${direction}|${link.to}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        exits.push({
+          direction,
+          destinationLabel: destination.label || link.to,
+        });
+      }
+    }
+    exits.sort((left, right) => {
+      const directionDelta = directionSortIndex(left.direction) - directionSortIndex(right.direction);
+      if (directionDelta) return directionDelta;
+      return left.destinationLabel.localeCompare(right.destinationLabel, "it");
+    });
+    return exits;
+  }
+
+  function selectedLaneSummary(model) {
+    if (!state.selectedLaneId) return null;
+    const laneMatch = findLaneById(model, state.selectedLaneId);
+    if (!laneMatch) return null;
+    const nodeMap = new Map((model.nodes || []).map((node) => [node.id, node]));
+    const fromNode = nodeMap.get(laneMatch.lane.startNodeId);
+    const toNode = nodeMap.get(laneMatch.lane.endNodeId);
+    return {
+      fromLabel: fromNode?.label || laneMatch.lane.startNodeId,
+      toLabel: toNode?.label || laneMatch.lane.endNodeId,
+      sourceDirection: laneMatch.lane.sourceDirection,
+      targetDirection: laneMatch.lane.targetDirection,
+      twoWay: laneMatch.lane.twoWay,
+    };
+  }
+
+  function renderCornerPanel(model) {
+    if (!nodeExitsPanel) return;
+    const laneSummary = selectedLaneSummary(model);
+    if (laneSummary) {
+      nodeExitsPanel.innerHTML = `
+        <div class="editor-corner-panel__title">Connettore</div>
+        <div class="editor-corner-panel__body">
+          <div class="editor-corner-panel__node">${escapeHtml(laneSummary.fromLabel)} → ${escapeHtml(laneSummary.toLabel)}</div>
+          <div class="editor-corner-panel__list">
+            <div class="editor-corner-panel__row">
+              <span class="editor-corner-panel__badge">${escapeHtml(directionBadge(laneSummary.sourceDirection) || laneSummary.sourceDirection || "auto")}</span>
+              <span class="editor-corner-panel__dest">${escapeHtml(laneSummary.fromLabel)} → ${escapeHtml(laneSummary.toLabel)}</span>
+            </div>
+            ${laneSummary.twoWay ? `
+              <div class="editor-corner-panel__row">
+                <span class="editor-corner-panel__badge">${escapeHtml(directionBadge(laneSummary.targetDirection) || laneSummary.targetDirection || "auto")}</span>
+                <span class="editor-corner-panel__dest">${escapeHtml(laneSummary.toLabel)} → ${escapeHtml(laneSummary.fromLabel)}</span>
+              </div>
+            ` : ""}
+          </div>
+        </div>
+      `;
+      return;
+    }
+    const selectedNode = (model.nodes || []).find((node) => node.id === state.selectedNodeId);
+    if (!selectedNode) {
+      nodeExitsPanel.innerHTML = `
+        <div class="editor-corner-panel__title">Uscite</div>
+        <div class="editor-corner-panel__body editor-corner-panel__empty">Seleziona una location per vedere dove portano le sue uscite.</div>
+      `;
+      return;
+    }
+    const exits = selectedNodeDestinations(model);
+    const listMarkup = exits.length
+      ? `<div class="editor-corner-panel__list">${exits.map((entry) => `
+          <div class="editor-corner-panel__row">
+            <span class="editor-corner-panel__badge">${escapeHtml(directionBadge(entry.direction) || entry.direction)}</span>
+            <span class="editor-corner-panel__dest">${escapeHtml(entry.destinationLabel)}</span>
+          </div>
+        `).join("")}</div>`
+      : `<div class="editor-corner-panel__empty">Nessuna uscita disponibile da questa location.</div>`;
+    nodeExitsPanel.innerHTML = `
+      <div class="editor-corner-panel__title">Uscite</div>
+      <div class="editor-corner-panel__body">
+        <div class="editor-corner-panel__node">${escapeHtml(selectedNode.label || selectedNode.id)}</div>
+        ${listMarkup}
+      </div>
+    `;
+  }
+
+  function axisAlignedSegments(points = []) {
+    const segments = [];
+    for (let index = 1; index < points.length; index += 1) {
+      const start = points[index - 1];
+      const end = points[index];
+      if (!start || !end) continue;
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      if (Math.abs(dx) < 0.1 && Math.abs(dy) >= 0.1) {
+        segments.push({
+          orientation: "vertical",
+          start,
+          end,
+          segmentIndex: index - 1,
+          minX: start.x,
+          maxX: start.x,
+          minY: Math.min(start.y, end.y),
+          maxY: Math.max(start.y, end.y),
+        });
+      } else if (Math.abs(dy) < 0.1 && Math.abs(dx) >= 0.1) {
+        segments.push({
+          orientation: "horizontal",
+          start,
+          end,
+          segmentIndex: index - 1,
+          minX: Math.min(start.x, end.x),
+          maxX: Math.max(start.x, end.x),
+          minY: start.y,
+          maxY: start.y,
+        });
+      }
+    }
+    return segments;
+  }
+
+  function pointNearSegmentEnd(segment, x, y, margin = BRIDGE_RADIUS + 2) {
+    return (
+      Math.hypot(segment.start.x - x, segment.start.y - y) <= margin
+      || Math.hypot(segment.end.x - x, segment.end.y - y) <= margin
+    );
+  }
+
+  function bridgeEraseMarkup(bridge, strokeWidth) {
+    const eraseWidth = strokeWidth + 5;
+    if (bridge.orientation === "horizontal") {
+      const left = bridge.x - BRIDGE_RADIUS;
+      const right = bridge.x + BRIDGE_RADIUS;
+      return `<path d="M ${left.toFixed(1)} ${bridge.y.toFixed(1)} L ${right.toFixed(1)} ${bridge.y.toFixed(1)}" fill="none" stroke="${BRIDGE_BACKGROUND}" stroke-width="${eraseWidth.toFixed(1)}" stroke-linecap="round"></path>`;
+    }
+    const top = bridge.y - BRIDGE_RADIUS;
+    const bottom = bridge.y + BRIDGE_RADIUS;
+    return `<path d="M ${bridge.x.toFixed(1)} ${top.toFixed(1)} L ${bridge.x.toFixed(1)} ${bottom.toFixed(1)}" fill="none" stroke="${BRIDGE_BACKGROUND}" stroke-width="${eraseWidth.toFixed(1)}" stroke-linecap="round"></path>`;
+  }
+
+  function pathMarkup(points = [], bridges = [], stroke = "#87683c", strokeWidth = 4.4) {
+    if (!Array.isArray(points) || !points.length) return "";
+    if (!Array.isArray(bridges) || !bridges.length) {
+      return `<polyline points="${pointMarkup(points)}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth.toFixed(1)}" stroke-linecap="round" stroke-linejoin="round"></polyline>`;
+    }
+    const bridgesBySegment = new Map();
+    for (const bridge of bridges) {
+      if (!bridgesBySegment.has(bridge.segmentIndex)) bridgesBySegment.set(bridge.segmentIndex, []);
+      bridgesBySegment.get(bridge.segmentIndex).push(bridge);
+    }
+    let path = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+    for (let index = 1; index < points.length; index += 1) {
+      const start = points[index - 1];
+      const end = points[index];
+      const segmentBridges = bridgesBySegment.get(index - 1) || [];
+      if (!segmentBridges.length) {
+        path += ` L ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+        continue;
+      }
+      if (Math.abs(start.y - end.y) < 0.1) {
+        const direction = end.x >= start.x ? 1 : -1;
+        const ordered = [...segmentBridges].sort((left, right) => direction * (left.x - right.x));
+        let cursorX = start.x;
+        const y = start.y;
+        for (const bridge of ordered) {
+          const entryX = bridge.x - (BRIDGE_RADIUS * direction);
+          const exitX = bridge.x + (BRIDGE_RADIUS * direction);
+          path += ` L ${entryX.toFixed(1)} ${y.toFixed(1)}`;
+          path += ` Q ${bridge.x.toFixed(1)} ${(y - BRIDGE_LIFT).toFixed(1)} ${exitX.toFixed(1)} ${y.toFixed(1)}`;
+          cursorX = exitX;
+        }
+        if (Math.abs(cursorX - end.x) >= 0.1) {
+          path += ` L ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+        }
+        continue;
+      }
+      if (Math.abs(start.x - end.x) < 0.1) {
+        const direction = end.y >= start.y ? 1 : -1;
+        const ordered = [...segmentBridges].sort((left, right) => direction * (left.y - right.y));
+        let cursorY = start.y;
+        const x = start.x;
+        for (const bridge of ordered) {
+          const entryY = bridge.y - (BRIDGE_RADIUS * direction);
+          const exitY = bridge.y + (BRIDGE_RADIUS * direction);
+          path += ` L ${x.toFixed(1)} ${entryY.toFixed(1)}`;
+          path += ` Q ${(x + BRIDGE_LIFT).toFixed(1)} ${bridge.y.toFixed(1)} ${x.toFixed(1)} ${exitY.toFixed(1)}`;
+          cursorY = exitY;
+        }
+        if (Math.abs(cursorY - end.y) >= 0.1) {
+          path += ` L ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+        }
+        continue;
+      }
+      path += ` L ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+    }
+    return `<path d="${path}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth.toFixed(1)}" stroke-linecap="round" stroke-linejoin="round"></path>`;
+  }
+
+  function computeLaneBridges(lineEntries = []) {
+    const segmentEntries = lineEntries.flatMap((entry, renderIndex) => (
+      axisAlignedSegments(entry.points).map((segment) => ({ ...segment, entry, renderIndex }))
+    ));
+    const bridgesByLane = new Map();
+    for (let index = 0; index < segmentEntries.length; index += 1) {
+      for (let compareIndex = index + 1; compareIndex < segmentEntries.length; compareIndex += 1) {
+        const first = segmentEntries[index];
+        const second = segmentEntries[compareIndex];
+        if (first.entry.laneId === second.entry.laneId) continue;
+        if (first.orientation === second.orientation) continue;
+        const horizontal = first.orientation === "horizontal" ? first : second;
+        const vertical = first.orientation === "vertical" ? first : second;
+        const crossX = vertical.start.x;
+        const crossY = horizontal.start.y;
+        if (
+          crossX <= horizontal.minX + BRIDGE_RADIUS + 2
+          || crossX >= horizontal.maxX - BRIDGE_RADIUS - 2
+          || crossY <= vertical.minY + BRIDGE_RADIUS + 2
+          || crossY >= vertical.maxY - BRIDGE_RADIUS - 2
+        ) continue;
+        if (
+          pointNearSegmentEnd(horizontal, crossX, crossY)
+          || pointNearSegmentEnd(vertical, crossX, crossY)
+        ) continue;
+        const bridgeSegment = (
+          first.entry.selected && !second.entry.selected ? first
+          : second.entry.selected && !first.entry.selected ? second
+          : first.renderIndex > second.renderIndex ? first : second
+        );
+        const laneKey = bridgeSegment.entry.laneId;
+        if (!bridgesByLane.has(laneKey)) bridgesByLane.set(laneKey, []);
+        const existing = bridgesByLane.get(laneKey);
+        if (existing.some((bridge) => Math.abs(bridge.x - crossX) < 1 && Math.abs(bridge.y - crossY) < 1)) continue;
+        existing.push({
+          x: crossX,
+          y: crossY,
+          orientation: bridgeSegment.orientation,
+          segmentIndex: bridgeSegment.segmentIndex,
+        });
+      }
+    }
+    return bridgesByLane;
   }
 
   function pointMarkup(points) {
@@ -1331,6 +1660,29 @@
     return cloneConnectorStyle(entry);
   }
 
+  function laneUsesReversedStyle(edge, lane) {
+    if (!edge || !lane) return false;
+    return lane.startNodeId !== edge.from || lane.endNodeId !== edge.to;
+  }
+
+  function uiConnectorStyleForLane(edge, lane, connectorStyle = defaultConnectorStyle()) {
+    if (!laneUsesReversedStyle(edge, lane)) return connectorStyle;
+    return {
+      ...connectorStyle,
+      sourceSide: connectorStyle.targetSide || "auto",
+      targetSide: connectorStyle.sourceSide || "auto",
+    };
+  }
+
+  function laneStyleFromUiStyle(edge, lane, uiStyle = defaultConnectorStyle()) {
+    if (!laneUsesReversedStyle(edge, lane)) return uiStyle;
+    return {
+      ...uiStyle,
+      sourceSide: uiStyle.targetSide || "auto",
+      targetSide: uiStyle.sourceSide || "auto",
+    };
+  }
+
   function updateSelectedLaneStyle(mutator) {
     if (!state.selectedEdgeId || !state.selectedLaneId) return false;
     const entry = connectorEntryForEdge(state.selectedEdgeId);
@@ -1378,7 +1730,18 @@
     render();
   }
 
+  function currentSelectedLaneContext() {
+    if (!state.selectedLaneId) return null;
+    const model = buildModel(state.scope);
+    return findLaneById(model, state.selectedLaneId);
+  }
+
   function syncSidebar() {
+    const connectorSelected = Boolean(state.selectedLaneId);
+    if (connectorPanel) connectorPanel.classList.toggle("editor-panel--disabled", !connectorSelected);
+    for (const control of [routeSelect, sourceSideSelect, targetSideSelect, addWaypointButton, clearWaypointsButton]) {
+      if (control) control.disabled = !connectorSelected;
+    }
     if (!state.selectedLaneId) {
       selectionSummary.textContent = state.selectedNodeId || "Nessuna selezione.";
       routeSelect.value = "auto";
@@ -1390,13 +1753,14 @@
     const laneMatch = findLaneById(model, state.selectedLaneId);
     const connector = connectorStyleForLane(state.selectedEdgeId, state.selectedLaneId);
     if (laneMatch) {
-      selectionSummary.textContent = `${laneMatch.edge.from} -> ${laneMatch.edge.to} • ${laneMatch.lane.sourceDirection}${laneMatch.lane.twoWay ? ` / ${laneMatch.lane.targetDirection}` : ""}`;
+      selectionSummary.textContent = `${laneMatch.lane.startNodeId} -> ${laneMatch.lane.endNodeId} • ${laneMatch.lane.sourceDirection}${laneMatch.lane.twoWay ? ` / ${laneMatch.lane.targetDirection}` : ""}`;
     } else {
       selectionSummary.textContent = state.selectedLaneId;
     }
-    routeSelect.value = connector.route || "auto";
-    sourceSideSelect.value = connector.sourceSide || "auto";
-    targetSideSelect.value = connector.targetSide || "auto";
+    const uiStyle = laneMatch ? uiConnectorStyleForLane(laneMatch.edge, laneMatch.lane, connector) : connector;
+    routeSelect.value = uiStyle.route || "auto";
+    sourceSideSelect.value = uiStyle.sourceSide || "auto";
+    targetSideSelect.value = uiStyle.targetSide || "auto";
   }
 
   function render() {
@@ -1408,6 +1772,7 @@
       scaledHeight,
       centers,
     } = computeCanvasMetrics(model);
+    const lineEntries = [];
 
     const lineMarkup = model.edges.map((edge) => {
       const laneMarkup = buildDisplayLanes(edge, centers).map((lane) => {
@@ -1416,13 +1781,22 @@
         const stroke = selected ? "#b27e24" : "#87683c";
         const geometry = connectorGeometry(edge, centers, style, lane);
         if (!geometry) return "";
+        const strokeWidth = selected ? 6.2 : 4.4;
         const pointsForEdge = geometry.points;
+        lineEntries.push({
+          edgeId: edge.id,
+          laneId: lane.id,
+          points: pointsForEdge,
+          stroke,
+          strokeWidth,
+          selected,
+        });
         const arrow = geometry.twoWay ? "" : arrowMarkup(pointsForEdge, stroke);
         const waypoints = selected
           ? (style.waypoints || []).map((point, index) => `<circle class="editor-waypoint" r="8" cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" data-waypoint-index="${index}" data-edge-id="${edge.id}" data-lane-id="${lane.id}"></circle>`).join("")
           : "";
         return `<g data-edge-id="${edge.id}" data-lane-id="${lane.id}">
-          <polyline points="${pointMarkup(pointsForEdge)}" fill="none" stroke="${stroke}" stroke-width="${selected ? "6.2" : "4.4"}" stroke-linecap="round" stroke-linejoin="round"></polyline>
+          ${pathMarkup(pointsForEdge, [], stroke, strokeWidth)}
           ${arrow}
           <polyline class="editor-edge-hit" points="${pointMarkup(pointsForEdge)}" fill="none" stroke="rgba(0,0,0,0)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" data-edge-hit="${edge.id}" data-lane-hit="${lane.id}"></polyline>
           ${waypoints}
@@ -1433,6 +1807,15 @@
       return `<g data-edge-id="${edge.id}">
         ${laneMarkup}
         ${exitBadges}
+      </g>`;
+    }).join("");
+    const bridgeMap = computeLaneBridges(lineEntries);
+    const bridgeMarkup = lineEntries.map((entry) => {
+      const bridges = bridgeMap.get(entry.laneId) || [];
+      if (!bridges.length) return "";
+      return `<g data-bridge-lane-id="${entry.laneId}">
+        ${bridges.map((bridge) => bridgeEraseMarkup(bridge, entry.strokeWidth)).join("")}
+        ${pathMarkup(entry.points, bridges, entry.stroke, entry.strokeWidth)}
       </g>`;
     }).join("");
 
@@ -1453,12 +1836,13 @@
 
     canvas.innerHTML = `<div class="editor-stage-shell" style="width:${scaledWidth}px;height:${scaledHeight}px;">
       <div class="editor-stage" style="width:${width}px;height:${height}px;transform:scale(${state.zoom});">
-        <svg class="editor-svg" viewBox="0 0 ${width} ${height}" aria-hidden="true">${lineMarkup}</svg>
+        <svg class="editor-svg" viewBox="0 0 ${width} ${height}" aria-hidden="true">${lineMarkup}${bridgeMarkup}</svg>
         ${nodeMarkup}
       </div>
     </div>`;
     scopeTitle.textContent = model.title;
     if (scopeSubtitle) scopeSubtitle.textContent = `Zoom ${currentZoomLabel()} • trascina i nodi, seleziona un connettore e rifiniscilo con i punti.`;
+    renderCornerPanel(model);
     updateScopeNavigationUi();
     updateZoomUi();
     syncSidebar();
@@ -1594,12 +1978,24 @@
     render();
   });
   sourceSideSelect.addEventListener("change", () => {
-    if (!updateSelectedLaneStyle((style) => ({ ...style, sourceSide: sourceSideSelect.value }))) return;
+    const laneContext = currentSelectedLaneContext();
+    if (!updateSelectedLaneStyle((style) => {
+      const uiStyle = laneContext ? uiConnectorStyleForLane(laneContext.edge, laneContext.lane, style) : style;
+      return laneContext
+        ? laneStyleFromUiStyle(laneContext.edge, laneContext.lane, { ...uiStyle, sourceSide: sourceSideSelect.value })
+        : { ...style, sourceSide: sourceSideSelect.value };
+    })) return;
     createBackup(`Lato origine aggiornato • ${backupScopeLabel(state.scope)}`);
     render();
   });
   targetSideSelect.addEventListener("change", () => {
-    if (!updateSelectedLaneStyle((style) => ({ ...style, targetSide: targetSideSelect.value }))) return;
+    const laneContext = currentSelectedLaneContext();
+    if (!updateSelectedLaneStyle((style) => {
+      const uiStyle = laneContext ? uiConnectorStyleForLane(laneContext.edge, laneContext.lane, style) : style;
+      return laneContext
+        ? laneStyleFromUiStyle(laneContext.edge, laneContext.lane, { ...uiStyle, targetSide: targetSideSelect.value })
+        : { ...style, targetSide: targetSideSelect.value };
+    })) return;
     createBackup(`Lato arrivo aggiornato • ${backupScopeLabel(state.scope)}`);
     render();
   });
@@ -1673,7 +2069,19 @@
       state.selectedLaneId = "";
       const model = buildModel(state.scope);
       const positions = state.scope === "world" ? state.layout.world.nodes : state.layout.regions[state.scope].nodes;
-      state.drag = { nodeId: state.selectedNodeId, positions, offsetX: event.clientX, offsetY: event.clientY, model, changed: false };
+      const entryKey = state.scope === "world" ? nodeId : nodeId.replace(/^room:/, "");
+      const currentPosition = positions[entryKey];
+      if (!currentPosition) return;
+      state.drag = {
+        nodeId: state.selectedNodeId,
+        positions,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        originX: Number(currentPosition.x) || 0,
+        originY: Number(currentPosition.y) || 0,
+        model,
+        changed: false,
+      };
       render();
       return;
     }
@@ -1692,14 +2100,22 @@
 
   window.addEventListener("pointermove", (event) => {
     if (state.drag) {
-      const { nodeId, positions } = state.drag;
+      const {
+        nodeId,
+        positions,
+        startClientX,
+        startClientY,
+        originX,
+        originY,
+      } = state.drag;
       const entryKey = state.scope === "world" ? nodeId : nodeId.replace(/^room:/, "");
       const next = positions[entryKey];
       if (!next) return;
-      next.x += (event.clientX - state.drag.offsetX) / (UNIT * state.zoom);
-      next.y += (event.clientY - state.drag.offsetY) / (UNIT * state.zoom);
-      state.drag.offsetX = event.clientX;
-      state.drag.offsetY = event.clientY;
+      const freeMove = event.altKey;
+      const rawX = originX + ((event.clientX - startClientX) / (UNIT * state.zoom));
+      const rawY = originY + ((event.clientY - startClientY) / (UNIT * state.zoom));
+      next.x = snapNodeCoordinate(rawX, !freeMove);
+      next.y = snapNodeCoordinate(rawY, !freeMove);
       state.drag.changed = true;
       render();
       return;

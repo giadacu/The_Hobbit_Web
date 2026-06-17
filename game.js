@@ -15630,6 +15630,8 @@
     const offsetX = Math.max(0, (width - contentWidth) / 2);
     const offsetY = Math.max(0, (height - contentHeight) / 2);
     const nodePixels = new Map();
+    const lineEntries = [];
+    const levelBadgeEntries = [];
 
     for (const node of model.nodes) {
       const point = positions.get(node.id) || { x: 0, y: 0 };
@@ -15645,6 +15647,35 @@
         overrideEntry: connectorOverrides[edge.id],
       });
       if (!geometry) return "";
+      const stroke = geometry.twoWay ? "#7f6641" : "#a17a4b";
+      const strokeWidth = worldScope ? 4.8 : 4.2;
+      const points = buildMapConnectorPoints(
+        geometry.fromAnchor,
+        geometry.toAnchor,
+        { fromDirection: geometry.fromDirection, toDirection: geometry.toDirection },
+        boxSize,
+        geometry.override
+      );
+      lineEntries.push({
+        laneId: geometry.id,
+        points,
+        stroke,
+        strokeWidth,
+      });
+      const levelBadgeMarkup = buildMapLevelConnectorBadge(
+        geometry.fromAnchor,
+        geometry.toAnchor,
+        { fromDirection: geometry.fromDirection, toDirection: geometry.toDirection },
+        {
+          boxSize,
+          twoWay: geometry.twoWay,
+          routeOverride: geometry.override,
+          stroke,
+          strokeWidth,
+          precomputedPoints: points,
+        }
+      );
+      if (levelBadgeMarkup) levelBadgeEntries.push(levelBadgeMarkup);
       return buildMapConnectorMarkup(
         geometry.fromAnchor,
         geometry.toAnchor,
@@ -15653,11 +15684,20 @@
           boxSize,
           twoWay: geometry.twoWay,
           routeOverride: geometry.override,
-          stroke: geometry.twoWay ? "#7f6641" : "#a17a4b",
-          strokeWidth: worldScope ? 4.8 : 4.2,
+          stroke,
+          strokeWidth,
+          precomputedPoints: points,
+          suppressLevelBadge: true,
         }
       );
     }).join("")).join("");
+    const bridgeMap = computeMapLaneBridges(lineEntries);
+    const bridgeMarkup = lineEntries.map((entry) => {
+      const bridges = bridgeMap.get(entry.laneId) || [];
+      if (!bridges.length) return "";
+      return `<g data-bridge-lane-id="${escapeXml(entry.laneId)}">${bridges.map((bridge) => buildMapConnectorBridgeEraseMarkup(bridge, entry.strokeWidth)).join("")}${buildMapConnectorPathMarkup(entry.points, bridges, entry.stroke, entry.strokeWidth)}</g>`;
+    }).join("");
+    const levelBadgeMarkup = levelBadgeEntries.join("");
     const stubMarkup = (model.exitStubs || []).map((stub) => {
       const center = nodePixels.get(stub.nodeId);
       const geometry = buildMapStubGeometry(center, stub.direction, boxSize, worldScope ? 42 : 36);
@@ -15740,7 +15780,7 @@
   <text x="40" y="78" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="17" fill="#6f5733">${escapeXml(model.subtitle || "")}</text>
   <text x="${width - 40}" y="48" text-anchor="end" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="15" font-weight="700" fill="#7b6033">${worldScope ? "Click marked locations for local maps" : "Back returns to the world overview"}</text>
   <text x="${width - 40}" y="74" text-anchor="end" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="15" font-weight="700" fill="#7b6033">Wheel, pinch, or buttons to zoom</text>
-  <g>${lineMarkup}${stubMarkup}</g>
+  <g>${lineMarkup}${bridgeMarkup}${stubMarkup}${levelBadgeMarkup}</g>
   <g>${nodeMarkup}</g>
 </svg>`;
     const currentRoomCenter = currentNodeId && nodePixels.get(currentNodeId)
@@ -16028,8 +16068,22 @@
     }[corner] || { x: center.x, y: center.y };
   }
 
+  function mapLevelSidePoint(center, side = "south", target = null, boxSize = 96) {
+    const half = boxSize / 2;
+    const quarterOffset = boxSize * 0.25;
+    const dx = (target?.x || center.x) - center.x;
+    const horizontalOffset = dx > 0 ? quarterOffset : -quarterOffset;
+    if (side === "north") {
+      return { x: center.x + horizontalOffset, y: center.y - half };
+    }
+    if (side === "south") {
+      return { x: center.x + horizontalOffset, y: center.y + half };
+    }
+    return mapBoxSideCenter(center, side, boxSize);
+  }
+
   function mapNearestLevelSideCenter(center, target, boxSize = 96) {
-    if (!target) return mapBoxSideCenter(center, "south", boxSize);
+    if (!target) return mapLevelSidePoint(center, "south", target, boxSize);
     const dx = target.x - center.x;
     const dy = target.y - center.y;
     const horizontalFromSide = dx >= 0 ? "east" : "west";
@@ -16038,8 +16092,8 @@
     const verticalToSide = dy >= 0 ? "north" : "south";
     const horizontalFrom = mapBoxSideCenter(center, horizontalFromSide, boxSize);
     const horizontalTo = mapBoxSideCenter(target, horizontalToSide, boxSize);
-    const verticalFrom = mapBoxSideCenter(center, verticalFromSide, boxSize);
-    const verticalTo = mapBoxSideCenter(target, verticalToSide, boxSize);
+    const verticalFrom = mapLevelSidePoint(center, verticalFromSide, target, boxSize);
+    const verticalTo = mapLevelSidePoint(target, verticalToSide, center, boxSize);
     const horizontalDistance = Math.hypot(horizontalTo.x - horizontalFrom.x, horizontalTo.y - horizontalFrom.y);
     const verticalDistance = Math.hypot(verticalTo.x - verticalFrom.x, verticalTo.y - verticalFrom.y);
     if (Math.abs(horizontalDistance - verticalDistance) < 0.01) {
@@ -16115,14 +16169,173 @@
     return bestDirection;
   }
 
+  const MAP_BRIDGE_RADIUS = 10;
+  const MAP_BRIDGE_LIFT = 8;
+  const MAP_BRIDGE_BACKGROUND = "#efe3c6";
+
+  function axisAlignedMapConnectorSegments(points = []) {
+    const segments = [];
+    for (let index = 1; index < points.length; index += 1) {
+      const start = points[index - 1];
+      const end = points[index];
+      if (!start || !end) continue;
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      if (Math.abs(dx) < 0.1 && Math.abs(dy) >= 0.1) {
+        segments.push({
+          orientation: "vertical",
+          start,
+          end,
+          segmentIndex: index - 1,
+          minX: start.x,
+          maxX: start.x,
+          minY: Math.min(start.y, end.y),
+          maxY: Math.max(start.y, end.y),
+        });
+      } else if (Math.abs(dy) < 0.1 && Math.abs(dx) >= 0.1) {
+        segments.push({
+          orientation: "horizontal",
+          start,
+          end,
+          segmentIndex: index - 1,
+          minX: Math.min(start.x, end.x),
+          maxX: Math.max(start.x, end.x),
+          minY: start.y,
+          maxY: start.y,
+        });
+      }
+    }
+    return segments;
+  }
+
+  function mapPointNearConnectorSegmentEnd(segment, x, y, margin = MAP_BRIDGE_RADIUS + 2) {
+    return (
+      Math.hypot(segment.start.x - x, segment.start.y - y) <= margin
+      || Math.hypot(segment.end.x - x, segment.end.y - y) <= margin
+    );
+  }
+
+  function buildMapConnectorPathMarkup(points = [], bridges = [], stroke = "#7f6641", strokeWidth = 4.4) {
+    if (!Array.isArray(points) || !points.length) return "";
+    if (!Array.isArray(bridges) || !bridges.length) {
+      if (points.length <= 2) {
+        return `<line x1="${points[0].x.toFixed(1)}" y1="${points[0].y.toFixed(1)}" x2="${points[1].x.toFixed(1)}" y2="${points[1].y.toFixed(1)}" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round" />`;
+      }
+      return `<polyline points="${points.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ")}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" />`;
+    }
+    const bridgesBySegment = new Map();
+    for (const bridge of bridges) {
+      if (!bridgesBySegment.has(bridge.segmentIndex)) bridgesBySegment.set(bridge.segmentIndex, []);
+      bridgesBySegment.get(bridge.segmentIndex).push(bridge);
+    }
+    let path = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+    for (let index = 1; index < points.length; index += 1) {
+      const start = points[index - 1];
+      const end = points[index];
+      const segmentBridges = bridgesBySegment.get(index - 1) || [];
+      if (!segmentBridges.length) {
+        path += ` L ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+        continue;
+      }
+      if (Math.abs(start.y - end.y) < 0.1) {
+        const direction = end.x >= start.x ? 1 : -1;
+        const ordered = [...segmentBridges].sort((left, right) => direction * (left.x - right.x));
+        let cursorX = start.x;
+        const y = start.y;
+        for (const bridge of ordered) {
+          const entryX = bridge.x - (MAP_BRIDGE_RADIUS * direction);
+          const exitX = bridge.x + (MAP_BRIDGE_RADIUS * direction);
+          path += ` L ${entryX.toFixed(1)} ${y.toFixed(1)}`;
+          path += ` Q ${bridge.x.toFixed(1)} ${(y - MAP_BRIDGE_LIFT).toFixed(1)} ${exitX.toFixed(1)} ${y.toFixed(1)}`;
+          cursorX = exitX;
+        }
+        if (Math.abs(cursorX - end.x) >= 0.1) {
+          path += ` L ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+        }
+        continue;
+      }
+      if (Math.abs(start.x - end.x) < 0.1) {
+        const direction = end.y >= start.y ? 1 : -1;
+        const ordered = [...segmentBridges].sort((left, right) => direction * (left.y - right.y));
+        let cursorY = start.y;
+        const x = start.x;
+        for (const bridge of ordered) {
+          const entryY = bridge.y - (MAP_BRIDGE_RADIUS * direction);
+          const exitY = bridge.y + (MAP_BRIDGE_RADIUS * direction);
+          path += ` L ${x.toFixed(1)} ${entryY.toFixed(1)}`;
+          path += ` Q ${(x + MAP_BRIDGE_LIFT).toFixed(1)} ${bridge.y.toFixed(1)} ${x.toFixed(1)} ${exitY.toFixed(1)}`;
+          cursorY = exitY;
+        }
+        if (Math.abs(cursorY - end.y) >= 0.1) {
+          path += ` L ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+        }
+        continue;
+      }
+      path += ` L ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+    }
+    return `<path d="${path}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" />`;
+  }
+
+  function buildMapConnectorBridgeEraseMarkup(bridge, strokeWidth = 4.4) {
+    const eraseWidth = strokeWidth + 5;
+    if (bridge.orientation === "horizontal") {
+      const left = bridge.x - MAP_BRIDGE_RADIUS;
+      const right = bridge.x + MAP_BRIDGE_RADIUS;
+      return `<path d="M ${left.toFixed(1)} ${bridge.y.toFixed(1)} L ${right.toFixed(1)} ${bridge.y.toFixed(1)}" fill="none" stroke="${MAP_BRIDGE_BACKGROUND}" stroke-width="${eraseWidth.toFixed(1)}" stroke-linecap="round"></path>`;
+    }
+    const top = bridge.y - MAP_BRIDGE_RADIUS;
+    const bottom = bridge.y + MAP_BRIDGE_RADIUS;
+    return `<path d="M ${bridge.x.toFixed(1)} ${top.toFixed(1)} L ${bridge.x.toFixed(1)} ${bottom.toFixed(1)}" fill="none" stroke="${MAP_BRIDGE_BACKGROUND}" stroke-width="${eraseWidth.toFixed(1)}" stroke-linecap="round"></path>`;
+  }
+
+  function computeMapLaneBridges(lineEntries = []) {
+    const segmentEntries = lineEntries.flatMap((entry, renderIndex) => (
+      axisAlignedMapConnectorSegments(entry.points).map((segment) => ({ ...segment, entry, renderIndex }))
+    ));
+    const bridgesByLane = new Map();
+    for (let index = 0; index < segmentEntries.length; index += 1) {
+      for (let compareIndex = index + 1; compareIndex < segmentEntries.length; compareIndex += 1) {
+        const first = segmentEntries[index];
+        const second = segmentEntries[compareIndex];
+        if (first.entry.laneId === second.entry.laneId) continue;
+        if (first.orientation === second.orientation) continue;
+        const horizontal = first.orientation === "horizontal" ? first : second;
+        const vertical = first.orientation === "vertical" ? first : second;
+        const crossX = vertical.start.x;
+        const crossY = horizontal.start.y;
+        if (
+          crossX <= horizontal.minX + MAP_BRIDGE_RADIUS + 2
+          || crossX >= horizontal.maxX - MAP_BRIDGE_RADIUS - 2
+          || crossY <= vertical.minY + MAP_BRIDGE_RADIUS + 2
+          || crossY >= vertical.maxY - MAP_BRIDGE_RADIUS - 2
+        ) continue;
+        if (
+          mapPointNearConnectorSegmentEnd(horizontal, crossX, crossY)
+          || mapPointNearConnectorSegmentEnd(vertical, crossX, crossY)
+        ) continue;
+        const bridgeSegment = first.renderIndex > second.renderIndex ? first : second;
+        const laneKey = bridgeSegment.entry.laneId;
+        if (!bridgesByLane.has(laneKey)) bridgesByLane.set(laneKey, []);
+        const existing = bridgesByLane.get(laneKey);
+        if (existing.some((bridge) => Math.abs(bridge.x - crossX) < 1 && Math.abs(bridge.y - crossY) < 1)) continue;
+        existing.push({
+          x: crossX,
+          y: crossY,
+          orientation: bridgeSegment.orientation,
+          segmentIndex: bridgeSegment.segmentIndex,
+        });
+      }
+    }
+    return bridgesByLane;
+  }
+
   function buildMapConnectorMarkup(fromAnchor, toAnchor, directions = {}, options = {}) {
     const stroke = options.stroke || "#7f6641";
     const strokeWidth = Number(options.strokeWidth) || 4.4;
-    const points = buildMapConnectorPoints(fromAnchor, toAnchor, directions, options.boxSize || 96, options.routeOverride || null);
+    const points = options.precomputedPoints || buildMapConnectorPoints(fromAnchor, toAnchor, directions, options.boxSize || 96, options.routeOverride || null);
+    const bridges = Array.isArray(options.bridges) ? options.bridges : [];
     const pointsMarkup = points.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
-    const connectorMarkup = points.length <= 2
-      ? `<line x1="${points[0].x.toFixed(1)}" y1="${points[0].y.toFixed(1)}" x2="${points[1].x.toFixed(1)}" y2="${points[1].y.toFixed(1)}" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round" />`
-      : `<polyline points="${pointsMarkup}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" />`;
+    const connectorMarkup = buildMapConnectorPathMarkup(points, bridges, stroke, strokeWidth);
     const highlightMarkup = options.editorSelected
       ? (points.length <= 2
           ? `<line x1="${points[0].x.toFixed(1)}" y1="${points[0].y.toFixed(1)}" x2="${points[1].x.toFixed(1)}" y2="${points[1].y.toFixed(1)}" stroke="rgba(212, 166, 74, 0.85)" stroke-width="${(strokeWidth + 5.2).toFixed(1)}" stroke-linecap="round" />`
@@ -16134,7 +16347,7 @@
           : `<polyline class="scene-map-editor-edge-hit" points="${pointsMarkup}" data-editor-edge="${escapeXml(options.editorEdgeId)}" fill="none" stroke="rgba(0,0,0,0)" stroke-width="${Math.max(16, strokeWidth + 10).toFixed(1)}" stroke-linecap="round" stroke-linejoin="round" />`)
       : "";
     const arrowMarkup = options.twoWay ? "" : buildMapConnectorArrowMarkup(points, { stroke, strokeWidth });
-    const levelBadge = buildMapLevelConnectorBadge(fromAnchor, toAnchor, directions, options);
+    const levelBadge = options.suppressLevelBadge ? "" : buildMapLevelConnectorBadge(fromAnchor, toAnchor, directions, options);
     return `<g class="${options.editorSelected ? "scene-map-editor-edge is-selected" : "scene-map-editor-edge"}" data-editor-edge="${escapeXml(options.editorEdgeId || "")}">${highlightMarkup}${connectorMarkup}${arrowMarkup}${levelBadge}${hitMarkup}</g>`;
   }
 
@@ -16179,8 +16392,14 @@
     const toLevel = isMapLevelDirection(directions.toDirection);
     if (!fromLevel && !toLevel) return "";
     const label = options.twoWay ? "U/D" : (normalize(directions.fromDirection) === "down" ? "D" : "U");
-    const centerX = (fromAnchor.x + toAnchor.x) / 2;
-    const centerY = (fromAnchor.y + toAnchor.y) / 2;
+    const points = Array.isArray(options.precomputedPoints) && options.precomputedPoints.length >= 2
+      ? options.precomputedPoints
+      : [fromAnchor, toAnchor];
+    const midpointIndex = Math.floor((points.length - 1) / 2);
+    const start = points[midpointIndex];
+    const end = points[Math.min(points.length - 1, midpointIndex + 1)];
+    const centerX = ((start?.x || fromAnchor.x) + (end?.x || toAnchor.x)) / 2;
+    const centerY = ((start?.y || fromAnchor.y) + (end?.y || toAnchor.y)) / 2;
     return `<g transform="translate(${centerX.toFixed(1)} ${centerY.toFixed(1)})">
       <rect x="-16" y="-11.5" width="32" height="19" rx="7" fill="#efe3c6" stroke="#8c7550" stroke-width="1.5" />
       <text x="0" y="3.6" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="10.5" font-weight="700" fill="#5b4522">${label}</text>

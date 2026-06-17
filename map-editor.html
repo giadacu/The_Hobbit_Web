@@ -25,7 +25,7 @@
           <div id="selection-summary" class="editor-summary">Nessuna selezione.</div>
         </section>
 
-        <section class="editor-panel editor-panel--connector">
+        <section id="connector-panel" class="editor-panel editor-panel--connector">
           <h2>Connettore</h2>
           <div class="editor-fields-grid">
             <label class="editor-field editor-field--span">
@@ -84,6 +84,10 @@
             <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
           </div>
         </div>
+        <aside id="node-exits-panel" class="editor-corner-panel">
+          <div class="editor-corner-panel__title">Uscite</div>
+          <div class="editor-corner-panel__body editor-corner-panel__empty">Seleziona una location per vedere dove portano le sue uscite.</div>
+        </aside>
         <div id="editor-canvas" class="editor-canvas"></div>
       </section>
     </main>

@@ -106,6 +106,21 @@ body {
   cursor: pointer;
 }
 
+.editor-panel--disabled {
+  opacity: 0.46;
+}
+
+.editor-panel--disabled select,
+.editor-panel--disabled button {
+  pointer-events: none;
+}
+
+.editor-field select:disabled,
+.editor-actions button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .editor-status {
   margin-top: 8px;
   color: #cdbb92;
@@ -187,6 +202,7 @@ body {
 }
 
 .editor-canvas-wrap {
+  position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
@@ -238,6 +254,75 @@ body {
 .editor-toolbar__actions button:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+.editor-corner-panel {
+  position: absolute;
+  top: 82px;
+  right: 24px;
+  z-index: 3;
+  width: 250px;
+  max-width: calc(100% - 48px);
+  padding: 10px 12px;
+  border: 1px solid rgba(111, 86, 38, 0.24);
+  border-radius: 14px;
+  background: rgba(248, 242, 226, 0.94);
+  color: #2f2412;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(3px);
+}
+
+.editor-corner-panel__title {
+  font: 700 0.8rem/1.1 "Trebuchet MS", "Avenir Next", sans-serif;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #6f5626;
+}
+
+.editor-corner-panel__body {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
+.editor-corner-panel__empty {
+  color: #78684c;
+}
+
+.editor-corner-panel__node {
+  margin-bottom: 8px;
+  font-weight: 700;
+  color: #3c2d16;
+}
+
+.editor-corner-panel__list {
+  display: grid;
+  gap: 6px;
+}
+
+.editor-corner-panel__row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.editor-corner-panel__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  padding: 3px 6px;
+  border: 1px solid rgba(156, 111, 30, 0.5);
+  border-radius: 999px;
+  background: rgba(251, 244, 227, 0.96);
+  color: #513915;
+  font: 700 0.72rem/1 "Trebuchet MS", "Avenir Next", sans-serif;
+  text-transform: lowercase;
+}
+
+.editor-corner-panel__dest {
+  min-width: 0;
 }
 
 .editor-canvas {
@@ -390,5 +475,13 @@ body {
   .editor-toolbar__actions {
     width: 100%;
     justify-content: flex-end;
+  }
+
+  .editor-corner-panel {
+    top: 116px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-width: none;
   }
 }
