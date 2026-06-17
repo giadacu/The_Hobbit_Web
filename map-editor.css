@@ -11,70 +11,178 @@ body {
 
 body {
   min-height: 100vh;
+  overflow: hidden;
 }
 
 .editor-shell {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
-  min-height: 100vh;
+  grid-template-columns: 280px minmax(0, 1fr);
+  height: 100vh;
+  overflow: hidden;
 }
 
 .editor-sidebar {
-  padding: 24px;
+  overflow: auto;
+  padding: 14px 12px;
   border-right: 1px solid rgba(214, 185, 102, 0.18);
   background: rgba(16, 14, 11, 0.92);
 }
 
 .editor-sidebar h1,
 .editor-panel h2 {
-  margin: 0 0 12px;
+  margin: 0 0 8px;
+}
+
+.editor-sidebar h1 {
+  font-size: 1.35rem;
+  line-height: 1.05;
+}
+
+.editor-panel h2 {
+  font-size: 0.92rem;
 }
 
 .editor-copy,
 .editor-summary,
 #scope-subtitle {
   color: #d4c5a1;
-  line-height: 1.45;
+  line-height: 1.28;
+  font-size: 0.82rem;
 }
 
 .editor-panel {
-  margin-top: 22px;
-  padding-top: 18px;
+  margin-top: 12px;
+  padding-top: 10px;
   border-top: 1px solid rgba(214, 185, 102, 0.14);
 }
 
 .editor-field {
   display: grid;
-  gap: 6px;
-  margin-top: 14px;
+  gap: 4px;
+  margin-top: 8px;
 }
 
 .editor-field span {
-  font-size: 0.84rem;
+  font-size: 0.67rem;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: #cdb47a;
+}
+
+.editor-fields-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.editor-field--span {
+  grid-column: 1 / -1;
 }
 
 .editor-field select,
 .editor-actions button {
   appearance: none;
   border: 1px solid rgba(214, 185, 102, 0.28);
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(245, 238, 219, 0.1);
   color: #f5eedb;
-  padding: 10px 12px;
+  padding: 6px 8px;
   font: inherit;
+  font-size: 0.8rem;
 }
 
 .editor-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 14px;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.editor-action-span {
+  grid-column: 1 / -1;
 }
 
 .editor-actions button {
+  cursor: pointer;
+}
+
+.editor-status {
+  margin-top: 8px;
+  color: #cdbb92;
+  font-size: 0.7rem;
+  line-height: 1.25;
+}
+
+.editor-status[data-tone="success"] {
+  color: #d7d19e;
+}
+
+.editor-status[data-tone="warning"] {
+  color: #e0bc85;
+}
+
+.editor-status[data-tone="danger"] {
+  color: #e1a08c;
+}
+
+.editor-backup-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  max-height: 220px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.editor-backup-empty {
+  color: #bcae8a;
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.editor-backup-card {
+  padding: 7px 8px;
+  border: 1px solid rgba(214, 185, 102, 0.16);
+  border-radius: 9px;
+  background: rgba(245, 238, 219, 0.06);
+}
+
+.editor-backup-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  color: #f2ead5;
+  font-size: 0.74rem;
+}
+
+.editor-backup-head strong {
+  font-size: 0.78rem;
+}
+
+.editor-backup-meta {
+  margin-top: 2px;
+  color: #cdbb92;
+  font-size: 0.66rem;
+  line-height: 1.2;
+}
+
+.editor-backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.editor-backup-actions button {
+  appearance: none;
+  border: 1px solid rgba(214, 185, 102, 0.24);
+  border-radius: 999px;
+  background: rgba(245, 238, 219, 0.1);
+  color: #f5eedb;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 0.68rem;
   cursor: pointer;
 }
 
@@ -82,33 +190,105 @@ body {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .editor-toolbar {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
   align-items: center;
-  padding: 18px 22px;
+  padding: 14px 18px;
   border-bottom: 1px solid rgba(214, 185, 102, 0.12);
-  background: rgba(15, 14, 11, 0.64);
+  background: rgba(15, 14, 11, 0.82);
+  min-width: 0;
+}
+
+.editor-toolbar__copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.editor-toolbar__copy strong {
+  font-size: 1.02rem;
+}
+
+.editor-toolbar__actions {
+  display: inline-grid;
+  grid-auto-flow: column;
+  gap: 7px;
+  align-items: center;
+}
+
+.editor-toolbar__actions button {
+  min-width: 38px;
+  appearance: none;
+  border: 1px solid rgba(214, 185, 102, 0.28);
+  border-radius: 9px;
+  background: rgba(245, 238, 219, 0.1);
+  color: #f5eedb;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
 }
 
 .editor-canvas {
   position: relative;
   overflow: auto;
-  padding: 28px;
+  min-height: 0;
+  padding: 20px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(173, 136, 59, 0.65) rgba(76, 58, 30, 0.16);
+}
+
+.editor-stage-shell {
+  position: relative;
 }
 
 .editor-stage {
-  position: relative;
+  position: absolute;
+  left: 0;
+  top: 0;
   min-width: 1200px;
   min-height: 800px;
-  border-radius: 24px;
+  border-radius: 22px;
   background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(120, 98, 52, 0.09) 0,
+      rgba(120, 98, 52, 0.09) 1px,
+      transparent 1px,
+      transparent 12px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(120, 98, 52, 0.09) 0,
+      rgba(120, 98, 52, 0.09) 1px,
+      transparent 1px,
+      transparent 12px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      rgba(120, 98, 52, 0.14) 0,
+      rgba(120, 98, 52, 0.14) 1px,
+      transparent 1px,
+      transparent 60px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(120, 98, 52, 0.14) 0,
+      rgba(120, 98, 52, 0.14) 1px,
+      transparent 1px,
+      transparent 60px
+    ),
     linear-gradient(180deg, rgba(239, 227, 198, 0.96), rgba(228, 211, 170, 0.95)),
     rgba(255, 255, 255, 0.96);
   box-shadow: 0 22px 48px rgba(0, 0, 0, 0.28);
+  transform-origin: top left;
 }
 
 .editor-svg {
@@ -120,16 +300,20 @@ body {
 
 .editor-node {
   position: absolute;
-  width: 104px;
-  min-height: 96px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 112px;
+  min-height: 106px;
   transform: translate(-50%, -50%);
   border: 2px solid #6f5626;
-  border-radius: 12px;
+  border-radius: 11px;
   background: rgba(245, 236, 213, 0.98);
   color: #2f2412;
-  font: 700 13px/1.15 "Trebuchet MS", "Avenir Next", sans-serif;
+  font: 700 12px/1.12 "Trebuchet MS", "Avenir Next", sans-serif;
   text-align: center;
-  padding: 10px 8px;
+  padding: 8px 9px;
   cursor: grab;
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14);
 }
@@ -150,6 +334,19 @@ body {
   stroke-width: 2.5;
 }
 
+.editor-exit-badge rect {
+  fill: rgba(251, 244, 227, 0.96);
+  stroke: rgba(156, 111, 30, 0.92);
+  stroke-width: 1.6;
+}
+
+.editor-exit-badge text {
+  fill: #513915;
+  font: 700 11px/1 "Trebuchet MS", "Avenir Next", sans-serif;
+  text-transform: lowercase;
+  pointer-events: none;
+}
+
 @media (max-width: 980px) {
   .editor-shell {
     grid-template-columns: 1fr;
@@ -158,5 +355,25 @@ body {
   .editor-sidebar {
     border-right: none;
     border-bottom: 1px solid rgba(214, 185, 102, 0.18);
+    max-height: 40vh;
+  }
+
+  body {
+    overflow: auto;
+  }
+
+  .editor-shell {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .editor-toolbar {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .editor-toolbar__actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 }

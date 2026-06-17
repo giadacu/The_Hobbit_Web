@@ -9,52 +9,79 @@
   <body>
     <main class="editor-shell">
       <aside class="editor-sidebar">
-        <h1>Map Editor</h1>
+        <h1>Editor Mappa</h1>
         <p class="editor-copy">Editor separato per layout e connettori. Il gioco usa solo l'output generato qui.</p>
 
-        <label class="editor-field">
-          <span>Scope</span>
-          <select id="scope-select"></select>
-        </label>
-
-        <div class="editor-actions">
-          <button id="download-layout" type="button">Download layout</button>
-          <button id="reset-scope" type="button">Reset scope</button>
-        </div>
-
         <section class="editor-panel">
-          <h2>Selection</h2>
-          <div id="selection-summary" class="editor-summary">Nessuna selezione.</div>
+          <h2>Mappa</h2>
+          <label class="editor-field">
+            <span>Ambito</span>
+            <select id="scope-select"></select>
+          </label>
         </section>
 
         <section class="editor-panel">
-          <h2>Connector</h2>
-          <label class="editor-field">
-            <span>Route</span>
-            <select id="connector-route">
-              <option value="auto">Auto</option>
-              <option value="straight">Straight</option>
-            </select>
-          </label>
-          <label class="editor-field">
-            <span>Source side</span>
-            <select id="connector-source-side"></select>
-          </label>
-          <label class="editor-field">
-            <span>Target side</span>
-            <select id="connector-target-side"></select>
-          </label>
-          <div class="editor-actions">
-            <button id="add-waypoint" type="button">Add waypoint</button>
-            <button id="clear-waypoints" type="button">Clear waypoints</button>
+          <h2>Selezione</h2>
+          <div id="selection-summary" class="editor-summary">Nessuna selezione.</div>
+        </section>
+
+        <section class="editor-panel editor-panel--connector">
+          <h2>Connettore</h2>
+          <div class="editor-fields-grid">
+            <label class="editor-field editor-field--span">
+              <span>Percorso</span>
+              <select id="connector-route">
+                <option value="auto">Auto</option>
+                <option value="straight">Diretto</option>
+              </select>
+            </label>
+            <label class="editor-field">
+              <span>Lato origine</span>
+              <select id="connector-source-side"></select>
+            </label>
+            <label class="editor-field">
+              <span>Lato arrivo</span>
+              <select id="connector-target-side"></select>
+            </label>
           </div>
+          <div class="editor-actions">
+            <button id="add-waypoint" type="button">Aggiungi punto</button>
+            <button id="clear-waypoints" type="button">Pulisci punti</button>
+          </div>
+        </section>
+
+        <section class="editor-panel">
+          <h2>Salvataggio</h2>
+          <div class="editor-actions">
+            <button id="save-layout" type="button" class="editor-action-span">Salva nel progetto</button>
+            <button id="download-layout" type="button">Salva file</button>
+            <button id="reset-scope" type="button">Reimposta vista</button>
+          </div>
+          <div id="save-status" class="editor-status">Prima volta: scegli `assets/map-layout-data.js`, poi potrai salvare direttamente da qui.</div>
+        </section>
+
+        <section class="editor-panel">
+          <h2>Backup</h2>
+          <div class="editor-actions">
+            <button id="choose-backup-folder" type="button" class="editor-action-span">Scegli cartella backup</button>
+            <button id="create-backup" type="button" class="editor-action-span">Crea snapshot</button>
+          </div>
+          <div id="backup-status" class="editor-status">Le modifiche vengono archiviate automaticamente nei passaggi principali.</div>
+          <div id="backup-list" class="editor-backup-list"></div>
         </section>
       </aside>
 
       <section class="editor-canvas-wrap">
         <div class="editor-toolbar">
-          <strong id="scope-title">World</strong>
-          <span id="scope-subtitle">Drag nodes, select a connector, shape it with waypoints.</span>
+          <div class="editor-toolbar__copy">
+            <strong id="scope-title">Mondo</strong>
+            <span id="scope-subtitle">Trascina i nodi, seleziona un connettore e rifiniscilo con i punti.</span>
+          </div>
+          <div class="editor-toolbar__actions">
+            <button id="zoom-out" type="button" aria-label="Zoom out">-</button>
+            <button id="zoom-reset" type="button">100%</button>
+            <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+          </div>
         </div>
         <div id="editor-canvas" class="editor-canvas"></div>
       </section>

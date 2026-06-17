@@ -14639,7 +14639,7 @@
         bag_end_dining_room: { x: 0, y: 1.15 },
         bag_end_pantry: { x: 1.25, y: 1.15 },
         bag_end_kitchen: { x: 2.5, y: 1.15 },
-        bag_end_guest_room: { x: -1.2, y: -1.1 },
+        bag_end_guest_room: { x: -1.2, y: 1.1 },
         bag_end_cellar_room: { x: 0, y: 2.3 },
       },
     },
@@ -14956,10 +14956,22 @@
     return Object.keys(sanitized).length ? sanitized : null;
   }
 
+  function sanitizeMapConnectorEntry(entry = {}) {
+    if (!entry || typeof entry !== "object") return null;
+    const baseStyle = sanitizeMapConnectorStyle(entry) || {};
+    const lanes = Object.fromEntries(
+      Object.entries(entry.lanes || {})
+        .map(([laneId, laneStyle]) => [laneId, sanitizeMapConnectorStyle(laneStyle)])
+        .filter(([_laneId, laneStyle]) => Boolean(laneStyle))
+    );
+    if (!Object.keys(baseStyle).length && !Object.keys(lanes).length) return null;
+    return Object.keys(lanes).length ? { ...baseStyle, lanes } : baseStyle;
+  }
+
   function cloneMapConnectorOverrideMap(overrides = {}) {
     return Object.fromEntries(
       Object.entries(overrides || {})
-        .map(([edgeId, override]) => [edgeId, sanitizeMapConnectorStyle(override)])
+        .map(([edgeId, override]) => [edgeId, sanitizeMapConnectorEntry(override)])
         .filter(([_edgeId, override]) => Boolean(override))
     );
   }
@@ -15287,6 +15299,7 @@
     const allowedNodeIds = options.allowedNodeIds || null;
     const edges = [];
     const edgeMap = new Map();
+    const seenLinks = new Set();
 
     for (const connection of game.connections || []) {
       if (!visitedSet.has(connection.from) || !visitedSet.has(connection.to)) continue;
@@ -15294,6 +15307,10 @@
       const toId = mapRoom(connection.to);
       if (!fromId || !toId || fromId === toId) continue;
       if (allowedNodeIds && (!allowedNodeIds.has(fromId) || !allowedNodeIds.has(toId))) continue;
+      const direction = compassDirectionKey(connection.direction) || normalize(connection.direction);
+      const linkKey = `${fromId}|${direction}|${toId}`;
+      if (seenLinks.has(linkKey)) continue;
+      seenLinks.add(linkKey);
 
       const left = fromId < toId ? fromId : toId;
       const right = left === fromId ? toId : fromId;
@@ -15307,7 +15324,7 @@
       entry.links.push({
         from: fromId,
         to: toId,
-        direction: compassDirectionKey(connection.direction) || normalize(connection.direction),
+        direction,
       });
     }
 
@@ -15407,6 +15424,163 @@
     };
   }
 
+  function mapLaneStorageKey(lane = {}) {
+    const mode = lane.twoWay ? "tw" : "ow";
+    return `${mode}:${lane.startNodeId || ""}>${lane.endNodeId || ""}:${normalize(lane.sourceDirection)}:${normalize(lane.targetDirection)}`;
+  }
+
+  function mapDirectionAlignmentScore(direction = "", fromPoint = null, toPoint = null) {
+    if (!fromPoint || !toPoint) return Number.NEGATIVE_INFINITY;
+    const vector = mapDirectionVector(direction);
+    const vectorMagnitude = Math.hypot(vector.x, vector.y);
+    if (!vectorMagnitude) return Number.NEGATIVE_INFINITY;
+    const dx = toPoint.x - fromPoint.x;
+    const dy = toPoint.y - fromPoint.y;
+    const distance = Math.hypot(dx, dy);
+    if (!distance) return Number.NEGATIVE_INFINITY;
+    return ((dx * vector.x) + (dy * vector.y)) / (distance * vectorMagnitude);
+  }
+
+  function mapReversePairScore(forwardLink, reverseLink, centers) {
+    const forwardScore = mapDirectionAlignmentScore(forwardLink.direction, centers[forwardLink.from], centers[forwardLink.to]);
+    const reverseScore = mapDirectionAlignmentScore(reverseLink.direction, centers[reverseLink.from], centers[reverseLink.to]);
+    if (!Number.isFinite(forwardScore) || !Number.isFinite(reverseScore)) return Number.NEGATIVE_INFINITY;
+    const exactOppositeBonus = oppositeDirection(forwardLink.direction) === normalize(reverseLink.direction) ? 0.2 : 0;
+    return forwardScore + reverseScore + exactOppositeBonus;
+  }
+
+  function mapRenderDirectionTowardsTarget(direction = "", fromPoint = null, toPoint = null) {
+    const normalized = compassDirectionKey(direction) || normalize(direction);
+    if (!normalized) return "";
+    const opposite = oppositeDirection(normalized);
+    if (!opposite) return normalized;
+    const forwardScore = mapDirectionAlignmentScore(normalized, fromPoint, toPoint);
+    const oppositeScore = mapDirectionAlignmentScore(opposite, fromPoint, toPoint);
+    return oppositeScore > forwardScore ? opposite : normalized;
+  }
+
+  function buildMapDisplayLanes(edge, centers) {
+    const links = edge?.links || [];
+    const lanes = [];
+    const used = new Set();
+    const forwardEntries = [];
+    const reverseEntries = [];
+    links.forEach((link, index) => {
+      if (link.from === edge.from && link.to === edge.to) {
+        forwardEntries.push({ link, index });
+        return;
+      }
+      if (link.from === edge.to && link.to === edge.from) {
+        reverseEntries.push({ link, index });
+      }
+    });
+    for (const forwardEntry of forwardEntries) {
+      if (used.has(forwardEntry.index)) continue;
+      const exactReverseIndex = reverseEntries.findIndex((reverseEntry) => (
+        !used.has(reverseEntry.index)
+        && normalize(reverseEntry.link.direction) === oppositeDirection(forwardEntry.link.direction)
+      ));
+      if (exactReverseIndex < 0) continue;
+      const reverseEntry = reverseEntries[exactReverseIndex];
+      lanes.push({
+        twoWay: true,
+        startNodeId: edge.from,
+        endNodeId: edge.to,
+        sourceDirection: normalize(forwardEntry.link.direction),
+        targetDirection: normalize(reverseEntry.link.direction),
+      });
+      used.add(forwardEntry.index);
+      used.add(reverseEntry.index);
+    }
+    while (forwardEntries.length && reverseEntries.length) {
+      let best = null;
+      for (const forwardEntry of forwardEntries) {
+        if (used.has(forwardEntry.index)) continue;
+        for (const reverseEntry of reverseEntries) {
+          if (used.has(reverseEntry.index)) continue;
+          const score = mapReversePairScore(forwardEntry.link, reverseEntry.link, centers);
+          if (!best || score > best.score) best = { forwardEntry, reverseEntry, score };
+        }
+      }
+      if (!best || best.score < 0.25) break;
+      lanes.push({
+        twoWay: true,
+        startNodeId: edge.from,
+        endNodeId: edge.to,
+        sourceDirection: normalize(best.forwardEntry.link.direction),
+        targetDirection: normalize(best.reverseEntry.link.direction),
+      });
+      used.add(best.forwardEntry.index);
+      used.add(best.reverseEntry.index);
+    }
+    for (let index = 0; index < links.length; index += 1) {
+      if (used.has(index)) continue;
+      const link = links[index];
+      lanes.push({
+        twoWay: false,
+        startNodeId: link.from,
+        endNodeId: link.to,
+        sourceDirection: normalize(link.direction),
+        targetDirection: oppositeDirection(link.direction),
+      });
+      used.add(index);
+    }
+    return lanes.map((lane) => ({ ...lane, id: mapLaneStorageKey(lane) }));
+  }
+
+  function resolveMapConnectorEntryStyle(entry = null, laneId = "") {
+    if (entry?.lanes?.[laneId]) return sanitizeMapConnectorStyle(entry.lanes[laneId]) || null;
+    return sanitizeMapConnectorStyle(entry || {}) || null;
+  }
+
+  function snapAlignedMapConnectorSides(from, to, sourceSide, targetSide, options = {}) {
+    const threshold = options.threshold ?? 18;
+    const sourceLocked = Boolean(options.sourceLocked);
+    const targetLocked = Boolean(options.targetLocked);
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    let nextSource = sourceSide;
+    let nextTarget = targetSide;
+    if (Math.abs(dx) <= threshold) {
+      if (!sourceLocked) nextSource = dy >= 0 ? "south" : "north";
+      if (!targetLocked) nextTarget = dy >= 0 ? "north" : "south";
+    } else if (Math.abs(dy) <= threshold) {
+      if (!sourceLocked) nextSource = dx >= 0 ? "east" : "west";
+      if (!targetLocked) nextTarget = dx >= 0 ? "west" : "east";
+    }
+    return {
+      sourceSide: nextSource,
+      targetSide: nextTarget,
+    };
+  }
+
+  function mapLaneRenderGeometry(edge, lane, centers, boxSize = 96, options = {}) {
+    const overrideEntry = options.overrideEntry || null;
+    const override = resolveMapConnectorEntryStyle(overrideEntry, lane.id);
+    const from = centers[lane.startNodeId];
+    const to = centers[lane.endNodeId];
+    if (!from || !to) return null;
+    const fromDirection = mapRenderDirectionTowardsTarget(lane.sourceDirection, from, to) || normalize(lane.sourceDirection);
+    const toDirection = mapRenderDirectionTowardsTarget(lane.targetDirection, to, from) || normalize(lane.targetDirection);
+    const preferredSourceSide = sanitizeMapConnectorAnchor(override?.sourceSide || override?.startAnchor || fromDirection);
+    const preferredTargetSide = sanitizeMapConnectorAnchor(override?.targetSide || override?.endAnchor || toDirection);
+    const snappedSides = snapAlignedMapConnectorSides(from, to, preferredSourceSide, preferredTargetSide, {
+      sourceLocked: Boolean(override?.sourceSide || override?.startAnchor),
+      targetLocked: Boolean(override?.targetSide || override?.endAnchor),
+    });
+    return {
+      id: lane.id,
+      from,
+      to,
+      fromDirection,
+      toDirection,
+      twoWay: lane.twoWay,
+      fromAnchor: resolveMapConnectorAnchor(from, snappedSides.sourceSide, fromDirection, boxSize, to),
+      toAnchor: resolveMapConnectorAnchor(to, snappedSides.targetSide, toDirection, boxSize, from),
+      override,
+    };
+  }
+
   function buildMapStubGeometry(center, direction = "", boxSize = 96, length = 38) {
     if (!center) return null;
     const vector = mapDirectionVector(direction);
@@ -15465,9 +15639,10 @@
       });
     }
 
-    const lineMarkup = model.edges.map((edge) => {
-      const geometry = mapEdgeRenderGeometry(edge, Object.fromEntries(nodePixels.entries()), boxSize, {
-        override: connectorOverrides[edge.id],
+    const centers = Object.fromEntries(nodePixels.entries());
+    const lineMarkup = model.edges.map((edge) => buildMapDisplayLanes(edge, centers).map((lane) => {
+      const geometry = mapLaneRenderGeometry(edge, lane, centers, boxSize, {
+        overrideEntry: connectorOverrides[edge.id],
       });
       if (!geometry) return "";
       return buildMapConnectorMarkup(
@@ -15482,7 +15657,7 @@
           strokeWidth: worldScope ? 4.8 : 4.2,
         }
       );
-    }).join("");
+    }).join("")).join("");
     const stubMarkup = (model.exitStubs || []).map((stub) => {
       const center = nodePixels.get(stub.nodeId);
       const geometry = buildMapStubGeometry(center, stub.direction, boxSize, worldScope ? 42 : 36);
