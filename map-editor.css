@@ -235,6 +235,11 @@ body {
   cursor: pointer;
 }
 
+.editor-toolbar__actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .editor-canvas {
   position: relative;
   overflow: auto;
@@ -318,9 +323,19 @@ body {
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14);
 }
 
+.editor-node.has-scope {
+  background: rgba(221, 235, 241, 0.98);
+  border-color: #5f7f8e;
+  box-shadow: 0 10px 22px rgba(22, 42, 56, 0.16);
+}
+
 .editor-node.is-selected {
   border-color: #b27e24;
   box-shadow: 0 0 0 4px rgba(178, 126, 36, 0.18), 0 8px 18px rgba(0, 0, 0, 0.14);
+}
+
+.editor-node.has-scope.is-selected {
+  border-color: #b27e24;
 }
 
 .editor-edge-hit,

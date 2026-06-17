@@ -13,6 +13,7 @@
     selectedNodeId: "",
     selectedEdgeId: "",
     selectedLaneId: "",
+    lastNodeClick: null,
     drag: null,
     waypointDrag: null,
   };
@@ -59,6 +60,7 @@
   const zoomOutButton = document.getElementById("zoom-out");
   const zoomResetButton = document.getElementById("zoom-reset");
   const zoomInButton = document.getElementById("zoom-in");
+  const scopeBackButton = document.getElementById("scope-back");
 
   function expandEditorData(rawData) {
     const data = JSON.parse(JSON.stringify(rawData || {}));
@@ -414,6 +416,28 @@
       positions: regionNodePositions(scope),
       connectors: regionConnectors(scope),
     };
+  }
+
+  function nodeOpenScope(node) {
+    if (!node) return "";
+    return node.openRegion || node.inlinePortal || "";
+  }
+
+  function parentScope(scope = state.scope) {
+    if (!scope || scope === "world") return "world";
+    return state.layout.regions?.[scope]?.parentScope || "world";
+  }
+
+  function updateScopeNavigationUi() {
+    if (scopeSelect && scopeSelect.value !== state.scope) {
+      scopeSelect.value = state.scope;
+    }
+    if (scopeBackButton) {
+      const canGoBack = state.scope !== "world";
+      scopeBackButton.disabled = !canGoBack;
+      scopeBackButton.textContent = canGoBack ? `Back a ${backupScopeLabel(parentScope(state.scope))}` : "Back";
+      scopeBackButton.title = canGoBack ? `Torna a ${backupScopeLabel(parentScope(state.scope))}` : "Sei gia al livello Mondo";
+    }
   }
 
   function normalizeDirection(direction = "") {
@@ -1415,7 +1439,16 @@
     const nodeMarkup = model.nodes.map((node) => {
       const center = centers[node.id];
       if (!center) return "";
-      return `<button class="editor-node${state.selectedNodeId === node.id ? " is-selected" : ""}" type="button" data-node-id="${node.id}" style="left:${center.x.toFixed(1)}px;top:${center.y.toFixed(1)}px;">${node.label}</button>`;
+      const openScope = nodeOpenScope(node);
+      const classes = [
+        "editor-node",
+        state.selectedNodeId === node.id ? "is-selected" : "",
+        openScope ? "has-scope" : "",
+      ].filter(Boolean).join(" ");
+      const scopeAttrs = openScope
+        ? ` data-open-scope="${openScope}" title="Doppio click per aprire ${escapeHtml(state.layout.regions?.[openScope]?.label || openScope)}"`
+        : "";
+      return `<button class="${classes}" type="button" data-node-id="${node.id}"${scopeAttrs} style="left:${center.x.toFixed(1)}px;top:${center.y.toFixed(1)}px;">${node.label}</button>`;
     }).join("");
 
     canvas.innerHTML = `<div class="editor-stage-shell" style="width:${scaledWidth}px;height:${scaledHeight}px;">
@@ -1426,6 +1459,7 @@
     </div>`;
     scopeTitle.textContent = model.title;
     if (scopeSubtitle) scopeSubtitle.textContent = `Zoom ${currentZoomLabel()} • trascina i nodi, seleziona un connettore e rifiniscilo con i punti.`;
+    updateScopeNavigationUi();
     updateZoomUi();
     syncSidebar();
   }
@@ -1435,6 +1469,7 @@
     state.selectedNodeId = "";
     state.selectedEdgeId = "";
     state.selectedLaneId = "";
+    state.lastNodeClick = null;
     render();
   }
 
@@ -1511,6 +1546,12 @@
 
   scopeSelect.innerHTML = [`<option value="world">world</option>`, ...Object.keys(state.layout.regions || {}).map((scope) => `<option value="${scope}">${scope}</option>`)].join("");
   scopeSelect.addEventListener("change", (event) => setScope(event.target.value));
+  if (scopeBackButton) {
+    scopeBackButton.addEventListener("click", () => {
+      if (state.scope === "world") return;
+      setScope(parentScope(state.scope));
+    });
+  }
   saveLayoutButton.addEventListener("click", () => {
     saveLayoutDirectly();
   });
@@ -1609,7 +1650,25 @@
     }
     const node = event.target.closest("[data-node-id]");
     if (node) {
-      state.selectedNodeId = node.getAttribute("data-node-id");
+      const nodeId = node.getAttribute("data-node-id") || "";
+      const openScope = node.getAttribute("data-open-scope");
+      const now = Date.now();
+      const repeatedNodeClick = Boolean(
+        state.lastNodeClick
+        && state.lastNodeClick.scope === state.scope
+        && state.lastNodeClick.nodeId === nodeId
+        && (now - state.lastNodeClick.time) <= 420
+      );
+      state.lastNodeClick = { scope: state.scope, nodeId, time: now };
+      if (repeatedNodeClick && openScope && state.layout.regions?.[openScope]) {
+        event.preventDefault();
+        state.lastNodeClick = null;
+        state.drag = null;
+        state.waypointDrag = null;
+        setScope(openScope);
+        return;
+      }
+      state.selectedNodeId = nodeId;
       state.selectedEdgeId = "";
       state.selectedLaneId = "";
       const model = buildModel(state.scope);
@@ -1620,9 +1679,11 @@
     }
     const edge = event.target.closest("[data-edge-hit]");
     if (edge) {
+      state.lastNodeClick = null;
       setSelectedLane(edge.getAttribute("data-edge-hit"), edge.getAttribute("data-lane-hit"));
       return;
     }
+    state.lastNodeClick = null;
     state.selectedNodeId = "";
     state.selectedEdgeId = "";
     state.selectedLaneId = "";
