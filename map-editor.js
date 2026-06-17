@@ -2304,7 +2304,6 @@
   }
 
   function render() {
-    normalizePromotedWorldNodePositions();
     const model = buildModel(state.scope);
     const {
       width,
