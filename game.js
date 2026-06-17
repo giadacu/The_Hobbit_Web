@@ -5590,6 +5590,7 @@
       if (!sceneMapOverlay || !sceneMapCanvas) return;
       if (!game.sceneMapVisible) {
         sceneMapOverlay.setAttribute("hidden", "hidden");
+        if (sceneMapBack) sceneMapBack.hidden = true;
         sceneMapCanvas.textContent = "";
         sceneMapCanvas.style.width = "";
         sceneMapCanvas.style.height = "";
@@ -5629,7 +5630,7 @@
       this.applySceneMapZoomPresentation(mapState);
       if (sceneMapTitle) sceneMapTitle.textContent = baseMapState.title || "Explored Map";
       if (sceneMapSubtitle) sceneMapSubtitle.textContent = baseMapState.subtitle || "";
-      if (sceneMapBack) sceneMapBack.hidden = !baseMapState.parentScope;
+      if (sceneMapBack) sceneMapBack.hidden = false;
       if (sceneMapZoomReset) sceneMapZoomReset.textContent = `${Math.round((game.sceneMapZoom || DEFAULT_SCENE_MAP_ZOOM) * 100)}%`;
       sceneMapOverlay.removeAttribute("hidden");
       if (!this.restoreSceneMapViewport(mapState)) this.centerSceneMapOnRoom(mapState);
@@ -5705,8 +5706,21 @@
       return true;
     }
 
+    closeSceneMap() {
+      if (!this.game.sceneMapVisible) return false;
+      this.game.sceneMapVisible = false;
+      this.game.sceneMapScope = "world";
+      this.game.sceneMapShowAll = false;
+      this.game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
+      this.game.sceneMapViewportAnchor = null;
+      this.game.sceneMapRenderCache = null;
+      this.render();
+      return true;
+    }
+
     sceneMapBack() {
-      if (!this.game.sceneMapVisible || this.game.sceneMapScope === "world") return false;
+      if (!this.game.sceneMapVisible) return false;
+      if (this.game.sceneMapScope === "world") return this.closeSceneMap();
       const parentScope = this.game.sceneMapRenderCache?.state?.parentScope || "world";
       this.game.sceneMapViewportAnchor = null;
       this.game.sceneMapScope = parentScope || "world";
@@ -9362,14 +9376,6 @@
         }
         rawCommand = this.normalizeConversationalQuestion(rawCommand);
         const normalizedCommand = normalizeNaturalCommand(rawCommand.toLowerCase());
-        if (!["map", "complete map"].includes(normalizedCommand)) {
-          this.sceneMapVisible = false;
-          this.sceneMapScope = "world";
-          this.sceneMapShowAll = false;
-          this.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
-          this.sceneMapViewportAnchor = null;
-          this.sceneMapRenderCache = null;
-        }
         if (normalizedCommand === "complete map") {
           this.showCompleteMap();
           return;
@@ -15856,13 +15862,11 @@
       <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000000" flood-opacity="0.18" />
     </filter>
     <pattern id="mapPaper" width="18" height="18" patternUnits="userSpaceOnUse">
-      <path d="M0 9H18M9 0V18" stroke="#e6d7b8" stroke-opacity="0.28" stroke-width="0.7" />
+      <path d="M0 9H18M9 0V18" stroke="#f2e7cb" stroke-opacity="0.1" stroke-width="0.7" />
     </pattern>
   </defs>
-  <rect x="8" y="8" width="${width - 16}" height="${height - 16}" rx="24" fill="#efe3c6" stroke="#8c7550" stroke-width="2.5" filter="url(#mapShadow)" />
-  <rect x="8" y="8" width="${width - 16}" height="${height - 16}" rx="24" fill="url(#mapPaper)" />
-  <text x="40" y="48" font-family="Georgia, 'Times New Roman', serif" font-size="28" font-weight="700" fill="#3a2b16">${escapeXml(model.title || "Explored Map")}</text>
-  <text x="40" y="78" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="17" fill="#6f5733">${escapeXml(model.subtitle || "")}</text>
+  <rect x="8" y="8" width="${width - 16}" height="${height - 16}" rx="24" fill="rgba(239, 227, 198, 0.24)" stroke="rgba(140, 117, 80, 0.58)" stroke-width="2.5" filter="url(#mapShadow)" />
+  <rect x="8" y="8" width="${width - 16}" height="${height - 16}" rx="24" fill="url(#mapPaper)" opacity="0.28" />
   <text x="${width - 40}" y="48" text-anchor="end" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="15" font-weight="700" fill="#7b6033">${worldScope ? "Click marked locations for local maps" : "Back returns to the world overview"}</text>
   <text x="${width - 40}" y="74" text-anchor="end" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="15" font-weight="700" fill="#7b6033">Wheel, pinch, or buttons to zoom</text>
   <g>${lineMarkup}${bridgeMarkup}${stubMarkup}${levelBadgeMarkup}</g>

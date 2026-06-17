@@ -3119,15 +3119,37 @@ const gameCases = [
       game.print(`Map image loaded: ${src.startsWith("data:image/svg+xml") ? "yes" : "no"}`);
       game.print(`Map has clickable regions: ${canvas.innerHTML.includes("data-map-open-region") ? "yes" : "no"}`);
       game.execute("exits");
-      const hiddenAfter = Object.prototype.hasOwnProperty.call(overlay.attributes, "hidden") ? "yes" : "no";
-      game.print(`Map overlay hidden after exits: ${hiddenAfter}`);
+      const visibleAfter = Object.prototype.hasOwnProperty.call(overlay.attributes, "hidden") ? "no" : "yes";
+      game.print(`Map overlay stays visible after exits: ${visibleAfter}`);
     },
     expectedIncluded: [
       "You study the paths already traced across Wilderland.",
       "Map overlay visible: yes",
       "Map image loaded: yes",
       "Map has clickable regions: yes",
-      "Map overlay hidden after exits: yes",
+      "Map overlay stays visible after exits: yes",
+    ],
+  },
+  {
+    name: "map stays open and updates while new locations are discovered",
+    drive(game) {
+      const overlay = document.getElementById("scene-map-overlay");
+      const subtitle = document.getElementById("scene-map-subtitle");
+      const image = document.getElementById("scene-map-image");
+      game.execute("map");
+      const beforeSrc = image.getAttribute("src") || "";
+      game.execute("jump beorn");
+      const afterSrc = image.getAttribute("src") || "";
+      const visibleAfterJump = Object.prototype.hasOwnProperty.call(overlay.attributes, "hidden") ? "no" : "yes";
+      game.print(`Map visible after jump: ${visibleAfterJump}`);
+      game.print(`Map image updated after jump: ${beforeSrc !== afterSrc ? "yes" : "no"}`);
+      game.print(`Map subtitle tracks current room: ${subtitle.textContent.includes("Beorns House") ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "Map visible after jump: yes",
+      "Map image updated after jump: yes",
+      "Map subtitle tracks current room: yes",
     ],
   },
   {
@@ -3154,7 +3176,8 @@ const gameCases = [
       game.print(`World map shows Goblin Tunnels node: ${decodedMapImage.includes('data-node-label=\"Goblin Tunnels\"') ? "yes" : "no"}`);
       game.print(`World map shows Goblin Tunnels connector badge: ${decodedMapImage.includes(">U/D<") ? "yes" : "no"}`);
       game.print(`World map hides tunnel internals: ${decodedMapImage.includes("Deep Dark Lake") || decodedMapImage.includes("Tunnel 14") ? "no" : "yes"}`);
-      game.print(`Back disabled in world map: ${backButton.disabled ? "yes" : "no"}`);
+      game.print(`Back visible in world map: ${backButton.hidden ? "no" : "yes"}`);
+      game.print(`Back enabled in world map: ${backButton.disabled ? "no" : "yes"}`);
       game.layout.adjustSceneMapZoom(0.1);
       game.print(`Zoom label after zoom in: ${zoomReset.textContent}`);
       game.print(`Map image reused after zoom: ${(image.getAttribute("src") || "") === beforeZoomSrc ? "yes" : "no"}`);
@@ -3184,7 +3207,8 @@ const gameCases = [
       "World map shows Goblin Tunnels node: yes",
       "World map shows Goblin Tunnels connector badge: yes",
       "World map hides tunnel internals: yes",
-      "Back disabled in world map: yes",
+      "Back visible in world map: yes",
+      "Back enabled in world map: yes",
       "Zoom label after zoom in: 70%",
       "Map image reused after zoom: yes",
       "Local map title: Goblin Tunnels",
@@ -3217,6 +3241,24 @@ const gameCases = [
       "You study the paths already traced across Wilderland.",
       "Wheel zoom label: 70%",
       "Wheel zoom prevented default: yes",
+    ],
+  },
+  {
+    name: "map back closes world overview to reveal the room image again",
+    drive(game) {
+      const overlay = document.getElementById("scene-map-overlay");
+      const image = document.getElementById("room-image");
+      const beforeMapSrc = image.getAttribute("src") || "";
+      game.execute("map");
+      game.layout.sceneMapBack();
+      const hiddenAfterBack = Object.prototype.hasOwnProperty.call(overlay.attributes, "hidden") ? "yes" : "no";
+      game.print(`World map hidden after back: ${hiddenAfterBack}`);
+      game.print(`Room image restored after back: ${(image.getAttribute("src") || "") === beforeMapSrc ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "World map hidden after back: yes",
+      "Room image restored after back: yes",
     ],
   },
   {
