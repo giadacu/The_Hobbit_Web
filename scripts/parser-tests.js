@@ -3154,7 +3154,8 @@ const gameCases = [
       game.print(`World map shows Goblin Tunnels node: ${decodedMapImage.includes('data-node-label=\"Goblin Tunnels\"') ? "yes" : "no"}`);
       game.print(`World map shows Goblin Tunnels connector badge: ${decodedMapImage.includes(">U/D<") ? "yes" : "no"}`);
       game.print(`World map hides tunnel internals: ${decodedMapImage.includes("Deep Dark Lake") || decodedMapImage.includes("Tunnel 14") ? "no" : "yes"}`);
-      game.layout.adjustSceneMapZoom(0.4);
+      game.print(`Back disabled in world map: ${backButton.disabled ? "yes" : "no"}`);
+      game.layout.adjustSceneMapZoom(0.1);
       game.print(`Zoom label after zoom in: ${zoomReset.textContent}`);
       game.print(`Map image reused after zoom: ${(image.getAttribute("src") || "") === beforeZoomSrc ? "yes" : "no"}`);
       game.layout.openSceneMapScope("goblin_tunnels");
@@ -3164,6 +3165,7 @@ const gameCases = [
       game.print(`Tunnel map shows Deep Dark Lake: ${tunnelMapImage.includes("Deep") && tunnelMapImage.includes("Dark") && tunnelMapImage.includes("Lake") ? "yes" : "no"}`);
       game.print(`Tunnel map shows a tunnel node: ${tunnelMapImage.includes("Tunnel 14") ? "yes" : "no"}`);
       game.print(`Back visible in local map: ${backButton.hidden ? "no" : "yes"}`);
+      game.print(`Back enabled in local map: ${backButton.disabled ? "no" : "yes"}`);
       game.layout.sceneMapBack();
       game.print(`World map title after back: ${title.textContent}`);
       game.layout.resetSceneMapZoom();
@@ -3182,13 +3184,15 @@ const gameCases = [
       "World map shows Goblin Tunnels node: yes",
       "World map shows Goblin Tunnels connector badge: yes",
       "World map hides tunnel internals: yes",
-      "Zoom label after zoom in: 100%",
+      "Back disabled in world map: yes",
+      "Zoom label after zoom in: 70%",
       "Map image reused after zoom: yes",
       "Local map title: Goblin Tunnels",
-      "Local map subtitle: Local map • use Back to return to the world overview",
+      "Local map subtitle: Local map",
       "Tunnel map shows Deep Dark Lake: yes",
       "Tunnel map shows a tunnel node: yes",
       "Back visible in local map: yes",
+      "Back enabled in local map: yes",
       "World map title after back: Explored Map",
       "Zoom label after reset: 60%",
     ],
@@ -3213,6 +3217,158 @@ const gameCases = [
       "You study the paths already traced across Wilderland.",
       "Wheel zoom label: 70%",
       "Wheel zoom prevented default: yes",
+    ],
+  },
+  {
+    name: "map editor saves connector route and anchor overrides",
+    drive(game) {
+      game.execute("jump beorn");
+      game.execute("map");
+      game.layout.startSceneMapEditing();
+      const state = game.sceneMapRenderCache?.state || null;
+      const edge = (state?.editorMeta?.edges || []).find((candidate) => candidate.id === "room:green_dragon_inn|room:green_dragon_inn_outside");
+      if (!edge) {
+        game.print("Connector override edge found: no");
+        return;
+      }
+      game.layout.selectSceneMapEditorEdge(edge.id);
+      const controlMarkup = game.layout.sceneMapEditorInfoMarkup(state?.editorMeta || {});
+      game.print(`Editor palette has save action: ${controlMarkup.includes('data-scene-map-editor-action=\"save-layout\"') ? "yes" : "no"}`);
+      game.print(`Editor palette is draggable: ${controlMarkup.includes('data-scene-map-panel-drag=\"true\"') ? "yes" : "no"}`);
+      game.print(`Connector route menu has oblique-horizontal: ${controlMarkup.includes('value="dh"') ? "yes" : "no"}`);
+      game.print(`Connector route menu has horiz-vert-oblique: ${controlMarkup.includes('value="hvd"') ? "yes" : "no"}`);
+      game.print(`Connector route menu has oblique-horiz-vert: ${controlMarkup.includes('value="dhv"') ? "yes" : "no"}`);
+      game.layout.updateSceneMapEditorEdgeOverride({
+        route: "hvd",
+        startAnchor: "east",
+        endAnchor: "west",
+        joints: [{ x: 240, y: 190 }, { x: 240, y: 260 }],
+      });
+      game.layout.saveSceneMapEditing();
+      const savedPayload = JSON.parse(localStorage.getItem("hobbit-web-map-layout-overrides") || "{}");
+      const savedOverride = savedPayload?.scopes?.world?.edges?.[edge.id] || null;
+      game.print(`Connector override edge found: yes`);
+      game.print(`Connector override saved route: ${savedOverride?.route || "missing"}`);
+      game.print(`Connector override saved start: ${savedOverride?.startAnchor || "missing"}`);
+      game.print(`Connector override saved end: ${savedOverride?.endAnchor || "missing"}`);
+      game.print(`Connector override saved joints: ${Array.isArray(savedOverride?.joints) ? savedOverride.joints.length : "missing"}`);
+      game.execute("map");
+      const reloaded = game.sceneMapRenderCache?.state?.editorMeta?.connectorOverrides?.[edge.id] || null;
+      game.print(`Connector override reloaded route: ${reloaded?.route || "missing"}`);
+      game.print(`Connector override reloaded end: ${reloaded?.endAnchor || "missing"}`);
+      game.print(`Connector override reloaded joints: ${Array.isArray(reloaded?.joints) ? reloaded.joints.length : "missing"}`);
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "Editor palette has save action: yes",
+      "Editor palette is draggable: yes",
+      "Connector route menu has oblique-horizontal: yes",
+      "Connector route menu has horiz-vert-oblique: yes",
+      "Connector route menu has oblique-horiz-vert: yes",
+      "Connector override edge found: yes",
+      "Connector override saved route: hvd",
+      "Connector override saved start: east",
+      "Connector override saved end: west",
+      "Connector override saved joints: 2",
+      "Connector override reloaded route: hvd",
+      "Connector override reloaded end: west",
+      "Connector override reloaded joints: 2",
+    ],
+  },
+  {
+    name: "map back exits local map even while editor is open",
+    drive(game) {
+      const title = document.getElementById("scene-map-title");
+      game.execute("jump beorn");
+      game.execute("map");
+      game.layout.openSceneMapScope("goblin_tunnels");
+      game.layout.startSceneMapEditing();
+      game.print(`Editing before back: ${game.sceneMapEditMode ? "yes" : "no"}`);
+      game.layout.sceneMapBack();
+      game.print(`Editing after back: ${game.sceneMapEditMode ? "yes" : "no"}`);
+      game.print(`Map title after back from editor: ${title.textContent}`);
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "Editing before back: yes",
+      "Editing after back: no",
+      "Map title after back from editor: Explored Map",
+    ],
+  },
+  {
+    name: "map editor clears selected connector on blank click without losing draft",
+    drive(game) {
+      game.execute("jump beorn");
+      game.execute("map");
+      game.layout.startSceneMapEditing();
+      const state = game.sceneMapRenderCache?.state || null;
+      const edge = (state?.editorMeta?.edges || []).find((candidate) => candidate.id === "room:green_dragon_inn|room:green_dragon_inn_outside");
+      if (!edge) {
+        game.print("Connector blank-click edge found: no");
+        return;
+      }
+      let prevented = false;
+      game.layout.selectSceneMapEditorEdge(edge.id);
+      game.layout.updateSceneMapEditorEdgeOverride({ route: "dh", bend: 24 });
+      game.print(`Connector selected before blank click: ${game.sceneMapEditSelectedEdgeId === edge.id ? "yes" : "no"}`);
+      game.layout.beginSceneMapEditorDrag({
+        target: { closest() { return null; } },
+        preventDefault() { prevented = true; },
+      });
+      const draft = game.sceneMapEditEdgeDraft?.[edge.id] || null;
+      game.print(`Connector blank-click edge found: yes`);
+      game.print(`Blank click prevented default: ${prevented ? "yes" : "no"}`);
+      game.print(`Connector selected after blank click: ${game.sceneMapEditSelectedEdgeId ? "yes" : "no"}`);
+      game.print(`Connector draft kept route: ${draft?.route || "missing"}`);
+      game.print(`Connector draft kept bend: ${draft?.bend ?? "missing"}`);
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "Connector selected before blank click: yes",
+      "Connector blank-click edge found: yes",
+      "Blank click prevented default: yes",
+      "Connector selected after blank click: no",
+      "Connector draft kept route: dh",
+      "Connector draft kept bend: 24",
+    ],
+  },
+  {
+    name: "map editor click on connector selects it",
+    drive(game) {
+      game.execute("jump beorn");
+      game.execute("map");
+      game.layout.startSceneMapEditing();
+      const state = game.sceneMapRenderCache?.state || null;
+      const edge = (state?.editorMeta?.edges || []).find((candidate) => candidate.id === "room:green_dragon_inn|room:green_dragon_inn_outside");
+      if (!edge) {
+        game.print("Connector click edge found: no");
+        return;
+      }
+      let prevented = false;
+      game.layout.beginSceneMapEditorDrag({
+        target: {
+          closest(selector) {
+            if (selector === "[data-editor-edge]") {
+              return {
+                getAttribute(name) {
+                  return name === "data-editor-edge" ? edge.id : "";
+                },
+              };
+            }
+            return null;
+          },
+        },
+        preventDefault() { prevented = true; },
+      });
+      game.print(`Connector click edge found: yes`);
+      game.print(`Connector click prevented default: ${prevented ? "yes" : "no"}`);
+      game.print(`Connector selected after click: ${game.sceneMapEditSelectedEdgeId === edge.id ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "Connector click edge found: yes",
+      "Connector click prevented default: yes",
+      "Connector selected after click: yes",
     ],
   },
   {
@@ -3256,7 +3412,7 @@ const gameCases = [
       "Elven halls shows long lake portal label: yes",
       "Elven halls hides Wooden Town internals: yes",
       "Long Lake title: Long Lake",
-      "Long Lake subtitle: Local map • use Back to return to Elvenking's Halls",
+      "Long Lake subtitle: Local map",
       "Long Lake map shows Lower Halls: yes",
       "Back visible in nested local map: yes",
       "Title after one back: Elvenking's Halls",

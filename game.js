@@ -13,12 +13,12 @@
   const SAVE_AUTOSAVE_PREFIX = `${SAVE_PREFIX}autosave:`;
   const MAX_AUTOSAVE_ENTRIES = 12;
   const LAYOUT_PREF_KEY = "hobbit-web-layout-mode";
-  const MAP_LAYOUT_OVERRIDE_KEY = "hobbit-web-map-layout-overrides";
-  const MAP_EDITOR_SNAP_PREF_KEY = "hobbit-web-map-editor-snap";
   const MOBILE_LAYOUT_MAX_WIDTH = 860;
   const DEFAULT_SCENE_MAP_ZOOM = 0.6;
   const MIN_SCENE_MAP_ZOOM = 0.4;
   const MAX_SCENE_MAP_ZOOM = 1;
+  const SCENE_MAP_ZOOM_STEP = 0.1;
+  const MAP_CONNECTOR_SIDE_OPTIONS = new Set(["auto", "north", "east", "south", "west", "north east", "north west", "south east", "south west"]);
 
   const $ = (id) => document.getElementById(id);
   const output = $("output");
@@ -33,16 +33,9 @@
   const sceneMapBack = $("scene-map-back");
   const sceneMapTitle = $("scene-map-title");
   const sceneMapSubtitle = $("scene-map-subtitle");
-  const sceneMapEditInfo = $("scene-map-edit-info");
   const sceneMapZoomOut = $("scene-map-zoom-out");
   const sceneMapZoomReset = $("scene-map-zoom-reset");
   const sceneMapZoomIn = $("scene-map-zoom-in");
-  const sceneMapEditToggle = $("scene-map-edit-toggle");
-  const sceneMapEditSave = $("scene-map-edit-save");
-  const sceneMapEditCommit = $("scene-map-edit-commit");
-  const sceneMapEditSnap = $("scene-map-edit-snap");
-  const sceneMapEditCancel = $("scene-map-edit-cancel");
-  const sceneMapEditReset = $("scene-map-edit-reset");
   const sceneMapScroll = $("scene-map-scroll");
   const sceneMapCanvas = $("scene-map-canvas");
   const sceneMapImage = $("scene-map-image");
@@ -5497,7 +5490,6 @@
       game.layoutModePreference = this.loadLayoutModePreference();
       game.layoutMode = "1";
       game.layout2SceneWidth = this.loadLayout2SceneWidthPreference();
-      game.sceneMapEditSnap = loadMapEditorSnapPreference();
       this.applyLayout2SceneWidth(game.layout2SceneWidth, { persist: false });
       this.applyLayoutMode(game.layoutModePreference);
       this.initializeLayoutSwitchVisibility();
@@ -5603,7 +5595,6 @@
         sceneMapCanvas.style.height = "";
         sceneMapImage?.removeAttribute("src");
         game.sceneMapViewportAnchor = null;
-        this.updateSceneMapEditorControls();
         return;
       }
       const cacheKey = buildSceneMapCacheKey(game, game.sceneMapScope || "world");
@@ -5641,342 +5632,10 @@
       if (sceneMapBack) sceneMapBack.hidden = !baseMapState.parentScope;
       if (sceneMapZoomReset) sceneMapZoomReset.textContent = `${Math.round((game.sceneMapZoom || DEFAULT_SCENE_MAP_ZOOM) * 100)}%`;
       sceneMapOverlay.removeAttribute("hidden");
-      this.updateSceneMapEditorControls(baseMapState);
-      this.renderSceneMapEditorOverlay(baseMapState);
       if (!this.restoreSceneMapViewport(mapState)) this.centerSceneMapOnRoom(mapState);
       game.sceneMapViewportAnchor = null;
     }
 
-    updateSceneMapEditorControls(baseMapState = null) {
-      const editing = Boolean(this.game.sceneMapEditMode && this.game.sceneMapVisible);
-      if (sceneMapEditToggle) {
-        sceneMapEditToggle.hidden = !this.game.sceneMapVisible || editing;
-        sceneMapEditToggle.textContent = "Edit";
-      }
-      if (sceneMapEditSave) sceneMapEditSave.hidden = !editing;
-      if (sceneMapEditCommit) sceneMapEditCommit.hidden = !editing;
-      if (sceneMapEditSnap) {
-        sceneMapEditSnap.hidden = !editing;
-        sceneMapEditSnap.textContent = this.game.sceneMapEditSnap ? "Snap On" : "Snap Off";
-        sceneMapEditSnap.setAttribute("aria-pressed", this.game.sceneMapEditSnap ? "true" : "false");
-      }
-      if (sceneMapEditCancel) sceneMapEditCancel.hidden = !editing;
-      if (sceneMapEditReset) sceneMapEditReset.hidden = !editing;
-      if (sceneMapBack) sceneMapBack.disabled = editing;
-      if (sceneMapZoomOut) sceneMapZoomOut.disabled = editing;
-      if (sceneMapZoomReset) sceneMapZoomReset.disabled = editing;
-      if (sceneMapZoomIn) sceneMapZoomIn.disabled = editing;
-      if (sceneMapEditInfo) {
-        if (!editing || !baseMapState?.editorMeta) {
-          sceneMapEditInfo.hidden = true;
-          sceneMapEditInfo.innerHTML = "";
-        } else {
-          sceneMapEditInfo.hidden = false;
-          sceneMapEditInfo.innerHTML = this.sceneMapEditorInfoMarkup(baseMapState.editorMeta);
-        }
-      }
-      if (sceneMapSubtitle && editing && baseMapState?.title) {
-        sceneMapSubtitle.textContent = `${baseMapState.subtitle || ""} • drag nodes, then Save`;
-      }
-    }
-
-    sceneMapEditorInfoMarkup(meta) {
-      const selectedNodeId = this.game.sceneMapEditSelectedNodeId || meta.currentNodeId || meta.nodes?.[0]?.id || "";
-      const node = (meta.nodes || []).find((candidate) => candidate.id === selectedNodeId) || null;
-      const exits = uniqueMapEditorExits(meta, selectedNodeId);
-      const nodeText = node?.label || "No selection";
-      const snapMarkup = `<span class="scene-map-edit-pill"><strong>Snap</strong> ${this.game.sceneMapEditSnap ? "On" : "Off"}</span>`;
-      const exitMarkup = exits.length
-        ? exits.map((exit) => `<span class="scene-map-edit-pill"><strong>${escapeXml(exit.badge)}</strong> ${escapeXml(exit.toLabel)}</span>`).join("")
-        : `<span class="scene-map-edit-pill"><strong>Exits</strong> none</span>`;
-      return `<span class="scene-map-edit-pill"><strong>Selected</strong> ${escapeXml(nodeText)}</span>${snapMarkup}${exitMarkup}`;
-    }
-
-    toggleSceneMapEditSnap() {
-      this.game.sceneMapEditSnap = !this.game.sceneMapEditSnap;
-      saveMapEditorSnapPreference(this.game.sceneMapEditSnap);
-      this.updateSceneMapEditorControls(this.game.sceneMapRenderCache?.state || null);
-      this.renderSceneMapEditorOverlay(this.game.sceneMapRenderCache?.state || null);
-      return true;
-    }
-
-    sceneMapEditorLayer() {
-      return sceneMapCanvas?.querySelector?.(".scene-map-editor-layer") || null;
-    }
-
-    startSceneMapEditing() {
-      if (!this.game.sceneMapVisible) return false;
-      const scope = this.game.sceneMapScope || "world";
-      const state = this.game.sceneMapRenderCache?.state || null;
-      if (!state?.editorMeta?.nodes?.length) return false;
-      this.game.sceneMapEditMode = true;
-      this.game.sceneMapEditScope = scope;
-      this.game.sceneMapEditDraft = cloneMapPointMap(state.editorMeta.nodeCenters || {});
-      this.game.sceneMapEditDrag = null;
-      this.game.sceneMapEditSelectedNodeId = state.editorMeta.currentNodeId || state.editorMeta.nodes?.[0]?.id || "";
-      this.renderSceneMap();
-      return true;
-    }
-
-    cancelSceneMapEditing(options = {}) {
-      const preserveScope = options.preserveScope === true;
-      this.game.sceneMapEditMode = false;
-      this.game.sceneMapEditDraft = null;
-      this.game.sceneMapEditDrag = null;
-      this.game.sceneMapEditSelectedNodeId = "";
-      if (!preserveScope) this.game.sceneMapEditScope = "";
-      this.renderSceneMap();
-      return true;
-    }
-
-    resetSceneMapEditingScope() {
-      const scope = this.game.sceneMapScope || "world";
-      clearMapLayoutScopeOverrides(scope);
-      this.game.sceneMapRenderCache = null;
-      this.game.sceneMapEditMode = false;
-      this.game.sceneMapEditDraft = null;
-      this.game.sceneMapEditDrag = null;
-      this.game.sceneMapEditScope = "";
-      this.game.sceneMapEditSelectedNodeId = "";
-      this.renderSceneMap();
-      return true;
-    }
-
-    saveSceneMapEditing() {
-      const scope = this.game.sceneMapScope || "world";
-      const state = this.game.sceneMapRenderCache?.state || null;
-      const meta = state?.editorMeta || null;
-      const draft = this.game.sceneMapEditDraft || null;
-      if (!meta || !draft) return false;
-      const savedPoints = {};
-      for (const node of meta.nodes || []) {
-        const center = draft[node.id];
-        if (!center) continue;
-        savedPoints[node.id] = {
-          x: roundMapCoordinate(((center.x - meta.offsetX - meta.padding - (meta.boxSize / 2)) / meta.unitX) + meta.minX),
-          y: roundMapCoordinate(((center.y - meta.offsetY - meta.padding - (meta.boxSize / 2)) / meta.unitY) + meta.minY),
-        };
-      }
-      saveMapLayoutScopeOverrides(scope, savedPoints);
-      this.game.sceneMapRenderCache = null;
-      this.game.sceneMapEditMode = false;
-      this.game.sceneMapEditDraft = null;
-      this.game.sceneMapEditDrag = null;
-      this.game.sceneMapEditScope = "";
-      this.game.sceneMapEditSelectedNodeId = "";
-      this.renderSceneMap();
-      this.game.print(`Saved map layout for ${state?.title || scope}.`);
-      return true;
-    }
-
-    sceneMapEditingSourcePositions(scope = "world") {
-      const state = this.game.sceneMapRenderCache?.state || null;
-      const meta = state?.editorMeta || null;
-      const draft = this.game.sceneMapEditDraft || null;
-      if (!meta || !draft) return {};
-      const savedPoints = {};
-      for (const node of meta.nodes || []) {
-        const center = draft[node.id];
-        if (!center) continue;
-        savedPoints[node.id] = {
-          x: roundMapCoordinate(((center.x - meta.offsetX - meta.padding - (meta.boxSize / 2)) / meta.unitX) + meta.minX),
-          y: roundMapCoordinate(((center.y - meta.offsetY - meta.padding - (meta.boxSize / 2)) / meta.unitY) + meta.minY),
-        };
-      }
-      return {
-        ...sourceMapPinnedPositionsForScope(scope),
-        ...savedPoints,
-      };
-    }
-
-    async commitSceneMapEditingToSource() {
-      const scope = this.game.sceneMapScope || "world";
-      const points = this.sceneMapEditingSourcePositions(scope);
-      if (!Object.keys(points).length) return false;
-      const picker = typeof window.showOpenFilePicker === "function" ? window.showOpenFilePicker : null;
-      if (picker) {
-        try {
-          const [handle] = await picker({
-            multiple: false,
-            types: [{ description: "JavaScript files", accept: { "text/javascript": [".js"] } }],
-            excludeAcceptAllOption: false,
-          });
-          if (!handle) return false;
-          const file = await handle.getFile();
-          const sourceText = await file.text();
-          const patched = patchGameJsMapPositions(sourceText, scope, points);
-          const writable = await handle.createWritable();
-          await writable.write(patched);
-          await writable.close();
-          this.game.print(`Wrote ${scope === "world" ? "world map" : `${scope} map`} positions into ${file.name}.`);
-          return true;
-        } catch (error) {
-          if (error?.name === "AbortError") return false;
-        }
-      }
-
-      try {
-        const sourceText = await fetch("game.js").then((response) => response.text());
-        const patched = patchGameJsMapPositions(sourceText, scope, points);
-        const blob = new Blob([patched], { type: "text/javascript;charset=utf-8" });
-        const downloadUrl = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
-        anchor.href = downloadUrl;
-        anchor.download = "game.js";
-        anchor.click();
-        setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
-        this.game.print("Downloaded a patched game.js. Replace the project file with that copy to make the layout permanent in source.");
-        return true;
-      } catch (_error) {
-        const snippet = mapSourceReplacementSnippet(scope, points);
-        try {
-          await navigator.clipboard?.writeText?.(snippet);
-        } catch (_clipboardError) {
-          // ignore clipboard failures and still provide a download
-        }
-        const blob = new Blob([snippet], { type: "text/plain;charset=utf-8" });
-        const downloadUrl = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
-        anchor.href = downloadUrl;
-        anchor.download = `${scope}-map-layout-snippet.txt`;
-        anchor.click();
-        setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
-        this.game.print("The browser could not rewrite game.js directly, so I downloaded a ready-to-paste source snippet instead.");
-        return true;
-      }
-    }
-
-    renderSceneMapEditorOverlay(baseMapState = null) {
-      const layer = this.sceneMapEditorLayer();
-      if (!layer || !sceneMapCanvas) return;
-      const editing = Boolean(this.game.sceneMapEditMode);
-      sceneMapCanvas.classList.toggle("is-editing", editing);
-      if (!editing || !baseMapState?.editorMeta) {
-        layer.setAttribute("hidden", "hidden");
-        layer.innerHTML = "";
-        return;
-      }
-      const meta = baseMapState.editorMeta;
-      const centers = this.game.sceneMapEditDraft || meta.nodeCenters || {};
-      const selectedNodeId = this.game.sceneMapEditSelectedNodeId || meta.currentNodeId || meta.nodes?.[0]?.id || "";
-      if (sceneMapEditInfo) {
-        sceneMapEditInfo.hidden = false;
-        sceneMapEditInfo.innerHTML = this.sceneMapEditorInfoMarkup(meta);
-      }
-      const lines = (meta.edges || []).map((edge) => {
-        const geometry = mapEdgeRenderGeometry(edge, centers, meta.boxSize);
-        if (!geometry) return "";
-        return buildMapConnectorMarkup(
-          geometry.fromAnchor,
-          geometry.toAnchor,
-          { fromDirection: geometry.fromDirection, toDirection: geometry.toDirection },
-          {
-            boxSize: meta.boxSize,
-            twoWay: geometry.twoWay,
-            stroke: geometry.twoWay ? "#7f6641" : "#a17a4b",
-            strokeWidth: 4.8,
-          }
-        );
-      }).join("");
-      const stubMarkup = (meta.exitStubs || []).map((stub) => {
-        const center = centers[stub.nodeId];
-        const geometry = buildMapStubGeometry(center, stub.direction, meta.boxSize, 36);
-        if (!geometry) return "";
-        return `<line x1="${geometry.from.x.toFixed(1)}" y1="${geometry.from.y.toFixed(1)}" x2="${geometry.to.x.toFixed(1)}" y2="${geometry.to.y.toFixed(1)}" stroke="#b08b52" stroke-width="4" stroke-linecap="round" stroke-dasharray="10 8" opacity="0.95" />`;
-      }).join("");
-      const badgeMarkup = uniqueMapEditorExits(meta, selectedNodeId).map((exit) => {
-        let centerX = 0;
-        let centerY = 0;
-        if (exit.toId) {
-          const from = centers[selectedNodeId];
-          const to = centers[exit.toId];
-          if (!from || !to) return "";
-          centerX = (from.x + to.x) / 2;
-          centerY = (from.y + to.y) / 2;
-        } else {
-          const stub = (meta.exitStubs || []).find((candidate) => candidate.nodeId === selectedNodeId && candidate.direction === exit.direction);
-          const geometry = buildMapStubGeometry(centers[selectedNodeId], exit.direction, meta.boxSize, 36);
-          if (!stub || !geometry) return "";
-          centerX = (geometry.from.x + geometry.to.x) / 2;
-          centerY = (geometry.from.y + geometry.to.y) / 2;
-        }
-        return `<g class="scene-map-editor-badge" transform="translate(${centerX.toFixed(1)} ${centerY.toFixed(1)})">
-          <rect x="-16" y="-11.5" width="32" height="20" rx="7"></rect>
-          <text x="0" y="3.8" text-anchor="middle">${escapeXml(exit.badge)}</text>
-        </g>`;
-      }).join("");
-      const nodeMarkup = (meta.nodes || []).map((node) => {
-        const center = centers[node.id];
-        if (!center) return "";
-        const current = node.id === meta.currentNodeId;
-        const classes = ["scene-map-editor-node"];
-        if (current) classes.push("is-current");
-        if (node.id === selectedNodeId) classes.push("is-selected");
-        if (this.game.sceneMapEditDrag?.nodeId === node.id) classes.push("is-dragging");
-        return `<button class="${classes.join(" ")}" type="button" data-editor-node="${escapeXml(node.id)}" style="left:${center.x.toFixed(1)}px;top:${center.y.toFixed(1)}px;">${escapeXml(node.label)}</button>`;
-      }).join("");
-      layer.innerHTML = `<svg class="scene-map-editor-svg" viewBox="0 0 ${baseMapState.baseWidth} ${baseMapState.baseHeight}" aria-hidden="true"><g>${lines}${stubMarkup}</g><g>${badgeMarkup}</g></svg>${nodeMarkup}`;
-      layer.removeAttribute("hidden");
-    }
-
-    beginSceneMapEditorDrag(event) {
-      if (!this.game.sceneMapEditMode || !event) return false;
-      const handle = event.target?.closest?.("[data-editor-node]");
-      if (!handle) return false;
-      const stage = sceneMapCanvas?.querySelector?.(".scene-map-stage");
-      if (!stage) return false;
-      const rect = stage.getBoundingClientRect?.();
-      if (!rect) return false;
-      const nodeId = handle.getAttribute("data-editor-node");
-      const point = this.game.sceneMapEditDraft?.[nodeId];
-      if (!nodeId || !point) return false;
-      event.preventDefault?.();
-      this.game.sceneMapEditSelectedNodeId = nodeId;
-      this.game.sceneMapEditDrag = {
-        nodeId,
-        stageLeft: rect.left,
-        stageTop: rect.top,
-        stageWidth: rect.width || 1,
-        stageHeight: rect.height || 1,
-        baseWidth: this.game.sceneMapRenderCache?.state?.baseWidth || 1,
-        baseHeight: this.game.sceneMapRenderCache?.state?.baseHeight || 1,
-      };
-      this.renderSceneMapEditorOverlay(this.game.sceneMapRenderCache?.state || null);
-      return true;
-    }
-
-    updateSceneMapEditorDrag(event) {
-      const drag = this.game.sceneMapEditDrag;
-      if (!drag || !this.game.sceneMapEditDraft) return false;
-      event.preventDefault?.();
-      let x = ((event.clientX - drag.stageLeft) / drag.stageWidth) * drag.baseWidth;
-      let y = ((event.clientY - drag.stageTop) / drag.stageHeight) * drag.baseHeight;
-      if (this.game.sceneMapEditSnap) {
-        const state = this.game.sceneMapRenderCache?.state || null;
-        const meta = state?.editorMeta || null;
-        if (meta) {
-          const sourceX = ((x - meta.offsetX - meta.padding - (meta.boxSize / 2)) / meta.unitX) + meta.minX;
-          const sourceY = ((y - meta.offsetY - meta.padding - (meta.boxSize / 2)) / meta.unitY) + meta.minY;
-          const snappedX = Math.round(sourceX * 5) / 5;
-          const snappedY = Math.round(sourceY * 5) / 5;
-          x = meta.offsetX + meta.padding + ((snappedX - meta.minX) * meta.unitX) + (meta.boxSize / 2);
-          y = meta.offsetY + meta.padding + ((snappedY - meta.minY) * meta.unitY) + (meta.boxSize / 2);
-        }
-      }
-      this.game.sceneMapEditDraft[drag.nodeId] = {
-        x: Math.max(32, Math.min(drag.baseWidth - 32, x)),
-        y: Math.max(140, Math.min(drag.baseHeight - 32, y)),
-      };
-      this.renderSceneMapEditorOverlay(this.game.sceneMapRenderCache?.state || null);
-      return true;
-    }
-
-    endSceneMapEditorDrag() {
-      if (!this.game.sceneMapEditDrag) return false;
-      this.game.sceneMapEditDrag = null;
-      this.renderSceneMapEditorOverlay(this.game.sceneMapRenderCache?.state || null);
-      return true;
-    }
 
     applySceneMapZoomPresentation(mapState = null) {
       if (!sceneMapCanvas || !mapState) return;
@@ -6048,7 +5707,6 @@
 
     sceneMapBack() {
       if (!this.game.sceneMapVisible || this.game.sceneMapScope === "world") return false;
-      if (this.game.sceneMapEditMode) return false;
       const parentScope = this.game.sceneMapRenderCache?.state?.parentScope || "world";
       this.game.sceneMapViewportAnchor = null;
       this.game.sceneMapScope = parentScope || "world";
@@ -6058,7 +5716,6 @@
 
     adjustSceneMapZoom(delta = 0, options = {}) {
       if (!this.game.sceneMapVisible) return false;
-      if (this.game.sceneMapEditMode) return false;
       if (!options.skipCapture) this.captureSceneMapViewportAnchor();
       const next = Math.max(MIN_SCENE_MAP_ZOOM, Math.min(MAX_SCENE_MAP_ZOOM, Number((this.game.sceneMapZoom || DEFAULT_SCENE_MAP_ZOOM) + delta).toFixed(2)));
       if (next === this.game.sceneMapZoom) return false;
@@ -6069,7 +5726,6 @@
 
     resetSceneMapZoom() {
       if (!this.game.sceneMapVisible) return false;
-      if (this.game.sceneMapEditMode) return false;
       this.captureSceneMapViewportAnchor();
       this.game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       this.renderSceneMap();
@@ -6079,7 +5735,6 @@
     openSceneMapScope(scope = "world") {
       const normalized = String(scope || "world").trim() || "world";
       if (normalized !== "world" && !MAP_REGION_DEFINITIONS[normalized]) return false;
-      if (this.game.sceneMapEditMode) return false;
       this.game.sceneMapViewportAnchor = null;
       this.game.sceneMapScope = normalized;
       this.renderSceneMap();
@@ -6088,7 +5743,6 @@
 
     handleSceneMapClick(event) {
       if (!this.game.sceneMapVisible) return false;
-      if (this.game.sceneMapEditMode) return false;
       const target = event?.target;
       const regionId = target?.closest?.("[data-map-open-region]")?.getAttribute?.("data-map-open-region");
       if (!regionId) return false;
@@ -6097,12 +5751,11 @@
 
     handleSceneMapWheel(event) {
       if (!this.game.sceneMapVisible || !event) return false;
-      if (this.game.sceneMapEditMode) return false;
       const lineWheel = Number(event.deltaMode) === 1;
       const pinchLike = Boolean(event.ctrlKey);
       const modifierZoom = Boolean(event.metaKey || event.altKey);
       if (!lineWheel && !pinchLike && !modifierZoom) return false;
-      const direction = Number(event.deltaY) < 0 ? 0.1 : -0.1;
+      const direction = Number(event.deltaY) < 0 ? SCENE_MAP_ZOOM_STEP : -SCENE_MAP_ZOOM_STEP;
       this.captureSceneMapViewportAnchor({
         clientX: Number(event.clientX),
         clientY: Number(event.clientY),
@@ -6824,10 +6477,6 @@
       game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       game.sceneMapViewportAnchor = null;
       game.sceneMapRenderCache = null;
-      game.sceneMapEditMode = false;
-      game.sceneMapEditDraft = null;
-      game.sceneMapEditScope = "";
-      game.sceneMapEditSelectedNodeId = "";
       game.spiderEyesState = save.spiderEyesState || null;
       game.gollumState = game.restoreGollumState(save.gollumState);
       game.turnCount = Number(save.turnCount) || 0;
@@ -8375,10 +8024,6 @@
       game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       game.sceneMapViewportAnchor = null;
       game.sceneMapRenderCache = null;
-      game.sceneMapEditMode = false;
-      game.sceneMapEditDraft = null;
-      game.sceneMapEditScope = "";
-      game.sceneMapEditSelectedNodeId = "";
       game.visitedRooms = new Set();
       game.tipsEnabled = false;
       game.tipIndex = 0;
@@ -8651,10 +8296,6 @@
       game.sceneMapVisible = true;
       game.sceneMapViewportAnchor = null;
       game.sceneMapRenderCache = null;
-      game.sceneMapEditMode = false;
-      game.sceneMapEditDraft = null;
-      game.sceneMapEditScope = "";
-      game.sceneMapEditSelectedNodeId = "";
       game.print("You study the paths already traced across Wilderland.");
       game.render();
     }
@@ -8671,10 +8312,6 @@
       game.sceneMapVisible = true;
       game.sceneMapViewportAnchor = null;
       game.sceneMapRenderCache = null;
-      game.sceneMapEditMode = false;
-      game.sceneMapEditDraft = null;
-      game.sceneMapEditScope = "";
-      game.sceneMapEditSelectedNodeId = "";
       game.print("You unfurl a complete test map of Wilderland, with every known place marked upon it.");
       game.render();
     }
@@ -9224,10 +8861,6 @@
       this.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       this.sceneMapViewportAnchor = null;
       this.sceneMapRenderCache = null;
-      this.sceneMapEditMode = false;
-      this.sceneMapEditDraft = null;
-      this.sceneMapEditScope = "";
-      this.sceneMapEditSelectedNodeId = "";
       this.visitedRooms = new Set();
       this.tipsEnabled = false;
       this.tipIndex = 0;
@@ -9514,20 +9147,10 @@
       bindLayoutButton(layoutMode1Button, "1");
       bindLayoutButton(layoutMode2Button, "2");
       sceneMapBack?.addEventListener("click", () => this.layout.sceneMapBack());
-      sceneMapEditToggle?.addEventListener("click", () => this.layout.startSceneMapEditing());
-      sceneMapEditSave?.addEventListener("click", () => this.layout.saveSceneMapEditing());
-      sceneMapEditCommit?.addEventListener("click", () => this.layout.commitSceneMapEditingToSource());
-      sceneMapEditSnap?.addEventListener("click", () => this.layout.toggleSceneMapEditSnap());
-      sceneMapEditCancel?.addEventListener("click", () => this.layout.cancelSceneMapEditing());
-      sceneMapEditReset?.addEventListener("click", () => this.layout.resetSceneMapEditingScope());
-      sceneMapZoomOut?.addEventListener("click", () => this.layout.adjustSceneMapZoom(-0.2));
+      sceneMapZoomOut?.addEventListener("click", () => this.layout.adjustSceneMapZoom(-SCENE_MAP_ZOOM_STEP));
       sceneMapZoomReset?.addEventListener("click", () => this.layout.resetSceneMapZoom());
-      sceneMapZoomIn?.addEventListener("click", () => this.layout.adjustSceneMapZoom(0.2));
+      sceneMapZoomIn?.addEventListener("click", () => this.layout.adjustSceneMapZoom(SCENE_MAP_ZOOM_STEP));
       sceneMapCanvas?.addEventListener("click", (event) => this.layout.handleSceneMapClick(event));
-      sceneMapCanvas?.addEventListener("pointerdown", (event) => this.layout.beginSceneMapEditorDrag(event));
-      document.addEventListener("pointermove", (event) => this.layout.updateSceneMapEditorDrag(event));
-      document.addEventListener("pointerup", () => this.layout.endSceneMapEditorDrag());
-      document.addEventListener("pointercancel", () => this.layout.endSceneMapEditorDrag());
       sceneMapScroll?.addEventListener("wheel", (event) => this.layout.handleSceneMapWheel(event), { passive: false });
       if (this.layoutSwitchAutoHide && layoutSwitch) {
         document.addEventListener("mousemove", (event) => this.handleLayoutMouseActivity(event), { passive: true });
@@ -9577,6 +9200,7 @@
         window.addEventListener("resize", () => {
           this.applyLayoutMode(this.layoutModePreference);
           this.applyLayout2SceneWidth(this.layout2SceneWidth, { persist: false });
+          this.layout.applySceneMapEditorPanelPosition();
         });
       }
     }
@@ -9745,10 +9369,6 @@
           this.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
           this.sceneMapViewportAnchor = null;
           this.sceneMapRenderCache = null;
-          this.sceneMapEditMode = false;
-          this.sceneMapEditDraft = null;
-          this.sceneMapEditScope = "";
-          this.sceneMapEditSelectedNodeId = "";
         }
         if (normalizedCommand === "complete map") {
           this.showCompleteMap();
@@ -10353,10 +9973,6 @@
       this.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       this.sceneMapViewportAnchor = null;
       this.sceneMapRenderCache = null;
-      this.sceneMapEditMode = false;
-      this.sceneMapEditDraft = null;
-      this.sceneMapEditScope = "";
-      this.sceneMapEditSelectedNodeId = "";
       this.render();
       return true;
     }
@@ -15293,55 +14909,12 @@
     },
   };
 
-  const WORLD_OVERVIEW_PINNED_POSITIONS = {
-    "region:bilbo_home": { x: 0.2, y: 0 },
-    "room:lane_beneath_hill": { x: 1.3, y: 0 },
-    "room:party_field": { x: 2.4, y: 0 },
-    "room:bywater_bridge": { x: 3.5, y: 0 },
-    "room:green_dragon_inn_outside": { x: 4.6, y: 0 },
-    "room:green_dragon_inn": { x: 4.6, y: -1.05 },
-    "room:dreary": { x: 5.75, y: 0 },
-    "room:trolls_clearing": { x: 6.85, y: -1.05 },
-    "room:hidden_path": { x: 6.85, y: -2.35 },
-    "room:trolls_cave": { x: 6.85, y: -3.4 },
-    "room:trollshaws_road": { x: 7.95, y: 0 },
-    "room:hidden_valley_path": { x: 9.05, y: 0 },
-    "region:rivendell": { x: 10.2, y: 0 },
-    "region:mountains": { x: 11.4, y: 0 },
-    "room:large_dry_cave": { x: 11.4, y: -1.05 },
-    "room:narrow_dangerous_path": { x: 12.4, y: 0 },
-    "region:beorn": { x: 13.6, y: -1.05 },
-    "room:great_river": { x: 13.6, y: -2.35 },
-    "region:mirkwood": { x: 15.6, y: -1.05 },
-    "region:elven_halls": { x: 16.6, y: -1.8 },
-    "room:treeless_opening": { x: 12.4, y: -1.05 },
-    "room:mountains": { x: 14.6, y: -3.4 },
-    "room:forest_river": { x: 15.6, y: -2.35 },
-    "region:goblin_tunnels": { x: 11.4, y: 0.85 },
-  };
-
-  const WORLD_MAP_LABEL_OVERRIDES = {
-    hidden_path: "Trolls Path",
-    large_dry_cave: "Dry Cave",
-    goblins_dungeon: "Goblin Dungeon",
-    dark_winding_passage: "Winding Passage",
-    inside_goblins_gate: "Goblin Gate In",
-    outside_goblins_gate: "Goblin Gate Out",
-    ...Object.fromEntries(Array.from({ length: 10 }, (_entry, index) => [`narrow_path_${index + 1}`, `Path ${index + 1}`])),
-    ...Object.fromEntries(Array.from({ length: 15 }, (_entry, index) => [`dark_stuffy_passage_${index + 1}`, `Tunnel ${index + 1}`])),
-  };
-
-  const WORLD_INLINE_REGION_HOSTS = {
-    goblin_tunnels: "large_dry_cave",
-  };
-
-  const WORLD_REGION_INLINE_IN_WORLD = new Set([
-    "green_dragon",
-  ]);
-
-  const WORLD_REGION_DRILLDOWN_DISABLED = new Set([
-    "green_dragon",
-  ]);
+  const MAP_LAYOUT_DATA = window.HOBBIT_MAP_LAYOUT || {};
+  const WORLD_OVERVIEW_PINNED_POSITIONS = MAP_LAYOUT_DATA.world?.nodes || {};
+  const WORLD_MAP_LABEL_OVERRIDES = MAP_LAYOUT_DATA.labelOverrides || {};
+  const WORLD_INLINE_REGION_HOSTS = MAP_LAYOUT_DATA.inlineRegionHosts || {};
+  const WORLD_REGION_INLINE_IN_WORLD = new Set(MAP_LAYOUT_DATA.inlineRegionsInWorld || []);
+  const WORLD_REGION_DRILLDOWN_DISABLED = new Set(MAP_LAYOUT_DATA.drilldownDisabled || []);
 
   const ROOM_TO_MAP_REGION = Object.fromEntries(
     Object.entries(MAP_REGION_DEFINITIONS)
@@ -15354,75 +14927,64 @@
     );
   }
 
-  function loadMapLayoutOverrides() {
-    try {
-      const payload = JSON.parse(localStorage.getItem(MAP_LAYOUT_OVERRIDE_KEY) || "{}");
-      const scopes = payload && typeof payload === "object" && payload.scopes && typeof payload.scopes === "object"
-        ? payload.scopes
-        : {};
-      return {
-        scopes: Object.fromEntries(
-          Object.entries(scopes).map(([scope, points]) => [scope, cloneMapPointMap(points)])
-        ),
-      };
-    } catch (_error) {
-      return { scopes: {} };
-    }
+  function sanitizeMapConnectorSide(side = "auto") {
+    const normalized = compassDirectionKey(side) || normalize(side) || "auto";
+    return MAP_CONNECTOR_SIDE_OPTIONS.has(normalized) ? normalized : "auto";
   }
 
-  function saveMapLayoutOverrides(overrides) {
-    try {
-      localStorage.setItem(MAP_LAYOUT_OVERRIDE_KEY, JSON.stringify({
-        scopes: Object.fromEntries(
-          Object.entries(overrides?.scopes || {}).map(([scope, points]) => [scope, cloneMapPointMap(points)])
-        ),
-      }));
-      return true;
-    } catch (_error) {
-      return false;
-    }
+  function sanitizeMapConnectorWaypoints(waypoints = []) {
+    if (!Array.isArray(waypoints)) return [];
+    return waypoints
+      .map((point) => ({
+        x: Math.round((Number(point?.x) || 0) * 10) / 10,
+        y: Math.round((Number(point?.y) || 0) * 10) / 10,
+      }))
+      .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
   }
 
-  function mapLayoutScopeOverrides(scope = "world") {
-    return cloneMapPointMap(loadMapLayoutOverrides().scopes?.[scope] || {});
+  function sanitizeMapConnectorStyle(style = {}) {
+    if (!style || typeof style !== "object") return null;
+    const route = normalize(style.route) === "straight" ? "straight" : "auto";
+    const sourceSide = sanitizeMapConnectorSide(style.sourceSide || style.startAnchor);
+    const targetSide = sanitizeMapConnectorSide(style.targetSide || style.endAnchor);
+    const waypoints = sanitizeMapConnectorWaypoints(style.waypoints || style.joints || []);
+    const sanitized = {};
+    if (route !== "auto") sanitized.route = route;
+    if (sourceSide !== "auto") sanitized.sourceSide = sourceSide;
+    if (targetSide !== "auto") sanitized.targetSide = targetSide;
+    if (waypoints.length) sanitized.waypoints = waypoints;
+    return Object.keys(sanitized).length ? sanitized : null;
   }
 
-  function saveMapLayoutScopeOverrides(scope = "world", points = {}) {
-    const payload = loadMapLayoutOverrides();
-    payload.scopes[scope] = cloneMapPointMap(points);
-    return saveMapLayoutOverrides(payload);
+  function cloneMapConnectorOverrideMap(overrides = {}) {
+    return Object.fromEntries(
+      Object.entries(overrides || {})
+        .map(([edgeId, override]) => [edgeId, sanitizeMapConnectorStyle(override)])
+        .filter(([_edgeId, override]) => Boolean(override))
+    );
   }
 
-  function clearMapLayoutScopeOverrides(scope = "world") {
-    const payload = loadMapLayoutOverrides();
-    delete payload.scopes[scope];
-    return saveMapLayoutOverrides(payload);
+  function sanitizeMapConnectorOverride(override = {}) {
+    return sanitizeMapConnectorStyle(override);
+  }
+
+  function sanitizeMapConnectorAnchor(anchor = "auto") {
+    return sanitizeMapConnectorSide(anchor);
+  }
+
+  function sanitizeMapConnectorRoute(route = "auto") {
+    return normalize(route) === "straight" ? "straight" : "auto";
   }
 
   function mapLayoutScopeSignature(scope = "world") {
-    return JSON.stringify(mapLayoutScopeOverrides(scope));
+    return JSON.stringify({
+      nodes: sourceMapPinnedPositionsForScope(scope),
+      edges: sourceMapConnectorOverridesForScope(scope),
+    });
   }
 
-  function mergeMapPinnedPositions(basePoints = {}, scope = "world") {
-    return {
-      ...cloneMapPointMap(basePoints),
-      ...mapLayoutScopeOverrides(scope),
-    };
-  }
-
-  function loadMapEditorSnapPreference() {
-    const saved = String(localStorage.getItem(MAP_EDITOR_SNAP_PREF_KEY) || "").trim().toLowerCase();
-    if (saved === "off" || saved === "false" || saved === "0") return false;
-    return true;
-  }
-
-  function saveMapEditorSnapPreference(enabled) {
-    try {
-      localStorage.setItem(MAP_EDITOR_SNAP_PREF_KEY, enabled ? "on" : "off");
-      return true;
-    } catch (_error) {
-      return false;
-    }
+  function mergeMapPinnedPositions(basePoints = {}) {
+    return cloneMapPointMap(basePoints);
   }
 
   function sourceMapPinnedPositionsForScope(scope = "world") {
@@ -15430,56 +14992,17 @@
     const region = MAP_REGION_DEFINITIONS[scope];
     if (!region) return {};
     return Object.fromEntries(
-      Object.entries(region.positions || {}).map(([roomId, point]) => [`room:${roomId}`, { x: Number(point?.x) || 0, y: Number(point?.y) || 0 }])
+      Object.entries(MAP_LAYOUT_DATA.regions?.[scope]?.nodes || region.positions || {}).map(([roomId, point]) => [`room:${roomId}`, { x: Number(point?.x) || 0, y: Number(point?.y) || 0 }])
     );
   }
 
-  function effectiveMapPinnedPositionsForScope(scope = "world") {
-    return {
-      ...sourceMapPinnedPositionsForScope(scope),
-      ...mapLayoutScopeOverrides(scope),
-    };
+  function sourceMapConnectorOverridesForScope(scope = "world") {
+    if (scope === "world") return cloneMapConnectorOverrideMap(MAP_LAYOUT_DATA.world?.connectors || {});
+    return cloneMapConnectorOverrideMap(MAP_LAYOUT_DATA.regions?.[scope]?.connectors || {});
   }
 
-  function formatMapPointValue(value) {
-    const rounded = roundMapCoordinate(value);
-    if (Math.abs(rounded - Math.round(rounded)) < 0.0001) return String(Math.round(rounded));
-    return rounded.toFixed(2).replace(/\.?0+$/, "");
-  }
-
-  function formatMapSourcePositions(scope = "world", points = {}) {
-    if (scope === "world") {
-      return Object.entries(points)
-        .map(([nodeId, point]) => `    ${JSON.stringify(nodeId)}: { x: ${formatMapPointValue(point.x)}, y: ${formatMapPointValue(point.y)} },`)
-        .join("\n");
-    }
-    return Object.entries(points)
-      .map(([nodeId, point]) => `        ${nodeId.replace(/^room:/, "")}: { x: ${formatMapPointValue(point.x)}, y: ${formatMapPointValue(point.y)} },`)
-      .join("\n");
-  }
-
-  function patchGameJsMapPositions(sourceText, scope = "world", points = {}) {
-    const source = String(sourceText || "");
-    const replacementBody = formatMapSourcePositions(scope, points);
-    if (scope === "world") {
-      return source.replace(
-        /const WORLD_OVERVIEW_PINNED_POSITIONS = \{\n[\s\S]*?\n  \};/,
-        `const WORLD_OVERVIEW_PINNED_POSITIONS = {\n${replacementBody}\n  };`
-      );
-    }
-    const scopePattern = new RegExp(`(${escapeRegExp(scope)}:\\s*\\{[\\s\\S]*?positions:\\s*\\{\\n)([\\s\\S]*?)(\\n\\s*\\},\\n\\s*\\},)`);
-    return source.replace(scopePattern, `$1${replacementBody}$3`);
-  }
-
-  function mapSourceReplacementSnippet(scope = "world", points = {}) {
-    if (scope === "world") {
-      return `const WORLD_OVERVIEW_PINNED_POSITIONS = {\n${formatMapSourcePositions(scope, points)}\n  };`;
-    }
-    return `${scope}: {\n      ...\n      positions: {\n${formatMapSourcePositions(scope, points)}\n      },\n    },`;
-  }
-
-  function escapeRegExp(text = "") {
-    return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  function effectiveMapConnectorOverridesForScope(scope = "world") {
+    return sourceMapConnectorOverridesForScope(scope);
   }
 
   function formatMapDirectionBadge(direction = "") {
@@ -15500,39 +15023,6 @@
       forward: "F",
       back: "B",
     }[normalized] || direction.toUpperCase();
-  }
-
-  function uniqueMapEditorExits(meta, nodeId) {
-    const exits = [];
-    const seen = new Set();
-    for (const edge of meta?.edges || []) {
-      for (const link of edge.links || []) {
-        if (link.from !== nodeId) continue;
-        const key = `${link.direction}|${link.to}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        const targetNode = (meta.nodes || []).find((candidate) => candidate.id === link.to);
-        exits.push({
-          direction: link.direction || "",
-          badge: formatMapDirectionBadge(link.direction || ""),
-          toId: link.to,
-          toLabel: targetNode?.label || link.to,
-        });
-      }
-    }
-    for (const stub of meta?.exitStubs || []) {
-      if (stub.nodeId !== nodeId) continue;
-      const key = `${stub.direction}|unexplored`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      exits.push({
-        direction: stub.direction || "",
-        badge: formatMapDirectionBadge(stub.direction || ""),
-        toId: "",
-        toLabel: "Unexplored",
-      });
-    }
-    return exits;
   }
 
   function buildExplorationMapState(game, options = {}) {
@@ -15565,6 +15055,7 @@
 
     return renderExplorationMapSvg(model, positions, {
       worldScope: scope === "world",
+      connectorOverrides: effectiveMapConnectorOverridesForScope(scope),
     });
   }
 
@@ -15785,7 +15276,7 @@
       currentNodeId,
       parentScope: region.parentScope || "world",
       title: region.label,
-      subtitle: `Local map • use Back to return to ${region.parentScope ? (MAP_REGION_DEFINITIONS[region.parentScope]?.label || "the previous map") : "the world overview"}`,
+      subtitle: "Local map",
       accessibleLabel: `${region.label} local map`,
       pinnedPositions,
     };
@@ -15809,7 +15300,7 @@
       const key = `${left}|${right}`;
       let entry = edgeMap.get(key);
       if (!entry) {
-        entry = { from: left, to: right, links: [] };
+        entry = { id: key, from: left, to: right, links: [] };
         edgeMap.set(key, entry);
         edges.push(entry);
       }
@@ -15833,6 +15324,7 @@
       const left = hostNodeId < node.id ? hostNodeId : node.id;
       const right = left === hostNodeId ? node.id : hostNodeId;
       edges.push({
+        id: `${left}|${right}`,
         from: left,
         to: right,
         links: [
@@ -15871,7 +15363,8 @@
     return stubs;
   }
 
-  function mapEdgeRenderGeometry(edge, centers, boxSize = 96) {
+  function mapEdgeRenderGeometry(edge, centers, boxSize = 96, options = {}) {
+    const override = sanitizeMapConnectorOverride(options.override || {}) || null;
     const links = edge?.links || [];
     const twoWay = links.some((link) => link.from === edge?.from && link.to === edge?.to)
       && links.some((link) => link.from === edge?.to && link.to === edge?.from);
@@ -15882,13 +15375,15 @@
       const fromDirection = resolveMapEdgeDirection(links, edge.from, edge.to, from, to);
       const toDirection = resolveMapEdgeDirection(links, edge.to, edge.from, to, from);
       return {
+        id: edge?.id || "",
         from,
         to,
         fromDirection,
         toDirection,
         twoWay: true,
-        fromAnchor: mapBoxAnchorPoint(from, fromDirection, boxSize, to),
-        toAnchor: mapBoxAnchorPoint(to, toDirection, boxSize, from),
+        fromAnchor: resolveMapConnectorAnchor(from, override?.sourceSide || override?.startAnchor, fromDirection, boxSize, to),
+        toAnchor: resolveMapConnectorAnchor(to, override?.targetSide || override?.endAnchor, toDirection, boxSize, from),
+        override,
       };
     }
 
@@ -15900,13 +15395,15 @@
     const fromDirection = link.direction || resolveMapEdgeDirection(links, link.from, link.to, from, to);
     const toDirection = oppositeDirection(fromDirection) || resolveMapEdgeDirection(links, link.to, link.from, to, from);
     return {
+      id: edge?.id || "",
       from,
       to,
       fromDirection,
       toDirection,
       twoWay: false,
-      fromAnchor: mapBoxAnchorPoint(from, fromDirection, boxSize, to),
-      toAnchor: mapBoxAnchorPoint(to, toDirection, boxSize, from),
+      fromAnchor: resolveMapConnectorAnchor(from, override?.sourceSide || override?.startAnchor, fromDirection, boxSize, to),
+      toAnchor: resolveMapConnectorAnchor(to, override?.targetSide || override?.endAnchor, toDirection, boxSize, from),
+      override,
     };
   }
 
@@ -15937,6 +15434,7 @@
     const minWidth = worldScope ? 1680 : 1100;
     const minHeight = worldScope ? 1020 : 760;
     const titleSpace = 126;
+    const connectorOverrides = cloneMapConnectorOverrideMap(options.connectorOverrides || {});
     const currentNodeId = model.currentNodeId || model.nodes[0]?.id || "";
     const current = positions.get(currentNodeId) || positions.get(model.nodes[0]?.id) || { x: 0, y: 0 };
 
@@ -15968,7 +15466,9 @@
     }
 
     const lineMarkup = model.edges.map((edge) => {
-      const geometry = mapEdgeRenderGeometry(edge, Object.fromEntries(nodePixels.entries()), boxSize);
+      const geometry = mapEdgeRenderGeometry(edge, Object.fromEntries(nodePixels.entries()), boxSize, {
+        override: connectorOverrides[edge.id],
+      });
       if (!geometry) return "";
       return buildMapConnectorMarkup(
         geometry.fromAnchor,
@@ -15977,6 +15477,7 @@
         {
           boxSize,
           twoWay: geometry.twoWay,
+          routeOverride: geometry.override,
           stroke: geometry.twoWay ? "#7f6641" : "#a17a4b",
           strokeWidth: worldScope ? 4.8 : 4.2,
         }
@@ -16103,10 +15604,12 @@
           roomId: node.roomId || "",
         })),
         edges: model.edges.map((edge) => ({
+          id: edge.id || `${edge.from}|${edge.to}`,
           from: edge.from,
           to: edge.to,
           links: (edge.links || []).map((link) => ({ ...link })),
         })),
+        connectorOverrides,
         exitStubs: (model.exitStubs || []).map((stub) => ({ ...stub })),
         nodeCenters: editorNodeCenters,
         currentNodeId,
@@ -16339,6 +15842,17 @@
     }[side] || { x: center.x, y: center.y };
   }
 
+  function mapBoxCornerPoint(center, corner = "north east", boxSize = 96) {
+    const half = boxSize / 2;
+    const inset = Math.max(2.5, Math.min(half * 0.1, 6));
+    return {
+      "north east": { x: center.x + half - inset, y: center.y - half + inset },
+      "north west": { x: center.x - half + inset, y: center.y - half + inset },
+      "south east": { x: center.x + half - inset, y: center.y + half - inset },
+      "south west": { x: center.x - half + inset, y: center.y + half - inset },
+    }[corner] || { x: center.x, y: center.y };
+  }
+
   function mapNearestLevelSideCenter(center, target, boxSize = 96) {
     if (!target) return mapBoxSideCenter(center, "south", boxSize);
     const dx = target.x - center.x;
@@ -16391,6 +15905,17 @@
     };
   }
 
+  function resolveMapConnectorAnchor(center, explicitAnchor = "auto", fallbackDirection = "", boxSize = 96, target = null) {
+    const normalizedAnchor = sanitizeMapConnectorAnchor(explicitAnchor);
+    if (normalizedAnchor && normalizedAnchor !== "auto") {
+      if (["north east", "north west", "south east", "south west"].includes(normalizedAnchor)) {
+        return mapBoxCornerPoint(center, normalizedAnchor, boxSize);
+      }
+      return mapBoxSideCenter(center, normalizedAnchor, boxSize);
+    }
+    return mapBoxAnchorPoint(center, fallbackDirection, boxSize, target);
+  }
+
   function resolveMapEdgeDirection(links, fromId, toId, fromPoint, toPoint) {
     const candidates = (links || []).filter((link) => link.from === fromId && link.to === toId);
     if (!candidates.length) {
@@ -16418,13 +15943,24 @@
   function buildMapConnectorMarkup(fromAnchor, toAnchor, directions = {}, options = {}) {
     const stroke = options.stroke || "#7f6641";
     const strokeWidth = Number(options.strokeWidth) || 4.4;
-    const points = buildMapConnectorPoints(fromAnchor, toAnchor, directions, options.boxSize || 96);
+    const points = buildMapConnectorPoints(fromAnchor, toAnchor, directions, options.boxSize || 96, options.routeOverride || null);
+    const pointsMarkup = points.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
     const connectorMarkup = points.length <= 2
       ? `<line x1="${points[0].x.toFixed(1)}" y1="${points[0].y.toFixed(1)}" x2="${points[1].x.toFixed(1)}" y2="${points[1].y.toFixed(1)}" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round" />`
-      : `<polyline points="${points.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ")}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" />`;
+      : `<polyline points="${pointsMarkup}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" />`;
+    const highlightMarkup = options.editorSelected
+      ? (points.length <= 2
+          ? `<line x1="${points[0].x.toFixed(1)}" y1="${points[0].y.toFixed(1)}" x2="${points[1].x.toFixed(1)}" y2="${points[1].y.toFixed(1)}" stroke="rgba(212, 166, 74, 0.85)" stroke-width="${(strokeWidth + 5.2).toFixed(1)}" stroke-linecap="round" />`
+          : `<polyline points="${pointsMarkup}" fill="none" stroke="rgba(212, 166, 74, 0.85)" stroke-width="${(strokeWidth + 5.2).toFixed(1)}" stroke-linecap="round" stroke-linejoin="round" />`)
+      : "";
+    const hitMarkup = options.editorEdgeId
+      ? (points.length <= 2
+          ? `<line class="scene-map-editor-edge-hit" x1="${points[0].x.toFixed(1)}" y1="${points[0].y.toFixed(1)}" x2="${points[1].x.toFixed(1)}" y2="${points[1].y.toFixed(1)}" data-editor-edge="${escapeXml(options.editorEdgeId)}" stroke="rgba(0,0,0,0)" stroke-width="${Math.max(16, strokeWidth + 10).toFixed(1)}" stroke-linecap="round" />`
+          : `<polyline class="scene-map-editor-edge-hit" points="${pointsMarkup}" data-editor-edge="${escapeXml(options.editorEdgeId)}" fill="none" stroke="rgba(0,0,0,0)" stroke-width="${Math.max(16, strokeWidth + 10).toFixed(1)}" stroke-linecap="round" stroke-linejoin="round" />`)
+      : "";
     const arrowMarkup = options.twoWay ? "" : buildMapConnectorArrowMarkup(points, { stroke, strokeWidth });
     const levelBadge = buildMapLevelConnectorBadge(fromAnchor, toAnchor, directions, options);
-    return `<g>${connectorMarkup}${arrowMarkup}${levelBadge}</g>`;
+    return `<g class="${options.editorSelected ? "scene-map-editor-edge is-selected" : "scene-map-editor-edge"}" data-editor-edge="${escapeXml(options.editorEdgeId || "")}">${highlightMarkup}${connectorMarkup}${arrowMarkup}${levelBadge}${hitMarkup}</g>`;
   }
 
   function buildMapConnectorArrowMarkup(points = [], options = {}) {
@@ -16447,8 +15983,9 @@
     const unitY = dy / magnitude;
     const stroke = options.stroke || "#7f6641";
     const strokeWidth = Number(options.strokeWidth) || 4.4;
-    const arrowLength = Math.max(13, strokeWidth * 2.8);
-    const arrowWidth = Math.max(4.8, strokeWidth * 1.05);
+    const arrowLength = Math.max(13, strokeWidth * 3);
+    const arrowWidth = Math.max(5.8, strokeWidth * 1.35);
+    const arrowOutlineWidth = Math.max(1.6, strokeWidth * 0.42);
     const tipX = end.x;
     const tipY = end.y;
     const baseX = tipX - (unitX * arrowLength);
@@ -16459,7 +15996,7 @@
     const leftY = baseY + (perpY * arrowWidth);
     const rightX = baseX - (perpX * arrowWidth);
     const rightY = baseY - (perpY * arrowWidth);
-    return `<polygon points="${leftX.toFixed(1)},${leftY.toFixed(1)} ${tipX.toFixed(1)},${tipY.toFixed(1)} ${rightX.toFixed(1)},${rightY.toFixed(1)}" fill="${stroke}" />`;
+    return `<polygon points="${leftX.toFixed(1)},${leftY.toFixed(1)} ${tipX.toFixed(1)},${tipY.toFixed(1)} ${rightX.toFixed(1)},${rightY.toFixed(1)}" fill="${stroke}" stroke="${stroke}" stroke-width="${arrowOutlineWidth.toFixed(1)}" stroke-linejoin="round" />`;
   }
 
   function buildMapLevelConnectorBadge(fromAnchor, toAnchor, directions = {}, options = {}) {
@@ -16480,77 +16017,35 @@
     return normalized === "up" || normalized === "down";
   }
 
-  function buildMapConnectorPoints(fromAnchor, toAnchor, directions = {}, boxSize = 96) {
+  function buildMapConnectorPoints(fromAnchor, toAnchor, directions = {}, boxSize = 96, routeOverride = null) {
+    const override = sanitizeMapConnectorOverride(routeOverride || {}) || null;
+    if (override?.waypoints?.length) return compactMapConnectorPoints([fromAnchor, ...override.waypoints, toAnchor]);
+    if (override?.route === "straight") return [fromAnchor, toAnchor];
     const dx = toAnchor.x - fromAnchor.x;
     const dy = toAnchor.y - fromAnchor.y;
     if (Math.abs(dx) < 0.5 || Math.abs(dy) < 0.5) return [fromAnchor, toAnchor];
 
     const fromDirection = compassDirectionKey(directions.fromDirection) || normalize(directions.fromDirection);
-    const toDirection = compassDirectionKey(directions.toDirection) || normalize(directions.toDirection);
-    const fromHorizontal = ["east", "west", "forward", "back"].includes(fromDirection);
-    const fromVertical = ["north", "south", "up", "down", "inside", "outside"].includes(fromDirection);
     const fromLevel = isMapLevelDirection(fromDirection);
-    const toLevel = isMapLevelDirection(toDirection);
-    const fromDiagonal = ["north east", "north west", "south east", "south west"].includes(fromDirection);
-    const toDiagonal = ["north east", "north west", "south east", "south west"].includes(toDirection);
-    const useBentSegment = fromDiagonal || toDiagonal || fromLevel || toLevel || (Math.abs(dx) > boxSize * 0.7 && Math.abs(dy) > boxSize * 0.7);
-    if (!useBentSegment) return [fromAnchor, toAnchor];
+    const toLevel = isMapLevelDirection(compassDirectionKey(directions.toDirection) || normalize(directions.toDirection));
+    if (fromLevel || toLevel) return [fromAnchor, toAnchor];
 
-    if (fromLevel || toLevel) {
-      return [fromAnchor, toAnchor];
-    }
+    const explicitSourceSide = override?.sourceSide || "auto";
+    const explicitTargetSide = override?.targetSide || "auto";
+    const horizontalStart = ["east", "west"].includes(explicitSourceSide)
+      || (explicitSourceSide === "auto" && !["north", "south"].includes(explicitTargetSide) && Math.abs(dx) >= Math.abs(dy));
 
-    const lead = Math.max(18, Math.min(boxSize * 0.42, Math.min(Math.abs(dx), Math.abs(dy)) * 0.34));
-    const diagonalLead = Math.max(12, Math.min(boxSize * 0.26, Math.min(Math.abs(dx), Math.abs(dy)) * 0.22));
-    const fromDiagonalPoint = fromDiagonal
-      ? {
-          x: fromAnchor.x + (Math.sign(dx) * diagonalLead),
-          y: fromAnchor.y + (Math.sign(dy) * diagonalLead),
-        }
-      : null;
-    const toDiagonalPoint = toDiagonal
-      ? {
-          x: toAnchor.x - (Math.sign(dx) * diagonalLead),
-          y: toAnchor.y - (Math.sign(dy) * diagonalLead),
-        }
-      : null;
-    if (fromDiagonalPoint || toDiagonalPoint) {
+    if (horizontalStart) {
       return compactMapConnectorPoints([
         fromAnchor,
-        ...(fromDiagonalPoint ? [fromDiagonalPoint] : []),
-        ...(toDiagonalPoint ? [toDiagonalPoint] : []),
-        toAnchor,
-      ]);
-    }
-    const startHorizontal = fromHorizontal || (!fromVertical && !fromDiagonal && Math.abs(dx) >= Math.abs(dy));
-
-    if (startHorizontal) {
-      return compactMapConnectorPoints([
-        fromAnchor,
-        { x: fromAnchor.x + (Math.sign(dx) * lead), y: fromAnchor.y },
-        toAnchor,
-      ]);
-    }
-
-    if (fromVertical) {
-      return compactMapConnectorPoints([
-        fromAnchor,
-        { x: fromAnchor.x, y: fromAnchor.y + (Math.sign(dy) * lead) },
-        toAnchor,
-      ]);
-    }
-
-    if (Math.abs(dx) >= Math.abs(dy)) {
-      return compactMapConnectorPoints([
-        fromAnchor,
-        { x: toAnchor.x - (Math.sign(dx) * lead), y: toAnchor.y },
+        { x: toAnchor.x, y: fromAnchor.y },
         toAnchor,
       ]);
     }
 
     return compactMapConnectorPoints([
       fromAnchor,
-      { x: toAnchor.x, y: toAnchor.y - (Math.sign(dy) * lead) },
+      { x: fromAnchor.x, y: toAnchor.y },
       toAnchor,
     ]);
   }

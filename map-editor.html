@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>The Hobbit Map Editor</title>
+    <link rel="stylesheet" href="map-editor.css?v=20260617-0001">
+  </head>
+  <body>
+    <main class="editor-shell">
+      <aside class="editor-sidebar">
+        <h1>Map Editor</h1>
+        <p class="editor-copy">Editor separato per layout e connettori. Il gioco usa solo l'output generato qui.</p>
+
+        <label class="editor-field">
+          <span>Scope</span>
+          <select id="scope-select"></select>
+        </label>
+
+        <div class="editor-actions">
+          <button id="download-layout" type="button">Download layout</button>
+          <button id="reset-scope" type="button">Reset scope</button>
+        </div>
+
+        <section class="editor-panel">
+          <h2>Selection</h2>
+          <div id="selection-summary" class="editor-summary">Nessuna selezione.</div>
+        </section>
+
+        <section class="editor-panel">
+          <h2>Connector</h2>
+          <label class="editor-field">
+            <span>Route</span>
+            <select id="connector-route">
+              <option value="auto">Auto</option>
+              <option value="straight">Straight</option>
+            </select>
+          </label>
+          <label class="editor-field">
+            <span>Source side</span>
+            <select id="connector-source-side"></select>
+          </label>
+          <label class="editor-field">
+            <span>Target side</span>
+            <select id="connector-target-side"></select>
+          </label>
+          <div class="editor-actions">
+            <button id="add-waypoint" type="button">Add waypoint</button>
+            <button id="clear-waypoints" type="button">Clear waypoints</button>
+          </div>
+        </section>
+      </aside>
+
+      <section class="editor-canvas-wrap">
+        <div class="editor-toolbar">
+          <strong id="scope-title">World</strong>
+          <span id="scope-subtitle">Drag nodes, select a connector, shape it with waypoints.</span>
+        </div>
+        <div id="editor-canvas" class="editor-canvas"></div>
+      </section>
+    </main>
+
+    <script src="assets/game-data.js?v=20260615-2258"></script>
+    <script src="assets/map-layout-data.js?v=20260617-0001"></script>
+    <script src="map-editor.js?v=20260617-0001"></script>
+  </body>
+</html>
