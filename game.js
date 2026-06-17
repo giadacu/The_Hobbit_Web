@@ -5598,6 +5598,13 @@
         game.sceneMapViewportAnchor = null;
         return;
       }
+      const resolvedScope = reconcileSceneMapScopeForCurrentRoom(game.sceneMapScope || "world", game.currentRoom, {
+        follow: game.sceneMapAutoFollow !== false,
+      });
+      if (resolvedScope !== (game.sceneMapScope || "world")) {
+        game.sceneMapScope = resolvedScope;
+        game.sceneMapViewportAnchor = null;
+      }
       const cacheKey = buildSceneMapCacheKey(game, game.sceneMapScope || "world");
       if (!game.sceneMapRenderCache || game.sceneMapRenderCache.key !== cacheKey) {
         const baseState = buildExplorationMapState(game, {
@@ -5710,6 +5717,7 @@
       if (!this.game.sceneMapVisible) return false;
       this.game.sceneMapVisible = false;
       this.game.sceneMapScope = "world";
+      this.game.sceneMapAutoFollow = true;
       this.game.sceneMapShowAll = false;
       this.game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       this.game.sceneMapViewportAnchor = null;
@@ -5724,6 +5732,7 @@
       const parentScope = this.game.sceneMapRenderCache?.state?.parentScope || "world";
       this.game.sceneMapViewportAnchor = null;
       this.game.sceneMapScope = parentScope || "world";
+      this.game.sceneMapAutoFollow = false;
       this.renderSceneMap();
       return true;
     }
@@ -5749,8 +5758,10 @@
     openSceneMapScope(scope = "world") {
       const normalized = String(scope || "world").trim() || "world";
       if (normalized !== "world" && !MAP_REGION_DEFINITIONS[normalized]) return false;
+      const resolvedScope = preferredSceneMapScopeForRoom(normalized, this.game.currentRoom);
       this.game.sceneMapViewportAnchor = null;
-      this.game.sceneMapScope = normalized;
+      this.game.sceneMapScope = resolvedScope;
+      this.game.sceneMapAutoFollow = false;
       this.renderSceneMap();
       return true;
     }
@@ -6487,6 +6498,7 @@
       game.trollsDefeated = Boolean(save.trollsDefeated);
       game.sceneMapVisible = false;
       game.sceneMapScope = "world";
+      game.sceneMapAutoFollow = true;
       game.sceneMapShowAll = false;
       game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       game.sceneMapViewportAnchor = null;
@@ -8034,6 +8046,7 @@
       game.trollsDefeated = false;
       game.sceneMapVisible = false;
       game.sceneMapScope = "world";
+      game.sceneMapAutoFollow = true;
       game.sceneMapShowAll = false;
       game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       game.sceneMapViewportAnchor = null;
@@ -8304,7 +8317,8 @@
         game.print("No location has been visited yet. The map cannot be displayed.");
         return;
       }
-      game.sceneMapScope = "world";
+      game.sceneMapScope = ROOM_TO_MAP_REGION[game.currentRoom] || "world";
+      game.sceneMapAutoFollow = true;
       game.sceneMapShowAll = false;
       game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       game.sceneMapVisible = true;
@@ -8321,6 +8335,7 @@
         return;
       }
       game.sceneMapScope = "world";
+      game.sceneMapAutoFollow = false;
       game.sceneMapShowAll = true;
       game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       game.sceneMapVisible = true;
@@ -8871,6 +8886,7 @@
       this.trollsDefeated = false;
       this.sceneMapVisible = false;
       this.sceneMapScope = "world";
+      this.sceneMapAutoFollow = true;
       this.sceneMapShowAll = false;
       this.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       this.sceneMapViewportAnchor = null;
@@ -9975,6 +9991,7 @@
       this.temporaryImageDismissOnNextCommand = options.dismissOnNextCommand !== false;
       this.sceneMapVisible = false;
       this.sceneMapScope = "world";
+      this.sceneMapAutoFollow = true;
       this.sceneMapShowAll = false;
       this.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       this.sceneMapViewportAnchor = null;
@@ -15159,6 +15176,110 @@
     </div>`;
   }
 
+  function currentRoomMapExits(game) {
+    const order = new Map([
+      ["north", 0],
+      ["north east", 1],
+      ["east", 2],
+      ["south east", 3],
+      ["south", 4],
+      ["south west", 5],
+      ["west", 6],
+      ["north west", 7],
+      ["up", 8],
+      ["down", 9],
+      ["inside", 10],
+      ["outside", 11],
+      ["forward", 12],
+      ["back", 13],
+    ]);
+    const labels = [...new Set(
+      (game.roomConnections?.() || [])
+        .map((connection) => compassDirectionKey(connection.direction) || normalize(connection.direction))
+        .filter(Boolean)
+    )];
+    labels.sort((left, right) => (order.get(left) ?? 99) - (order.get(right) ?? 99));
+    return labels.map((direction) => ({ direction, label: formatMapDirectionBadge(direction) }));
+  }
+
+  function preferredSceneMapScopeForRoom(scope = "world", roomId = "") {
+    const normalizedScope = String(scope || "world").trim() || "world";
+    if (normalizedScope === "world") return normalizedScope;
+    const deepestRoomRegion = ROOM_TO_MAP_REGION[roomId] || "";
+    if (!deepestRoomRegion) return normalizedScope;
+    let ancestor = deepestRoomRegion;
+    while (ancestor) {
+      if (ancestor === normalizedScope) return deepestRoomRegion;
+      ancestor = MAP_REGION_DEFINITIONS[ancestor]?.parentScope || "";
+    }
+    return normalizedScope;
+  }
+
+  function isMapRegionWithinScope(regionId = "", scope = "world") {
+    if (!regionId) return false;
+    const normalizedScope = String(scope || "world").trim() || "world";
+    if (normalizedScope === "world") return true;
+    let ancestor = regionId;
+    while (ancestor) {
+      if (ancestor === normalizedScope) return true;
+      ancestor = MAP_REGION_DEFINITIONS[ancestor]?.parentScope || "";
+    }
+    return false;
+  }
+
+  function commonMapScope(left = "", right = "") {
+    if (!left || !right) return "world";
+    const leftChain = [];
+    let current = left;
+    while (current) {
+      leftChain.push(current);
+      current = MAP_REGION_DEFINITIONS[current]?.parentScope || "";
+    }
+    current = right;
+    while (current) {
+      if (leftChain.includes(current)) return current;
+      current = MAP_REGION_DEFINITIONS[current]?.parentScope || "";
+    }
+    return "world";
+  }
+
+  function reconcileSceneMapScopeForCurrentRoom(scope = "world", roomId = "", options = {}) {
+    const normalizedScope = String(scope || "world").trim() || "world";
+    const deepestRoomRegion = ROOM_TO_MAP_REGION[roomId] || "";
+    if (options.follow) return deepestRoomRegion || "world";
+    if (normalizedScope === "world") return "world";
+    if (!deepestRoomRegion) return "world";
+    if (isMapRegionWithinScope(deepestRoomRegion, normalizedScope)) return normalizedScope;
+    return commonMapScope(deepestRoomRegion, normalizedScope);
+  }
+
+  function mapNodeExitMarkerGeometry(direction = "", point = {}, boxSize = 96) {
+    const normalized = compassDirectionKey(direction) || normalize(direction);
+    const centerX = Number(point.x) || 0;
+    const centerY = Number(point.y) || 0;
+    const left = centerX - (boxSize / 2);
+    const top = centerY - (boxSize / 2);
+    const right = centerX + (boxSize / 2);
+    const bottom = centerY + (boxSize / 2);
+    const positions = {
+      north: { x: centerX, y: top - 16 },
+      "north east": { x: right + 14, y: top - 12 },
+      east: { x: right + 18, y: centerY + 4 },
+      "south east": { x: right + 14, y: bottom + 18 },
+      south: { x: centerX, y: bottom + 20 },
+      "south west": { x: left - 14, y: bottom + 18 },
+      west: { x: left - 18, y: centerY + 4 },
+      "north west": { x: left - 14, y: top - 12 },
+      up: { x: right + 18, y: top + 14 },
+      down: { x: right + 18, y: bottom - 8 },
+      inside: { x: left - 18, y: top + 14 },
+      outside: { x: left - 18, y: bottom - 8 },
+      forward: { x: centerX, y: top - 16 },
+      back: { x: centerX, y: bottom + 20 },
+    };
+    return positions[normalized] || null;
+  }
+
   function buildWorldMapModel(game, visitedRooms, roomOrder) {
     const nodes = [];
     const nodeMap = new Map();
@@ -15262,6 +15383,7 @@
       edges,
       exitStubs,
       currentNodeId,
+      currentNodeExits: currentRoomMapExits(game),
       parentScope: "",
       title: "Explored Map",
       subtitle: `World overview • current: ${roomDisplayName(game.rooms[currentRoomId] || currentRoomId)}`,
@@ -15320,6 +15442,7 @@
       edges,
       exitStubs,
       currentNodeId,
+      currentNodeExits: currentRoomMapExits(game),
       parentScope: region.parentScope || "world",
       title: region.label,
       subtitle: "Local map",
@@ -15695,6 +15818,7 @@
     const unitX = worldScope ? 170 : 156;
     const unitY = worldScope ? 170 : 156;
     const padding = worldScope ? 128 : 110;
+    const overflowMargin = worldScope ? 72 : 84;
     const minWidth = worldScope ? 1680 : 1100;
     const minHeight = worldScope ? 1020 : 760;
     const titleSpace = 126;
@@ -15713,8 +15837,8 @@
       maxY = Math.max(maxY, point.y);
     }
 
-    const contentWidth = Math.round(((maxX - minX) * unitX) + (padding * 2) + boxSize);
-    const contentHeight = Math.round(((maxY - minY) * unitY) + (padding * 2) + boxSize + titleSpace);
+    const contentWidth = Math.round(((maxX - minX) * unitX) + (padding * 2) + boxSize + (overflowMargin * 2));
+    const contentHeight = Math.round(((maxY - minY) * unitY) + (padding * 2) + boxSize + titleSpace + (overflowMargin * 2));
     const width = Math.max(minWidth, contentWidth);
     const height = Math.max(minHeight, contentHeight);
     const offsetX = Math.max(0, (width - contentWidth) / 2);
@@ -15726,8 +15850,8 @@
     for (const node of model.nodes) {
       const point = positions.get(node.id) || { x: 0, y: 0 };
       nodePixels.set(node.id, {
-        x: offsetX + padding + ((point.x - minX) * unitX) + (boxSize / 2),
-        y: offsetY + padding + ((point.y - minY) * unitY) + (boxSize / 2),
+        x: offsetX + overflowMargin + padding + ((point.x - minX) * unitX) + (boxSize / 2),
+        y: offsetY + overflowMargin + padding + ((point.y - minY) * unitY) + (boxSize / 2),
       });
     }
 
@@ -15800,6 +15924,7 @@
       const x = point.x - (boxSize / 2);
       const y = point.y - (boxSize / 2);
       const currentNode = node.id === currentNodeId;
+      const currentNodeExits = currentNode ? (model.currentNodeExits || []) : [];
       const clickable = Boolean(node.openRegion);
       const inlinePortal = node.inlinePortal || null;
       const lines = wrapMapLabel(node.label, worldScope ? 13 : 12, 3);
@@ -15810,6 +15935,16 @@
       const labelMarkup = lines
         .map((line, index) => `<tspan x="${point.x.toFixed(1)}" y="${(startY + (index * lineHeight)).toFixed(1)}">${escapeXml(line)}</tspan>`)
         .join("");
+      const exitsMarkup = currentNodeExits.length
+        ? currentNodeExits.map((exit) => {
+          const geometry = mapNodeExitMarkerGeometry(exit.direction, point, boxSize);
+          if (!geometry) return "";
+          return `<g data-node-exit="${escapeXml(exit.direction)}" data-node-exit-label="${escapeXml(exit.label)}">
+        <circle cx="${geometry.x.toFixed(1)}" cy="${geometry.y.toFixed(1)}" r="10.5" fill="rgba(255, 248, 233, 0.78)" stroke="rgba(124, 90, 35, 0.42)" stroke-width="1.2" />
+        <text x="${geometry.x.toFixed(1)}" y="${(geometry.y + 3.8).toFixed(1)}" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="10.5" font-weight="700" letter-spacing="0.04em" fill="#6f511f">${escapeXml(exit.label)}</text>
+      </g>`;
+        }).join("")
+        : "";
       const badgeMarkup = clickable
         ? `<text x="${point.x.toFixed(1)}" y="${(y + boxSize + 20).toFixed(1)}" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="12" font-weight="700" fill="#7a5b26">click to open</text>`
         : "";
@@ -15824,6 +15959,7 @@
         ${currentNode ? `<rect x="${(x - 9).toFixed(1)}" y="${(y - 9).toFixed(1)}" width="${(boxSize + 18).toFixed(1)}" height="${(boxSize + 18).toFixed(1)}" rx="15" fill="none" stroke="#d4a64a" stroke-width="5" />` : ""}
         <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${boxSize}" height="${boxSize}" rx="10" fill="${currentNode ? "#f0d79f" : clickable ? "#f2dfb0" : "#f5ecd5"}" stroke="${currentNode ? "#6c4d18" : clickable ? "#7c5a23" : "#6f5a35"}" stroke-width="${currentNode ? "3.1" : "2.5"}" />
         <text x="${point.x.toFixed(1)}" y="${point.y.toFixed(1)}" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="${worldScope ? "13.5" : "13"}" font-weight="${clickable ? "700" : "600"}" fill="#2f2412">${labelMarkup}</text>
+        ${exitsMarkup}
         ${inlinePortalMarkup}
         ${badgeMarkup}
       </g>`;

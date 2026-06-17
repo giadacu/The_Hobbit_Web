@@ -129,6 +129,7 @@ function bootGame() {
   global.cancelAnimationFrame = clearTimeout;
 
   vm.runInThisContext(fs.readFileSync("assets/game-data.js", "utf8"));
+  vm.runInThisContext(fs.readFileSync("assets/map-layout-data.js", "utf8"));
   vm.runInThisContext(fs.readFileSync("game.js", "utf8"));
   return window.hobbitGame.splitter.constructor;
 }
@@ -3134,7 +3135,7 @@ const gameCases = [
     name: "map stays open and updates while new locations are discovered",
     drive(game) {
       const overlay = document.getElementById("scene-map-overlay");
-      const subtitle = document.getElementById("scene-map-subtitle");
+      const title = document.getElementById("scene-map-title");
       const image = document.getElementById("scene-map-image");
       game.execute("map");
       const beforeSrc = image.getAttribute("src") || "";
@@ -3143,13 +3144,31 @@ const gameCases = [
       const visibleAfterJump = Object.prototype.hasOwnProperty.call(overlay.attributes, "hidden") ? "no" : "yes";
       game.print(`Map visible after jump: ${visibleAfterJump}`);
       game.print(`Map image updated after jump: ${beforeSrc !== afterSrc ? "yes" : "no"}`);
-      game.print(`Map subtitle tracks current room: ${subtitle.textContent.includes("Beorns House") ? "yes" : "no"}`);
+      game.print(`Map title tracks current scope: ${title.textContent === "Beorn's House" ? "yes" : "no"}`);
     },
     expectedIncluded: [
       "You study the paths already traced across Wilderland.",
       "Map visible after jump: yes",
       "Map image updated after jump: yes",
-      "Map subtitle tracks current room: yes",
+      "Map title tracks current scope: yes",
+    ],
+  },
+  {
+    name: "map shows current room exits on the active node",
+    drive(game) {
+      const image = document.getElementById("scene-map-image");
+      game.execute("jump beorn");
+      game.execute("map");
+      const decodedMapImage = decodeURIComponent(image.getAttribute("src") || "");
+      game.print(`Current node shows north exit marker: ${decodedMapImage.includes('data-node-exit=\"north\"') && decodedMapImage.includes('data-node-exit-label=\"N\"') ? "yes" : "no"}`);
+      game.print(`Current node shows east exit marker: ${decodedMapImage.includes('data-node-exit=\"east\"') && decodedMapImage.includes('data-node-exit-label=\"E\"') ? "yes" : "no"}`);
+      game.print(`Current node shows southwest exit marker: ${decodedMapImage.includes('data-node-exit=\"south west\"') && decodedMapImage.includes('data-node-exit-label=\"SW\"') ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "Current node shows north exit marker: yes",
+      "Current node shows east exit marker: yes",
+      "Current node shows southwest exit marker: yes",
     ],
   },
   {
@@ -3161,7 +3180,7 @@ const gameCases = [
       const backButton = document.getElementById("scene-map-back");
       const canvas = document.getElementById("scene-map-canvas");
       const image = document.getElementById("scene-map-image");
-      game.execute("jump beorn");
+      game.execute("jump dreary");
       game.execute("map");
       const beforeZoomSrc = image.getAttribute("src") || "";
       const decodedMapImage = decodeURIComponent(beforeZoomSrc);
@@ -3219,6 +3238,43 @@ const gameCases = [
       "Back enabled in local map: yes",
       "World map title after back: Explored Map",
       "Zoom label after reset: 60%",
+    ],
+  },
+  {
+    name: "map rises back to world scope when the room leaves the local region",
+    drive(game) {
+      const title = document.getElementById("scene-map-title");
+      game.execute("map");
+      game.print(`Initial local title: ${title.textContent}`);
+      game.execute("open door");
+      game.execute("east");
+      game.print(`Title after leaving local region: ${title.textContent}`);
+      game.execute("west");
+      game.print(`Title after re-entering local region: ${title.textContent}`);
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "Initial local title: Bilbo's Home",
+      "Title after leaving local region: Explored Map",
+      "Title after re-entering local region: Bilbo's Home",
+    ],
+  },
+  {
+    name: "map drilldown opens directly to the current nested local scope",
+    setup(game) {
+      movePlayerTo(game, "lower_halls");
+      game.visitedRooms.add("cellar");
+      game.visitedRooms.add("front_gate");
+    },
+    drive(game) {
+      const title = document.getElementById("scene-map-title");
+      game.execute("map");
+      game.layout.openSceneMapScope("elven_halls");
+      game.print(`Direct drilldown title: ${title.textContent}`);
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "Direct drilldown title: Erebor",
     ],
   },
   {
