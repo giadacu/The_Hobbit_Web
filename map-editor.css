@@ -91,6 +91,10 @@ body {
   font-size: 0.8rem;
 }
 
+.editor-field option:disabled {
+  color: #94866a;
+}
+
 .editor-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;

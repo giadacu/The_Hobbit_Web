@@ -25,6 +25,22 @@
           <div id="selection-summary" class="editor-summary">Nessuna selezione.</div>
         </section>
 
+        <section id="hierarchy-panel" class="editor-panel">
+          <h2>Gerarchia</h2>
+          <div id="hierarchy-summary" class="editor-summary">Seleziona una stanza per spostarla tra gli ambiti.</div>
+          <div class="editor-fields-grid">
+            <label class="editor-field editor-field--span">
+              <span>Porta dentro</span>
+              <select id="hierarchy-target-scope"></select>
+            </label>
+          </div>
+          <div class="editor-actions">
+            <button id="move-room-up" type="button">Porta fuori</button>
+            <button id="move-room-down" type="button">Porta dentro</button>
+          </div>
+          <div id="hierarchy-status" class="editor-status">Lo spostamento crea un backup automatico prima di applicare le modifiche.</div>
+        </section>
+
         <section id="connector-panel" class="editor-panel editor-panel--connector">
           <h2>Connettore</h2>
           <div class="editor-fields-grid">

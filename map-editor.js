@@ -40,14 +40,17 @@
   const DRAFT_STORAGE_KEY = "hobbit-map-editor-layout-draft-v1";
   const ZOOM_STORAGE_KEY = "hobbit-map-editor-zoom-v1";
   const MAX_BACKUPS = 30;
-  const ROOM_TO_REGION = Object.fromEntries(
-    Object.entries(state.layout.regions || {}).flatMap(([regionId, region]) => (region.rooms || []).map((roomId) => [roomId, regionId]))
-  );
 
   const scopeSelect = document.getElementById("scope-select");
   const scopeTitle = document.getElementById("scope-title");
   const scopeSubtitle = document.getElementById("scope-subtitle");
   const selectionSummary = document.getElementById("selection-summary");
+  const hierarchyPanel = document.getElementById("hierarchy-panel");
+  const hierarchySummary = document.getElementById("hierarchy-summary");
+  const hierarchyTargetScopeSelect = document.getElementById("hierarchy-target-scope");
+  const moveRoomUpButton = document.getElementById("move-room-up");
+  const moveRoomDownButton = document.getElementById("move-room-down");
+  const hierarchyStatus = document.getElementById("hierarchy-status");
   const canvas = document.getElementById("editor-canvas");
   const routeSelect = document.getElementById("connector-route");
   const sourceSideSelect = document.getElementById("connector-source-side");
@@ -297,6 +300,34 @@
     );
   }
 
+  function roomToRegionMap(layout = state.layout) {
+    return Object.fromEntries(
+      Object.entries(layout.regions || {}).flatMap(([regionId, region]) => (region.rooms || []).map((roomId) => [roomId, regionId]))
+    );
+  }
+
+  function regionForRoom(roomId = "", layout = state.layout) {
+    return roomToRegionMap(layout)[roomId] || "";
+  }
+
+  function childScopeIds(scope = state.scope, layout = state.layout) {
+    return Object.entries(layout.regions || {})
+      .filter(([, region]) => (
+        scope === "world"
+          ? !region.parentScope
+          : region.parentScope === scope
+      ))
+      .map(([regionId]) => regionId)
+      .sort((left, right) => backupScopeLabel(left).localeCompare(backupScopeLabel(right), "it"));
+  }
+
+  function setHierarchyStatus(message, tone = "") {
+    if (!hierarchyStatus) return;
+    hierarchyStatus.textContent = message;
+    if (tone) hierarchyStatus.dataset.tone = tone;
+    else delete hierarchyStatus.dataset.tone;
+  }
+
   function roomName(roomId = "") {
     return state.layout.labelOverrides?.[roomId] || DATA.rooms?.[roomId]?.name || roomId;
   }
@@ -375,7 +406,7 @@
       const nodes = [];
       const nodeMap = new Map();
       for (const roomId of rooms) {
-        const regionId = ROOM_TO_REGION[roomId];
+        const regionId = regionForRoom(roomId);
         const region = state.layout.regions?.[regionId];
         if (region?.parentScope) continue;
         if (regionId && (state.layout.inlineRegionsInWorld || []).includes(regionId)) {
@@ -400,7 +431,7 @@
           : { id, roomId, label: roomName(roomId), kind: "room" });
       }
       const edges = buildEdges(rooms, (roomId) => {
-        const regionId = ROOM_TO_REGION[roomId];
+        const regionId = regionForRoom(roomId);
         const region = state.layout.regions?.[regionId];
         if (region?.parentScope) return "";
         if (regionId && (state.layout.inlineRegionsInWorld || []).includes(regionId)) return `room:${roomId}`;
@@ -939,7 +970,7 @@
       && normalizeDirection(candidate.sourceDirection) === direction
     ));
     if (directLane) {
-      const directStyle = connectorStyleForLane(edge.id, directLane.id);
+      const directStyle = resolvedConnectorStyle(edge, directLane);
       return connectorGeometry(edge, centers, directStyle, directLane);
     }
     const reverseLane = lanes.find((candidate) => (
@@ -949,7 +980,7 @@
       && normalizeDirection(candidate.targetDirection) === direction
     ));
     if (!reverseLane) return null;
-    const reverseStyle = connectorStyleForLane(edge.id, reverseLane.id);
+    const reverseStyle = resolvedConnectorStyle(edge, reverseLane);
     return connectorGeometry(edge, centers, reverseStyle, reverseLaneView(reverseLane));
   }
 
@@ -1012,7 +1043,7 @@
   function scopeNodeDescriptorForRoom(scope = "world", roomId = "") {
     if (!roomId) return null;
     if (scope === "world") {
-      const regionId = ROOM_TO_REGION[roomId];
+      const regionId = regionForRoom(roomId);
       const region = state.layout.regions?.[regionId];
       if (region?.parentScope) return null;
       if (regionId && (state.layout.inlineRegionsInWorld || []).includes(regionId)) {
@@ -1090,6 +1121,237 @@
       targetDirection: laneMatch.lane.targetDirection,
       twoWay: laneMatch.lane.twoWay,
     };
+  }
+
+  function selectedRoomContext(model = null) {
+    const resolvedModel = model || buildModel(state.scope);
+    const selectedNode = (resolvedModel.nodes || []).find((node) => node.id === state.selectedNodeId);
+    if (!selectedNode?.roomId) return null;
+    return {
+      node: selectedNode,
+      roomId: selectedNode.roomId,
+      scope: state.scope,
+      model: resolvedModel,
+    };
+  }
+
+  function roomHasHierarchyDependents(roomId = "", scope = state.scope, layout = state.layout) {
+    if (!roomId) return "";
+    const childRegion = Object.entries(layout.regions || {}).find(([, region]) => region.parentScope === scope && region.hostRoomId === roomId);
+    if (childRegion) return `La stanza ospita il sottoambito ${backupScopeLabel(childRegion[0])}.`;
+    if (scope === "world") {
+      const inlineRegion = Object.entries(layout.inlineRegionHosts || {}).find(([, hostRoomId]) => hostRoomId === roomId);
+      if (inlineRegion) return `La stanza ospita il portale inline di ${backupScopeLabel(inlineRegion[0])}.`;
+    }
+    return "";
+  }
+
+  function validMoveInTargets(roomId = "", scope = state.scope, layout = state.layout) {
+    return childScopeIds(scope, layout).filter((targetScope) => (
+      !(layout.regions?.[targetScope]?.rooms || []).includes(roomId)
+      && layout.regions?.[targetScope]?.hostRoomId !== roomId
+    ));
+  }
+
+  function availablePointNear(basePoint = { x: 0, y: 0 }, points = {}) {
+    const occupied = new Set(
+      Object.values(points || {}).map((point) => `${(Number(point.x) || 0).toFixed(4)}|${(Number(point.y) || 0).toFixed(4)}`)
+    );
+    const offsets = [
+      [0, 0], [1.2, 0], [-1.2, 0], [0, 1.1], [0, -1.1],
+      [1.2, 1.1], [1.2, -1.1], [-1.2, 1.1], [-1.2, -1.1],
+      [2.4, 0], [-2.4, 0], [0, 2.2], [0, -2.2],
+    ];
+    for (const [dx, dy] of offsets) {
+      const candidate = {
+        x: Math.round(((Number(basePoint.x) || 0) + dx) * 1000) / 1000,
+        y: Math.round(((Number(basePoint.y) || 0) + dy) * 1000) / 1000,
+      };
+      const key = `${candidate.x.toFixed(4)}|${candidate.y.toFixed(4)}`;
+      if (!occupied.has(key)) return candidate;
+    }
+    return {
+      x: Math.round(((Number(basePoint.x) || 0) + 1.2) * 1000) / 1000,
+      y: Math.round(((Number(basePoint.y) || 0) + 1.1) * 1000) / 1000,
+    };
+  }
+
+  function placementOffsetForDirection(direction = "") {
+    const normalized = normalizeDirection(direction);
+    const side = normalized === "up" ? "north" : normalized === "down" ? "south" : directionSide(normalized);
+    const opposite = ({
+      north: "south",
+      east: "west",
+      south: "north",
+      west: "east",
+      "north east": "south west",
+      "north west": "south east",
+      "south east": "north west",
+      "south west": "north east",
+    })[side] || "east";
+    const vector = directionVector(opposite);
+    return {
+      x: Math.round((vector.x * 1.2) * 1000) / 1000,
+      y: Math.round((vector.y * 1.1) * 1000) / 1000,
+      sourceSide: opposite || "auto",
+      targetSide: side || "auto",
+    };
+  }
+
+  function roomDirectionsTowardsScope(roomId = "", scope = state.scope) {
+    if (!roomId || scope === "world") return [];
+    const scopeRooms = new Set(state.layout.regions?.[scope]?.rooms || []);
+    return (DATA.connections || [])
+      .filter((connection) => connection.from === roomId && scopeRooms.has(connection.to))
+      .map((connection) => normalizeDirection(connection.direction))
+      .filter(Boolean)
+      .sort((left, right) => directionSortIndex(left) - directionSortIndex(right));
+  }
+
+  function promotedWorldRoomParentScope(roomId = "") {
+    if (!roomId || regionForRoom(roomId)) return "";
+    return Object.entries(state.layout.regions || {})
+      .filter(([, region]) => !region.parentScope)
+      .map(([regionId, region]) => ({
+        regionId,
+        score: (DATA.connections || []).reduce((total, connection) => {
+          const regionRooms = new Set(region.rooms || []);
+          if (connection.from === roomId && regionRooms.has(connection.to)) return total + 1;
+          if (connection.to === roomId && regionRooms.has(connection.from)) return total + 1;
+          return total;
+        }, 0),
+      }))
+      .filter((entry) => entry.score > 0)
+      .sort((left, right) => right.score - left.score || backupScopeLabel(left.regionId).localeCompare(backupScopeLabel(right.regionId), "it"))[0]?.regionId || "";
+  }
+
+  function connectorEntryKey(nodeA = "", nodeB = "") {
+    const left = nodeA < nodeB ? nodeA : nodeB;
+    const right = left === nodeA ? nodeB : nodeA;
+    return `${left}|${right}`;
+  }
+
+  function normalizePromotedWorldNodePositions() {
+    const worldNodes = state.layout.world?.nodes;
+    if (!worldNodes) return false;
+    let changed = false;
+    for (const [nodeId, point] of Object.entries(worldNodes)) {
+      if (!nodeId.startsWith("room:")) continue;
+      const roomId = nodeId.replace(/^room:/, "");
+      if (regionForRoom(roomId)) continue;
+      const parentScopeId = promotedWorldRoomParentScope(roomId);
+      if (!parentScopeId) continue;
+      const basePoint = worldNodes[`region:${parentScopeId}`];
+      const preferredDirection = roomDirectionsTowardsScope(roomId, parentScopeId)[0] || "";
+      if (!basePoint || !preferredDirection) continue;
+      const offset = placementOffsetForDirection(preferredDirection);
+      const currentX = Number(point?.x) || 0;
+      const currentY = Number(point?.y) || 0;
+      const dx = currentX - (Number(basePoint.x) || 0);
+      const dy = currentY - (Number(basePoint.y) || 0);
+      const distance = Math.hypot(dx, dy);
+      const wrongSide = (offset.x && (dx * offset.x) < 0) || (offset.y && (dy * offset.y) < 0);
+      if (distance >= 0.95 && !wrongSide) continue;
+      worldNodes[nodeId] = availablePointNear({
+        x: (Number(basePoint.x) || 0) + offset.x,
+        y: (Number(basePoint.y) || 0) + offset.y,
+      }, worldNodes);
+      changed = true;
+    }
+    return changed;
+  }
+
+  function parentNodeBasePoint(roomId = "", scope = "world") {
+    if (scope === "world") {
+      const worldNodes = state.layout.world?.nodes || {};
+      const sourceRegionPoint = worldNodes[`region:${state.scope}`];
+      const roomPoint = worldNodes[`room:${roomId}`];
+      return roomPoint || sourceRegionPoint || { x: 0, y: 0 };
+    }
+    const hostRoomId = state.layout.regions?.[scope]?.hostRoomId || "";
+    const parentNodes = state.layout.regions?.[scope]?.nodes || {};
+    return parentNodes[hostRoomId] || { x: 0, y: 0 };
+  }
+
+  function childNodeBasePoint(targetScope = "", sourceRoomId = "") {
+    const childNodes = state.layout.regions?.[targetScope]?.nodes || {};
+    const hostRoomId = state.layout.regions?.[targetScope]?.hostRoomId || "";
+    const sourcePoint = (
+      state.scope === "world"
+        ? state.layout.world?.nodes?.[`room:${sourceRoomId}`]
+        : state.layout.regions?.[state.scope]?.nodes?.[sourceRoomId]
+    );
+    return childNodes[hostRoomId] || sourcePoint || { x: 0, y: 0 };
+  }
+
+  function moveRoomBetweenScopes(roomId = "", fromScope = state.scope, toScope = "world") {
+    if (!roomId || fromScope === toScope) return false;
+    const fromRegion = fromScope === "world" ? null : state.layout.regions?.[fromScope];
+    const toRegion = toScope === "world" ? null : state.layout.regions?.[toScope];
+    if (fromScope !== "world" && !fromRegion) return false;
+    if (toScope !== "world" && !toRegion) return false;
+    if (toRegion?.hostRoomId === roomId) {
+      setHierarchyStatus(`Non posso spostare ${roomName(roomId)} dentro ${backupScopeLabel(toScope)} perché ne è l'host.`, "danger");
+      return false;
+    }
+
+    const blockReason = roomHasHierarchyDependents(roomId, fromScope);
+    if (blockReason) {
+      setHierarchyStatus(blockReason, "danger");
+      return false;
+    }
+
+    if (fromRegion) {
+      fromRegion.rooms = (fromRegion.rooms || []).filter((entry) => entry !== roomId);
+      if (fromRegion.previewRooms) fromRegion.previewRooms = fromRegion.previewRooms.filter((entry) => entry !== roomId);
+      delete fromRegion.nodes?.[roomId];
+    } else {
+      delete state.layout.world?.nodes?.[`room:${roomId}`];
+    }
+
+    let hierarchyConnectorPreset = null;
+    if (toRegion) {
+      if (!Array.isArray(toRegion.rooms)) toRegion.rooms = [];
+      if (!toRegion.rooms.includes(roomId)) toRegion.rooms.push(roomId);
+      const targetNodes = toRegion.nodes || (toRegion.nodes = {});
+      targetNodes[roomId] = availablePointNear(childNodeBasePoint(toScope, roomId), targetNodes);
+    } else {
+      if (!state.layout.world) state.layout.world = { nodes: {}, connectors: {} };
+      const worldNodes = state.layout.world.nodes || (state.layout.world.nodes = {});
+      const basePoint = parentNodeBasePoint(roomId, toScope);
+      const preferredDirection = roomDirectionsTowardsScope(roomId, fromScope)[0] || "";
+      if (preferredDirection && fromScope !== "world") {
+        const offset = placementOffsetForDirection(preferredDirection);
+        worldNodes[`room:${roomId}`] = availablePointNear({
+          x: (Number(basePoint.x) || 0) + offset.x,
+          y: (Number(basePoint.y) || 0) + offset.y,
+        }, worldNodes);
+        hierarchyConnectorPreset = offset;
+      } else {
+        worldNodes[`room:${roomId}`] = availablePointNear(basePoint, worldNodes);
+      }
+      if (fromScope !== "world") {
+        const edgeId = connectorEntryKey(`region:${fromScope}`, `room:${roomId}`);
+        if (hierarchyConnectorPreset) {
+          state.layout.world.connectors[edgeId] = {
+            route: "straight",
+            sourceSide: hierarchyConnectorPreset.sourceSide,
+            targetSide: hierarchyConnectorPreset.targetSide,
+            waypoints: [],
+            lanes: {},
+          };
+        } else {
+          delete state.layout.world.connectors[edgeId];
+        }
+      }
+    }
+
+    state.selectedEdgeId = "";
+    state.selectedLaneId = "";
+    state.selectedNodeId = toScope === "world" ? `room:${roomId}` : `room:${roomId}`;
+    state.scope = toScope;
+    state.pendingFocus = { scope: toScope, nodeId: `room:${roomId}` };
+    return true;
   }
 
   function renderCornerPanel(model) {
@@ -1883,6 +2145,32 @@
     return cloneConnectorStyle(entry);
   }
 
+  function inferredHierarchyConnectorStyle(edge) {
+    if (state.scope !== "world" || !edge) return null;
+    const regionNodeId = edge.from.startsWith("region:") ? edge.from : edge.to.startsWith("region:") ? edge.to : "";
+    const roomNodeId = edge.from.startsWith("room:") ? edge.from : edge.to.startsWith("room:") ? edge.to : "";
+    if (!regionNodeId || !roomNodeId) return null;
+    const regionId = regionNodeId.replace(/^region:/, "");
+    const roomId = roomNodeId.replace(/^room:/, "");
+    if (regionForRoom(roomId) === regionId) return null;
+    const preferredDirection = roomDirectionsTowardsScope(roomId, regionId)[0] || "";
+    if (!preferredDirection) return null;
+    const preset = placementOffsetForDirection(preferredDirection);
+    return {
+      route: "straight",
+      sourceSide: preset.sourceSide,
+      targetSide: preset.targetSide,
+      waypoints: [],
+    };
+  }
+
+  function resolvedConnectorStyle(edge, lane) {
+    const explicit = connectorStyleForLane(edge?.id || "", lane?.id || "");
+    const hasExplicitEntry = Boolean(currentConnectorMap()[edge?.id || ""]);
+    if (hasExplicitEntry) return explicit;
+    return inferredHierarchyConnectorStyle(edge) || explicit;
+  }
+
   function laneUsesReversedStyle(edge, lane) {
     if (!edge || !lane) return false;
     return lane.startNodeId !== edge.from || lane.endNodeId !== edge.to;
@@ -1960,10 +2248,40 @@
   }
 
   function syncSidebar() {
+    const model = buildModel(state.scope);
     const connectorSelected = Boolean(state.selectedLaneId);
     if (connectorPanel) connectorPanel.classList.toggle("editor-panel--disabled", !connectorSelected);
     for (const control of [routeSelect, sourceSideSelect, targetSideSelect, addWaypointButton, clearWaypointsButton]) {
       if (control) control.disabled = !connectorSelected;
+    }
+    const roomContext = selectedRoomContext(model);
+    const canMoveUp = Boolean(roomContext && state.scope !== "world" && !roomHasHierarchyDependents(roomContext.roomId, state.scope));
+    const targetScopes = roomContext ? validMoveInTargets(roomContext.roomId, state.scope) : [];
+    const canMoveDown = Boolean(roomContext && targetScopes.length);
+    if (hierarchyPanel) hierarchyPanel.classList.toggle("editor-panel--disabled", !roomContext);
+    if (hierarchyTargetScopeSelect) {
+      hierarchyTargetScopeSelect.innerHTML = roomContext
+        ? targetScopes.length
+          ? targetScopes.map((targetScope) => `<option value="${escapeHtml(targetScope)}">${escapeHtml(backupScopeLabel(targetScope))}</option>`).join("")
+          : `<option value="">Nessun ambito disponibile</option>`
+        : `<option value="">Seleziona una stanza</option>`;
+      hierarchyTargetScopeSelect.disabled = !canMoveDown;
+    }
+    if (moveRoomUpButton) moveRoomUpButton.disabled = !canMoveUp;
+    if (moveRoomDownButton) moveRoomDownButton.disabled = !canMoveDown;
+    if (hierarchySummary) {
+      if (!roomContext) {
+        hierarchySummary.textContent = "Seleziona una stanza per spostarla tra gli ambiti.";
+        setHierarchyStatus("Lo spostamento crea un backup automatico prima di applicare le modifiche.", "");
+      } else if (roomHasHierarchyDependents(roomContext.roomId, state.scope)) {
+        hierarchySummary.textContent = `${roomName(roomContext.roomId)} • Ambito attuale: ${backupScopeLabel(state.scope)}. ${roomHasHierarchyDependents(roomContext.roomId, state.scope)}`;
+        setHierarchyStatus(roomHasHierarchyDependents(roomContext.roomId, state.scope), "danger");
+      } else {
+        const parentLabel = state.scope === "world" ? "Mondo" : backupScopeLabel(parentScope(state.scope));
+        const downLabel = targetScopes.length ? targetScopes.map((targetScope) => backupScopeLabel(targetScope)).join(", ") : "nessun sottoambito disponibile";
+        hierarchySummary.textContent = `${roomName(roomContext.roomId)} • Ambito attuale: ${backupScopeLabel(state.scope)} • Fuori: ${parentLabel} • Dentro: ${downLabel}`;
+        setHierarchyStatus("Lo spostamento crea un backup automatico prima di applicare le modifiche.", "");
+      }
     }
     if (!state.selectedLaneId) {
       selectionSummary.textContent = state.selectedNodeId || "Nessuna selezione.";
@@ -1972,7 +2290,6 @@
       targetSideSelect.value = "auto";
       return;
     }
-    const model = buildModel(state.scope);
     const laneMatch = findLaneById(model, state.selectedLaneId);
     const connector = connectorStyleForLane(state.selectedEdgeId, state.selectedLaneId);
     if (laneMatch) {
@@ -1987,6 +2304,7 @@
   }
 
   function render() {
+    normalizePromotedWorldNodePositions();
     const model = buildModel(state.scope);
     const {
       width,
@@ -2001,7 +2319,7 @@
 
     const lineMarkup = model.edges.map((edge) => {
       const laneMarkup = buildDisplayLanes(edge, centers).map((lane) => {
-        const style = connectorStyleForLane(edge.id, lane.id);
+        const style = resolvedConnectorStyle(edge, lane);
         const selected = state.selectedLaneId === lane.id;
         const stroke = selected ? "#b27e24" : "#87683c";
         const geometry = connectorGeometry(edge, centers, style, lane);
@@ -2182,6 +2500,31 @@
     const trigger = event.target.closest("[data-parent-scope][data-parent-node-id]");
     if (!trigger) return;
     jumpToScopeNode(trigger.getAttribute("data-parent-scope") || "world", trigger.getAttribute("data-parent-node-id") || "");
+  });
+  moveRoomUpButton?.addEventListener("click", () => {
+    const roomContext = selectedRoomContext();
+    if (!roomContext || state.scope === "world") return;
+    const targetScope = parentScope(state.scope);
+    const blockReason = roomHasHierarchyDependents(roomContext.roomId, state.scope);
+    if (blockReason) {
+      setHierarchyStatus(blockReason, "danger");
+      return;
+    }
+    createBackup(`Gerarchia aggiornata • ${roomName(roomContext.roomId)}`);
+    if (!moveRoomBetweenScopes(roomContext.roomId, state.scope, targetScope)) return;
+    setHierarchyStatus(`${roomName(roomContext.roomId)} spostata in ${backupScopeLabel(targetScope)}.`, "success");
+    setSaveStatus("Gerarchia aggiornata nella bozza locale. Salva nel progetto oppure usa Salva file per applicarla al gioco.", "warning");
+    render();
+  });
+  moveRoomDownButton?.addEventListener("click", () => {
+    const roomContext = selectedRoomContext();
+    const targetScope = hierarchyTargetScopeSelect?.value || "";
+    if (!roomContext || !targetScope) return;
+    createBackup(`Gerarchia aggiornata • ${roomName(roomContext.roomId)}`);
+    if (!moveRoomBetweenScopes(roomContext.roomId, state.scope, targetScope)) return;
+    setHierarchyStatus(`${roomName(roomContext.roomId)} spostata in ${backupScopeLabel(targetScope)}.`, "success");
+    setSaveStatus("Gerarchia aggiornata nella bozza locale. Salva nel progetto oppure usa Salva file per applicarla al gioco.", "warning");
+    render();
   });
   if (scopeBackButton) {
     scopeBackButton.addEventListener("click", () => {
