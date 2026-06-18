@@ -3609,6 +3609,8 @@ const gameCases = [
       const state = game.sceneMapRenderCache?.state || null;
       game.print(`Misty Mountains map hides Narrow Ledge before visit: ${localMapImage.includes("Narrow Ledge") ? "no" : "yes"}`);
       game.print(`Misty Mountains map hides Storm Shelter before visit: ${localMapImage.includes("Storm Shelter") ? "no" : "yes"}`);
+      game.print(`Misty Mountains map uses editor box width: ${Number(state?.editorMeta?.boxWidth) === 112 ? "yes" : "no"}`);
+      game.print(`Misty Mountains map uses editor box height: ${Number(state?.editorMeta?.boxHeight) === 106 ? "yes" : "no"}`);
       game.print(`Misty Mountains map keeps full-width layout bounds: ${(Number(state?.baseWidth) || 0) > 1500 ? "yes" : "no"}`);
       game.print(`Misty Mountains map keeps full-height layout bounds: ${(Number(state?.baseHeight) || 0) > 1200 ? "yes" : "no"}`);
       game.print(`Misty Mountains current node stays left of layout center: ${Number(state?.currentRoomCenterBase?.x) < ((Number(state?.baseWidth) || 0) * 0.45) ? "yes" : "no"}`);
@@ -3617,9 +3619,32 @@ const gameCases = [
       "You study the paths already traced across Wilderland.",
       "Misty Mountains map hides Narrow Ledge before visit: yes",
       "Misty Mountains map hides Storm Shelter before visit: yes",
+      "Misty Mountains map uses editor box width: yes",
+      "Misty Mountains map uses editor box height: yes",
       "Misty Mountains map keeps full-width layout bounds: yes",
       "Misty Mountains map keeps full-height layout bounds: yes",
       "Misty Mountains current node stays left of layout center: yes",
+    ],
+  },
+  {
+    name: "one-way level connector uses the editor lane override id format",
+    setup(game) {
+      movePlayerTo(game, "deep_misty_valley_2");
+      game.visitedRooms.add("narrow_path_6");
+    },
+    drive(game) {
+      const image = document.getElementById("scene-map-image");
+      game.execute("map");
+      const localMapImage = decodeURIComponent(image.getAttribute("src") || "");
+      const polylineCount = [...localMapImage.matchAll(/<polyline points=\"([^\"]+)\"/g)].length;
+      const lineCount = [...localMapImage.matchAll(/<line x1=\"([^\"]+)\" y1=\"([^\"]+)\" x2=\"([^\"]+)\" y2=\"([^\"]+)\"/g)].length;
+      game.print(`Deep Misty connector keeps waypoint polyline: ${polylineCount >= 1 ? "yes" : "no"}`);
+      game.print(`Deep Misty connector avoids fallback straight line: ${lineCount === 0 ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "Deep Misty connector keeps waypoint polyline: yes",
+      "Deep Misty connector avoids fallback straight line: yes",
     ],
   },
   {

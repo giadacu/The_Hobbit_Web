@@ -627,26 +627,37 @@ shape in the game. Their bends and jogs did not line up with the editor.
 
 Root cause
 ----------
-Connector waypoint overrides stored in `assets/map-layout-data.js` are authored
-in the editor's SVG coordinate space. The game renderer was applying those
-waypoints directly inside a different local-map canvas metric, so the final
-connector path drifted even when node placement was otherwise close.
+The decisive mismatch was in lane-id resolution for one-way non-compass links.
+
+- The editor stores a lane like:
+  `ow:room:deep_misty_valley_2>room:narrow_path_6:up:`
+- The game generated:
+  `ow:room:deep_misty_valley_2>room:narrow_path_6:up:down`
+
+Because the ids did not match, the game failed to load the lane-specific
+override from `assets/map-layout-data.js` and silently fell back to auto
+routing for that connector.
+
+Box/anchor metric differences were a secondary mismatch, but they were not the
+root cause of the persistent Deep Misty Valley connector error.
 
 Resolution
 ----------
-1. Added a local-map waypoint transform in the game renderer.
-2. When a local connector uses explicit waypoints, the points are remapped from
-   editor-space coordinates into the current in-game local-map canvas.
-3. The transform keeps the current game canvas sizing while preserving the
-   final connector shape authored in the editor.
+1. Added editor-compatible fallback matching for one-way lane ids such as
+   `up:`, `down:`, `inside:`, `outside:`, `forward:`, and `back:`.
+2. When a direct lane-id lookup misses, the game now also checks the legacy
+   editor form with a blank target direction for those one-way lanes.
+3. This allows the renderer to load the correct lane-specific waypoint and
+   anchor overrides instead of falling back to auto routing.
 
 Files touched
 -------------
 - game.js
+- scripts/parser-tests.js
 
 Future debugging advice
 -----------------------
 - If node positions look right but connector bends do not, inspect the
-  coordinate system used by saved waypoints before changing routing logic.
+  lane-id matching first, especially for one-way `up/down`-style connectors.
 - Saved layout overrides can only be shared between tools if both sides agree
-  on how SVG pixel coordinates are transformed.
+  on lane-id normalization as well as SVG coordinate transforms.

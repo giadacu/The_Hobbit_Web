@@ -28,6 +28,16 @@
   const MAP_EDITOR_UNIT = 168;
   const MAP_EDITOR_PADDING = 120;
 
+  function normalizeMapBoxMetrics(boxMetrics = 96) {
+    if (typeof boxMetrics === "object" && boxMetrics) {
+      const width = Number(boxMetrics.width) || Number(boxMetrics.boxWidth) || Number(boxMetrics.boxSize) || 96;
+      const height = Number(boxMetrics.height) || Number(boxMetrics.boxHeight) || Number(boxMetrics.boxSize) || width;
+      return { width, height };
+    }
+    const size = Number(boxMetrics) || 96;
+    return { width: size, height: size };
+  }
+
   const $ = (id) => document.getElementById(id);
   const output = $("output");
   const input = $("command-input");
@@ -5831,14 +5841,14 @@
       if (!nodeId) return null;
       const center = mapState.editorMeta.nodeCenters?.[nodeId];
       if (!center) return null;
-      const boxSize = Number(mapState.editorMeta.boxSize) || 96;
-      const outerSize = boxSize + (SCENE_MAP_CURRENT_INDICATOR_PADDING * 2);
+      const boxWidth = Number(mapState.editorMeta.boxWidth) || Number(mapState.editorMeta.boxSize) || 96;
+      const boxHeight = Number(mapState.editorMeta.boxHeight) || Number(mapState.editorMeta.boxSize) || boxWidth;
       return {
         nodeId,
-        left: center.x - (outerSize / 2),
-        top: center.y - (outerSize / 2),
-        width: outerSize,
-        height: outerSize,
+        left: center.x - ((boxWidth / 2) + SCENE_MAP_CURRENT_INDICATOR_PADDING),
+        top: center.y - ((boxHeight / 2) + SCENE_MAP_CURRENT_INDICATOR_PADDING),
+        width: boxWidth + (SCENE_MAP_CURRENT_INDICATOR_PADDING * 2),
+        height: boxHeight + (SCENE_MAP_CURRENT_INDICATOR_PADDING * 2),
       };
     }
 
@@ -15906,14 +15916,15 @@
     };
   }
 
-  function mapNodeExitMarkerGeometry(direction = "", point = {}, boxSize = 96) {
+  function mapNodeExitMarkerGeometry(direction = "", point = {}, boxMetrics = 96) {
+    const { width: boxWidth, height: boxHeight } = normalizeMapBoxMetrics(boxMetrics);
     const normalized = compassDirectionKey(direction) || normalize(direction);
     const centerX = Number(point.x) || 0;
     const centerY = Number(point.y) || 0;
-    const left = centerX - (boxSize / 2);
-    const top = centerY - (boxSize / 2);
-    const right = centerX + (boxSize / 2);
-    const bottom = centerY + (boxSize / 2);
+    const left = centerX - (boxWidth / 2);
+    const top = centerY - (boxHeight / 2);
+    const right = centerX + (boxWidth / 2);
+    const bottom = centerY + (boxHeight / 2);
     const positions = {
       north: { x: centerX, y: top - 16 },
       "north east": { x: right + 14, y: top - 12 },
@@ -16349,8 +16360,25 @@
     return lanes.map((lane) => ({ ...lane, id: mapLaneStorageKey(lane) }));
   }
 
-  function resolveMapConnectorEntryStyle(entry = null, laneId = "") {
+  function legacyEditorLaneStorageKeys(lane = null) {
+    if (!lane || lane.twoWay) return [];
+    const sourceDirection = normalize(lane.sourceDirection);
+    const targetDirection = normalize(lane.targetDirection);
+    if (!sourceDirection) return [];
+    const editorBlankTargetDirections = new Set(["up", "down", "inside", "outside", "forward", "back"]);
+    if (!editorBlankTargetDirections.has(sourceDirection)) return [];
+    if (targetDirection && targetDirection !== oppositeDirection(sourceDirection)) return [];
+    return [`ow:${lane.startNodeId || ""}>${lane.endNodeId || ""}:${sourceDirection}:`];
+  }
+
+  function resolveMapConnectorEntryStyle(entry = null, lane = null) {
+    const laneId = typeof lane === "string" ? lane : (lane?.id || "");
     if (entry?.lanes?.[laneId]) return sanitizeMapConnectorStyle(entry.lanes[laneId]) || null;
+    if (entry?.lanes && lane && typeof lane === "object") {
+      for (const legacyLaneId of legacyEditorLaneStorageKeys(lane)) {
+        if (entry.lanes[legacyLaneId]) return sanitizeMapConnectorStyle(entry.lanes[legacyLaneId]) || null;
+      }
+    }
     return sanitizeMapConnectorStyle(entry || {}) || null;
   }
 
@@ -16393,9 +16421,10 @@
     };
   }
 
-  function mapLaneRenderGeometry(edge, lane, centers, boxSize = 96, options = {}) {
+  function mapLaneRenderGeometry(edge, lane, centers, boxMetrics = 96, options = {}) {
+    const metrics = normalizeMapBoxMetrics(boxMetrics);
     const overrideEntry = options.overrideEntry || null;
-    const override = resolveMapConnectorEntryStyle(overrideEntry, lane.id);
+    const override = resolveMapConnectorEntryStyle(overrideEntry, lane);
     const from = centers[lane.startNodeId];
     const to = centers[lane.endNodeId];
     if (!from || !to) return null;
@@ -16418,11 +16447,11 @@
     const fromLevel = isMapLevelDirection(fromDirection);
     const toLevel = isMapLevelDirection(toDirection);
     const fromAnchor = fromLevel
-      ? mapLevelSidePoint(from, snappedSides.sourceSide, to, boxSize)
-      : resolveMapConnectorAnchor(from, snappedSides.sourceSide, fromDirection, boxSize, to);
+      ? mapLevelSidePoint(from, snappedSides.sourceSide, to, metrics)
+      : resolveMapConnectorAnchor(from, snappedSides.sourceSide, fromDirection, metrics, to);
     const toAnchor = toLevel
-      ? mapLevelSidePoint(to, snappedSides.targetSide, from, boxSize)
-      : resolveMapConnectorAnchor(to, snappedSides.targetSide, toDirection, boxSize, from);
+      ? mapLevelSidePoint(to, snappedSides.targetSide, from, metrics)
+      : resolveMapConnectorAnchor(to, snappedSides.targetSide, toDirection, metrics, from);
     let points = [fromAnchor, toAnchor];
     if (override?.route === "straight") {
       points = [fromAnchor, toAnchor];
@@ -16461,17 +16490,18 @@
     };
   }
 
-  function buildMapStubGeometry(center, direction = "", boxSize = 96, length = 38) {
+  function buildMapStubGeometry(center, direction = "", boxMetrics = 96, length = 38) {
+    const { width: boxWidth, height: boxHeight } = normalizeMapBoxMetrics(boxMetrics);
     if (!center) return null;
     const vector = mapDirectionVector(direction);
     const magnitude = Math.hypot(vector.x, vector.y) || 1;
     const unitX = vector.x / magnitude;
     const unitY = vector.y / magnitude;
     const target = {
-      x: center.x + (unitX * boxSize),
-      y: center.y + (unitY * boxSize),
+      x: center.x + (unitX * Math.max(boxWidth, boxHeight)),
+      y: center.y + (unitY * Math.max(boxWidth, boxHeight)),
     };
-    const from = mapBoxAnchorPoint(center, direction, boxSize, target);
+    const from = mapBoxAnchorPoint(center, direction, { width: boxWidth, height: boxHeight }, target);
     const to = {
       x: from.x + (unitX * length),
       y: from.y + (unitY * length),
@@ -16486,7 +16516,8 @@
     return ["north", "north east", "east", "south east", "south", "south west", "west", "north west"].includes(normalized) ? normalized : "";
   }
 
-  function mapExternalExitPlacement(center, direction = "", boxSize = 96, index = 0, total = 1) {
+  function mapExternalExitPlacement(center, direction = "", boxMetrics = 96, index = 0, total = 1) {
+    const { width: boxWidth, height: boxHeight } = normalizeMapBoxMetrics(boxMetrics);
     if (!center) return null;
     const side = mapExternalExitSide(direction);
     const label = formatMapDirectionBadge(direction);
@@ -16498,11 +16529,11 @@
     const normalX = -alongY;
     const normalY = alongX;
     const spread = total > 1 ? (index - ((total - 1) / 2)) * 28 : 0;
-    const half = boxSize / 2;
-    const quarterOffset = boxSize * 0.25;
-    let anchorPoint = mapBoxAnchorPoint(center, side, boxSize);
-    if (direction === "up") anchorPoint = { x: center.x - quarterOffset, y: center.y - half };
-    if (direction === "down") anchorPoint = { x: center.x + quarterOffset, y: center.y + half };
+    const halfHeight = boxHeight / 2;
+    const quarterOffset = boxWidth * 0.25;
+    let anchorPoint = mapBoxAnchorPoint(center, side, { width: boxWidth, height: boxHeight });
+    if (direction === "up") anchorPoint = { x: center.x - quarterOffset, y: center.y - halfHeight };
+    if (direction === "down") anchorPoint = { x: center.x + quarterOffset, y: center.y + halfHeight };
     anchorPoint = {
       x: anchorPoint.x + (normalX * spread),
       y: anchorPoint.y + (normalY * spread),
@@ -16562,16 +16593,17 @@
     if (!bounds) return null;
     const unitX = Number(metrics.unitX) || 0;
     const unitY = Number(metrics.unitY) || 0;
-    const boxSize = Number(metrics.boxSize) || 0;
+    const boxWidth = Number(metrics.boxWidth) || Number(metrics.boxSize) || 0;
+    const boxHeight = Number(metrics.boxHeight) || Number(metrics.boxSize) || 0;
     const padding = Number(metrics.padding) || 0;
     const overflowMargin = Number(metrics.overflowMargin) || 0;
     const offsetX = Number(metrics.offsetX) || 0;
     const offsetY = Number(metrics.offsetY) || 0;
-    if (!unitX || !unitY || !boxSize) return null;
+    if (!unitX || !unitY || !boxWidth || !boxHeight) return null;
     const editorBaseX = MAP_EDITOR_PADDING + (MAP_EDITOR_BOX_WIDTH / 2);
     const editorBaseY = MAP_EDITOR_PADDING + (MAP_EDITOR_BOX_HEIGHT / 2);
-    const gameBaseX = offsetX + overflowMargin + padding + (boxSize / 2);
-    const gameBaseY = offsetY + overflowMargin + padding + (boxSize / 2);
+    const gameBaseX = offsetX + overflowMargin + padding + (boxWidth / 2);
+    const gameBaseY = offsetY + overflowMargin + padding + (boxHeight / 2);
     return (point = {}) => ({
       x: gameBaseX + (((Number(point.x) || 0) - editorBaseX) * (unitX / MAP_EDITOR_UNIT)),
       y: gameBaseY + (((Number(point.y) || 0) - editorBaseY) * (unitY / MAP_EDITOR_UNIT)),
@@ -16580,10 +16612,15 @@
 
   function renderExplorationMapSvg(model, positions, options = {}) {
     const worldScope = options.worldScope !== false;
-    const boxSize = worldScope ? 98 : 92;
-    const unitX = worldScope ? 170 : 156;
-    const unitY = worldScope ? 170 : 156;
-    const padding = worldScope ? 128 : 110;
+    const boxMetrics = worldScope
+      ? { width: 98, height: 98 }
+      : { width: MAP_EDITOR_BOX_WIDTH, height: MAP_EDITOR_BOX_HEIGHT };
+    const boxWidth = boxMetrics.width;
+    const boxHeight = boxMetrics.height;
+    const boxSize = Math.max(boxWidth, boxHeight);
+    const unitX = worldScope ? 170 : MAP_EDITOR_UNIT;
+    const unitY = worldScope ? 170 : MAP_EDITOR_UNIT;
+    const padding = worldScope ? 128 : MAP_EDITOR_PADDING;
     const overflowMargin = worldScope
       ? 72
       : ((model.externalExits || []).length ? 190 : 84);
@@ -16608,8 +16645,8 @@
       maxY = Math.max(maxY, point.y);
     }
 
-    const contentWidth = Math.round(((maxX - minX) * unitX) + (padding * 2) + boxSize + (overflowMargin * 2));
-    const contentHeight = Math.round(((maxY - minY) * unitY) + (padding * 2) + boxSize + titleSpace + (overflowMargin * 2));
+    const contentWidth = Math.round(((maxX - minX) * unitX) + (padding * 2) + boxWidth + (overflowMargin * 2));
+    const contentHeight = Math.round(((maxY - minY) * unitY) + (padding * 2) + boxHeight + titleSpace + (overflowMargin * 2));
     const width = Math.max(minWidth, contentWidth);
     const height = Math.max(minHeight, contentHeight);
     const offsetX = Math.max(0, (width - contentWidth) / 2);
@@ -16620,21 +16657,21 @@
     const localWaypointTransform = !worldScope
       ? createLocalMapEditorWaypointTransform(
           mapBoundsFromPinnedPositions(model.layoutBoundsPositions || model.pinnedPositions || {}),
-          { unitX, unitY, boxSize, padding, overflowMargin, offsetX, offsetY }
+          { unitX, unitY, boxWidth, boxHeight, padding, overflowMargin, offsetX, offsetY }
         )
       : null;
 
     for (const node of model.nodes) {
       const point = positions.get(node.id) || { x: 0, y: 0 };
       nodePixels.set(node.id, {
-        x: offsetX + overflowMargin + padding + ((point.x - minX) * unitX) + (boxSize / 2),
-        y: offsetY + overflowMargin + padding + ((point.y - minY) * unitY) + (boxSize / 2),
+        x: offsetX + overflowMargin + padding + ((point.x - minX) * unitX) + (boxWidth / 2),
+        y: offsetY + overflowMargin + padding + ((point.y - minY) * unitY) + (boxHeight / 2),
       });
     }
 
     const centers = Object.fromEntries(nodePixels.entries());
     const lineMarkup = model.edges.map((edge) => buildMapDisplayLanes(edge, centers).map((lane) => {
-      const geometry = mapLaneRenderGeometry(edge, lane, centers, boxSize, {
+      const geometry = mapLaneRenderGeometry(edge, lane, centers, boxMetrics, {
         overrideEntry: connectorOverrides[edge.id],
         transformWaypoint: localWaypointTransform,
       });
@@ -16644,9 +16681,9 @@
       const points = geometry.points || buildMapConnectorPoints(
         geometry.fromAnchor,
         geometry.toAnchor,
-        { fromDirection: geometry.fromDirection, toDirection: geometry.toDirection },
-        boxSize,
-        geometry.override
+          { fromDirection: geometry.fromDirection, toDirection: geometry.toDirection },
+          boxMetrics,
+          geometry.override
       );
       lineEntries.push({
         laneId: geometry.id,
@@ -16658,7 +16695,7 @@
         geometry.fromAnchor,
         geometry.toAnchor,
         { fromDirection: geometry.fromDirection, toDirection: geometry.toDirection },
-        {
+          {
           boxSize,
           twoWay: geometry.twoWay,
           routeOverride: geometry.override,
@@ -16672,7 +16709,7 @@
         geometry.fromAnchor,
         geometry.toAnchor,
         { fromDirection: geometry.fromDirection, toDirection: geometry.toDirection },
-        {
+          {
           boxSize,
           twoWay: geometry.twoWay,
           routeOverride: geometry.override,
@@ -16692,7 +16729,7 @@
     const levelBadgeMarkup = levelBadgeEntries.join("");
     const stubMarkup = (model.exitStubs || []).map((stub) => {
       const center = nodePixels.get(stub.nodeId);
-      const geometry = buildMapStubGeometry(center, stub.direction, boxSize, worldScope ? 42 : 36);
+      const geometry = buildMapStubGeometry(center, stub.direction, boxMetrics, worldScope ? 42 : 36);
       if (!geometry) return "";
       return `<line x1="${geometry.from.x.toFixed(1)}" y1="${geometry.from.y.toFixed(1)}" x2="${geometry.to.x.toFixed(1)}" y2="${geometry.to.y.toFixed(1)}" stroke="#b08b52" stroke-width="${worldScope ? "4.1" : "3.6"}" stroke-linecap="round" stroke-dasharray="10 8" opacity="0.95" />`;
     }).join("");
@@ -16704,14 +16741,14 @@
     }
     const externalExitMarkup = [...externalExitGroups.values()].map((group) => group.map((entry, index) => {
       const center = nodePixels.get(entry.sourceNodeId);
-      const placement = mapExternalExitPlacement(center, entry.direction, boxSize, index, group.length);
+      const placement = mapExternalExitPlacement(center, entry.direction, boxMetrics, index, group.length);
       return renderMapExternalExit(entry, placement);
     }).join("")).join("");
 
     const nodeMarkup = model.nodes.map((node) => {
       const point = nodePixels.get(node.id) || { x: padding, y: padding };
-      const x = point.x - (boxSize / 2);
-      const y = point.y - (boxSize / 2);
+      const x = point.x - (boxWidth / 2);
+      const y = point.y - (boxHeight / 2);
       const currentNode = node.id === currentNodeId;
       const currentNodeExits = currentNode ? (model.currentNodeExits || []) : [];
       const clickable = Boolean(node.openRegion);
@@ -16726,7 +16763,7 @@
         .join("");
       const exitsMarkup = currentNodeExits.length
         ? currentNodeExits.map((exit) => {
-          const geometry = mapNodeExitMarkerGeometry(exit.direction, point, boxSize);
+          const geometry = mapNodeExitMarkerGeometry(exit.direction, point, boxMetrics);
           if (!geometry) return "";
           return `<g data-node-exit="${escapeXml(exit.direction)}" data-node-exit-label="${escapeXml(exit.label)}">
         <circle cx="${geometry.x.toFixed(1)}" cy="${geometry.y.toFixed(1)}" r="10.5" fill="rgba(255, 248, 233, 0.78)" stroke="rgba(124, 90, 35, 0.42)" stroke-width="1.2" />
@@ -16735,7 +16772,7 @@
         }).join("")
         : "";
       const badgeMarkup = clickable
-        ? `<text x="${point.x.toFixed(1)}" y="${(y + boxSize + 20).toFixed(1)}" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="12" font-weight="700" fill="#7a5b26">click to open</text>`
+        ? `<text x="${point.x.toFixed(1)}" y="${(y + boxHeight + 20).toFixed(1)}" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="12" font-weight="700" fill="#7a5b26">click to open</text>`
         : "";
       const regionAttr = clickable ? ` data-map-open-region="${escapeXml(node.openRegion)}"` : "";
       const labelAttr = ` data-node-label="${escapeXml(node.label)}"`;
@@ -16745,8 +16782,8 @@
         <text x="${point.x.toFixed(1)}" y="${(y + 80).toFixed(1)}" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="10.5" font-weight="700" fill="#5e4316">click to open map</text>`
         : "";
       return `<g${regionAttr}${labelAttr}>
-        ${currentNode ? `<rect x="${(x - 9).toFixed(1)}" y="${(y - 9).toFixed(1)}" width="${(boxSize + 18).toFixed(1)}" height="${(boxSize + 18).toFixed(1)}" rx="15" fill="none" stroke="#d4a64a" stroke-width="5" />` : ""}
-        <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${boxSize}" height="${boxSize}" rx="10" fill="${currentNode ? "#f0d79f" : clickable ? "#f2dfb0" : "#f5ecd5"}" stroke="${currentNode ? "#6c4d18" : clickable ? "#7c5a23" : "#6f5a35"}" stroke-width="${currentNode ? "3.1" : "2.5"}" />
+        ${currentNode ? `<rect x="${(x - 9).toFixed(1)}" y="${(y - 9).toFixed(1)}" width="${(boxWidth + 18).toFixed(1)}" height="${(boxHeight + 18).toFixed(1)}" rx="15" fill="none" stroke="#d4a64a" stroke-width="5" />` : ""}
+        <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${boxWidth}" height="${boxHeight}" rx="10" fill="${currentNode ? "#f0d79f" : clickable ? "#f2dfb0" : "#f5ecd5"}" stroke="${currentNode ? "#6c4d18" : clickable ? "#7c5a23" : "#6f5a35"}" stroke-width="${currentNode ? "3.1" : "2.5"}" />
         <text x="${point.x.toFixed(1)}" y="${point.y.toFixed(1)}" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="${worldScope ? "13.5" : "13"}" font-weight="${clickable ? "700" : "600"}" fill="#2f2412">${labelMarkup}</text>
         ${exitsMarkup}
         ${inlinePortalMarkup}
@@ -16761,10 +16798,10 @@
           items.push({
             openRegion: node.openRegion,
             label: node.label,
-            x: Math.round(point.x - (boxSize / 2)),
-            y: Math.round(point.y - (boxSize / 2)),
-            width: boxSize,
-            height: boxSize,
+            x: Math.round(point.x - (boxWidth / 2)),
+            y: Math.round(point.y - (boxHeight / 2)),
+            width: boxWidth,
+            height: boxHeight,
           });
         }
         if (node.inlinePortal) {
@@ -16843,6 +16880,8 @@
         nodeCenters: editorNodeCenters,
         currentNodeId,
         boxSize,
+        boxWidth,
+        boxHeight,
         unitX,
         unitY,
         padding,
@@ -17061,53 +17100,56 @@
     return Math.round(value * 20) / 20;
   }
 
-  function mapBoxSideCenter(center, side = "east", boxSize = 96) {
-    const half = boxSize / 2;
+  function mapBoxSideCenter(center, side = "east", boxMetrics = 96) {
+    const { width: boxWidth, height: boxHeight } = normalizeMapBoxMetrics(boxMetrics);
     return {
-      north: { x: center.x, y: center.y - half },
-      east: { x: center.x + half, y: center.y },
-      south: { x: center.x, y: center.y + half },
-      west: { x: center.x - half, y: center.y },
+      north: { x: center.x, y: center.y - (boxHeight / 2) },
+      east: { x: center.x + (boxWidth / 2), y: center.y },
+      south: { x: center.x, y: center.y + (boxHeight / 2) },
+      west: { x: center.x - (boxWidth / 2), y: center.y },
     }[side] || { x: center.x, y: center.y };
   }
 
-  function mapBoxCornerPoint(center, corner = "north east", boxSize = 96) {
-    const half = boxSize / 2;
-    const inset = Math.max(2.5, Math.min(half * 0.1, 6));
+  function mapBoxCornerPoint(center, corner = "north east", boxMetrics = 96) {
+    const { width: boxWidth, height: boxHeight } = normalizeMapBoxMetrics(boxMetrics);
+    const halfWidth = boxWidth / 2;
+    const halfHeight = boxHeight / 2;
+    const inset = Math.max(2.5, Math.min(Math.min(halfWidth, halfHeight) * 0.1, 6));
     return {
-      "north east": { x: center.x + half - inset, y: center.y - half + inset },
-      "north west": { x: center.x - half + inset, y: center.y - half + inset },
-      "south east": { x: center.x + half - inset, y: center.y + half - inset },
-      "south west": { x: center.x - half + inset, y: center.y + half - inset },
+      "north east": { x: center.x + halfWidth - inset, y: center.y - halfHeight + inset },
+      "north west": { x: center.x - halfWidth + inset, y: center.y - halfHeight + inset },
+      "south east": { x: center.x + halfWidth - inset, y: center.y + halfHeight - inset },
+      "south west": { x: center.x - halfWidth + inset, y: center.y + halfHeight - inset },
     }[corner] || { x: center.x, y: center.y };
   }
 
-  function mapLevelSidePoint(center, side = "south", target = null, boxSize = 96) {
-    const half = boxSize / 2;
-    const quarterOffset = boxSize * 0.25;
+  function mapLevelSidePoint(center, side = "south", target = null, boxMetrics = 96) {
+    const { width: boxWidth, height: boxHeight } = normalizeMapBoxMetrics(boxMetrics);
+    const halfHeight = boxHeight / 2;
+    const quarterOffset = boxWidth * 0.25;
     const dx = (target?.x || center.x) - center.x;
     const horizontalOffset = dx > 0 ? quarterOffset : -quarterOffset;
     if (side === "north") {
-      return { x: center.x + horizontalOffset, y: center.y - half };
+      return { x: center.x + horizontalOffset, y: center.y - halfHeight };
     }
     if (side === "south") {
-      return { x: center.x + horizontalOffset, y: center.y + half };
+      return { x: center.x + horizontalOffset, y: center.y + halfHeight };
     }
-    return mapBoxSideCenter(center, side, boxSize);
+    return mapBoxSideCenter(center, side, boxMetrics);
   }
 
-  function mapNearestLevelSideCenter(center, target, boxSize = 96) {
-    if (!target) return mapLevelSidePoint(center, "south", target, boxSize);
+  function mapNearestLevelSideCenter(center, target, boxMetrics = 96) {
+    if (!target) return mapLevelSidePoint(center, "south", target, boxMetrics);
     const dx = target.x - center.x;
     const dy = target.y - center.y;
     const horizontalFromSide = dx >= 0 ? "east" : "west";
     const horizontalToSide = dx >= 0 ? "west" : "east";
     const verticalFromSide = dy >= 0 ? "south" : "north";
     const verticalToSide = dy >= 0 ? "north" : "south";
-    const horizontalFrom = mapBoxSideCenter(center, horizontalFromSide, boxSize);
-    const horizontalTo = mapBoxSideCenter(target, horizontalToSide, boxSize);
-    const verticalFrom = mapLevelSidePoint(center, verticalFromSide, target, boxSize);
-    const verticalTo = mapLevelSidePoint(target, verticalToSide, center, boxSize);
+    const horizontalFrom = mapBoxSideCenter(center, horizontalFromSide, boxMetrics);
+    const horizontalTo = mapBoxSideCenter(target, horizontalToSide, boxMetrics);
+    const verticalFrom = mapLevelSidePoint(center, verticalFromSide, target, boxMetrics);
+    const verticalTo = mapLevelSidePoint(target, verticalToSide, center, boxMetrics);
     const horizontalDistance = Math.hypot(horizontalTo.x - horizontalFrom.x, horizontalTo.y - horizontalFrom.y);
     const verticalDistance = Math.hypot(verticalTo.x - verticalFrom.x, verticalTo.y - verticalFrom.y);
     if (Math.abs(horizontalDistance - verticalDistance) < 0.01) {
@@ -17116,47 +17158,47 @@
     return horizontalDistance < verticalDistance ? horizontalFrom : verticalFrom;
   }
 
-  function mapBoxAnchorPoint(center, direction = "", boxSize = 96, target = null) {
-    const half = boxSize / 2;
+  function mapBoxAnchorPoint(center, direction = "", boxMetrics = 96, target = null) {
+    const { width: boxWidth, height: boxHeight } = normalizeMapBoxMetrics(boxMetrics);
     const normalized = compassDirectionKey(direction) || normalize(direction);
-    if (isMapLevelDirection(normalized)) return mapNearestLevelSideCenter(center, target, boxSize);
-    const diagonalInset = Math.max(3, Math.min(half * 0.12, 6));
-    const diagonalVerticalNudge = Math.max(1, Math.min(half * 0.05, 2.5));
+    if (isMapLevelDirection(normalized)) return mapNearestLevelSideCenter(center, target, boxMetrics);
+    const diagonalInset = Math.max(3, Math.min(Math.min(boxWidth, boxHeight) * 0.12, 6));
+    const diagonalVerticalNudge = Math.max(1, Math.min(boxHeight * 0.05, 2.5));
     const anchored = {
-      north: { x: center.x, y: center.y - half },
-      "north east": { x: center.x + half - diagonalInset, y: center.y - half + diagonalVerticalNudge },
-      east: { x: center.x + half, y: center.y },
-      "south east": { x: center.x + half - diagonalInset, y: center.y + half - diagonalVerticalNudge },
-      south: { x: center.x, y: center.y + half },
-      "south west": { x: center.x - half + diagonalInset, y: center.y + half - diagonalVerticalNudge },
-      west: { x: center.x - half, y: center.y },
-      "north west": { x: center.x - half + diagonalInset, y: center.y - half + diagonalVerticalNudge },
-      inside: { x: center.x, y: center.y - half },
-      outside: { x: center.x, y: center.y + half },
-      forward: { x: center.x + half, y: center.y },
-      back: { x: center.x - half, y: center.y },
+      north: { x: center.x, y: center.y - (boxHeight / 2) },
+      "north east": { x: center.x + (boxWidth / 2) - diagonalInset, y: center.y - (boxHeight / 2) + diagonalVerticalNudge },
+      east: { x: center.x + (boxWidth / 2), y: center.y },
+      "south east": { x: center.x + (boxWidth / 2) - diagonalInset, y: center.y + (boxHeight / 2) - diagonalVerticalNudge },
+      south: { x: center.x, y: center.y + (boxHeight / 2) },
+      "south west": { x: center.x - (boxWidth / 2) + diagonalInset, y: center.y + (boxHeight / 2) - diagonalVerticalNudge },
+      west: { x: center.x - (boxWidth / 2), y: center.y },
+      "north west": { x: center.x - (boxWidth / 2) + diagonalInset, y: center.y - (boxHeight / 2) + diagonalVerticalNudge },
+      inside: { x: center.x, y: center.y - (boxHeight / 2) },
+      outside: { x: center.x, y: center.y + (boxHeight / 2) },
+      forward: { x: center.x + (boxWidth / 2), y: center.y },
+      back: { x: center.x - (boxWidth / 2), y: center.y },
     }[normalized];
     if (anchored) return anchored;
     if (!target) return { x: center.x, y: center.y };
     const dx = target.x - center.x;
     const dy = target.y - center.y;
     if (!dx && !dy) return { x: center.x, y: center.y };
-    const scale = half / Math.max(Math.abs(dx), Math.abs(dy), 1);
+    const scale = Math.min(boxWidth / 2, boxHeight / 2) / Math.max(Math.abs(dx), Math.abs(dy), 1);
     return {
       x: center.x + (dx * scale),
       y: center.y + (dy * scale),
     };
   }
 
-  function resolveMapConnectorAnchor(center, explicitAnchor = "auto", fallbackDirection = "", boxSize = 96, target = null) {
+  function resolveMapConnectorAnchor(center, explicitAnchor = "auto", fallbackDirection = "", boxMetrics = 96, target = null) {
     const normalizedAnchor = sanitizeMapConnectorAnchor(explicitAnchor);
     if (normalizedAnchor && normalizedAnchor !== "auto") {
       if (["north east", "north west", "south east", "south west"].includes(normalizedAnchor)) {
-        return mapBoxCornerPoint(center, normalizedAnchor, boxSize);
+        return mapBoxCornerPoint(center, normalizedAnchor, boxMetrics);
       }
-      return mapBoxSideCenter(center, normalizedAnchor, boxSize);
+      return mapBoxSideCenter(center, normalizedAnchor, boxMetrics);
     }
-    return mapBoxAnchorPoint(center, fallbackDirection, boxSize, target);
+    return mapBoxAnchorPoint(center, fallbackDirection, boxMetrics, target);
   }
 
   function resolveMapEdgeDirection(links, fromId, toId, fromPoint, toPoint) {
