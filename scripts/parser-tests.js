@@ -38,6 +38,13 @@ function makeElement(id = "") {
     focus() {},
     closest() { return makeElement("scene"); },
     contains() { return false; },
+    querySelector(selector) {
+      if (selector === ".scene-map-current-indicator" && this.innerHTML.includes("scene-map-current-indicator")) {
+        if (!this._sceneMapCurrentIndicator) this._sceneMapCurrentIndicator = makeElement("scene-map-current-indicator");
+        return this._sceneMapCurrentIndicator;
+      }
+      return null;
+    },
     getBoundingClientRect() { return { width: 800, height: 500 }; },
     get clientWidth() { return 800; },
     get clientHeight() { return 500; },
@@ -3169,6 +3176,161 @@ const gameCases = [
       "Current node shows north exit marker: yes",
       "Current node shows east exit marker: yes",
       "Current node shows southwest exit marker: yes",
+    ],
+  },
+  {
+    name: "map animates the current node frame during local movement",
+    drive(game) {
+      const title = document.getElementById("scene-map-title");
+      game.execute("jump beorn");
+      game.execute("map");
+      game.execute("east");
+      const animation = game.sceneMapTravelAnimation || {};
+      game.print(`Map movement animation active: ${animation.active === true ? "yes" : "no"}`);
+      game.print(`Map movement animation source tracked: ${animation.fromRoom === "beorns_house" ? "yes" : "no"}`);
+      game.print(`Map movement animation target tracked: ${animation.toRoom === "beorn_great_hall" ? "yes" : "no"}`);
+      game.print(`Map title stays on local scope: ${title.textContent === "Beorn's House" ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "Map movement animation active: yes",
+      "Map movement animation source tracked: yes",
+      "Map movement animation target tracked: yes",
+      "Map title stays on local scope: yes",
+    ],
+  },
+  {
+    name: "map delays local drilldown until entry animation completes",
+    drive(game) {
+      const title = document.getElementById("scene-map-title");
+      const originalSetTimeout = global.setTimeout;
+      const delayedTimers = [];
+      global.setTimeout = (fn, delay = 0, ...args) => {
+        if (Number(delay) > 100) {
+          delayedTimers.push(() => fn(...args));
+          return delayedTimers.length;
+        }
+        return originalSetTimeout(fn, delay, ...args);
+      };
+      try {
+        game.execute("jump beorn");
+        game.execute("south west");
+        game.execute("map");
+        game.execute("east");
+        const animation = game.sceneMapTravelAnimation || {};
+        game.print(`Map entry animation active: ${animation.active === true ? "yes" : "no"}`);
+        game.print(`Map entry animation holds world scope first: ${title.textContent === "Explored Map" ? "yes" : "no"}`);
+        game.print(`Map entry animation plans local drilldown: ${animation.finalScope === "beorn" ? "yes" : "no"}`);
+        while (delayedTimers.length) {
+          const finishAnimation = delayedTimers.shift();
+          if (typeof finishAnimation === "function") finishAnimation();
+        }
+        game.print(`Map opens local scope after animation: ${title.textContent === "Beorn's House" ? "yes" : "no"}`);
+      } finally {
+        global.setTimeout = originalSetTimeout;
+      }
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "Map entry animation active: yes",
+      "Map entry animation holds world scope first: yes",
+      "Map entry animation plans local drilldown: yes",
+      "Map opens local scope after animation: yes",
+    ],
+  },
+  {
+    name: "map keeps scroll steady when destination stays visible",
+    drive(game) {
+      const scroll = document.getElementById("scene-map-scroll");
+      const originalSetTimeout = global.setTimeout;
+      global.setTimeout = (fn, delay = 0, ...args) => (Number(delay) > 100
+        ? 1
+        : originalSetTimeout(fn, delay, ...args));
+      try {
+        game.execute("jump beorn");
+        game.execute("south west");
+        game.execute("map");
+        game.sceneMapZoom = 1;
+        game.layout.renderSceneMap();
+        const beforeLeft = Number(scroll.scrollLeft) || 0;
+        const beforeTop = Number(scroll.scrollTop) || 0;
+        game.execute("east");
+        game.print(`Map keeps horizontal scroll for visible destination: ${Number(scroll.scrollLeft) === beforeLeft ? "yes" : "no"}`);
+        game.print(`Map keeps vertical scroll for visible destination: ${Number(scroll.scrollTop) === beforeTop ? "yes" : "no"}`);
+      } finally {
+        global.setTimeout = originalSetTimeout;
+      }
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "Map keeps horizontal scroll for visible destination: yes",
+      "Map keeps vertical scroll for visible destination: yes",
+    ],
+  },
+  {
+    name: "map nudges scroll when destination falls outside viewport",
+    drive(game) {
+      const title = document.getElementById("scene-map-title");
+      const scroll = document.getElementById("scene-map-scroll");
+      const originalSetTimeout = global.setTimeout;
+      global.setTimeout = (fn, delay = 0, ...args) => (Number(delay) > 100
+        ? 1
+        : originalSetTimeout(fn, delay, ...args));
+      try {
+        game.execute("jump beorn");
+        game.execute("south west");
+        game.execute("map");
+        game.sceneMapZoom = 1;
+        game.layout.renderSceneMap();
+        const state = game.sceneMapRenderCache?.state;
+        const currentX = Number(state?.editorMeta?.nodeCenters?.["room:narrow_dangerous_path"]?.x) || 0;
+        const targetX = Number(state?.editorMeta?.nodeCenters?.["region:beorn"]?.x) || 0;
+        const viewportWidth = Number(scroll.clientWidth) || 800;
+        const beforeLeft = Math.max(0, Math.round(currentX - viewportWidth + 60));
+        scroll.scrollLeft = beforeLeft;
+        const fullCenterLeft = Math.max(0, Math.round(targetX - (viewportWidth / 2)));
+        game.execute("east");
+        const afterLeft = Number(scroll.scrollLeft) || 0;
+        game.print(`Map keeps shared scope during offscreen move: ${title.textContent === "Explored Map" ? "yes" : "no"}`);
+        game.print(`Map scroll shifts when destination is outside viewport: ${afterLeft > beforeLeft ? "yes" : "no"}`);
+        game.print(`Map scroll shift is gentler than full recenter: ${afterLeft < fullCenterLeft ? "yes" : "no"}`);
+      } finally {
+        global.setTimeout = originalSetTimeout;
+      }
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "Map keeps shared scope during offscreen move: yes",
+      "Map scroll shifts when destination is outside viewport: yes",
+      "Map scroll shift is gentler than full recenter: yes",
+    ],
+  },
+  {
+    name: "map rescues current location when restored viewport leaves it offscreen",
+    drive(game) {
+      const scroll = document.getElementById("scene-map-scroll");
+      game.execute("jump beorn");
+      game.execute("south west");
+      game.execute("map");
+      game.sceneMapZoom = 1;
+      game.layout.renderSceneMap();
+      game.sceneMapViewportAnchor = {
+        scope: game.sceneMapScope || "world",
+        mapX: 0,
+        mapY: 0,
+        offsetX: 0,
+        offsetY: 0,
+      };
+      scroll.scrollLeft = 0;
+      scroll.scrollTop = 0;
+      game.layout.renderSceneMap();
+      game.print(`Map rescues horizontal visibility after stale viewport restore: ${Number(scroll.scrollLeft) > 0 ? "yes" : "no"}`);
+      game.print(`Map rescues vertical visibility after stale viewport restore: ${Number(scroll.scrollTop) > 0 ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "Map rescues horizontal visibility after stale viewport restore: yes",
+      "Map rescues vertical visibility after stale viewport restore: yes",
     ],
   },
   {

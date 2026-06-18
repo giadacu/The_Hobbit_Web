@@ -18,6 +18,9 @@
   const MIN_SCENE_MAP_ZOOM = 0.4;
   const MAX_SCENE_MAP_ZOOM = 1;
   const SCENE_MAP_ZOOM_STEP = 0.1;
+  const SCENE_MAP_CURRENT_INDICATOR_PADDING = 9;
+  const SCENE_MAP_CURRENT_INDICATOR_ANIMATION_MS = 420;
+  const SCENE_MAP_ROOM_VISIBILITY_PADDING = 84;
   const MAP_CONNECTOR_SIDE_OPTIONS = new Set(["auto", "north", "east", "south", "west", "north east", "north west", "south east", "south west"]);
 
   const $ = (id) => document.getElementById(id);
@@ -5590,6 +5593,7 @@
       const game = this.game;
       if (!sceneMapOverlay || !sceneMapCanvas) return;
       if (!game.sceneMapVisible) {
+        this.clearSceneMapCurrentIndicatorAnimation();
         sceneMapOverlay.setAttribute("hidden", "hidden");
         if (sceneMapBack) sceneMapBack.hidden = true;
         sceneMapCanvas.textContent = "";
@@ -5600,11 +5604,12 @@
         return;
       }
       const manualScope = Boolean(game.sceneMapManualScope);
+      const pendingTravelScope = !manualScope ? (game.sceneMapTravelAnimation?.holdScope || "") : "";
       const resolvedScope = manualScope
         ? (game.sceneMapScope || "world")
-        : reconcileSceneMapScopeForCurrentRoom(game.sceneMapScope || "world", game.currentRoom, {
+        : (pendingTravelScope || reconcileSceneMapScopeForCurrentRoom(game.sceneMapScope || "world", game.currentRoom, {
             follow: game.sceneMapAutoFollow !== false,
-          });
+          }));
       if (resolvedScope !== (game.sceneMapScope || "world")) {
         game.sceneMapScope = resolvedScope;
         game.sceneMapViewportAnchor = null;
@@ -5639,13 +5644,21 @@
       }
       const mapState = scaleSceneMapState(baseMapState, game.sceneMapZoom || DEFAULT_SCENE_MAP_ZOOM);
       this.applySceneMapZoomPresentation(mapState);
+      this.syncSceneMapCurrentIndicator(baseMapState);
       if (sceneMapTitle) sceneMapTitle.textContent = baseMapState.title || "Explored Map";
       if (sceneMapSubtitle) sceneMapSubtitle.textContent = baseMapState.subtitle || "";
       if (sceneMapBack) sceneMapBack.hidden = false;
       if (sceneMapZoomReset) sceneMapZoomReset.textContent = `${Math.round((game.sceneMapZoom || DEFAULT_SCENE_MAP_ZOOM) * 100)}%`;
       sceneMapOverlay.removeAttribute("hidden");
-      if (!this.restoreSceneMapViewport(mapState)) this.centerSceneMapOnRoom(mapState);
-      game.sceneMapViewportAnchor = null;
+      const restoredViewport = this.restoreSceneMapViewport(mapState);
+      if (!restoredViewport) {
+        if (game.sceneMapViewportMode === "travel") this.ensureSceneMapRoomVisible(mapState);
+        else this.centerSceneMapOnRoom(mapState);
+      }
+      if (!manualScope || game.sceneMapViewportMode === "travel") this.ensureSceneMapRoomVisible(mapState);
+      game.sceneMapViewportMode = null;
+      if (game.sceneMapTravelAnimation) this.captureSceneMapViewportAnchor();
+      else game.sceneMapViewportAnchor = null;
     }
 
 
@@ -5656,6 +5669,142 @@
       sceneMapCanvas.style.setProperty("--scene-map-base-width", `${mapState.baseWidth || mapState.width}px`);
       sceneMapCanvas.style.setProperty("--scene-map-base-height", `${mapState.baseHeight || mapState.height}px`);
       sceneMapCanvas.style.setProperty("--scene-map-scale", String(mapState.zoom || 1));
+    }
+
+    getSceneMapCurrentIndicator() {
+      return sceneMapCanvas?.querySelector?.(".scene-map-current-indicator") || null;
+    }
+
+    clearSceneMapCurrentIndicatorAnimation(options = {}) {
+      const { keepState = false } = options;
+      if (this.game.sceneMapCurrentIndicatorFrame) {
+        if (typeof window.cancelAnimationFrame === "function") window.cancelAnimationFrame(this.game.sceneMapCurrentIndicatorFrame);
+        else clearTimeout(this.game.sceneMapCurrentIndicatorFrame);
+      }
+      if (this.game.sceneMapCurrentIndicatorTimer) clearTimeout(this.game.sceneMapCurrentIndicatorTimer);
+      this.game.sceneMapCurrentIndicatorFrame = null;
+      this.game.sceneMapCurrentIndicatorTimer = null;
+      const indicator = this.getSceneMapCurrentIndicator();
+      indicator?.classList?.remove("is-animating");
+      indicator?.removeAttribute?.("data-animating");
+      if (!keepState) this.game.sceneMapTravelAnimation = null;
+    }
+
+    sceneMapIndicatorBoxForRoom(mapState = null, roomId = "") {
+      if (!mapState?.editorMeta) return null;
+      const scope = mapState.scope || this.game.sceneMapScope || "world";
+      const descriptor = roomId
+        ? mapScopeNodeDescriptorForRoom(this.game, scope, roomId)
+        : null;
+      const nodeId = descriptor?.id || mapState.editorMeta.currentNodeId || "";
+      if (!nodeId) return null;
+      const center = mapState.editorMeta.nodeCenters?.[nodeId];
+      if (!center) return null;
+      const boxSize = Number(mapState.editorMeta.boxSize) || 96;
+      const outerSize = boxSize + (SCENE_MAP_CURRENT_INDICATOR_PADDING * 2);
+      return {
+        nodeId,
+        left: center.x - (outerSize / 2),
+        top: center.y - (outerSize / 2),
+        width: outerSize,
+        height: outerSize,
+      };
+    }
+
+    placeSceneMapCurrentIndicator(indicator, box) {
+      if (!indicator || !box) return false;
+      indicator.hidden = false;
+      indicator.style.left = `${box.left}px`;
+      indicator.style.top = `${box.top}px`;
+      indicator.style.width = `${box.width}px`;
+      indicator.style.height = `${box.height}px`;
+      return true;
+    }
+
+    syncSceneMapCurrentIndicator(mapState = null) {
+      const indicator = this.getSceneMapCurrentIndicator();
+      const targetBox = this.sceneMapIndicatorBoxForRoom(mapState, this.game.currentRoom);
+      if (!targetBox) {
+        this.clearSceneMapCurrentIndicatorAnimation();
+        if (indicator) indicator.hidden = true;
+        return;
+      }
+
+      const pendingAnimation = this.game.sceneMapTravelAnimation;
+      const fromBox = pendingAnimation?.fromRoom
+        ? this.sceneMapIndicatorBoxForRoom(mapState, pendingAnimation.fromRoom)
+        : null;
+      const shouldAnimate = Boolean(
+        pendingAnimation
+        && pendingAnimation.toRoom === this.game.currentRoom
+        && fromBox
+        && fromBox.nodeId !== targetBox.nodeId
+      );
+
+      this.clearSceneMapCurrentIndicatorAnimation({ keepState: shouldAnimate });
+
+      if (!indicator) {
+        this.game.sceneMapTravelAnimation = shouldAnimate
+          ? {
+              ...pendingAnimation,
+              active: true,
+              scope: mapState?.scope || this.game.sceneMapScope || "world",
+              fromNodeId: fromBox.nodeId,
+              toNodeId: targetBox.nodeId,
+            }
+          : null;
+        return;
+      }
+
+      indicator.setAttribute("data-room-id", this.game.currentRoom || "");
+      indicator.setAttribute("data-node-id", targetBox.nodeId);
+
+      if (!shouldAnimate) {
+        this.placeSceneMapCurrentIndicator(indicator, targetBox);
+        this.game.sceneMapTravelAnimation = null;
+        return;
+      }
+
+      this.game.sceneMapTravelAnimation = {
+        ...pendingAnimation,
+        active: true,
+        scope: mapState?.scope || this.game.sceneMapScope || "world",
+        fromNodeId: fromBox.nodeId,
+        toNodeId: targetBox.nodeId,
+      };
+      this.placeSceneMapCurrentIndicator(indicator, fromBox);
+      indicator.setAttribute("data-animating", "true");
+      indicator.classList?.add("is-animating");
+      const runAnimation = () => this.placeSceneMapCurrentIndicator(indicator, targetBox);
+      if (typeof window.requestAnimationFrame === "function") {
+        this.game.sceneMapCurrentIndicatorFrame = window.requestAnimationFrame(runAnimation);
+      } else {
+        this.game.sceneMapCurrentIndicatorFrame = setTimeout(runAnimation, 16);
+      }
+      this.game.sceneMapCurrentIndicatorTimer = setTimeout(() => {
+        const finalScope = pendingAnimation?.finalScope || "";
+        const shouldSwapScope = Boolean(
+          pendingAnimation?.pendingScopeSwap
+          && this.game.sceneMapVisible
+          && !this.game.sceneMapManualScope
+          && this.game.sceneMapAutoFollow !== false
+          && finalScope
+          && finalScope !== (this.game.sceneMapScope || "world")
+        );
+        indicator.classList?.remove("is-animating");
+        indicator.removeAttribute?.("data-animating");
+        this.placeSceneMapCurrentIndicator(indicator, targetBox);
+        this.game.sceneMapCurrentIndicatorFrame = null;
+        this.game.sceneMapCurrentIndicatorTimer = null;
+        this.game.sceneMapTravelAnimation = null;
+        if (shouldSwapScope) {
+          this.game.sceneMapScope = finalScope;
+          this.game.sceneMapViewportAnchor = null;
+          this.game.sceneMapViewportMode = "travel";
+          this.game.sceneMapRenderCache = null;
+          this.renderSceneMap();
+        }
+      }, SCENE_MAP_CURRENT_INDICATOR_ANIMATION_MS + 40);
     }
 
     centerSceneMapOnRoom(mapState = null) {
@@ -5671,6 +5820,39 @@
       const targetTop = Math.max(0, target.y - (viewportHeight / 2));
       sceneMapScroll.scrollLeft = targetLeft;
       sceneMapScroll.scrollTop = targetTop;
+    }
+
+    ensureSceneMapRoomVisible(mapState = null) {
+      if (!sceneMapScroll) return false;
+      const target = (this.game.sceneMapShowAll && (this.game.sceneMapScope || "world") === "world")
+        ? (mapState?.defaultCenter || mapState?.currentRoomCenter || null)
+        : (mapState?.currentRoomCenter || mapState?.defaultCenter || null);
+      if (!target) return false;
+      const viewportWidth = Number(sceneMapScroll.clientWidth) || 0;
+      const viewportHeight = Number(sceneMapScroll.clientHeight) || 0;
+      if (!viewportWidth || !viewportHeight) return false;
+
+      const maxScrollLeft = Math.max(0, (Number(mapState?.width) || 0) - viewportWidth);
+      const maxScrollTop = Math.max(0, (Number(mapState?.height) || 0) - viewportHeight);
+      const currentLeft = Math.max(0, Math.min(Number(sceneMapScroll.scrollLeft) || 0, maxScrollLeft));
+      const currentTop = Math.max(0, Math.min(Number(sceneMapScroll.scrollTop) || 0, maxScrollTop));
+      const marginX = Math.max(36, Math.min(SCENE_MAP_ROOM_VISIBILITY_PADDING, Math.floor(viewportWidth * 0.2)));
+      const marginY = Math.max(36, Math.min(SCENE_MAP_ROOM_VISIBILITY_PADDING, Math.floor(viewportHeight * 0.2)));
+      const visibleLeft = currentLeft;
+      const visibleRight = currentLeft + viewportWidth;
+      const visibleTop = currentTop;
+      const visibleBottom = currentTop + viewportHeight;
+
+      let targetLeft = currentLeft;
+      let targetTop = currentTop;
+      if (target.x < visibleLeft) targetLeft = Math.max(0, Math.round(target.x - marginX));
+      else if (target.x > visibleRight) targetLeft = Math.min(maxScrollLeft, Math.round(target.x + marginX - viewportWidth));
+      if (target.y < visibleTop) targetTop = Math.max(0, Math.round(target.y - marginY));
+      else if (target.y > visibleBottom) targetTop = Math.min(maxScrollTop, Math.round(target.y + marginY - viewportHeight));
+
+      sceneMapScroll.scrollLeft = targetLeft;
+      sceneMapScroll.scrollTop = targetTop;
+      return targetLeft !== currentLeft || targetTop !== currentTop;
     }
 
     restoreSceneMapViewport(mapState = null) {
@@ -5719,6 +5901,7 @@
 
     closeSceneMap() {
       if (!this.game.sceneMapVisible) return false;
+      this.clearSceneMapCurrentIndicatorAnimation();
       this.game.sceneMapVisible = false;
       this.game.sceneMapScope = "world";
       this.game.sceneMapAutoFollow = true;
@@ -5726,6 +5909,7 @@
       this.game.sceneMapShowAll = false;
       this.game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       this.game.sceneMapViewportAnchor = null;
+      this.game.sceneMapViewportMode = null;
       this.game.sceneMapRenderCache = null;
       this.render();
       return true;
@@ -5734,8 +5918,10 @@
     sceneMapBack() {
       if (!this.game.sceneMapVisible) return false;
       if (this.game.sceneMapScope === "world") return this.closeSceneMap();
+      this.clearSceneMapCurrentIndicatorAnimation();
       const parentScope = this.game.sceneMapRenderCache?.state?.parentScope || "world";
       this.game.sceneMapViewportAnchor = null;
+      this.game.sceneMapViewportMode = null;
       this.game.sceneMapScope = parentScope || "world";
       this.game.sceneMapAutoFollow = false;
       this.game.sceneMapManualScope = true;
@@ -5764,7 +5950,9 @@
     openSceneMapScope(scope = "world") {
       const normalized = String(scope || "world").trim() || "world";
       if (normalized !== "world" && !MAP_REGION_DEFINITIONS[normalized]) return false;
+      this.clearSceneMapCurrentIndicatorAnimation();
       this.game.sceneMapViewportAnchor = null;
+      this.game.sceneMapViewportMode = null;
       this.game.sceneMapScope = normalized;
       this.game.sceneMapAutoFollow = false;
       this.game.sceneMapManualScope = true;
@@ -6519,7 +6707,11 @@
       game.sceneMapShowAll = false;
       game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       game.sceneMapViewportAnchor = null;
+      game.sceneMapViewportMode = null;
       game.sceneMapRenderCache = null;
+      game.sceneMapTravelAnimation = null;
+      game.sceneMapCurrentIndicatorFrame = null;
+      game.sceneMapCurrentIndicatorTimer = null;
       game.spiderEyesState = save.spiderEyesState || null;
       game.gollumState = game.restoreGollumState(save.gollumState);
       game.turnCount = Number(save.turnCount) || 0;
@@ -8093,7 +8285,11 @@
       game.sceneMapShowAll = false;
       game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       game.sceneMapViewportAnchor = null;
+      game.sceneMapViewportMode = null;
       game.sceneMapRenderCache = null;
+      game.sceneMapTravelAnimation = null;
+      game.sceneMapCurrentIndicatorFrame = null;
+      game.sceneMapCurrentIndicatorTimer = null;
       game.visitedRooms = new Set();
       game.tipsEnabled = false;
       game.tipIndex = 0;
@@ -8367,6 +8563,7 @@
       game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       game.sceneMapVisible = true;
       game.sceneMapViewportAnchor = null;
+      game.sceneMapViewportMode = null;
       game.sceneMapRenderCache = null;
       game.print("You study the paths already traced across Wilderland.");
       game.render();
@@ -8385,6 +8582,7 @@
       game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       game.sceneMapVisible = true;
       game.sceneMapViewportAnchor = null;
+      game.sceneMapViewportMode = null;
       game.sceneMapRenderCache = null;
       game.print("You unfurl a complete test map of Wilderland, with every known place marked upon it.");
       game.render();
@@ -8936,7 +9134,11 @@
       this.sceneMapShowAll = false;
       this.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       this.sceneMapViewportAnchor = null;
+      this.sceneMapViewportMode = null;
       this.sceneMapRenderCache = null;
+      this.sceneMapTravelAnimation = null;
+      this.sceneMapCurrentIndicatorFrame = null;
+      this.sceneMapCurrentIndicatorTimer = null;
       this.visitedRooms = new Set();
       this.tipsEnabled = false;
       this.tipIndex = 0;
@@ -10047,7 +10249,11 @@
       this.sceneMapShowAll = false;
       this.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       this.sceneMapViewportAnchor = null;
+      this.sceneMapViewportMode = null;
       this.sceneMapRenderCache = null;
+      this.sceneMapTravelAnimation = null;
+      this.sceneMapCurrentIndicatorFrame = null;
+      this.sceneMapCurrentIndicatorTimer = null;
       this.render();
       return true;
     }
@@ -12293,6 +12499,13 @@
       );
       const previousRoom = this.currentRoom;
       const movedInTotalDarkness = this.roomIsDark(previousRoom);
+      if (this.sceneMapVisible && previousRoom !== connection.to) {
+        this.sceneMapTravelAnimation = buildSceneMapTravelAnimationPlan(previousRoom, connection.to);
+        this.sceneMapViewportMode = "travel";
+      } else {
+        this.sceneMapTravelAnimation = null;
+        this.sceneMapViewportMode = null;
+      }
       this.currentRoom = connection.to;
       this.player.position = connection.to;
       if (this.sceneMapVisible) {
@@ -15182,10 +15395,16 @@
       model.pinnedPositions || {},
     );
 
-    return renderExplorationMapSvg(model, positions, {
+    const rendered = renderExplorationMapSvg(model, positions, {
       worldScope: scope === "world",
       connectorOverrides: effectiveMapConnectorOverridesForScope(scope),
     });
+    return rendered
+      ? {
+          ...rendered,
+          scope,
+        }
+      : null;
   }
 
   function buildSceneMapCacheKey(game, scope = "world") {
@@ -15237,6 +15456,7 @@
       .join("");
     return `<div class="scene-map-stage" style="width:${mapState.baseWidth}px;height:${mapState.baseHeight}px;">
       <img class="scene-map-render" src="${mapState.imageSrc}" alt="${escapeXml(mapState.accessibleLabel || mapState.title || "Explored map")}">
+      <div class="scene-map-current-indicator" aria-hidden="true" hidden></div>
       <div class="scene-map-hotspots">${hotspotMarkup}</div>
       <div class="scene-map-editor-layer" hidden></div>
     </div>`;
@@ -15404,6 +15624,31 @@
     if (!deepestRoomRegion) return "world";
     if (isMapRegionWithinScope(deepestRoomRegion, normalizedScope)) return normalizedScope;
     return commonMapScope(deepestRoomRegion, normalizedScope);
+  }
+
+  function buildSceneMapTravelAnimationPlan(fromRoom = "", toRoom = "") {
+    if (!fromRoom || !toRoom || fromRoom === toRoom) return null;
+    const fromRegion = ROOM_TO_MAP_REGION[fromRoom] || "";
+    const toRegion = ROOM_TO_MAP_REGION[toRoom] || "";
+    const finalScope = toRegion || "world";
+    let holdScope = finalScope;
+
+    if (!fromRegion && !toRegion) {
+      holdScope = "world";
+    } else if (fromRegion && toRegion) {
+      holdScope = fromRegion === toRegion ? fromRegion : commonMapScope(fromRegion, toRegion);
+    } else {
+      holdScope = "world";
+    }
+
+    return {
+      fromRoom,
+      toRoom,
+      active: false,
+      holdScope,
+      finalScope,
+      pendingScopeSwap: holdScope !== finalScope,
+    };
   }
 
   function mapNodeExitMarkerGeometry(direction = "", point = {}, boxSize = 96) {

@@ -600,6 +600,32 @@ body.is-resizing-layout * {
   pointer-events: none;
 }
 
+.scene-map-current-indicator {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  box-sizing: border-box;
+  border: 5px solid #d4a64a;
+  border-radius: 15px;
+  box-shadow:
+    0 0 0 1px rgba(108, 77, 24, 0.16) inset,
+    0 0 18px rgba(212, 166, 74, 0.18);
+  pointer-events: none;
+}
+
+.scene-map-current-indicator.is-animating {
+  transition:
+    left 420ms cubic-bezier(0.24, 0.84, 0.24, 1),
+    top 420ms cubic-bezier(0.24, 0.84, 0.24, 1),
+    width 420ms cubic-bezier(0.24, 0.84, 0.24, 1),
+    height 420ms cubic-bezier(0.24, 0.84, 0.24, 1),
+    box-shadow 240ms ease;
+  box-shadow:
+    0 0 0 1px rgba(108, 77, 24, 0.2) inset,
+    0 0 24px rgba(212, 166, 74, 0.34);
+}
+
 .scene-map-hotspots {
   position: absolute;
   inset: 0;

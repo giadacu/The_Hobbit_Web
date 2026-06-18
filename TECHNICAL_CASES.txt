@@ -257,3 +257,183 @@ Future debugging advice
   the model-building step first, not only the SVG rendering step.
 - Keep unexplored internal exits (`exitStubs`) separate from parent-scope
   exits with known destinations, because they serve different UI purposes.
+
+
+Case 005 - 2026-06-18 - Map mode needed a moving current-cell frame during travel
+----------------------------------------------------------------------------------
+
+Symptom
+-------
+With the explored map open, changing location immediately snapped the current
+highlight to the new cell. There was no sense of the selection frame travelling
+from the old room to the new one.
+
+Root cause
+----------
+The current-room frame was baked directly into the generated SVG. Because the
+map is rendered as a data-URL image, that static highlight could only jump when
+the SVG was rebuilt for the new room.
+
+Resolution
+----------
+The fix moved the current-room frame out of the SVG and into a DOM overlay.
+
+1. Added a `.scene-map-current-indicator` element inside the map stage.
+2. Stored a pending map-travel animation whenever the player moves while the
+   scene map is visible.
+3. Reused `editorMeta.nodeCenters` to resolve both the old and new node boxes
+   in the freshly rendered scope.
+4. Animated the overlay frame from the previous node to the new node when both
+   rooms are visible in the same rendered map; otherwise it safely falls back
+   to an immediate placement.
+5. Cleared animation timers/state whenever the map closes, changes scope, or
+   other UI flows reset the map.
+
+Files touched
+-------------
+- game.js
+- style.css
+- scripts/parser-tests.js
+
+Future debugging advice
+-----------------------
+- If a map movement animation fails only on some routes, check whether both the
+  source room and destination room resolve to visible nodes in the same scope.
+- For map UI effects layered over the SVG, prefer DOM overlays fed by
+  `editorMeta` coordinates instead of re-encoding the SVG on every frame.
+
+
+Case 006 - 2026-06-18 - Entry into a local-map region skipped the travel animation
+-----------------------------------------------------------------------------------
+
+Symptom
+-------
+When the player moved into a location that owns its own local map, the scene
+map immediately drilled down into that local map. The current-location frame
+did not have time to animate across the shared parent map first.
+
+Root cause
+----------
+Auto-follow resolved the destination scope immediately from the new room.
+That meant moves such as world -> Beorn's House rebuilt the map straight into
+`beorn`, so the source node only existed on the old world map and the target
+only existed on the new local map. There was no common rendered scope for the
+frame animation.
+
+Resolution
+----------
+The fix introduced a two-step travel plan for map-follow transitions.
+
+1. On movement with the map open, the game now stores:
+   - `holdScope`: the shared scope where both endpoints can be represented
+   - `finalScope`: the destination scope after the animation
+   - whether a scope swap is pending after the animation
+
+2. While the animation is active, scene-map rendering prefers `holdScope`
+   instead of immediately auto-following into the destination local map.
+
+3. When the frame animation completes, the map automatically re-renders into
+   `finalScope`, so the drilldown happens only after the motion is visible.
+
+4. Parser-test DOM stubs were updated with a minimal `querySelector()` for the
+   current-frame overlay, allowing the delayed drilldown behavior to be tested.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+
+Future debugging advice
+-----------------------
+- If a move crosses map boundaries, compute an intermediate shared scope first;
+  otherwise animated markers will appear to teleport.
+- In DOM-light test harnesses, map overlays that are inserted via `innerHTML`
+  may need lightweight query helpers or the animation path will not execute.
+
+
+Case 007 - 2026-06-18 - Keyboard travel kept force-centering the map viewport
+------------------------------------------------------------------------------
+
+Symptom
+-------
+With the map open, moving by commands such as `n`, `e`, and similar always
+recentered the scroll viewport on the new location. This made the map feel
+jumpy even when the destination was already visible.
+
+Root cause
+----------
+After each movement render, the scene map fell back to `centerSceneMapOnRoom()`
+whenever no explicit viewport anchor was present. That was correct for first
+opening the map, but wrong for movement updates where the existing scroll
+context should be preserved.
+
+There was also a second render during animated travel. Without preserving the
+viewport between those renders, a minimal visibility adjustment could still be
+overwritten by a later full recenter.
+
+Resolution
+----------
+The fix introduced a movement-specific viewport mode.
+
+1. Command travel now marks the next map render as `travel` mode.
+2. In `travel` mode, the map checks whether the destination node is already
+   inside the current viewport.
+3. If the destination is visible, the scroll position is left unchanged.
+4. If it is outside the viewport, the map scrolls only enough to bring it back
+   into view with a small margin, instead of fully centering it.
+5. While a travel animation is active, the current viewport is captured and
+   restored across follow-up renders so the gentle adjustment is not replaced
+   by a second full recenter.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+
+Future debugging advice
+-----------------------
+- Keep “initial open” viewport behavior separate from “movement follow” viewport
+  behavior; they need different heuristics.
+- If a scroll tweak seems to work and then disappears, look for a second render
+  in the same interaction rather than only the first viewport calculation.
+
+
+Case 008 - 2026-06-18 - Restored map viewport could still leave the current room offscreen
+-------------------------------------------------------------------------------------------
+
+Symptom
+-------
+In some already-rendered map states, the current location could still end up
+outside the visible viewport. The map image was present, but the player had to
+drag the scrollbars manually before the active location became visible.
+
+Root cause
+----------
+Viewport restoration and centering were treated as the final layout step.
+If a stale viewport anchor restored the scroll position to an area that no
+longer contained the current room, the render completed without any final
+sanity check that the tracked location was actually visible on screen.
+
+Resolution
+----------
+Added a final visibility safety pass after map positioning.
+
+1. After restoring or choosing the viewport, auto-follow renders now run
+   `ensureSceneMapRoomVisible()` as a final guard.
+2. If the current room is already visible, nothing moves.
+3. If it is offscreen, the map nudges the viewport just enough to bring it
+   back into view.
+4. Added a regression test that forces a stale viewport anchor and confirms
+   the map rescues the current location without manual scrolling.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+
+Future debugging advice
+-----------------------
+- For scrollable map UIs, restoration and centering are not enough on their
+  own; add a final “is the tracked target actually visible?” check.
+- If users report “the map is there but the place I am in is missing”, inspect
+  stale viewport anchors before inspecting the SVG or node placement logic.
