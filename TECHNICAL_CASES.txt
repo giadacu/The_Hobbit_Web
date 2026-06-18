@@ -566,3 +566,87 @@ Future debugging advice
 - If a scope transition seems to ignore its anchor, check both:
   - whether the target scope has any actual scrollable range
   - whether an old anchor from another scope is blocking replacement
+
+
+Case 012 - 2026-06-18 - Local in-game maps could collapse around visited rooms instead of keeping editor geometry
+--------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Some local maps in the game, including Misty Mountains, did not match the map
+editor. The editor showed the correct full local layout footprint, but the
+in-game map collapsed around only the visited rooms. That changed the apparent
+shape and proportions of the local map compared with the editor reference.
+
+Root cause
+----------
+The in-game local-map builder used `visitedRooms` both to decide which local
+rooms to render and to derive the effective local-map footprint. The editor,
+instead, always used the full scope layout from `assets/map-layout-data.js` as
+the positioning reference.
+
+There was also a child-portal mismatch:
+- the editor always attached inline child-region portals to the host node
+- the game only added those portals after at least one child room was visited
+
+Resolution
+----------
+Aligned the game local-map model with the editor behavior while preserving
+exploration fog.
+
+1. Local maps still render only visited rooms and their reachable metadata.
+2. The renderer now derives local-map bounds from the full scope layout, so
+   the visible subset sits in the same geometry and scale used by the editor.
+3. Inline child-region portals now appear whenever the parent scope defines
+   them, matching the editor.
+4. Added a regression test for Misty Mountains that verifies:
+   - unvisited rooms stay hidden
+   - the local map still keeps the full editor-sized footprint
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+
+Future debugging advice
+-----------------------
+- When the editor and game disagree on a local map, first compare the room set
+  that each model builder includes before debugging connector geometry.
+- Treat the editor layout as the source of truth for local scope membership and
+  nested portals unless exploration-based pruning is an explicit design choice.
+
+
+Case 013 - 2026-06-18 - Local-map connector waypoints used editor coordinates without game-space remapping
+------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After restoring the correct full local-map footprint, node boxes matched the
+editor much better, but some local-map connectors still had the wrong final
+shape in the game. Their bends and jogs did not line up with the editor.
+
+Root cause
+----------
+Connector waypoint overrides stored in `assets/map-layout-data.js` are authored
+in the editor's SVG coordinate space. The game renderer was applying those
+waypoints directly inside a different local-map canvas metric, so the final
+connector path drifted even when node placement was otherwise close.
+
+Resolution
+----------
+1. Added a local-map waypoint transform in the game renderer.
+2. When a local connector uses explicit waypoints, the points are remapped from
+   editor-space coordinates into the current in-game local-map canvas.
+3. The transform keeps the current game canvas sizing while preserving the
+   final connector shape authored in the editor.
+
+Files touched
+-------------
+- game.js
+
+Future debugging advice
+-----------------------
+- If node positions look right but connector bends do not, inspect the
+  coordinate system used by saved waypoints before changing routing logic.
+- Saved layout overrides can only be shared between tools if both sides agree
+  on how SVG pixel coordinates are transformed.

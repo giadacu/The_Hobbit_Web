@@ -3598,6 +3598,31 @@ const gameCases = [
     ],
   },
   {
+    name: "misty mountains local map keeps full layout bounds while hiding unvisited rooms",
+    setup(game) {
+      movePlayerTo(game, "misty_mountain");
+    },
+    drive(game) {
+      const image = document.getElementById("scene-map-image");
+      game.execute("map");
+      const localMapImage = decodeURIComponent(image.getAttribute("src") || "");
+      const state = game.sceneMapRenderCache?.state || null;
+      game.print(`Misty Mountains map hides Narrow Ledge before visit: ${localMapImage.includes("Narrow Ledge") ? "no" : "yes"}`);
+      game.print(`Misty Mountains map hides Storm Shelter before visit: ${localMapImage.includes("Storm Shelter") ? "no" : "yes"}`);
+      game.print(`Misty Mountains map keeps full-width layout bounds: ${(Number(state?.baseWidth) || 0) > 1500 ? "yes" : "no"}`);
+      game.print(`Misty Mountains map keeps full-height layout bounds: ${(Number(state?.baseHeight) || 0) > 1200 ? "yes" : "no"}`);
+      game.print(`Misty Mountains current node stays left of layout center: ${Number(state?.currentRoomCenterBase?.x) < ((Number(state?.baseWidth) || 0) * 0.45) ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "Misty Mountains map hides Narrow Ledge before visit: yes",
+      "Misty Mountains map hides Storm Shelter before visit: yes",
+      "Misty Mountains map keeps full-width layout bounds: yes",
+      "Misty Mountains map keeps full-height layout bounds: yes",
+      "Misty Mountains current node stays left of layout center: yes",
+    ],
+  },
+  {
     name: "map rises back to world scope when the room leaves the local region",
     drive(game) {
       const title = document.getElementById("scene-map-title");

@@ -23,6 +23,10 @@
   const SCENE_MAP_ROOM_VISIBILITY_PADDING = 84;
   const SCENE_MAP_SCOPE_TRANSITION_PAN_MS = 320;
   const MAP_CONNECTOR_SIDE_OPTIONS = new Set(["auto", "north", "east", "south", "west", "north east", "north west", "south east", "south west"]);
+  const MAP_EDITOR_BOX_WIDTH = 112;
+  const MAP_EDITOR_BOX_HEIGHT = 106;
+  const MAP_EDITOR_UNIT = 168;
+  const MAP_EDITOR_PADDING = 120;
 
   const $ = (id) => document.getElementById(id);
   const output = $("output");
@@ -16048,9 +16052,10 @@
       .filter(([_regionId, candidate]) => candidate.parentScope === scope);
     const previewRoomSet = new Set(region.previewRooms || []);
     const childRoomIds = new Set(childRegions.flatMap(([_regionId, candidate]) => candidate.rooms || []));
-    const visitedRegionRooms = region.rooms
-      .filter((roomId) => visitedRooms.includes(roomId) && (!childRoomIds.has(roomId) || previewRoomSet.has(roomId)))
+    const layoutRegionRooms = region.rooms
+      .filter((roomId) => !childRoomIds.has(roomId) || previewRoomSet.has(roomId))
       .sort((left, right) => (roomOrder.get(left) ?? 0) - (roomOrder.get(right) ?? 0));
+    const visitedRegionRooms = layoutRegionRooms.filter((roomId) => visitedRooms.includes(roomId));
     if (!visitedRegionRooms.length) return null;
 
     const nodes = visitedRegionRooms.map((roomId) => ({
@@ -16063,8 +16068,7 @@
 
     for (const [childRegionId, childRegion] of childRegions) {
       const hostNode = nodeMap.get(childRegion.hostRoomId || "");
-      const visibleChildRooms = (childRegion.rooms || []).filter((roomId) => visitedRooms.includes(roomId));
-      if (!hostNode || !visibleChildRooms.length) continue;
+      if (!hostNode) continue;
       hostNode.inlinePortal = {
         openRegion: childRegionId,
         label: childRegion.label,
@@ -16072,13 +16076,14 @@
       };
     }
 
-    const edges = buildMapEdges(game, new Set(visitedRegionRooms), {
+    const visitedRegionRoomSet = new Set(visitedRegionRooms);
+    const edges = buildMapEdges(game, visitedRegionRoomSet, {
       mapRoom: (roomId) => `room:${roomId}`,
       allowedNodeIds: new Set(nodes.map((node) => node.id)),
     });
     const externalExits = buildMapExternalExits(game, nodes, scope);
     const externalStubKeys = new Set(externalExits.map((entry) => `${entry.sourceNodeId}|${entry.direction}`));
-    const exitStubs = buildMapExitStubs(game, new Set(visitedRegionRooms), {
+    const exitStubs = buildMapExitStubs(game, visitedRegionRoomSet, {
       mapRoom: (roomId) => `room:${roomId}`,
       allowedNodeIds: new Set(nodes.map((node) => node.id)),
     }).filter((stub) => !externalStubKeys.has(`${stub.nodeId}|${stub.direction}`));
@@ -16088,6 +16093,12 @@
       Object.entries(region.positions || {}).map(([roomId, point]) => [`room:${roomId}`, point])
     );
     const pinnedPositions = mergeMapPinnedPositions(defaultPinnedPositions, scope);
+    const layoutBoundsPositions = Object.fromEntries(
+      layoutRegionRooms
+        .map((roomId) => `room:${roomId}`)
+        .filter((nodeId) => pinnedPositions[nodeId])
+        .map((nodeId) => [nodeId, pinnedPositions[nodeId]])
+    );
     return {
       nodes,
       edges,
@@ -16100,6 +16111,7 @@
       subtitle: "Local map",
       accessibleLabel: `${region.label} local map`,
       pinnedPositions,
+      layoutBoundsPositions,
     };
   }
 
@@ -16415,7 +16427,10 @@
     if (override?.route === "straight") {
       points = [fromAnchor, toAnchor];
     } else if (override?.waypoints?.length) {
-      points = compactMapConnectorPoints([fromAnchor, ...override.waypoints, toAnchor]);
+      const waypoints = typeof options.transformWaypoint === "function"
+        ? override.waypoints.map((point) => options.transformWaypoint(point))
+        : override.waypoints;
+      points = compactMapConnectorPoints([fromAnchor, ...waypoints, toAnchor]);
     } else if (!fromLevel && !toLevel) {
       const sourceLead = buildMapDirectionalLead(fromAnchor, snappedSides.sourceSide);
       const targetLead = buildMapDirectionalLead(toAnchor, snappedSides.targetSide);
@@ -16532,6 +16547,37 @@
     </g>`;
   }
 
+  function mapBoundsFromPinnedPositions(points = {}) {
+    const values = Object.values(points || {}).filter((point) => point && Number.isFinite(point.x) && Number.isFinite(point.y));
+    if (!values.length) return null;
+    return {
+      minX: Math.min(...values.map((point) => point.x), 0),
+      maxX: Math.max(...values.map((point) => point.x), 1),
+      minY: Math.min(...values.map((point) => point.y), 0),
+      maxY: Math.max(...values.map((point) => point.y), 1),
+    };
+  }
+
+  function createLocalMapEditorWaypointTransform(bounds, metrics = {}) {
+    if (!bounds) return null;
+    const unitX = Number(metrics.unitX) || 0;
+    const unitY = Number(metrics.unitY) || 0;
+    const boxSize = Number(metrics.boxSize) || 0;
+    const padding = Number(metrics.padding) || 0;
+    const overflowMargin = Number(metrics.overflowMargin) || 0;
+    const offsetX = Number(metrics.offsetX) || 0;
+    const offsetY = Number(metrics.offsetY) || 0;
+    if (!unitX || !unitY || !boxSize) return null;
+    const editorBaseX = MAP_EDITOR_PADDING + (MAP_EDITOR_BOX_WIDTH / 2);
+    const editorBaseY = MAP_EDITOR_PADDING + (MAP_EDITOR_BOX_HEIGHT / 2);
+    const gameBaseX = offsetX + overflowMargin + padding + (boxSize / 2);
+    const gameBaseY = offsetY + overflowMargin + padding + (boxSize / 2);
+    return (point = {}) => ({
+      x: gameBaseX + (((Number(point.x) || 0) - editorBaseX) * (unitX / MAP_EDITOR_UNIT)),
+      y: gameBaseY + (((Number(point.y) || 0) - editorBaseY) * (unitY / MAP_EDITOR_UNIT)),
+    });
+  }
+
   function renderExplorationMapSvg(model, positions, options = {}) {
     const worldScope = options.worldScope !== false;
     const boxSize = worldScope ? 98 : 92;
@@ -16548,11 +16594,14 @@
     const currentNodeId = model.currentNodeId || model.nodes[0]?.id || "";
     const current = positions.get(currentNodeId) || positions.get(model.nodes[0]?.id) || { x: 0, y: 0 };
 
+    const boundsPoints = Object.keys(model.layoutBoundsPositions || {}).length
+      ? Object.values(model.layoutBoundsPositions || {})
+      : [...positions.values()];
     let minX = current.x;
     let maxX = current.x;
     let minY = current.y;
     let maxY = current.y;
-    for (const point of positions.values()) {
+    for (const point of boundsPoints) {
       minX = Math.min(minX, point.x);
       maxX = Math.max(maxX, point.x);
       minY = Math.min(minY, point.y);
@@ -16568,6 +16617,12 @@
     const nodePixels = new Map();
     const lineEntries = [];
     const levelBadgeEntries = [];
+    const localWaypointTransform = !worldScope
+      ? createLocalMapEditorWaypointTransform(
+          mapBoundsFromPinnedPositions(model.layoutBoundsPositions || model.pinnedPositions || {}),
+          { unitX, unitY, boxSize, padding, overflowMargin, offsetX, offsetY }
+        )
+      : null;
 
     for (const node of model.nodes) {
       const point = positions.get(node.id) || { x: 0, y: 0 };
@@ -16581,6 +16636,7 @@
     const lineMarkup = model.edges.map((edge) => buildMapDisplayLanes(edge, centers).map((lane) => {
       const geometry = mapLaneRenderGeometry(edge, lane, centers, boxSize, {
         overrideEntry: connectorOverrides[edge.id],
+        transformWaypoint: localWaypointTransform,
       });
       if (!geometry) return "";
       const stroke = "#87683c";
