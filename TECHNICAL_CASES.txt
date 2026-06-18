@@ -116,3 +116,98 @@ Future debugging advice
   in-output debug lines rather than relying only on the JS console.
 - For other hazard scenes, review whether autosave happens before or after the
   scene state is committed.
+
+
+Case 002 - 2026-06-18 - Clicking a world-map location would not open its local map
+------------------------------------------------------------------------------------
+
+Symptom
+-------
+Using the mouse to click a clickable location on the scene map, such as Misty
+Mountains, no longer opened that location's dedicated local map. Directional
+movement still preserved the intended map behavior while travelling.
+
+Observed behavior
+-----------------
+- The click handler still received the map hotspot click.
+- The target region id (for example `mountains`) was detected correctly.
+- After the click, the map immediately stayed on or snapped back to `world`
+  instead of opening the requested local scope.
+- Movement-based map updates still worked, because auto-follow based on current
+  room remained active.
+
+Root cause
+----------
+The click path and the movement path were sharing a single scope-reconciliation
+flow.
+
+- `openSceneMapScope(regionId)` set the scope after a click, but the later map
+  render reconciliation still treated the current room as authoritative.
+- That reconciliation was correct for auto-follow mode, but wrong for manual
+  click-open behavior.
+- As a result, clicking a location did not persist a manual scope choice.
+
+Resolution
+----------
+The fix introduced an explicit manual scope mode for the scene map.
+
+1. Added `sceneMapManualScope` to distinguish:
+   - movement-driven auto-follow map behavior
+   - click-opened manual map behavior
+
+2. When the player clicks a map hotspot:
+   - the exact clicked region becomes the scope
+   - `sceneMapAutoFollow = false`
+   - `sceneMapManualScope = true`
+
+3. During map render:
+   - if `sceneMapManualScope` is true, the chosen scope is preserved
+   - otherwise the existing room-based reconciliation logic still runs
+
+4. `showMap()` and other movement-driven map openings explicitly reset manual
+   mode, preserving the existing behavior when navigating by directions.
+
+Files touched
+-------------
+- game.js
+
+Future debugging advice
+-----------------------
+- If clicks appear to work visually but do not change the map state, inspect
+  scope reconciliation after the click, not only the click handler itself.
+- Keep click-driven map mode and movement-driven auto-follow mode distinct.
+
+
+Case 003 - 2026-06-18 - Map click fix broke auto-follow on later directional movement
+---------------------------------------------------------------------------------------
+
+Symptom
+-------
+After fixing click-to-open local maps, directional travel no longer restored
+the normal automatic submap behavior. Entering a region such as Misty Mountains
+while moving by directions could leave the map stuck in the previously chosen
+manual scope behavior.
+
+Root cause
+----------
+The click fix introduced a persistent manual-map mode flag
+(`sceneMapManualScope`). That was correct for mouse-driven map browsing, but a
+successful movement command did not reset the map back into standard
+auto-follow mode.
+
+Resolution
+----------
+On successful player movement, if the scene map is visible, the game now
+restores standard map behavior immediately:
+
+- `sceneMapAutoFollow = true`
+- `sceneMapManualScope = false`
+- `sceneMapShowAll = false`
+
+That preserves:
+- manual local-map opening by mouse click
+- automatic map scope changes when the player moves by directions
+
+Files touched
+-------------
+- game.js

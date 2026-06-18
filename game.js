@@ -5599,9 +5599,12 @@
         game.sceneMapViewportAnchor = null;
         return;
       }
-      const resolvedScope = reconcileSceneMapScopeForCurrentRoom(game.sceneMapScope || "world", game.currentRoom, {
-        follow: game.sceneMapAutoFollow !== false,
-      });
+      const manualScope = Boolean(game.sceneMapManualScope);
+      const resolvedScope = manualScope
+        ? (game.sceneMapScope || "world")
+        : reconcileSceneMapScopeForCurrentRoom(game.sceneMapScope || "world", game.currentRoom, {
+            follow: game.sceneMapAutoFollow !== false,
+          });
       if (resolvedScope !== (game.sceneMapScope || "world")) {
         game.sceneMapScope = resolvedScope;
         game.sceneMapViewportAnchor = null;
@@ -5719,6 +5722,7 @@
       this.game.sceneMapVisible = false;
       this.game.sceneMapScope = "world";
       this.game.sceneMapAutoFollow = true;
+      this.game.sceneMapManualScope = false;
       this.game.sceneMapShowAll = false;
       this.game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       this.game.sceneMapViewportAnchor = null;
@@ -5734,6 +5738,7 @@
       this.game.sceneMapViewportAnchor = null;
       this.game.sceneMapScope = parentScope || "world";
       this.game.sceneMapAutoFollow = false;
+      this.game.sceneMapManualScope = true;
       this.renderSceneMap();
       return true;
     }
@@ -5759,10 +5764,11 @@
     openSceneMapScope(scope = "world") {
       const normalized = String(scope || "world").trim() || "world";
       if (normalized !== "world" && !MAP_REGION_DEFINITIONS[normalized]) return false;
-      const resolvedScope = preferredSceneMapScopeForRoom(normalized, this.game.currentRoom);
       this.game.sceneMapViewportAnchor = null;
-      this.game.sceneMapScope = resolvedScope;
+      this.game.sceneMapScope = normalized;
       this.game.sceneMapAutoFollow = false;
+      this.game.sceneMapManualScope = true;
+      if (normalized !== "world") this.game.sceneMapShowAll = false;
       this.renderSceneMap();
       return true;
     }
@@ -6509,6 +6515,7 @@
       game.sceneMapVisible = false;
       game.sceneMapScope = "world";
       game.sceneMapAutoFollow = true;
+      game.sceneMapManualScope = false;
       game.sceneMapShowAll = false;
       game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       game.sceneMapViewportAnchor = null;
@@ -8082,6 +8089,7 @@
       game.sceneMapVisible = false;
       game.sceneMapScope = "world";
       game.sceneMapAutoFollow = true;
+      game.sceneMapManualScope = false;
       game.sceneMapShowAll = false;
       game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       game.sceneMapViewportAnchor = null;
@@ -8354,6 +8362,7 @@
       }
       game.sceneMapScope = ROOM_TO_MAP_REGION[game.currentRoom] || "world";
       game.sceneMapAutoFollow = true;
+      game.sceneMapManualScope = false;
       game.sceneMapShowAll = false;
       game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       game.sceneMapVisible = true;
@@ -8371,6 +8380,7 @@
       }
       game.sceneMapScope = "world";
       game.sceneMapAutoFollow = false;
+      game.sceneMapManualScope = false;
       game.sceneMapShowAll = true;
       game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       game.sceneMapVisible = true;
@@ -8922,6 +8932,7 @@
       this.sceneMapVisible = false;
       this.sceneMapScope = "world";
       this.sceneMapAutoFollow = true;
+      this.sceneMapManualScope = false;
       this.sceneMapShowAll = false;
       this.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       this.sceneMapViewportAnchor = null;
@@ -10027,6 +10038,7 @@
       this.sceneMapVisible = false;
       this.sceneMapScope = "world";
       this.sceneMapAutoFollow = true;
+      this.sceneMapManualScope = false;
       this.sceneMapShowAll = false;
       this.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       this.sceneMapViewportAnchor = null;
@@ -12278,6 +12290,11 @@
       const movedInTotalDarkness = this.roomIsDark(previousRoom);
       this.currentRoom = connection.to;
       this.player.position = connection.to;
+      if (this.sceneMapVisible) {
+        this.sceneMapAutoFollow = true;
+        this.sceneMapManualScope = false;
+        this.sceneMapShowAll = false;
+      }
       if (connection.to === "beorns_house" && BEORN_MOUNTAIN_APPROACH_ROOMS.has(previousRoom)) {
         this.flags.beorn_mountain_arrival_complete = true;
       }
