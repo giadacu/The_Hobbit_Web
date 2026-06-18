@@ -238,6 +238,83 @@ The fix aligned the game renderer with the editor logic.
    local map, so the game can map a connection to the correct parent/world
    node label.
 
+
+Case 005 - 2026-06-18 - Golden-path autoplay test hid seed-sensitive Gollum and Smaug failures
+-----------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The existing autoplay regression in `scripts/parser-tests.js` passed reliably,
+but separate seeded batch runs could still fail in "real" autoplay playthroughs.
+Observed seeded failures clustered in two places:
+
+- Gollum at `deep_dark_lake`
+- Smaug / Bard handoff in Erebor
+
+Root cause
+----------
+The existing regression only exercised one deterministic golden path:
+
+- it forced `Math.random = () => 0.99`
+- it ran a single autoplay route
+- it did not vary `storySeed`
+
+That meant the suite proved one winning path existed, but it did not probe the
+seed-sensitive branches that affect:
+
+- Gollum riddle selection and encounter flow
+- Erebor/Smaug timing and state progression
+
+Resolution
+----------
+Added a seeded autoplay batch mode to `scripts/parser-tests.js` so autoplay can
+be probed across many reproducible runs without changing the default suite.
+
+Usage
+-----
+- `node scripts/parser-tests.js --autoplay-batch-only --autoplay-batch=100`
+- optional flags:
+  - `--autoplay-seed-start=<n>`
+  - `--autoplay-step-limit=<n>`
+  - `--autoplay-batch-strict`
+
+The batch runner now:
+
+- assigns a reproducible PRNG per seed
+- resets the game and reapplies the same seed to `storySeed`
+- recreates seed-sensitive encounter state such as Gollum
+- executes autoplay up to a configurable step limit
+- prints a per-seed report with outcome classification and last visible line
+
+Observed report after adding the harness
+---------------------------------------
+For seeds `1-100` with step limit `500`, the batch produced:
+
+- 76 victories
+- 13 `stuck_gollum`
+- 10 `death_smaug`
+- 1 generic `step_limit`
+
+Representative failing seeds
+----------------------------
+- Gollum stalls: `7, 11, 20, 31, 32, 33, 45, 69, 74, 76, 80, 87, 94`
+- Smaug deaths: `21, 23, 37, 41, 62, 63, 77, 79, 83, 90`
+- Other step-limit: `27`
+
+Files touched
+-------------
+- `scripts/parser-tests.js`
+
+Future debugging advice
+-----------------------
+- Treat the golden-path autoplay test as a smoke test, not as proof of
+  autoplay robustness.
+- When changing autoplay logic for Gollum or Erebor, rerun the seeded batch and
+  promote a few representative failing seeds into targeted regressions.
+- The last output line in the batch report is useful for spotting whether a run
+  is failing because autoplay is speaking to no one, missing a state
+  transition, or looping after a room-state change.
+
 2. Local map models now build `externalExits` for immediate off-scope
    connections and keep their destination labels.
 
@@ -661,3 +738,293 @@ Future debugging advice
   lane-id matching first, especially for one-way `up/down`-style connectors.
 - Saved layout overrides can only be shared between tools if both sides agree
   on lane-id normalization as well as SVG coordinate transforms.
+
+
+Case 014 - 2026-06-18 - Parser tests still called the removed inline map editor API
+------------------------------------------------------------------------------------
+
+Symptom
+-------
+Running `node scripts/parser-tests.js` stopped with:
+
+`TypeError: game.layout.startSceneMapEditing is not a function`
+
+The failure repeated whenever the suite reached the old inline map-editor
+cases.
+
+Root cause
+----------
+The map editor used to live inside the main game runtime, but it was later
+split into the separate `map-editor.html` / `map-editor.js` tool.
+
+Two stale references remained:
+
+1. `scripts/parser-tests.js` still contained game-runtime tests for inline map
+   editor behaviors such as:
+   - `startSceneMapEditing()`
+   - `selectSceneMapEditorEdge()`
+   - `saveSceneMapEditing()`
+
+2. `game.js` still called `this.layout.applySceneMapEditorPanelPosition()`
+   during window resize even though that method no longer exists on the game
+   `LayoutController`.
+
+Resolution
+----------
+1. Removed the obsolete parser test cases that exercised the retired inline
+   map-editor API from `scripts/parser-tests.js`.
+2. Guarded the leftover resize-time call in `game.js` so the game no longer
+   throws if the inline editor method is absent.
+3. Re-ran the parser suite and confirmed it now progresses beyond the old
+   inline-editor crash point. Any remaining failures after that are separate
+   map regressions, not this API mismatch.
+
+Files touched
+-------------
+- scripts/parser-tests.js
+- game.js
+
+Future debugging advice
+-----------------------
+- When a tool is split out of the main runtime, audit both runtime code and
+  regression tests for stale method calls before assuming a gameplay bug.
+- Keep game-runtime tests focused on `index.html`/`game.js` behavior; editor
+  interactions that belong to `map-editor.js` should have their own dedicated
+  test path.
+
+
+Case 015 - 2026-06-18 - Scene-map regression tests still assumed world-first opening and complete-map drilldown lost full reveal
+-------------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After removing the obsolete inline map-editor tests, `node scripts/parser-tests.js`
+still failed on several scene-map cases.
+
+The visible mismatches were:
+- some tests still expected `map` to open the world overview first
+- some tests expected immediate re-drilldown into a local scope while the
+  current-room frame animation was still in progress
+- `complete map` could open the full world overview, but manually opening a
+  local scope from there silently dropped the full-reveal mode
+
+Root cause
+----------
+There were two different issues mixed together.
+
+1. The scene-map behavior had evolved, but older tests still described a
+   previous model:
+   - `showMap()` now opens the current room's deepest local scope first
+   - `sceneMapBack()` climbs parent scopes one level at a time
+   - boundary-crossing auto-follow can intentionally hold the parent/world
+     scope briefly before drilling back down after the frame animation
+
+2. `openSceneMapScope()` always forced:
+
+   `sceneMapShowAll = false`
+
+   for non-world scopes. That was fine for ordinary explored-map browsing, but
+   wrong when the player started from `complete map`. It meant a manual
+   drilldown into a full local map immediately reverted to visited-only rules.
+
+Resolution
+----------
+The fix had two parts.
+
+1. Preserved `sceneMapShowAll` when manually opening a child scope.
+   That lets `complete map` keep its full-reveal behavior while drilling into
+   local maps such as Long Lake.
+
+2. Updated the parser tests to match the current scene-map contract:
+   - `map` can open directly to a local scope such as Bilbo's Home or Erebor
+   - `back` climbs the scope hierarchy before closing the overlay
+   - some re-drilldowns are intentionally delayed until movement animation
+     settles
+   - world/local drilldown tests now use valid jump checkpoints and setups
+     that reflect the current map progression
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+
+Verification
+------------
+- `node scripts/parser-tests.js`
+- Result: `1100 parser/dialogue tests passed.`
+
+Future debugging advice
+-----------------------
+- When scene-map tests fail, check first whether the scope semantics changed:
+  world-first, local-first, parent-back, and delayed drilldown are distinct
+  behaviors with different correct expectations.
+- Treat `complete map` as a separate mode from ordinary explored-map browsing.
+  If local drilldown from the full map suddenly hides content again, inspect
+  whether `sceneMapShowAll` is being cleared on scope changes.
+
+
+Case 016 - 2026-06-18 - Spider-road safe moments printed twice and spoiled the ambush
+--------------------------------------------------------------------------------------
+
+Symptom
+-------
+On the Mirkwood forest-road crossings, entering the spider-eyes scene could
+print two consecutive safe-moment lines. The labels also explained the spider
+hazard too explicitly, weakening the suspense.
+
+Root cause
+----------
+Two separate autosave paths fired on the same move:
+
+- the spider-eyes encounter trigger recorded its own event-specific autosave
+- the room-entry hazard autosave then recorded another safe moment for the same
+  turn
+
+Because the labels were different, the duplicate-suppression logic did not
+collapse them into one message.
+
+Resolution
+----------
+- The spider-eyes trigger now reuses the room hazard autosave instead of
+  creating a separate event autosave.
+- The two forest-road autosave labels were rewritten to location-based text:
+  - `along the forest road`
+  - `deeper along the forest road`
+- Added a parser regression that verifies each crossing prints only one safe
+  moment and that the old spoiler-heavy labels no longer appear.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+
+Future debugging advice
+-----------------------
+- If safe moments duplicate on a room transition, check whether both a
+  room-level hazard and an encounter-level trigger are recording autosaves in
+  the same turn.
+- For suspense-heavy scenes, keep autosave labels location-based unless the
+  reason needs to be explicit for clarity elsewhere.
+
+
+Case 017 - 2026-06-18 - Goblin ambush safe moment still relied on key-collision dedupe
+---------------------------------------------------------------------------------------
+
+Symptom
+-------
+After fixing the Mirkwood spider-road duplicate safe moments, another entry
+hazard still used the same fragile pattern: the upper-tunnel goblin ambush.
+
+Observed behavior
+-----------------
+- The tunnel entry did not visibly print two safe moments in normal play.
+- But that was only because the room hazard autosave and the ambush trigger
+  happened to share the same storage key.
+- The two code paths still used different labels, so the behavior depended on
+  key-collision deduplication rather than one intentional source of truth.
+
+Root cause
+----------
+Two autosave paths existed for `dark_stuffy_passage_14`:
+
+- room hazard autosave in `maybeAutosaveForRoom()`
+- encounter autosave inside `triggerGoblinTunnelEncounter()`
+
+Unlike the spider-road bug, this case stayed mostly hidden because both paths
+used the same key (`hazard:goblins:tunnel-ambush`). That suppressed the second
+print, but left the implementation inconsistent and easier to break later.
+
+Resolution
+----------
+- `triggerGoblinTunnelEncounter()` now reuses `maybeAutosaveForRoom()` instead
+  of recording its own separate autosave.
+- The tunnel room hazard label was aligned to the encounter wording:
+  `before the goblin ambush in the upper tunnels`
+- Added a parser regression that checks event-driven room entries for both the
+  goblin ambush and Gollum only print one safe moment.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+
+Future debugging advice
+-----------------------
+- If duplicate-safe-moment protection depends on identical keys but the labels
+  still differ, that is a maintenance smell worth simplifying before it
+  becomes a visible bug.
+- For entry-triggered hazards, prefer one autosave source of truth per room
+  transition, even when dedupe currently hides the overlap.
+
+
+Case 018 - 2026-06-18 - Autoplay could not be interrupted from the keyboard
+----------------------------------------------------------------------------
+
+Symptom
+-------
+While autoplay was running, there was no immediate keyboard escape hatch.
+Typing `stop` worked, but pressing `Esc` did nothing unless the scene map was
+open.
+
+Root cause
+----------
+The global `keydown` handler already listened for `Escape`, but only used it
+to close the scene map and later endgame prompts. Autoplay had no dedicated
+keyboard interrupt path.
+
+Resolution
+----------
+- Added `Escape` handling before the scene-map branch so `Esc` stops autoplay
+  immediately when autoplay is active.
+- Added a parser regression that dispatches a synthetic `keydown` event and
+  verifies autoplay stops cleanly.
+- Extended the parser test harness so document-level listeners can be captured
+  and triggered during runtime-style tests.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+
+Future debugging advice
+-----------------------
+- For long-running UI modes like autoplay, prefer a keyboard interrupt in the
+  same global handler that already manages overlays and modal states.
+- When runtime behavior depends on document-level events, keep the test harness
+  able to register and dispatch those events instead of testing only via direct
+  method calls.
+
+
+Case 019 - 2026-06-18 - `restart` needed an explicit confirmation step
+----------------------------------------------------------------------
+
+Symptom
+-------
+Typing `restart` immediately reset the whole adventure. That was abrupt during
+ordinary play and too easy to trigger accidentally after a death or victory.
+
+Root cause
+----------
+The parser routed `restart` straight to `restartGame()`, and the endgame input
+handler did the same for restart-style phrases. There was no intermediate
+confirmation state.
+
+Resolution
+----------
+- Added a dedicated restart-confirmation state with `yes/no` handling.
+- `restart` now asks for confirmation instead of resetting immediately.
+- The confirmation also applies at endgame, where cancelling restores the
+  relevant endgame prompt instead of leaving the player without context.
+- Added parser regressions for both confirming and cancelling a restart.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+
+Future debugging advice
+-----------------------
+- Commands with destructive, irreversible effects should go through a small
+  explicit confirmation state rather than calling the final action directly.
+- If a confirmation can happen during endgame as well as mid-play, store enough
+  context to restore the right prompt when the player answers `no`.

@@ -2,6 +2,47 @@ const fs = require("fs");
 const vm = require("vm");
 
 const outputLines = [];
+const AUTOPLAY_VICTORY_LINE = "Congratulations. You have killed Smaug and found the treasure - a real thief.";
+
+function parseCliOptions(argv = []) {
+  const options = {
+    autoplayBatchCount: 0,
+    autoplayBatchOnly: false,
+    autoplayBatchSeedStart: 1,
+    autoplayBatchStepLimit: 500,
+    autoplayBatchStrict: false,
+  };
+  for (const arg of argv) {
+    if (arg === "--autoplay-batch-only") {
+      options.autoplayBatchOnly = true;
+      continue;
+    }
+    if (arg === "--autoplay-batch-strict") {
+      options.autoplayBatchStrict = true;
+      continue;
+    }
+    if (arg.startsWith("--autoplay-batch=")) {
+      options.autoplayBatchCount = Math.max(0, Number.parseInt(arg.split("=")[1], 10) || 0);
+      continue;
+    }
+    if (arg.startsWith("--autoplay-seed-start=")) {
+      options.autoplayBatchSeedStart = Number.parseInt(arg.split("=")[1], 10) || options.autoplayBatchSeedStart;
+      continue;
+    }
+    if (arg.startsWith("--autoplay-step-limit=")) {
+      options.autoplayBatchStepLimit = Math.max(1, Number.parseInt(arg.split("=")[1], 10) || options.autoplayBatchStepLimit);
+    }
+  }
+  return options;
+}
+
+function makeSeededRandom(seed) {
+  let state = (Number(seed) >>> 0) || 1;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+}
 
 function makeElement(id = "") {
   return {
@@ -56,6 +97,11 @@ function makeElement(id = "") {
     set src(value) { this.attributes.src = value; },
     get src() { return this.attributes.src || ""; },
   };
+}
+
+function dispatchDocumentEvent(type, event = {}) {
+  const listeners = global.document?._listeners?.[type] || [];
+  for (const listener of listeners) listener(event);
 }
 
 function bootGame() {
@@ -115,15 +161,32 @@ function bootGame() {
   global.window = global;
   global.location = { protocol: "file:" };
   global.window.location = global.location;
+  const documentListeners = new Map();
   global.document = {
     getElementById: (id) => elements.get(id) || makeElement(id),
     createElement: () => makeElement(),
-    addEventListener() {},
-    removeEventListener() {},
+    addEventListener(type, listener) {
+      const list = documentListeners.get(type) || [];
+      list.push(listener);
+      documentListeners.set(type, list);
+    },
+    removeEventListener(type, listener) {
+      const list = documentListeners.get(type) || [];
+      documentListeners.set(type, list.filter((entry) => entry !== listener));
+    },
     body: makeElement("body"),
     documentElement: makeElement("html"),
     fonts: { ready: Promise.resolve() },
+    _listeners: Object.create(null),
   };
+  Object.defineProperty(global.document, "_listeners", {
+    value: new Proxy({}, {
+      get(_, prop) {
+        return documentListeners.get(prop) || [];
+      },
+    }),
+    configurable: true,
+  });
   const storage = new Map();
   global.localStorage = {
     getItem(key) { return storage.has(key) ? storage.get(key) : null; },
@@ -184,6 +247,102 @@ function runGameCase(testCase) {
   const excludesForbidden = (testCase.notExpectedIncluded || []).every((pattern) => !actual.some((line) => lineMatches(line, pattern)));
   const ok = includesExpected && excludesForbidden;
   return { ...testCase, actual, expected: testCase.expectedIncluded, ok };
+}
+
+function prepareAutoplaySeededRun(game, seed) {
+  game.restartGame();
+  game.storySeed = Number(seed) || 1;
+  game.gollumState = game.createGollumState();
+  game.flags.smaugstate = "sleeping";
+  outputLines.length = 0;
+}
+
+function autoplayBatchOutcome({ game, issued, stepLimit }) {
+  const output = outputLines.slice();
+  const summary = output.join("\n");
+  const tail = output.slice(-8).join("\n");
+  const lastCommand = issued.at(-1) || "";
+  if (summary.includes(AUTOPLAY_VICTORY_LINE)) {
+    return { code: "victory", detail: `victory in ${issued.length} step(s)`, lastLine: output.at(-1) || "" };
+  }
+  if (game.endgame) {
+    if (!game.flags.dragondefeated && ["lower_halls", "front_gate", "lonely_mountain"].includes(game.currentRoom)) {
+      return { code: "death_smaug", detail: "fatal endgame triggered in Erebor before the dragon was defeated", lastLine: output.at(-1) || "" };
+    }
+    if (game.currentRoom === "deep_dark_lake" || /Gollum/i.test(tail)) {
+      return { code: "death_gollum", detail: "fatal endgame triggered around Gollum encounter", lastLine: output.at(-1) || "" };
+    }
+    return { code: "death_other", detail: "fatal endgame triggered outside the expected autoplay win path", lastLine: output.at(-1) || "" };
+  }
+  if (game.currentRoom === "deep_dark_lake" || issued.slice(-6).every((command) => ["ask gollum a riddle", "wear ring", "north"].includes(command))) {
+    return { code: "stuck_gollum", detail: `step limit ${stepLimit} reached in ${game.currentRoom} after "${lastCommand}"`, lastLine: output.at(-1) || "" };
+  }
+  if (["lower_halls", "front_gate", "lonely_mountain"].includes(game.currentRoom) && !game.flags.dragondefeated) {
+    return { code: "stuck_smaug", detail: `step limit ${stepLimit} reached in Erebor before dragon defeat after "${lastCommand}"`, lastLine: output.at(-1) || "" };
+  }
+  return { code: "step_limit", detail: `step limit ${stepLimit} reached in ${game.currentRoom} after "${lastCommand}"`, lastLine: output.at(-1) || "" };
+}
+
+function runAutoplaySeedBatch(options = {}) {
+  const {
+    count = 20,
+    seedStart = 1,
+    stepLimit = 500,
+  } = options;
+  const game = window.hobbitGame;
+  const originalRandom = Math.random;
+  const runs = [];
+  try {
+    for (let offset = 0; offset < count; offset += 1) {
+      const seed = seedStart + offset;
+      Math.random = makeSeededRandom(seed);
+      prepareAutoplaySeededRun(game, seed);
+      const issued = [];
+      for (let step = 0; step < stepLimit && !game.endgame; step += 1) {
+        const command = game.nextAutoplayCommand();
+        if (!command) break;
+        issued.push(command);
+        game.execute(command);
+      }
+      const outcome = autoplayBatchOutcome({ game, issued, stepLimit });
+      runs.push({
+        seed,
+        steps: issued.length,
+        room: game.currentRoom,
+        dragonDefeated: Boolean(game.flags.dragondefeated),
+        endgame: Boolean(game.endgame),
+        lastCommand: issued.at(-1) || "",
+        outcome,
+      });
+    }
+  } finally {
+    Math.random = originalRandom;
+    outputLines.length = 0;
+  }
+
+  const counts = new Map();
+  for (const run of runs) {
+    counts.set(run.outcome.code, (counts.get(run.outcome.code) || 0) + 1);
+  }
+  return { runs, counts };
+}
+
+function printAutoplayBatchReport(report, options = {}) {
+  const { count = report.runs.length, seedStart = 1, stepLimit = 500 } = options;
+  console.log(`\nAUTOPLAY BATCH REPORT (${count} seed(s), seeds ${seedStart}-${seedStart + count - 1}, step limit ${stepLimit})`);
+  const sortedCounts = [...report.counts.entries()].sort((left, right) => left[0].localeCompare(right[0]));
+  for (const [code, amount] of sortedCounts) {
+    console.log(`  ${code}: ${amount}`);
+  }
+  const failures = report.runs.filter((run) => run.outcome.code !== "victory");
+  if (!failures.length) {
+    console.log("  No failing seeds found.");
+    return;
+  }
+  console.log("  Failing seeds:");
+  for (const run of failures) {
+    console.log(`    seed ${run.seed}: ${run.outcome.code} (${run.outcome.detail}); steps=${run.steps}; room=${run.room}; dragonDefeated=${run.dragonDefeated ? "yes" : "no"}; last="${run.lastCommand}"; output="${run.outcome.lastLine || ""}"`);
+  }
 }
 
 function lineMatches(line, pattern) {
@@ -2819,6 +2978,27 @@ const gameCases = [
     ],
   },
   {
+    name: "escape halts autoplay when it is running",
+    drive(game) {
+      game.execute("autoplay fast");
+      game.print(`Autoplay after start: ${game.autoplayRunning ? "yes" : "no"}`);
+      let prevented = false;
+      dispatchDocumentEvent("keydown", {
+        key: "Escape",
+        preventDefault() { prevented = true; },
+      });
+      game.print(`Escape prevented default: ${prevented ? "yes" : "no"}`);
+      game.print(`Autoplay after escape: ${game.autoplayRunning ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Autoplay fast started. Type 'stop' to stop it.",
+      "Autoplay after start: yes",
+      "Autoplay stopped.",
+      "Escape prevented default: yes",
+      "Autoplay after escape: no",
+    ],
+  },
+  {
     name: "autoplay wins without weight drops",
     drive(game) {
       const originalRandom = Math.random;
@@ -3116,13 +3296,18 @@ const gameCases = [
   },
   {
     name: "map command shows the game map overlay",
+    setup(game) {
+      movePlayerTo(game, "bilbos_garden");
+    },
     drive(game) {
       const overlay = document.getElementById("scene-map-overlay");
+      const title = document.getElementById("scene-map-title");
       const canvas = document.getElementById("scene-map-canvas");
       const image = document.getElementById("scene-map-image");
       game.execute("map");
       const visible = Object.prototype.hasOwnProperty.call(overlay.attributes, "hidden") ? "no" : "yes";
       const src = image.getAttribute("src") || "";
+      game.print(`Map title after open: ${title.textContent}`);
       game.print(`Map overlay visible: ${visible}`);
       game.print(`Map image loaded: ${src.startsWith("data:image/svg+xml") ? "yes" : "no"}`);
       game.print(`Map has clickable regions: ${canvas.innerHTML.includes("data-map-open-region") ? "yes" : "no"}`);
@@ -3132,6 +3317,7 @@ const gameCases = [
     },
     expectedIncluded: [
       "You study the paths already traced across Wilderland.",
+      "Map title after open: Explored Map",
       "Map overlay visible: yes",
       "Map image loaded: yes",
       "Map has clickable regions: yes",
@@ -3537,8 +3723,9 @@ const gameCases = [
       const backButton = document.getElementById("scene-map-back");
       const canvas = document.getElementById("scene-map-canvas");
       const image = document.getElementById("scene-map-image");
-      game.execute("jump dreary");
+      game.execute("jump beorn");
       game.execute("map");
+      game.layout.sceneMapBack();
       const beforeZoomSrc = image.getAttribute("src") || "";
       const decodedMapImage = decodeURIComponent(beforeZoomSrc);
       game.print(`World map has green dragon drilldown: ${canvas.innerHTML.includes('data-map-open-region="green_dragon"') ? "yes" : "no"}`);
@@ -3648,7 +3835,7 @@ const gameCases = [
     ],
   },
   {
-    name: "map rises back to world scope when the room leaves the local region",
+    name: "map rises back to world scope when the room leaves the local region and delays re-drilldown on re-entry",
     drive(game) {
       const title = document.getElementById("scene-map-title");
       game.execute("map");
@@ -3657,17 +3844,17 @@ const gameCases = [
       game.execute("east");
       game.print(`Title after leaving local region: ${title.textContent}`);
       game.execute("west");
-      game.print(`Title after re-entering local region: ${title.textContent}`);
+      game.print(`Title immediately after re-entering local region: ${title.textContent}`);
     },
     expectedIncluded: [
       "You study the paths already traced across Wilderland.",
       "Initial local title: Bilbo's Home",
       "Title after leaving local region: Explored Map",
-      "Title after re-entering local region: Bilbo's Home",
+      "Title immediately after re-entering local region: Explored Map",
     ],
   },
   {
-    name: "map drilldown opens directly to the current nested local scope",
+    name: "map opens directly to the current nested local scope and still allows manual parent browsing",
     setup(game) {
       movePlayerTo(game, "lower_halls");
       game.visitedRooms.add("cellar");
@@ -3676,12 +3863,14 @@ const gameCases = [
     drive(game) {
       const title = document.getElementById("scene-map-title");
       game.execute("map");
+      game.print(`Initial nested local title: ${title.textContent}`);
       game.layout.openSceneMapScope("elven_halls");
-      game.print(`Direct drilldown title: ${title.textContent}`);
+      game.print(`Manual parent title: ${title.textContent}`);
     },
     expectedIncluded: [
       "You study the paths already traced across Wilderland.",
-      "Direct drilldown title: Erebor",
+      "Initial nested local title: Erebor",
+      "Manual parent title: Elvenking's Halls",
     ],
   },
   {
@@ -3707,177 +3896,31 @@ const gameCases = [
     ],
   },
   {
-    name: "map back closes world overview to reveal the room image again",
+    name: "map back rises to world overview before closing it",
     drive(game) {
       const overlay = document.getElementById("scene-map-overlay");
       const image = document.getElementById("room-image");
+      const title = document.getElementById("scene-map-title");
       const beforeMapSrc = image.getAttribute("src") || "";
       game.execute("map");
       game.layout.sceneMapBack();
-      const hiddenAfterBack = Object.prototype.hasOwnProperty.call(overlay.attributes, "hidden") ? "yes" : "no";
-      game.print(`World map hidden after back: ${hiddenAfterBack}`);
-      game.print(`Room image restored after back: ${(image.getAttribute("src") || "") === beforeMapSrc ? "yes" : "no"}`);
-    },
-    expectedIncluded: [
-      "You study the paths already traced across Wilderland.",
-      "World map hidden after back: yes",
-      "Room image restored after back: yes",
-    ],
-  },
-  {
-    name: "map editor saves connector route and anchor overrides",
-    drive(game) {
-      game.execute("jump beorn");
-      game.execute("map");
-      game.layout.startSceneMapEditing();
-      const state = game.sceneMapRenderCache?.state || null;
-      const edge = (state?.editorMeta?.edges || []).find((candidate) => candidate.id === "room:green_dragon_inn|room:green_dragon_inn_outside");
-      if (!edge) {
-        game.print("Connector override edge found: no");
-        return;
-      }
-      game.layout.selectSceneMapEditorEdge(edge.id);
-      const controlMarkup = game.layout.sceneMapEditorInfoMarkup(state?.editorMeta || {});
-      game.print(`Editor palette has save action: ${controlMarkup.includes('data-scene-map-editor-action=\"save-layout\"') ? "yes" : "no"}`);
-      game.print(`Editor palette is draggable: ${controlMarkup.includes('data-scene-map-panel-drag=\"true\"') ? "yes" : "no"}`);
-      game.print(`Connector route menu has oblique-horizontal: ${controlMarkup.includes('value="dh"') ? "yes" : "no"}`);
-      game.print(`Connector route menu has horiz-vert-oblique: ${controlMarkup.includes('value="hvd"') ? "yes" : "no"}`);
-      game.print(`Connector route menu has oblique-horiz-vert: ${controlMarkup.includes('value="dhv"') ? "yes" : "no"}`);
-      game.layout.updateSceneMapEditorEdgeOverride({
-        route: "hvd",
-        startAnchor: "east",
-        endAnchor: "west",
-        joints: [{ x: 240, y: 190 }, { x: 240, y: 260 }],
-      });
-      game.layout.saveSceneMapEditing();
-      const savedPayload = JSON.parse(localStorage.getItem("hobbit-web-map-layout-overrides") || "{}");
-      const savedOverride = savedPayload?.scopes?.world?.edges?.[edge.id] || null;
-      game.print(`Connector override edge found: yes`);
-      game.print(`Connector override saved route: ${savedOverride?.route || "missing"}`);
-      game.print(`Connector override saved start: ${savedOverride?.startAnchor || "missing"}`);
-      game.print(`Connector override saved end: ${savedOverride?.endAnchor || "missing"}`);
-      game.print(`Connector override saved joints: ${Array.isArray(savedOverride?.joints) ? savedOverride.joints.length : "missing"}`);
-      game.execute("map");
-      const reloaded = game.sceneMapRenderCache?.state?.editorMeta?.connectorOverrides?.[edge.id] || null;
-      game.print(`Connector override reloaded route: ${reloaded?.route || "missing"}`);
-      game.print(`Connector override reloaded end: ${reloaded?.endAnchor || "missing"}`);
-      game.print(`Connector override reloaded joints: ${Array.isArray(reloaded?.joints) ? reloaded.joints.length : "missing"}`);
-    },
-    expectedIncluded: [
-      "You study the paths already traced across Wilderland.",
-      "Editor palette has save action: yes",
-      "Editor palette is draggable: yes",
-      "Connector route menu has oblique-horizontal: yes",
-      "Connector route menu has horiz-vert-oblique: yes",
-      "Connector route menu has oblique-horiz-vert: yes",
-      "Connector override edge found: yes",
-      "Connector override saved route: hvd",
-      "Connector override saved start: east",
-      "Connector override saved end: west",
-      "Connector override saved joints: 2",
-      "Connector override reloaded route: hvd",
-      "Connector override reloaded end: west",
-      "Connector override reloaded joints: 2",
-    ],
-  },
-  {
-    name: "map back exits local map even while editor is open",
-    drive(game) {
-      const title = document.getElementById("scene-map-title");
-      game.execute("jump beorn");
-      game.execute("map");
-      game.layout.openSceneMapScope("goblin_tunnels");
-      game.layout.startSceneMapEditing();
-      game.print(`Editing before back: ${game.sceneMapEditMode ? "yes" : "no"}`);
+      game.print(`Title after first back: ${title.textContent}`);
+      game.print(`World map still visible after first back: ${Object.prototype.hasOwnProperty.call(overlay.attributes, "hidden") ? "no" : "yes"}`);
       game.layout.sceneMapBack();
-      game.print(`Editing after back: ${game.sceneMapEditMode ? "yes" : "no"}`);
-      game.print(`Map title after back from editor: ${title.textContent}`);
+      const hiddenAfterSecondBack = Object.prototype.hasOwnProperty.call(overlay.attributes, "hidden") ? "yes" : "no";
+      game.print(`World map hidden after second back: ${hiddenAfterSecondBack}`);
+      game.print(`Room image restored after second back: ${(image.getAttribute("src") || "") === beforeMapSrc ? "yes" : "no"}`);
     },
     expectedIncluded: [
       "You study the paths already traced across Wilderland.",
-      "Editing before back: yes",
-      "Editing after back: no",
-      "Map title after back from editor: Explored Map",
+      "Title after first back: Explored Map",
+      "World map still visible after first back: yes",
+      "World map hidden after second back: yes",
+      "Room image restored after second back: yes",
     ],
   },
   {
-    name: "map editor clears selected connector on blank click without losing draft",
-    drive(game) {
-      game.execute("jump beorn");
-      game.execute("map");
-      game.layout.startSceneMapEditing();
-      const state = game.sceneMapRenderCache?.state || null;
-      const edge = (state?.editorMeta?.edges || []).find((candidate) => candidate.id === "room:green_dragon_inn|room:green_dragon_inn_outside");
-      if (!edge) {
-        game.print("Connector blank-click edge found: no");
-        return;
-      }
-      let prevented = false;
-      game.layout.selectSceneMapEditorEdge(edge.id);
-      game.layout.updateSceneMapEditorEdgeOverride({ route: "dh", bend: 24 });
-      game.print(`Connector selected before blank click: ${game.sceneMapEditSelectedEdgeId === edge.id ? "yes" : "no"}`);
-      game.layout.beginSceneMapEditorDrag({
-        target: { closest() { return null; } },
-        preventDefault() { prevented = true; },
-      });
-      const draft = game.sceneMapEditEdgeDraft?.[edge.id] || null;
-      game.print(`Connector blank-click edge found: yes`);
-      game.print(`Blank click prevented default: ${prevented ? "yes" : "no"}`);
-      game.print(`Connector selected after blank click: ${game.sceneMapEditSelectedEdgeId ? "yes" : "no"}`);
-      game.print(`Connector draft kept route: ${draft?.route || "missing"}`);
-      game.print(`Connector draft kept bend: ${draft?.bend ?? "missing"}`);
-    },
-    expectedIncluded: [
-      "You study the paths already traced across Wilderland.",
-      "Connector selected before blank click: yes",
-      "Connector blank-click edge found: yes",
-      "Blank click prevented default: yes",
-      "Connector selected after blank click: no",
-      "Connector draft kept route: dh",
-      "Connector draft kept bend: 24",
-    ],
-  },
-  {
-    name: "map editor click on connector selects it",
-    drive(game) {
-      game.execute("jump beorn");
-      game.execute("map");
-      game.layout.startSceneMapEditing();
-      const state = game.sceneMapRenderCache?.state || null;
-      const edge = (state?.editorMeta?.edges || []).find((candidate) => candidate.id === "room:green_dragon_inn|room:green_dragon_inn_outside");
-      if (!edge) {
-        game.print("Connector click edge found: no");
-        return;
-      }
-      let prevented = false;
-      game.layout.beginSceneMapEditorDrag({
-        target: {
-          closest(selector) {
-            if (selector === "[data-editor-edge]") {
-              return {
-                getAttribute(name) {
-                  return name === "data-editor-edge" ? edge.id : "";
-                },
-              };
-            }
-            return null;
-          },
-        },
-        preventDefault() { prevented = true; },
-      });
-      game.print(`Connector click edge found: yes`);
-      game.print(`Connector click prevented default: ${prevented ? "yes" : "no"}`);
-      game.print(`Connector selected after click: ${game.sceneMapEditSelectedEdgeId === edge.id ? "yes" : "no"}`);
-    },
-    expectedIncluded: [
-      "You study the paths already traced across Wilderland.",
-      "Connector click edge found: yes",
-      "Connector click prevented default: yes",
-      "Connector selected after click: yes",
-    ],
-  },
-  {
-    name: "map supports nested local drilldown from cellar to long lake",
+    name: "map supports nested local scope navigation from erebor back to world",
     drive(game) {
       const title = document.getElementById("scene-map-title");
       const subtitle = document.getElementById("scene-map-subtitle");
@@ -3886,50 +3929,43 @@ const gameCases = [
       const image = document.getElementById("scene-map-image");
       game.execute("jump smaug");
       game.execute("map");
-      const worldMapImage = decodeURIComponent(image.getAttribute("src") || "");
-      game.print(`World map has elven halls region: ${canvas.innerHTML.includes('data-map-open-region="elven_halls"') ? "yes" : "no"}`);
-      game.print(`World map has standalone Long Lake region: ${canvas.innerHTML.includes('data-map-open-region="long_lake"') ? "yes" : "no"}`);
-      game.print(`World map hides Bleak Barren Land detail: ${worldMapImage.includes("Bleak Barren Land") ? "no" : "yes"}`);
-      game.layout.openSceneMapScope("elven_halls");
-      const hallsMapImage = decodeURIComponent(image.getAttribute("src") || "");
-      game.print(`Elven halls title: ${title.textContent}`);
-      game.print(`Elven halls has long lake portal: ${canvas.innerHTML.includes('data-map-open-region="long_lake"') ? "yes" : "no"}`);
-      game.print(`Elven halls shows long lake portal label: ${hallsMapImage.includes("Long Lake") ? "yes" : "no"}`);
-      game.print(`Elven halls hides Wooden Town internals: ${hallsMapImage.includes("Wooden Town") ? "no" : "yes"}`);
-      game.layout.openSceneMapScope("long_lake");
+      const ereborMapImage = decodeURIComponent(image.getAttribute("src") || "");
+      game.print(`Initial nested title: ${title.textContent}`);
+      game.print(`Initial nested subtitle: ${subtitle.textContent}`);
+      game.print(`Erebor map hides Long Lake detail: ${ereborMapImage.includes("Long Lake") ? "no" : "yes"}`);
+      game.layout.sceneMapBack();
       const longLakeMapImage = decodeURIComponent(image.getAttribute("src") || "");
-      game.print(`Long Lake title: ${title.textContent}`);
+      game.print(`Title after one back: ${title.textContent}`);
       game.print(`Long Lake subtitle: ${subtitle.textContent}`);
-      game.print(`Long Lake map shows Erebor portal: ${longLakeMapImage.includes("Erebor") ? "yes" : "no"}`);
-      game.print(`Long Lake map hides Lower Halls detail: ${longLakeMapImage.includes("Lower Halls") ? "no" : "yes"}`);
+      game.print(`Long Lake shows Front Gate host room: ${longLakeMapImage.includes("Front Gate") ? "yes" : "no"}`);
+      game.print(`Long Lake hides Lower Halls detail: ${longLakeMapImage.includes("Lower Halls") ? "no" : "yes"}`);
       game.print(`Back visible in nested local map: ${backButton.hidden ? "no" : "yes"}`);
       game.layout.sceneMapBack();
-      game.print(`Title after one back: ${title.textContent}`);
-      game.layout.sceneMapBack();
       game.print(`Title after second back: ${title.textContent}`);
+      game.print(`Elven halls has long lake portal: ${canvas.innerHTML.includes('data-map-open-region="long_lake"') ? "yes" : "no"}`);
+      game.layout.sceneMapBack();
+      game.print(`Title after third back: ${title.textContent}`);
     },
     expectedIncluded: [
       "You study the paths already traced across Wilderland.",
-      "World map has elven halls region: yes",
-      "World map has standalone Long Lake region: no",
-      "World map hides Bleak Barren Land detail: yes",
-      "Elven halls title: Elvenking's Halls",
-      "Elven halls has long lake portal: yes",
-      "Elven halls shows long lake portal label: yes",
-      "Elven halls hides Wooden Town internals: yes",
-      "Long Lake title: Long Lake",
+      "Initial nested title: Erebor",
+      "Initial nested subtitle: Local map",
+      "Erebor map hides Long Lake detail: yes",
+      "Title after one back: Long Lake",
       "Long Lake subtitle: Local map",
-      "Long Lake map shows Erebor portal: yes",
-      "Long Lake map hides Lower Halls detail: yes",
+      "Long Lake shows Front Gate host room: no",
+      "Long Lake hides Lower Halls detail: yes",
       "Back visible in nested local map: yes",
-      "Title after one back: Elvenking's Halls",
-      "Title after second back: Explored Map",
+      "Title after second back: Elvenking's Halls",
+      "Elven halls has long lake portal: yes",
+      "Title after third back: Explored Map",
     ],
   },
   {
     name: "complete map shows every room without altering visited progress",
     drive(game) {
       const overlay = document.getElementById("scene-map-overlay");
+      const title = document.getElementById("scene-map-title");
       const canvas = document.getElementById("scene-map-canvas");
       const image = document.getElementById("scene-map-image");
       const scroll = document.getElementById("scene-map-scroll");
@@ -3943,6 +3979,7 @@ const gameCases = [
       game.print(`Complete map world view hides Lower Halls detail: ${worldMapImage.includes("Lower Halls") ? "no" : "yes"}`);
       game.layout.openSceneMapScope("long_lake");
       const longLakeMapImage = decodeURIComponent(image.getAttribute("src") || "");
+      game.print(`Complete map long lake title: ${title.textContent}`);
       game.print(`Complete map long lake shows Erebor portal: ${longLakeMapImage.includes("Erebor") ? "yes" : "no"}`);
       game.print(`Complete map long lake hides Lower Halls detail: ${longLakeMapImage.includes("Lower Halls") ? "no" : "yes"}`);
       game.print(`Complete map long lake shows Front Gate: ${longLakeMapImage.includes("Front Gate") ? "yes" : "no"}`);
@@ -3954,6 +3991,7 @@ const gameCases = [
       "Complete map opens away from far left: yes",
       "Complete map has Elven halls region: yes",
       "Complete map world view hides Lower Halls detail: yes",
+      "Complete map long lake title: Long Lake",
       "Complete map long lake shows Erebor portal: yes",
       "Complete map long lake hides Lower Halls detail: yes",
       "Complete map long lake shows Front Gate: yes",
@@ -4717,6 +4755,40 @@ const gameCases = [
     ],
   },
   {
+    name: "spider-road safe moments stay single and non-spoilery",
+    setup(game) {
+      game.flags.dragondefeated = true;
+      game.currentRoom = "waterfall";
+      game.player.position = "waterfall";
+      game.visitedRooms = new Set(["waterfall", "forest_road_2", "forest_road"]);
+    },
+    drive(game) {
+      const firstStart = outputLines.length;
+      game.execute("west");
+      const firstSafeLines = outputLines.slice(firstStart).filter((line) => line.includes("A safe moment is marked here"));
+      game.print(`First spider crossing safe moments shown: ${firstSafeLines.length}`);
+      game.print(`First spider crossing label: ${game.autosaveMeta?.label || "none"}`);
+      const secondStart = outputLines.length;
+      game.execute("wait");
+      game.execute("wait");
+      game.execute("west");
+      const secondSafeLines = outputLines.slice(secondStart).filter((line) => line.includes("A safe moment is marked here"));
+      game.print(`Second spider crossing safe moments shown: ${secondSafeLines.length}`);
+      game.print(`Second spider crossing label: ${game.autosaveMeta?.label || "none"}`);
+    },
+    expectedIncluded: [
+      "First spider crossing safe moments shown: 1",
+      "First spider crossing label: along the forest road",
+      "Second spider crossing safe moments shown: 1",
+      "Second spider crossing label: deeper along the forest road",
+    ],
+    notExpectedIncluded: [
+      "before the spider ambush near",
+      "before crossing the spider-haunted road",
+      "before the second spider-haunted crossing",
+    ],
+  },
+  {
     name: "jump laketown applies a coherent bard rendezvous state",
     drive(game) {
       game.execute("jump laketown");
@@ -5408,6 +5480,48 @@ const gameCases = [
     ],
   },
   {
+    name: "event-driven hazard entries keep a single safe moment",
+    setup(game) {
+      for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+        const key = localStorage.key(index);
+        if (key && key.startsWith("hobbit-web-save:")) localStorage.removeItem(key);
+      }
+      game.storage.refreshLatestAutosaveState();
+      placeCharacterWithPlayer(game, "thorin");
+      placeCharacterWithPlayer(game, "gandalf");
+    },
+    drive(game) {
+      movePlayerTo(game, "dark_stuffy_passage_14");
+      game.visitedRooms.delete("deep_dark_lake");
+      const goblinStart = outputLines.length;
+      game.maybeAutosaveForRoom(game.currentRoom);
+      game.checkSpecialSituations();
+      const goblinSafeLines = outputLines.slice(goblinStart).filter((line) => line.includes("A safe moment is marked here"));
+      game.print(`Goblin entry safe moments shown: ${goblinSafeLines.length}`);
+      game.print(`Goblin entry label: ${game.autosaveMeta?.label || "none"}`);
+
+      movePlayerTo(game, "deep_dark_lake");
+      game.gollumState = game.createGollumState();
+      const gollum = game.currentGollum();
+      if (gollum) {
+        gollum.visible = true;
+        gollum.position = "deep_dark_lake";
+      }
+      const gollumStart = outputLines.length;
+      game.maybeAutosaveForRoom(game.currentRoom);
+      game.checkSpecialSituations();
+      const gollumSafeLines = outputLines.slice(gollumStart).filter((line) => line.includes("A safe moment is marked here"));
+      game.print(`Gollum entry safe moments shown: ${gollumSafeLines.length}`);
+      game.print(`Gollum entry label: ${game.autosaveMeta?.label || "none"}`);
+    },
+    expectedIncluded: [
+      "Goblin entry safe moments shown: 1",
+      "Goblin entry label: before the goblin ambush in the upper tunnels",
+      "Gollum entry safe moments shown: 1",
+      "Gollum entry label: before meeting Gollum",
+    ],
+  },
+  {
     name: "tunnel ambush goblin requires bilbo and a companion to finish it",
     setup(game) {
       movePlayerTo(game, "dark_stuffy_passage_14");
@@ -5900,12 +6014,33 @@ const gameCases = [
       game.execute("ask gollum a riddle");
       game.execute("answer toaster");
       game.execute("restart");
+      const hadPendingRestartConfirmation = Boolean(game.pendingRestartConfirmation);
+      game.execute("yes");
+      game.print(`Restart confirmation pending: ${hadPendingRestartConfirmation ? "yes" : "no"}`);
       game.print(`Restart room: ${game.currentRoom}`);
       game.print(`Restart endgame: ${game.endgame ? "yes" : "no"}`);
     },
     expectedIncluded: [
+      "Restart confirmation pending: yes",
       "Restart room: hobbit_hole",
       "Restart endgame: no",
+    ],
+  },
+  {
+    name: "restart command can be cancelled during play",
+    drive(game) {
+      game.execute("south");
+      game.execute("restart");
+      game.print(`Restart cancellation pending: ${game.pendingRestartConfirmation ? "yes" : "no"}`);
+      game.execute("no");
+      game.print(`Restart cancelled room: ${game.currentRoom}`);
+      game.print(`Restart cancelled endgame: ${game.endgame ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Restart cancellation pending: yes",
+      "Restart cancelled.",
+      "Restart cancelled room: bag_end_dining_room",
+      "Restart cancelled endgame: no",
     ],
   },
   {
@@ -6368,29 +6503,53 @@ const externalRegressions = loadExternalRegressionCases();
 cases.push(...externalRegressions.splitterCases);
 gameCases.push(...externalRegressions.gameCases);
 
+const cliOptions = parseCliOptions(process.argv.slice(2));
 const Splitter = bootGame();
-const results = cases.map((testCase) => runCase(Splitter, testCase));
-const dialogueResults = dialogueCases.map(([input, expected], index) => runDialogueCase({
-  name: `dialogue ${String(index + 1).padStart(3, "0")}`,
-  input,
-  expected,
-}));
-const gameResults = gameCases.map(runGameCase);
-const allResults = [...results, ...dialogueResults, ...gameResults];
-const failed = allResults.filter((result) => !result.ok);
+let failed = [];
+if (!cliOptions.autoplayBatchOnly) {
+  const results = cases.map((testCase) => runCase(Splitter, testCase));
+  const dialogueResults = dialogueCases.map(([input, expected], index) => runDialogueCase({
+    name: `dialogue ${String(index + 1).padStart(3, "0")}`,
+    input,
+    expected,
+  }));
+  const gameResults = gameCases.map(runGameCase);
+  const allResults = [...results, ...dialogueResults, ...gameResults];
+  failed = allResults.filter((result) => !result.ok);
 
-for (const result of allResults) {
-  const mark = result.ok ? "PASS" : "FAIL";
-  console.log(`${mark} ${result.name}`);
-  if (!result.ok) {
-    console.log(`  expected: ${JSON.stringify(result.expected)}`);
-    console.log(`  actual:   ${JSON.stringify(result.actual)}`);
+  for (const result of allResults) {
+    const mark = result.ok ? "PASS" : "FAIL";
+    console.log(`${mark} ${result.name}`);
+    if (!result.ok) {
+      console.log(`  expected: ${JSON.stringify(result.expected)}`);
+      console.log(`  actual:   ${JSON.stringify(result.actual)}`);
+    }
+  }
+
+  if (failed.length) {
+    console.error(`\n${failed.length} parser test(s) failed.`);
+    process.exit(1);
+  }
+
+  console.log(`\n${allResults.length} parser/dialogue tests passed.`);
+}
+
+if (cliOptions.autoplayBatchCount > 0) {
+  const report = runAutoplaySeedBatch({
+    count: cliOptions.autoplayBatchCount,
+    seedStart: cliOptions.autoplayBatchSeedStart,
+    stepLimit: cliOptions.autoplayBatchStepLimit,
+  });
+  printAutoplayBatchReport(report, {
+    count: cliOptions.autoplayBatchCount,
+    seedStart: cliOptions.autoplayBatchSeedStart,
+    stepLimit: cliOptions.autoplayBatchStepLimit,
+  });
+  if (cliOptions.autoplayBatchStrict) {
+    const failures = report.runs.filter((run) => run.outcome.code !== "victory");
+    if (failures.length) {
+      console.error(`\n${failures.length} autoplay batch run(s) failed.`);
+      process.exit(1);
+    }
   }
 }
-
-if (failed.length) {
-  console.error(`\n${failed.length} parser test(s) failed.`);
-  process.exit(1);
-}
-
-console.log(`\n${allResults.length} parser/dialogue tests passed.`);

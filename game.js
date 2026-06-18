@@ -4029,7 +4029,7 @@
         load: () => game.load(objectText),
         autosave: () => game.resumeFromAutosave(),
         quit: () => game.quit(),
-        restart: () => game.restartGame(),
+        restart: () => game.requestRestartConfirmation(),
         undo: () => game.undoUnavailable(),
         pause: () => game.pauseGame(),
         map: () => game.showMap(),
@@ -6205,7 +6205,6 @@
       this.game.sceneMapScope = normalized;
       this.game.sceneMapAutoFollow = false;
       this.game.sceneMapManualScope = true;
-      if (normalized !== "world") this.game.sceneMapShowAll = false;
       this.game.sceneMapRenderCache = null;
       this.game.sceneMapLayoutState = null;
       this.renderSceneMap();
@@ -6972,6 +6971,7 @@
       game.endgame = false;
       game.endgameRestartArmed = false;
       game.pendingEndgameChoice = null;
+      game.pendingRestartConfirmation = null;
       game.player = game.characters[game.data.player];
       game.normalizeCharacterMovementModes();
       game.normalizeLanternState();
@@ -7615,9 +7615,7 @@
       const goblin = this.goblinTunnelGoblin();
       const victim = this.chooseGoblinTunnelVictim();
       if (!goblin || !victim) return false;
-      game.recordAutosave("before the goblin ambush in the upper tunnels", {
-        key: "hazard:goblins:tunnel-ambush",
-      });
+      game.hazards?.maybeAutosaveForRoom(game.currentRoom);
       game.flags.goblintunnelambushactive = true;
       game.flags.goblintunnelambushresolved = false;
       game.flags.goblintunnelambushroom = game.currentRoom;
@@ -7810,9 +7808,7 @@
       const trigger = this.spiderEyesTriggerFor(previousRoom, currentRoom, direction);
       if (!trigger) return;
       if (game.flags[this.spiderEyesResolvedFlag(currentRoom)]) return;
-      game.recordAutosave(`before the spider ambush near ${roomDisplayName(game.rooms[currentRoom] || currentRoom, { article: true })}`, {
-        key: `hazard:spider-eyes:${currentRoom}`,
-      });
+      this.maybeAutosaveForRoom(currentRoom);
       game.spiderEyesState = {
         active: true,
         room: currentRoom,
@@ -7943,11 +7939,11 @@
       const hazardMap = {
         deep_dark_lake: { label: "before meeting Gollum", key: "hazard:gollum:room" },
         trolls_clearing: { label: "before facing the trolls", key: "hazard:trolls:room" },
-        dark_stuffy_passage_14: { label: "before the goblin ambush in the tunnels", key: "hazard:goblins:tunnel-ambush" },
+        dark_stuffy_passage_14: { label: "before the goblin ambush in the upper tunnels", key: "hazard:goblins:tunnel-ambush" },
         west_bank: { label: "before testing the fast river", key: "hazard:river:west-bank" },
         cellar: { label: "before the barrel escape", key: "hazard:river:cellar" },
-        forest_road_2: { label: "before crossing the spider-haunted road", key: "hazard:spiders:forest-road-2" },
-        forest_road: { label: "before the second spider-haunted crossing", key: "hazard:spiders:forest-road" },
+        forest_road_2: { label: "along the forest road", key: "hazard:spiders:forest-road-2" },
+        forest_road: { label: "deeper along the forest road", key: "hazard:spiders:forest-road" },
       };
       const hazard = hazardMap[roomId];
       if (!hazard) return false;
@@ -8511,6 +8507,45 @@
       game.focusCommandInput({ defer: true });
     }
 
+    requestRestartConfirmation() {
+      const game = this.game;
+      game.pendingRestartConfirmation = {
+        endgame: Boolean(game.endgame),
+        pendingEndgameChoice: game.pendingEndgameChoice || null,
+      };
+      game.print(restartConfirmText(), "system");
+      game.focusCommandInput({ defer: true });
+      return true;
+    }
+
+    handleRestartConfirmation(rawCommand) {
+      const game = this.game;
+      if (!game.pendingRestartConfirmation) return false;
+      const answer = normalize(rawCommand);
+      if (["yes", "y", "confirm"].includes(answer)) {
+        game.pendingRestartConfirmation = null;
+        this.restartGame();
+        return true;
+      }
+      if (["no", "n", "cancel", "stop"].includes(answer)) {
+        const context = game.pendingRestartConfirmation;
+        game.pendingRestartConfirmation = null;
+        game.print(restartCancelledText(), "system");
+        if (context?.endgame) {
+          if (context.pendingEndgameChoice) {
+            game.print(game.autosaveSnapshot
+              ? autosaveChoiceText(game.autosaveMeta?.roomName)
+              : `${noAutosaveText()} ${restartChoiceText()}`, "system");
+          } else {
+            game.print(adventureEndedText(), "system");
+          }
+        }
+        return true;
+      }
+      game.print(restartConfirmText(), "system");
+      return true;
+    }
+
     restartGame() {
       const game = this.game;
       this.stopAutoplay();
@@ -8527,6 +8562,7 @@
       game.endgame = false;
       game.endgameRestartArmed = false;
       game.pendingEndgameChoice = null;
+      game.pendingRestartConfirmation = null;
       game.visitedTrollsClearing = false;
       game.waitCounter = 0;
       game.secretDoorWaitCounter = 0;
@@ -8553,6 +8589,7 @@
       this.resetAutoplayState();
       game.pendingClarification = null;
       game.forcedChoice = null;
+      game.pendingRestartConfirmation = null;
       game.clarifiedReferences = {};
       game.commandIssuer = null;
       game.lastConversationCharacterId = null;
@@ -9417,6 +9454,7 @@
       this.sharedDelegatedContext = this.emptyCommandReferenceContext();
       this.endgameRestartArmed = false;
       this.pendingEndgameChoice = null;
+      this.pendingRestartConfirmation = null;
       this.arrivalNoticeTimers = [];
       this.spiderEyesState = null;
       this.gollumState = null;
@@ -9642,6 +9680,11 @@
       });
       document.addEventListener("keydown", (event) => {
         if (this.storage?.isPanelOpen?.()) return;
+        if (event.key === "Escape" && this.autoplayRunning) {
+          event.preventDefault();
+          this.stopAutoplay("Autoplay stopped.");
+          return;
+        }
         if (event.key === "Escape" && this.sceneMapVisible) {
           event.preventDefault();
           this.layout.closeSceneMap();
@@ -9745,7 +9788,9 @@
         window.addEventListener("resize", () => {
           this.applyLayoutMode(this.layoutModePreference);
           this.applyLayout2SceneWidth(this.layout2SceneWidth, { persist: false });
-          this.layout.applySceneMapEditorPanelPosition();
+          if (typeof this.layout.applySceneMapEditorPanelPosition === "function") {
+            this.layout.applySceneMapEditorPanelPosition();
+          }
         });
       }
     }
@@ -9865,6 +9910,10 @@
         if (this.temporaryImageDismissOnNextCommand && normalize(lower)) {
           this.clearTemporaryImage({ render: false });
         }
+        if (this.pendingRestartConfirmation) {
+          this.handleRestartConfirmation(rawCommand);
+          return;
+        }
         if (this.endgame) {
           const normalizedEndgame = normalize(lower);
           if (this.pendingEndgameChoice) {
@@ -9877,7 +9926,7 @@
               return;
             }
             if (["restart", "start again", "from beginning", "beginning"].includes(normalizedEndgame)) {
-              this.restartGame();
+              this.requestRestartConfirmation();
               return;
             }
             this.print(this.autosaveSnapshot
@@ -9886,7 +9935,7 @@
             return;
           }
           if (normalizedEndgame === "restart") {
-            this.restartGame();
+            this.requestRestartConfirmation();
             return;
           }
           this.print(adventureEndedText(), "system");
@@ -11299,6 +11348,7 @@
       this.pendingClarification = null;
       this.forcedChoice = null;
       this.pendingEndgameChoice = null;
+      this.pendingRestartConfirmation = null;
       this.endgame = false;
       this.endgameRestartArmed = false;
       this.normalizeCharacterMovementModes();
@@ -11327,6 +11377,7 @@
       this.endgame = false;
       this.endgameRestartArmed = false;
       this.pendingEndgameChoice = null;
+      this.pendingRestartConfirmation = null;
       this.visitedTrollsClearing = false;
       this.waitCounter = 0;
       this.secretDoorWaitCounter = 0;
@@ -11337,6 +11388,7 @@
       this.tipIndex = 0;
       this.pendingClarification = null;
       this.forcedChoice = null;
+      this.pendingRestartConfirmation = null;
       this.clarifiedReferences = {};
       this.commandIssuer = null;
       this.lastConversationCharacterId = null;
@@ -13870,6 +13922,14 @@
       return this.flow.restartGame();
     }
 
+    requestRestartConfirmation() {
+      return this.flow.requestRestartConfirmation();
+    }
+
+    handleRestartConfirmation(rawCommand) {
+      return this.flow.handleRestartConfirmation(rawCommand);
+    }
+
     handleTimedSpecials() {
       return this.hazards.handleTimedSpecials();
     }
@@ -14902,6 +14962,14 @@
 
   function restartChoiceText() {
     return "Type 'restart' to begin the tale again.";
+  }
+
+  function restartConfirmText() {
+    return "Are you sure you want to restart? Type 'yes' to confirm or 'no' to stay in the current tale.";
+  }
+
+  function restartCancelledText() {
+    return "Restart cancelled.";
   }
 
   function restartAnyKeyText() {
