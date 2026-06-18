@@ -177,15 +177,16 @@
     {
       key: "trolls",
       shortcut: "trolls",
-      label: "Trolls Clearing",
-      description: "Past the pony sequence, on the road to the trolls.",
+      label: "Troll Approach",
+      description: "Past the pony sequence, one move before the trolls' clearing.",
       aliases: ["trolls", "troll clearing", "trolls clearing", "clearing"],
       apply(game) {
         game.debugCompleteUnexpectedParty();
         game.debugMarkPonyProgress();
         game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true });
         game.flags.seenpony = true;
-        game.debugMovePlayer("trolls_clearing", { markRoute: true });
+        game.flags.debugforcetrollencounter = true;
+        game.debugMovePlayer("dreary", { markRoute: true });
         game.waitCounter = 0;
       },
     },
@@ -6451,6 +6452,15 @@
       }
     }
 
+    isQuotaExceededError(error) {
+      if (!error) return false;
+      const name = String(error.name || "");
+      const message = String(error.message || "");
+      return name === "QuotaExceededError"
+        || name === "NS_ERROR_DOM_QUOTA_REACHED"
+        || /quota/i.test(message);
+    }
+
     createSnapshot() {
       const game = this.game;
       return clone({
@@ -6538,7 +6548,29 @@
         label,
         key,
       });
-      localStorage.setItem(this.storageKeyForAutosave(record.id), JSON.stringify(record));
+      const storageKey = this.storageKeyForAutosave(record.id);
+      const payload = JSON.stringify(record);
+      try {
+        localStorage.setItem(storageKey, payload);
+      } catch (error) {
+        if (!this.isQuotaExceededError(error)) throw error;
+        const autosaves = this.autosaveEntries().sort((left, right) => (Number(left.savedAt) || 0) - (Number(right.savedAt) || 0));
+        let stored = false;
+        for (const stale of autosaves) {
+          localStorage.removeItem(stale.storageKey);
+          try {
+            localStorage.setItem(storageKey, payload);
+            stored = true;
+            break;
+          } catch (retryError) {
+            if (!this.isQuotaExceededError(retryError)) throw retryError;
+          }
+        }
+        if (!stored) {
+          this.refreshLatestAutosaveState();
+          return false;
+        }
+      }
       this.pruneAutosaves();
       this.refreshLatestAutosaveState();
       game.print(autosaveMarkedText(label), "system");
@@ -7424,19 +7456,22 @@
     checkTrollsClearing() {
       const game = this.game;
       if (game.currentRoom !== "trolls_clearing") return;
+      const forcedEncounter = Boolean(game.flags.debugforcetrollencounter);
       if (game.trollsTransformed) {
         game.ensureTrollKeyRecovered();
         game.visitedTrollsClearing = true;
         game.trollsDefeated = true;
+        game.flags.debugforcetrollencounter = false;
         game.print("You see the stone remains of the trolls.");
         return;
       }
-      if (!game.visitedTrollsClearing) {
-        game.recordAutosave("before facing the trolls", { key: "hazard:trolls:room" });
+      if (!game.visitedTrollsClearing || forcedEncounter) {
         game.visitedTrollsClearing = true;
+        game.flags.debugforcetrollencounter = false;
         game.waitCounter = 0;
         game.flags.trollsclearingwarningturns = 0;
         game.flags.trollsclearingwarningturnstamp = -1;
+        game.recordAutosave("before facing the trolls", { key: "hazard:trolls:room" });
         game.print("You crouch low behind a mossy boulder, heart pounding, as the trolls argue by the flickering campfire in the moonlit clearing.");
         game.print("Only then do you make out the cause of the quarrel: one of the trolls has already caught a dwarf and is brandishing him like the beginning of supper.");
         game.print("What shall us do with him?");
@@ -12234,6 +12269,11 @@
         this.print(`The ${door.name} is locked.`);
         return false;
       }
+      const triggerTrollEncounterOnEntry = (
+        connection.to === "trolls_clearing"
+        && !this.trollsTransformed
+        && (!this.visitedTrollsClearing || Boolean(this.flags.debugforcetrollencounter))
+      );
       const previousRoom = this.currentRoom;
       const movedInTotalDarkness = this.roomIsDark(previousRoom);
       this.currentRoom = connection.to;
@@ -12256,8 +12296,12 @@
       this.describeRoom();
       this.triggerSpiderEyesEncounter(previousRoom, connection.to, direction);
       this.hazards?.maybeProgressAutosave(previousRoom, connection.to);
-      this.maybeAutosaveForRoom(connection.to);
-      this.checkSpecialSituations();
+      if (!triggerTrollEncounterOnEntry) this.maybeAutosaveForRoom(connection.to);
+      if (triggerTrollEncounterOnEntry) {
+        this.checkTrollsClearing();
+      } else {
+        this.checkSpecialSituations();
+      }
       return true;
     }
 

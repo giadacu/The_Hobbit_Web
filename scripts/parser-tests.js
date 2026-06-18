@@ -3764,6 +3764,7 @@ const gameCases = [
     name: "jump trolls preserves offscreen dawn progression after leaving the clearing",
     drive(game) {
       game.execute("jump trolls");
+      game.execute("east");
       game.execute("south west");
       game.execute("wait");
       game.execute("wait");
@@ -3771,7 +3772,7 @@ const gameCases = [
       game.print(`Trolls transformed after waits: ${game.trollsTransformed ? "yes" : "no"}`);
     },
     expectedIncluded: [
-      "Jumped to Trolls Clearing.",
+      "Jumped to Troll Approach.",
       "Day dawns.",
       "Trolls transformed after waits: yes",
     ],
@@ -3780,6 +3781,7 @@ const gameCases = [
     name: "ordinary turns do not advance troll dawn unless the key was stolen",
     drive(game) {
       game.execute("jump trolls");
+      game.execute("east");
       game.execute("south west");
       game.execute("look");
       game.execute("inventory");
@@ -3787,7 +3789,7 @@ const gameCases = [
       game.print(`Trolls transformed after ordinary turns without theft: ${game.trollsTransformed ? "yes" : "no"}`);
     },
     expectedIncluded: [
-      "Jumped to Trolls Clearing.",
+      "Jumped to Troll Approach.",
       "Trolls transformed after ordinary turns without theft: no",
     ],
     notExpectedIncluded: [
@@ -3798,6 +3800,7 @@ const gameCases = [
     name: "ordinary turns advance troll dawn after stealing the key and leaving",
     drive(game) {
       game.execute("jump trolls");
+      game.execute("east");
       game.execute("carefully take large key and south west");
       game.execute("look");
       game.execute("inventory");
@@ -3805,19 +3808,20 @@ const gameCases = [
       game.print(`Trolls transformed after ordinary turns with theft: ${game.trollsTransformed ? "yes" : "no"}`);
     },
     expectedIncluded: [
-      "Jumped to Trolls Clearing.",
+      "Jumped to Troll Approach.",
       "You take the large key.",
       "Day dawns.",
       "Trolls transformed after ordinary turns with theft: yes",
     ],
   },
   {
-    name: "jump trolls starts at the opening troll argument",
+    name: "jump trolls lands one move before the opening troll argument",
     drive(game) {
       game.execute("jump trolls");
+      game.execute("east");
     },
     expectedIncluded: [
-      "Jumped to Trolls Clearing.",
+      "Jumped to Troll Approach.",
       "You crouch low behind a mossy boulder, heart pounding, as the trolls argue by the flickering campfire in the moonlit clearing.",
       "What shall us do with him?",
       "Roast him!",
@@ -3827,11 +3831,12 @@ const gameCases = [
     name: "jump trolls allows one orienting command before bilbo is in immediate danger",
     drive(game) {
       game.execute("jump trolls");
+      game.execute("east");
       game.execute("look");
       game.print(`Endgame after first look: ${game.endgame ? "yes" : "no"}`);
     },
     expectedIncluded: [
-      "Jumped to Trolls Clearing.",
+      "Jumped to Troll Approach.",
       "You are in the trolls' clearing.",
       "Endgame after first look: no",
     ],
@@ -3965,6 +3970,7 @@ const gameCases = [
     name: "surviving the trolls marks a post-danger autosave",
     drive(game) {
       game.execute("jump trolls");
+      game.execute("east");
       outputLines.length = 0;
       game.execute("carefully take large key and south west");
       game.execute("wait");
@@ -3981,12 +3987,13 @@ const gameCases = [
     name: "post-troll road to rivendell requires bilbo to carry a blade",
     drive(game) {
       game.execute("jump trolls");
+      game.execute("east");
       game.transformTrolls();
       game.execute("south east");
       game.print(`Road room after block: ${game.currentRoom}`);
     },
     expectedIncluded: [
-      "Jumped to Trolls Clearing.",
+      "Jumped to Troll Approach.",
       "The Trollshaws are no place for you to go unarmed.",
       "Road room after block: trolls_clearing",
     ],
@@ -3995,11 +4002,12 @@ const gameCases = [
     name: "live trolls block the open road toward rivendell without killing bilbo",
     drive(game) {
       game.execute("jump trolls");
+      game.execute("east");
       game.execute("south east");
       game.print(`Road room with live trolls: ${game.currentRoom}`);
     },
     expectedIncluded: [
-      "Jumped to Trolls Clearing.",
+      "Jumped to Troll Approach.",
       "The road toward Rivendell lies bare in the trolls' firelight.",
       "Road room with live trolls: trolls_clearing",
     ],
@@ -4014,10 +4022,11 @@ const gameCases = [
     drive(game) {
       game.execute("jump trolls");
       game.execute("east");
+      game.execute("east");
       game.print(`Endgame after eastward attempt: ${game.endgame ? "yes" : "no"}`);
     },
     expectedIncluded: [
-      "Jumped to Trolls Clearing.",
+      "Jumped to Troll Approach.",
       "The road toward Rivendell lies bare in the trolls' firelight.",
       "Endgame after eastward attempt: no",
     ],
@@ -4030,6 +4039,7 @@ const gameCases = [
     name: "repeated rivendellward attempts in the troll clearing do not themselves get bilbo killed",
     drive(game) {
       game.execute("jump trolls");
+      game.execute("east");
       game.execute("east");
       game.execute("south east");
       game.execute("east");
@@ -5456,6 +5466,7 @@ const gameCases = [
     name: "load after troll death opens the safe moments panel",
     drive(game) {
       game.execute("jump trolls");
+      game.execute("east");
       outputLines.length = 0;
       game.execute("take large key");
       game.execute("wait");
@@ -5790,6 +5801,7 @@ const beginnerContexts = [
     setup(game) {
       game.restartGame();
       game.execute("jump trolls");
+      game.execute("east");
     },
     commands: [
       "look",

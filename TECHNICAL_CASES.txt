@@ -1,0 +1,118 @@
+TECHNICAL CASES LOG
+===================
+
+Purpose
+-------
+This file is the running memory for tricky technical issues solved in this
+repository. When a new session starts on this project, read this file first.
+When we solve another non-trivial technical problem, append a new entry with:
+
+- date
+- symptom
+- root cause
+- resolution
+- files touched
+- notes for future debugging
+
+
+Case 001 - 2026-06-18 - Troll dawn never arrives after the troll encounter
+---------------------------------------------------------------------------
+
+Symptom
+-------
+After the player reaches the trolls and then leaves the clearing, repeated
+"wait" commands in another location sometimes never trigger "Day dawns.".
+The problem was especially visible in debug flows started with "jump trolls".
+
+Observed behavior
+-----------------
+- The player could enter trolls_clearing and see the live trolls.
+- The intro scene for the troll encounter sometimes did not fully initialize.
+- The offscreen dawn timer never progressed.
+- Temporary debug output showed:
+  - visitedTrollsClearing stayed "no"
+  - waitCounter stayed at 0 while outside the clearing
+  - forceEncounter stayed "yes"
+- A temporary debug catch exposed the browser error:
+  "The quota has been exceeded."
+
+Root cause
+----------
+There were two related problems.
+
+1. The "jump trolls" checkpoint placed the player too deep into the scene flow.
+   That made the encounter depend on follow-up state and timing that were not
+   always initialized consistently.
+
+2. The real blocker was autosave failure during the troll encounter setup.
+   In checkTrollsClearing(), the code attempted:
+
+   game.recordAutosave("before facing the trolls", { key: "hazard:trolls:room" });
+
+   before the encounter state was fully committed.
+
+   If localStorage was full, recordAutosave() threw a quota error. That
+   interrupted the function before visitedTrollsClearing, waitCounter, and the
+   other troll-scene flags were safely finalized. As a result, the game looked
+   like the player had met the trolls, but the offscreen dawn logic still
+   thought the encounter had never properly started.
+
+Resolution
+----------
+The final fix had four parts.
+
+1. "jump trolls" now lands on the troll approach ("dreary"), one move before
+   the clearing, instead of placing the player directly inside trolls_clearing.
+
+2. The jump also sets a temporary force flag:
+   debugforcetrollencounter
+   so the first entry into trolls_clearing always starts the intended scene.
+
+3. Movement into trolls_clearing now decides up front whether the troll
+   encounter must trigger, and directly runs checkTrollsClearing() on entry
+   instead of relying only on later generic post-move checks.
+
+4. checkTrollsClearing() now commits critical encounter state before attempting
+   the autosave:
+   - visitedTrollsClearing = true
+   - debugforcetrollencounter = false
+   - waitCounter = 0
+   - troll warning state reset
+
+   The autosave is then attempted afterward, so save failure cannot break the
+   encounter state.
+
+5. recordAutosave() was hardened against localStorage quota failures.
+   If the browser reports quota exhaustion, the code now:
+   - recognizes the quota error
+   - removes older autosaves
+   - retries saving
+   - returns false safely if it still cannot save
+   - does not let the exception break game flow
+
+Files touched
+-------------
+- game.js
+
+Key implementation notes
+------------------------
+- The robust fix was not "reset the flag less often". The issue was that the
+  flag was never being committed because the autosave exception interrupted the
+  encounter setup.
+- For hazardous-scene triggers, gameplay state should be committed before any
+  best-effort persistence layer like localStorage autosave.
+- When debugging browser-only state bugs, temporary in-output debug lines were
+  useful:
+  - troll-debug
+  - troll-debug-entry
+  - debug-error
+  They were removed after confirmation.
+
+Future debugging advice
+-----------------------
+- If a scene seems to start visually but downstream timers do not move, check
+  whether a browser-side persistence call is throwing mid-scene.
+- If a user reports behavior that cannot be reproduced locally, add temporary
+  in-output debug lines rather than relying only on the JS console.
+- For other hazard scenes, review whether autosave happens before or after the
+  scene state is committed.
