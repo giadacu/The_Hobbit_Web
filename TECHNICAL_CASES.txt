@@ -211,3 +211,49 @@ That preserves:
 Files touched
 -------------
 - game.js
+
+
+Case 004 - 2026-06-18 - Local maps missed immediate parent/world connections shown by the editor
+--------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Inside a local map such as Rivendell, the game only showed anonymous dashed
+exit stubs for out-of-scope links. The immediate parent/world connections that
+were visible in the map editor, such as Hidden Valley Path and Misty Mountains,
+were not rendered in the in-game map.
+
+Root cause
+----------
+The in-game scene-map model built only `exitStubs` for connections leaving the
+current scope. Unlike the editor, it never promoted those links into explicit
+external exits resolved against the parent scope, so the renderer had no
+destination labels to show.
+
+Resolution
+----------
+The fix aligned the game renderer with the editor logic.
+
+1. Added a scope-aware destination resolver for rooms outside the current
+   local map, so the game can map a connection to the correct parent/world
+   node label.
+
+2. Local map models now build `externalExits` for immediate off-scope
+   connections and keep their destination labels.
+
+3. The SVG renderer now draws those exits as labeled pills with direction
+   badges, matching the editor behavior more closely.
+
+4. Anonymous exit stubs are filtered out when a labeled external exit already
+   represents the same source node and direction, avoiding duplicate marks.
+
+Files touched
+-------------
+- game.js
+
+Future debugging advice
+-----------------------
+- If the editor shows a cross-scope map link that the game does not, compare
+  the model-building step first, not only the SVG rendering step.
+- Keep unexplored internal exits (`exitStubs`) separate from parent-scope
+  exits with known destinations, because they serve different UI purposes.

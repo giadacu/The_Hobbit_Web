@@ -9178,6 +9178,11 @@
       });
       document.addEventListener("keydown", (event) => {
         if (this.storage?.isPanelOpen?.()) return;
+        if (event.key === "Escape" && this.sceneMapVisible) {
+          event.preventDefault();
+          this.layout.closeSceneMap();
+          return;
+        }
         if (!this.endgameRestartArmed) return;
         event.preventDefault();
         if (this.pendingEndgameChoice) {
@@ -15263,6 +15268,93 @@
     return labels.map((direction) => ({ direction, label: formatMapDirectionBadge(direction) }));
   }
 
+  function mapScopeNodeDescriptorForRoom(game, scope = "world", roomId = "") {
+    if (!roomId) return null;
+    if (scope === "world") {
+      const regionId = ROOM_TO_MAP_REGION[roomId] || "";
+      const region = regionId ? MAP_REGION_DEFINITIONS[regionId] : null;
+      if (region?.parentScope) return null;
+      if (regionId && WORLD_REGION_INLINE_IN_WORLD.has(regionId)) {
+        return {
+          id: `room:${roomId}`,
+          label: WORLD_MAP_LABEL_OVERRIDES[roomId] || roomDisplayName(game.rooms?.[roomId] || roomId),
+          scope: "world",
+        };
+      }
+      if (regionId && WORLD_INLINE_REGION_HOSTS[regionId]) return null;
+      if (regionId) {
+        return {
+          id: `region:${regionId}`,
+          label: region?.label || WORLD_MAP_LABEL_OVERRIDES[roomId] || roomDisplayName(game.rooms?.[roomId] || roomId),
+          scope: "world",
+        };
+      }
+      return {
+        id: `room:${roomId}`,
+        label: WORLD_MAP_LABEL_OVERRIDES[roomId] || roomDisplayName(game.rooms?.[roomId] || roomId),
+        scope: "world",
+      };
+    }
+
+    const region = MAP_REGION_DEFINITIONS[scope];
+    if (!region) return null;
+    const childRegions = Object.entries(MAP_REGION_DEFINITIONS)
+      .filter(([_regionId, candidate]) => candidate.parentScope === scope);
+    const childRoomIds = new Set(childRegions.flatMap(([_regionId, candidate]) => candidate.rooms || []));
+    const previewRooms = new Set(region.previewRooms || []);
+    if (!(region.rooms || []).includes(roomId)) return null;
+    if (childRoomIds.has(roomId) && !previewRooms.has(roomId)) return null;
+    return {
+      id: `room:${roomId}`,
+      label: WORLD_MAP_LABEL_OVERRIDES[roomId] || roomDisplayName(game.rooms?.[roomId] || roomId),
+      scope,
+    };
+  }
+
+  function buildMapExternalExits(game, nodes, scope = "world") {
+    if (!Array.isArray(nodes) || scope === "world") return [];
+    const parent = MAP_REGION_DEFINITIONS[scope]?.parentScope || "world";
+    const visibleRoomIds = new Set(nodes.map((node) => node.roomId).filter(Boolean));
+    const exits = [];
+    const seen = new Set();
+
+    for (const node of nodes) {
+      if (!node?.roomId) continue;
+      for (const connection of game.connections || []) {
+        if (connection.from !== node.roomId) continue;
+        if (visibleRoomIds.has(connection.to)) continue;
+        const direction = compassDirectionKey(connection.direction) || normalize(connection.direction);
+        if (!direction) continue;
+        const parentTarget = mapScopeNodeDescriptorForRoom(game, parent, connection.to);
+        if (!parentTarget) continue;
+        const key = `${node.id}|${direction}|${parentTarget.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        exits.push({
+          id: key,
+          sourceNodeId: node.id,
+          direction,
+          destinationLabel: parentTarget.label,
+          parentNodeId: parentTarget.id,
+          parentScope: parentTarget.scope,
+        });
+      }
+    }
+
+    exits.sort((left, right) => {
+      if (left.sourceNodeId !== right.sourceNodeId) return left.sourceNodeId.localeCompare(right.sourceNodeId, "it");
+      const directionDelta = ([
+        "north", "north east", "east", "south east", "south", "south west", "west", "north west", "up", "down", "inside", "outside", "forward", "back",
+      ].indexOf(left.direction) - [
+        "north", "north east", "east", "south east", "south", "south west", "west", "north west", "up", "down", "inside", "outside", "forward", "back",
+      ].indexOf(right.direction));
+      if (directionDelta) return directionDelta;
+      return left.destinationLabel.localeCompare(right.destinationLabel, "it");
+    });
+
+    return exits;
+  }
+
   function preferredSceneMapScopeForRoom(scope = "world", roomId = "") {
     const normalizedScope = String(scope || "world").trim() || "world";
     if (normalizedScope === "world") return normalizedScope;
@@ -15488,10 +15580,12 @@
       mapRoom: (roomId) => `room:${roomId}`,
       allowedNodeIds: new Set(nodes.map((node) => node.id)),
     });
+    const externalExits = buildMapExternalExits(game, nodes, scope);
+    const externalStubKeys = new Set(externalExits.map((entry) => `${entry.sourceNodeId}|${entry.direction}`));
     const exitStubs = buildMapExitStubs(game, new Set(visitedRegionRooms), {
       mapRoom: (roomId) => `room:${roomId}`,
       allowedNodeIds: new Set(nodes.map((node) => node.id)),
-    });
+    }).filter((stub) => !externalStubKeys.has(`${stub.nodeId}|${stub.direction}`));
 
     const currentNodeId = region.rooms.includes(game.currentRoom) ? `room:${game.currentRoom}` : "";
     const defaultPinnedPositions = Object.fromEntries(
@@ -15502,6 +15596,7 @@
       nodes,
       edges,
       exitStubs,
+      externalExits,
       currentNodeId,
       currentNodeExits: currentRoomMapExits(game),
       parentScope: region.parentScope || "world",
@@ -15873,13 +15968,83 @@
     return { from, to };
   }
 
+  function mapExternalExitSide(direction = "") {
+    const normalized = compassDirectionKey(direction) || normalize(direction);
+    if (normalized === "up") return "north";
+    if (normalized === "down") return "south";
+    return ["north", "north east", "east", "south east", "south", "south west", "west", "north west"].includes(normalized) ? normalized : "";
+  }
+
+  function mapExternalExitPlacement(center, direction = "", boxSize = 96, index = 0, total = 1) {
+    if (!center) return null;
+    const side = mapExternalExitSide(direction);
+    const label = formatMapDirectionBadge(direction);
+    if (!side || !label) return null;
+    const vector = mapDirectionVector(side);
+    const magnitude = Math.hypot(vector.x, vector.y) || 1;
+    const alongX = vector.x / magnitude;
+    const alongY = vector.y / magnitude;
+    const normalX = -alongY;
+    const normalY = alongX;
+    const spread = total > 1 ? (index - ((total - 1) / 2)) * 28 : 0;
+    const half = boxSize / 2;
+    const quarterOffset = boxSize * 0.25;
+    let anchorPoint = mapBoxAnchorPoint(center, side, boxSize);
+    if (direction === "up") anchorPoint = { x: center.x - quarterOffset, y: center.y - half };
+    if (direction === "down") anchorPoint = { x: center.x + quarterOffset, y: center.y + half };
+    anchorPoint = {
+      x: anchorPoint.x + (normalX * spread),
+      y: anchorPoint.y + (normalY * spread),
+    };
+    const stubEnd = {
+      x: anchorPoint.x + (alongX * 32),
+      y: anchorPoint.y + (alongY * 32),
+    };
+    return {
+      label,
+      anchorPoint,
+      stubEnd,
+      directionVector: { x: alongX, y: alongY },
+    };
+  }
+
+  function renderMapExternalExit(entry, placement, options = {}) {
+    if (!entry || !placement) return "";
+    const destinationText = entry.destinationLabel || "";
+    const badgeWidth = Math.max(18, (placement.label.length * 7) + 10);
+    const labelWidth = Math.max(74, Math.min(210, (destinationText.length * 6.7) + 20));
+    const pillWidth = badgeWidth + labelWidth + 10;
+    const pillHeight = 22;
+    const pillGap = 10;
+    const centerX = placement.stubEnd.x + (placement.directionVector.x * ((pillWidth / 2) + pillGap));
+    const centerY = placement.stubEnd.y + (placement.directionVector.y * ((pillHeight / 2) + pillGap));
+    const pillX = centerX - (pillWidth / 2);
+    const pillY = centerY - (pillHeight / 2);
+    const badgeX = pillX + 4;
+    const textX = badgeX + badgeWidth + 8;
+    const lineColor = options.lineColor || "#b08b52";
+    const pillFill = options.pillFill || "#efe1ba";
+    const pillStroke = options.pillStroke || "#8c6a31";
+    const badgeFill = options.badgeFill || "#d8be86";
+    const textFill = options.textFill || "#5e4316";
+    return `<g>
+      <path d="M ${placement.anchorPoint.x.toFixed(1)} ${placement.anchorPoint.y.toFixed(1)} L ${placement.stubEnd.x.toFixed(1)} ${placement.stubEnd.y.toFixed(1)}" fill="none" stroke="${lineColor}" stroke-width="3.4" stroke-linecap="round"></path>
+      <rect x="${pillX.toFixed(1)}" y="${pillY.toFixed(1)}" width="${pillWidth.toFixed(1)}" height="${pillHeight}" rx="11" fill="${pillFill}" stroke="${pillStroke}" stroke-width="1.8"></rect>
+      <rect x="${badgeX.toFixed(1)}" y="${(pillY + 3).toFixed(1)}" width="${badgeWidth.toFixed(1)}" height="${(pillHeight - 6).toFixed(1)}" rx="8" fill="${badgeFill}"></rect>
+      <text x="${(badgeX + (badgeWidth / 2)).toFixed(1)}" y="${(centerY + 3.2).toFixed(1)}" text-anchor="middle" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="10.5" font-weight="700" fill="${textFill}">${escapeXml(placement.label)}</text>
+      <text x="${textX.toFixed(1)}" y="${(centerY + 3.2).toFixed(1)}" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="11.5" font-weight="700" fill="${textFill}">${escapeXml(destinationText)}</text>
+    </g>`;
+  }
+
   function renderExplorationMapSvg(model, positions, options = {}) {
     const worldScope = options.worldScope !== false;
     const boxSize = worldScope ? 98 : 92;
     const unitX = worldScope ? 170 : 156;
     const unitY = worldScope ? 170 : 156;
     const padding = worldScope ? 128 : 110;
-    const overflowMargin = worldScope ? 72 : 84;
+    const overflowMargin = worldScope
+      ? 72
+      : ((model.externalExits || []).length ? 190 : 84);
     const minWidth = worldScope ? 1680 : 1100;
     const minHeight = worldScope ? 1020 : 760;
     const titleSpace = 126;
@@ -15979,6 +16144,17 @@
       if (!geometry) return "";
       return `<line x1="${geometry.from.x.toFixed(1)}" y1="${geometry.from.y.toFixed(1)}" x2="${geometry.to.x.toFixed(1)}" y2="${geometry.to.y.toFixed(1)}" stroke="#b08b52" stroke-width="${worldScope ? "4.1" : "3.6"}" stroke-linecap="round" stroke-dasharray="10 8" opacity="0.95" />`;
     }).join("");
+    const externalExitGroups = new Map();
+    for (const exit of model.externalExits || []) {
+      const key = `${exit.sourceNodeId}|${exit.direction}`;
+      if (!externalExitGroups.has(key)) externalExitGroups.set(key, []);
+      externalExitGroups.get(key).push(exit);
+    }
+    const externalExitMarkup = [...externalExitGroups.values()].map((group) => group.map((entry, index) => {
+      const center = nodePixels.get(entry.sourceNodeId);
+      const placement = mapExternalExitPlacement(center, entry.direction, boxSize, index, group.length);
+      return renderMapExternalExit(entry, placement);
+    }).join("")).join("");
 
     const nodeMarkup = model.nodes.map((node) => {
       const point = nodePixels.get(node.id) || { x: padding, y: padding };
@@ -16066,7 +16242,7 @@
   <rect x="8" y="8" width="${width - 16}" height="${height - 16}" rx="24" fill="url(#mapPaper)" opacity="0.28" />
   <text x="${width - 40}" y="48" text-anchor="end" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="15" font-weight="700" fill="#7b6033">${worldScope ? "Click marked locations for local maps" : "Back returns to the world overview"}</text>
   <text x="${width - 40}" y="74" text-anchor="end" font-family="'Trebuchet MS', 'Avenir Next', sans-serif" font-size="15" font-weight="700" fill="#7b6033">Wheel, pinch, or buttons to zoom</text>
-  <g>${lineMarkup}${bridgeMarkup}${stubMarkup}${levelBadgeMarkup}</g>
+  <g>${lineMarkup}${bridgeMarkup}${stubMarkup}${externalExitMarkup}${levelBadgeMarkup}</g>
   <g>${nodeMarkup}</g>
 </svg>`;
     const currentRoomCenter = currentNodeId && nodePixels.get(currentNodeId)
