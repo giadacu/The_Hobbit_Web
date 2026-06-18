@@ -579,12 +579,14 @@ body.is-resizing-layout * {
   --scene-map-scale: 1;
   --scene-map-base-width: 0px;
   --scene-map-base-height: 0px;
+  --scene-map-stage-offset-x: 0px;
+  --scene-map-stage-offset-y: 0px;
 }
 
 .scene-map-stage {
   position: absolute;
-  left: 0;
-  top: 0;
+  left: var(--scene-map-stage-offset-x);
+  top: var(--scene-map-stage-offset-y);
   width: var(--scene-map-base-width);
   height: var(--scene-map-base-height);
   transform-origin: top left;

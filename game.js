@@ -21,6 +21,7 @@
   const SCENE_MAP_CURRENT_INDICATOR_PADDING = 9;
   const SCENE_MAP_CURRENT_INDICATOR_ANIMATION_MS = 420;
   const SCENE_MAP_ROOM_VISIBILITY_PADDING = 84;
+  const SCENE_MAP_SCOPE_TRANSITION_PAN_MS = 320;
   const MAP_CONNECTOR_SIDE_OPTIONS = new Set(["auto", "north", "east", "south", "west", "north east", "north west", "south east", "south west"]);
 
   const $ = (id) => document.getElementById(id);
@@ -5593,6 +5594,7 @@
       const game = this.game;
       if (!sceneMapOverlay || !sceneMapCanvas) return;
       if (!game.sceneMapVisible) {
+        this.cancelSceneMapScrollAnimation();
         this.clearSceneMapCurrentIndicatorAnimation();
         sceneMapOverlay.setAttribute("hidden", "hidden");
         if (sceneMapBack) sceneMapBack.hidden = true;
@@ -5601,6 +5603,7 @@
         sceneMapCanvas.style.height = "";
         sceneMapImage?.removeAttribute("src");
         game.sceneMapViewportAnchor = null;
+        game.sceneMapLayoutState = null;
         return;
       }
       const manualScope = Boolean(game.sceneMapManualScope);
@@ -5623,6 +5626,7 @@
           sceneMapOverlay.setAttribute("hidden", "hidden");
           sceneMapCanvas.textContent = "";
           sceneMapImage?.removeAttribute("src");
+          game.sceneMapLayoutState = null;
           return;
         }
         game.sceneMapRenderCache = {
@@ -5640,9 +5644,14 @@
         sceneMapOverlay.setAttribute("hidden", "hidden");
         sceneMapCanvas.textContent = "";
         sceneMapImage?.removeAttribute("src");
+        game.sceneMapLayoutState = null;
         return;
       }
-      const mapState = scaleSceneMapState(baseMapState, game.sceneMapZoom || DEFAULT_SCENE_MAP_ZOOM);
+      const scopeTransitionActive = this.prepareSceneMapScopeTransitionAnchor(baseMapState);
+      const mapState = this.prepareSceneMapLayoutState(
+        scaleSceneMapState(baseMapState, game.sceneMapZoom || DEFAULT_SCENE_MAP_ZOOM)
+      );
+      game.sceneMapLayoutState = mapState;
       this.applySceneMapZoomPresentation(mapState);
       this.syncSceneMapCurrentIndicator(baseMapState);
       if (sceneMapTitle) sceneMapTitle.textContent = baseMapState.title || "Explored Map";
@@ -5655,10 +5664,64 @@
         if (game.sceneMapViewportMode === "travel") this.ensureSceneMapRoomVisible(mapState);
         else this.centerSceneMapOnRoom(mapState);
       }
-      if (!manualScope || game.sceneMapViewportMode === "travel") this.ensureSceneMapRoomVisible(mapState);
+      if (!scopeTransitionActive && (!manualScope || game.sceneMapViewportMode === "travel")) this.ensureSceneMapRoomVisible(mapState);
+      if (scopeTransitionActive) this.startSceneMapScopeTransitionPan(mapState);
       game.sceneMapViewportMode = null;
       if (game.sceneMapTravelAnimation) this.captureSceneMapViewportAnchor();
       else game.sceneMapViewportAnchor = null;
+    }
+
+    prepareSceneMapLayoutState(mapState = null) {
+      if (!mapState || !sceneMapScroll) return mapState;
+      const viewportWidth = Number(sceneMapScroll.clientWidth) || 0;
+      const viewportHeight = Number(sceneMapScroll.clientHeight) || 0;
+      if (!viewportWidth || !viewportHeight) {
+        return {
+          ...mapState,
+          stageOffsetX: 0,
+          stageOffsetY: 0,
+        };
+      }
+      const focusPoint = mapState.currentRoomCenter || mapState.defaultCenter || null;
+      if (!focusPoint) {
+        return {
+          ...mapState,
+          stageOffsetX: 0,
+          stageOffsetY: 0,
+        };
+      }
+      const anchor = this.game.sceneMapViewportAnchor;
+      const desiredOffsetX = anchor?.scope === (this.game.sceneMapScope || "world")
+        ? (Number(anchor.offsetX) || 0)
+        : Math.round(viewportWidth / 2);
+      const desiredOffsetY = anchor?.scope === (this.game.sceneMapScope || "world")
+        ? (Number(anchor.offsetY) || 0)
+        : Math.round(viewportHeight / 2);
+      const stageWidth = Number(mapState.width) || 0;
+      const stageHeight = Number(mapState.height) || 0;
+      const stageOffsetX = Math.max(0, Math.round(desiredOffsetX - focusPoint.x));
+      const stageOffsetY = Math.max(0, Math.round(desiredOffsetY - focusPoint.y));
+      const trailingSpaceX = Math.max(0, Math.round((viewportWidth - desiredOffsetX) - (stageWidth - focusPoint.x)));
+      const trailingSpaceY = Math.max(0, Math.round((viewportHeight - desiredOffsetY) - (stageHeight - focusPoint.y)));
+      return {
+        ...mapState,
+        width: stageWidth + stageOffsetX + trailingSpaceX,
+        height: stageHeight + stageOffsetY + trailingSpaceY,
+        currentRoomCenter: mapState.currentRoomCenter
+          ? {
+              x: mapState.currentRoomCenter.x + stageOffsetX,
+              y: mapState.currentRoomCenter.y + stageOffsetY,
+            }
+          : null,
+        defaultCenter: mapState.defaultCenter
+          ? {
+              x: mapState.defaultCenter.x + stageOffsetX,
+              y: mapState.defaultCenter.y + stageOffsetY,
+            }
+          : null,
+        stageOffsetX,
+        stageOffsetY,
+      };
     }
 
 
@@ -5669,6 +5732,8 @@
       sceneMapCanvas.style.setProperty("--scene-map-base-width", `${mapState.baseWidth || mapState.width}px`);
       sceneMapCanvas.style.setProperty("--scene-map-base-height", `${mapState.baseHeight || mapState.height}px`);
       sceneMapCanvas.style.setProperty("--scene-map-scale", String(mapState.zoom || 1));
+      sceneMapCanvas.style.setProperty("--scene-map-stage-offset-x", `${Number(mapState.stageOffsetX) || 0}px`);
+      sceneMapCanvas.style.setProperty("--scene-map-stage-offset-y", `${Number(mapState.stageOffsetY) || 0}px`);
     }
 
     getSceneMapCurrentIndicator() {
@@ -5690,6 +5755,68 @@
       if (!keepState) this.game.sceneMapTravelAnimation = null;
     }
 
+    cancelSceneMapScrollAnimation(options = {}) {
+      const { clearTransition = false } = options;
+      if (this.game.sceneMapScrollAnimationFrame) {
+        if (typeof window.cancelAnimationFrame === "function") window.cancelAnimationFrame(this.game.sceneMapScrollAnimationFrame);
+        else clearTimeout(this.game.sceneMapScrollAnimationFrame);
+      }
+      this.game.sceneMapScrollAnimationFrame = null;
+      if (clearTransition) this.game.sceneMapScopeTransition = null;
+    }
+
+    sceneMapViewportOffsetForPoint(point = null) {
+      if (!sceneMapScroll || !point) return null;
+      const layoutState = this.game.sceneMapLayoutState || null;
+      const zoom = Number(this.game.sceneMapZoom) || DEFAULT_SCENE_MAP_ZOOM;
+      const viewportWidth = Number(sceneMapScroll.clientWidth) || 0;
+      const viewportHeight = Number(sceneMapScroll.clientHeight) || 0;
+      if (!viewportWidth || !viewportHeight) return null;
+      return {
+        x: Math.max(0, Math.min(
+          viewportWidth,
+          Math.round((Number(layoutState?.stageOffsetX) || 0) + (point.x * zoom) - (Number(sceneMapScroll.scrollLeft) || 0)),
+        )),
+        y: Math.max(0, Math.min(
+          viewportHeight,
+          Math.round((Number(layoutState?.stageOffsetY) || 0) + (point.y * zoom) - (Number(sceneMapScroll.scrollTop) || 0)),
+        )),
+      };
+    }
+
+    queueSceneMapScopeTransition(targetScope = "world", sourcePoint = null, options = {}) {
+      const normalizedScope = String(targetScope || "world").trim() || "world";
+      const offset = this.sceneMapViewportOffsetForPoint(sourcePoint);
+      if (!offset) return false;
+      this.cancelSceneMapScrollAnimation({ clearTransition: true });
+      this.game.sceneMapScopeTransition = {
+        targetScope: normalizedScope,
+        targetRoomId: String(options.targetRoomId || this.game.currentRoom || "").trim(),
+        offsetX: offset.x,
+        offsetY: offset.y,
+        started: false,
+      };
+      return true;
+    }
+
+    prepareSceneMapScopeTransitionAnchor(mapState = null) {
+      const transition = this.game.sceneMapScopeTransition;
+      const currentScope = this.game.sceneMapScope || "world";
+      if (!transition || transition.targetScope !== currentScope) return false;
+      if (this.game.sceneMapViewportAnchor?.scope === currentScope) return false;
+      if (this.game.sceneMapViewportAnchor) this.game.sceneMapViewportAnchor = null;
+      const targetBox = this.sceneMapIndicatorBoxForRoom(mapState, transition.targetRoomId || this.game.currentRoom);
+      if (!targetBox) return false;
+      this.game.sceneMapViewportAnchor = {
+        scope: currentScope,
+        mapX: targetBox.left + (targetBox.width / 2),
+        mapY: targetBox.top + (targetBox.height / 2),
+        offsetX: transition.offsetX,
+        offsetY: transition.offsetY,
+      };
+      return true;
+    }
+
     sceneMapIndicatorBoxForRoom(mapState = null, roomId = "") {
       if (!mapState?.editorMeta) return null;
       const scope = mapState.scope || this.game.sceneMapScope || "world";
@@ -5708,6 +5835,19 @@
         top: center.y - (outerSize / 2),
         width: outerSize,
         height: outerSize,
+      };
+    }
+
+    sceneMapScaledIndicatorBoxForRoom(mapState = null, roomId = "") {
+      const baseBox = this.sceneMapIndicatorBoxForRoom(mapState, roomId);
+      if (!baseBox) return null;
+      const zoom = Number(mapState?.zoom) || DEFAULT_SCENE_MAP_ZOOM;
+      return {
+        ...baseBox,
+        left: Math.round(baseBox.left * zoom) + (Number(mapState?.stageOffsetX) || 0),
+        top: Math.round(baseBox.top * zoom) + (Number(mapState?.stageOffsetY) || 0),
+        width: Math.round(baseBox.width * zoom),
+        height: Math.round(baseBox.height * zoom),
       };
     }
 
@@ -5798,10 +5938,15 @@
         this.game.sceneMapCurrentIndicatorTimer = null;
         this.game.sceneMapTravelAnimation = null;
         if (shouldSwapScope) {
+          this.queueSceneMapScopeTransition(finalScope, {
+            x: targetBox.left + (targetBox.width / 2),
+            y: targetBox.top + (targetBox.height / 2),
+          });
           this.game.sceneMapScope = finalScope;
           this.game.sceneMapViewportAnchor = null;
           this.game.sceneMapViewportMode = "travel";
           this.game.sceneMapRenderCache = null;
+          this.game.sceneMapLayoutState = null;
           this.renderSceneMap();
         }
       }, SCENE_MAP_CURRENT_INDICATOR_ANIMATION_MS + 40);
@@ -5809,50 +5954,130 @@
 
     centerSceneMapOnRoom(mapState = null) {
       if (!sceneMapScroll) return;
+      const centeredViewport = this.sceneMapCenteredViewport(mapState);
+      if (!centeredViewport) return;
+      sceneMapScroll.scrollLeft = centeredViewport.left;
+      sceneMapScroll.scrollTop = centeredViewport.top;
+    }
+
+    sceneMapCenteredViewport(mapState = null) {
       const target = (this.game.sceneMapShowAll && (this.game.sceneMapScope || "world") === "world")
         ? (mapState?.defaultCenter || mapState?.currentRoomCenter || null)
         : (mapState?.currentRoomCenter || mapState?.defaultCenter || null);
-      if (!target) return;
+      if (!target || !sceneMapScroll) return null;
       const viewportWidth = Number(sceneMapScroll.clientWidth) || 0;
       const viewportHeight = Number(sceneMapScroll.clientHeight) || 0;
-      if (!viewportWidth || !viewportHeight) return;
-      const targetLeft = Math.max(0, target.x - (viewportWidth / 2));
-      const targetTop = Math.max(0, target.y - (viewportHeight / 2));
-      sceneMapScroll.scrollLeft = targetLeft;
-      sceneMapScroll.scrollTop = targetTop;
+      if (!viewportWidth || !viewportHeight) return null;
+      return {
+        left: Math.max(0, Math.round(target.x - (viewportWidth / 2))),
+        top: Math.max(0, Math.round(target.y - (viewportHeight / 2))),
+      };
     }
 
     ensureSceneMapRoomVisible(mapState = null) {
       if (!sceneMapScroll) return false;
-      const target = (this.game.sceneMapShowAll && (this.game.sceneMapScope || "world") === "world")
-        ? (mapState?.defaultCenter || mapState?.currentRoomCenter || null)
-        : (mapState?.currentRoomCenter || mapState?.defaultCenter || null);
-      if (!target) return false;
-      const viewportWidth = Number(sceneMapScroll.clientWidth) || 0;
-      const viewportHeight = Number(sceneMapScroll.clientHeight) || 0;
-      if (!viewportWidth || !viewportHeight) return false;
-
-      const maxScrollLeft = Math.max(0, (Number(mapState?.width) || 0) - viewportWidth);
-      const maxScrollTop = Math.max(0, (Number(mapState?.height) || 0) - viewportHeight);
-      const currentLeft = Math.max(0, Math.min(Number(sceneMapScroll.scrollLeft) || 0, maxScrollLeft));
-      const currentTop = Math.max(0, Math.min(Number(sceneMapScroll.scrollTop) || 0, maxScrollTop));
-      const marginX = Math.max(36, Math.min(SCENE_MAP_ROOM_VISIBILITY_PADDING, Math.floor(viewportWidth * 0.2)));
-      const marginY = Math.max(36, Math.min(SCENE_MAP_ROOM_VISIBILITY_PADDING, Math.floor(viewportHeight * 0.2)));
-      const visibleLeft = currentLeft;
-      const visibleRight = currentLeft + viewportWidth;
-      const visibleTop = currentTop;
-      const visibleBottom = currentTop + viewportHeight;
-
-      let targetLeft = currentLeft;
-      let targetTop = currentTop;
-      if (target.x < visibleLeft) targetLeft = Math.max(0, Math.round(target.x - marginX));
-      else if (target.x > visibleRight) targetLeft = Math.min(maxScrollLeft, Math.round(target.x + marginX - viewportWidth));
-      if (target.y < visibleTop) targetTop = Math.max(0, Math.round(target.y - marginY));
-      else if (target.y > visibleBottom) targetTop = Math.min(maxScrollTop, Math.round(target.y + marginY - viewportHeight));
-
+      const targetViewport = this.sceneMapVisibleViewportForRoom(mapState);
+      if (!targetViewport) return false;
+      const currentLeft = Number(sceneMapScroll.scrollLeft) || 0;
+      const currentTop = Number(sceneMapScroll.scrollTop) || 0;
+      const targetLeft = targetViewport.left;
+      const targetTop = targetViewport.top;
       sceneMapScroll.scrollLeft = targetLeft;
       sceneMapScroll.scrollTop = targetTop;
       return targetLeft !== currentLeft || targetTop !== currentTop;
+    }
+
+    sceneMapVisibleViewportForRoom(mapState = null, options = {}) {
+      if (!sceneMapScroll) return null;
+      const target = (this.game.sceneMapShowAll && (this.game.sceneMapScope || "world") === "world")
+        ? (mapState?.defaultCenter || mapState?.currentRoomCenter || null)
+        : (mapState?.currentRoomCenter || mapState?.defaultCenter || null);
+      if (!target) return null;
+      const viewportWidth = Number(sceneMapScroll.clientWidth) || 0;
+      const viewportHeight = Number(sceneMapScroll.clientHeight) || 0;
+      if (!viewportWidth || !viewportHeight) return null;
+
+      const maxScrollLeft = Math.max(0, (Number(mapState?.width) || 0) - viewportWidth);
+      const maxScrollTop = Math.max(0, (Number(mapState?.height) || 0) - viewportHeight);
+      const currentLeft = Math.max(0, Math.min(
+        Number.isFinite(options.currentLeft) ? options.currentLeft : (Number(sceneMapScroll.scrollLeft) || 0),
+        maxScrollLeft,
+      ));
+      const currentTop = Math.max(0, Math.min(
+        Number.isFinite(options.currentTop) ? options.currentTop : (Number(sceneMapScroll.scrollTop) || 0),
+        maxScrollTop,
+      ));
+      const marginX = Math.max(36, Math.min(SCENE_MAP_ROOM_VISIBILITY_PADDING, Math.floor(viewportWidth * 0.2)));
+      const marginY = Math.max(36, Math.min(SCENE_MAP_ROOM_VISIBILITY_PADDING, Math.floor(viewportHeight * 0.2)));
+      const targetBox = this.sceneMapScaledIndicatorBoxForRoom(mapState, this.game.currentRoom);
+      const visibleLeft = currentLeft + marginX;
+      const visibleRight = currentLeft + viewportWidth - marginX;
+      const visibleTop = currentTop + marginY;
+      const visibleBottom = currentTop + viewportHeight - marginY;
+
+      let targetLeft = currentLeft;
+      let targetTop = currentTop;
+      if (targetBox) {
+        const targetLeftEdge = targetBox.left;
+        const targetRightEdge = targetBox.left + targetBox.width;
+        const targetTopEdge = targetBox.top;
+        const targetBottomEdge = targetBox.top + targetBox.height;
+        if (targetLeftEdge < visibleLeft) targetLeft = Math.max(0, Math.round(targetLeftEdge - marginX));
+        else if (targetRightEdge > visibleRight) targetLeft = Math.min(maxScrollLeft, Math.round(targetRightEdge + marginX - viewportWidth));
+        if (targetTopEdge < visibleTop) targetTop = Math.max(0, Math.round(targetTopEdge - marginY));
+        else if (targetBottomEdge > visibleBottom) targetTop = Math.min(maxScrollTop, Math.round(targetBottomEdge + marginY - viewportHeight));
+      } else {
+        if (target.x < visibleLeft) targetLeft = Math.max(0, Math.round(target.x - marginX));
+        else if (target.x > visibleRight) targetLeft = Math.min(maxScrollLeft, Math.round(target.x + marginX - viewportWidth));
+        if (target.y < visibleTop) targetTop = Math.max(0, Math.round(target.y - marginY));
+        else if (target.y > visibleBottom) targetTop = Math.min(maxScrollTop, Math.round(target.y + marginY - viewportHeight));
+      }
+      return { left: targetLeft, top: targetTop };
+    }
+
+    startSceneMapScopeTransitionPan(mapState = null) {
+      const transition = this.game.sceneMapScopeTransition;
+      if (!transition || transition.started || transition.targetScope !== (this.game.sceneMapScope || "world") || !sceneMapScroll) return false;
+      const startLeft = Number(sceneMapScroll.scrollLeft) || 0;
+      const startTop = Number(sceneMapScroll.scrollTop) || 0;
+      const destination = this.sceneMapVisibleViewportForRoom(mapState, {
+        currentLeft: startLeft,
+        currentTop: startTop,
+      });
+      if (!destination) {
+        this.game.sceneMapScopeTransition = null;
+        return false;
+      }
+      if (startLeft === destination.left && startTop === destination.top) {
+        this.game.sceneMapScopeTransition = null;
+        return false;
+      }
+      transition.started = true;
+      this.cancelSceneMapScrollAnimation();
+      const startedAt = Date.now();
+      const step = () => {
+        const elapsed = Date.now() - startedAt;
+        const progress = Math.max(0, Math.min(1, elapsed / SCENE_MAP_SCOPE_TRANSITION_PAN_MS));
+        const eased = 1 - ((1 - progress) * (1 - progress) * (1 - progress));
+        sceneMapScroll.scrollLeft = Math.round(startLeft + ((destination.left - startLeft) * eased));
+        sceneMapScroll.scrollTop = Math.round(startTop + ((destination.top - startTop) * eased));
+        if (progress >= 1) {
+          this.game.sceneMapScrollAnimationFrame = null;
+          this.game.sceneMapScopeTransition = null;
+          return;
+        }
+        if (typeof window.requestAnimationFrame === "function") {
+          this.game.sceneMapScrollAnimationFrame = window.requestAnimationFrame(step);
+        } else {
+          this.game.sceneMapScrollAnimationFrame = setTimeout(step, 16);
+        }
+      };
+      if (typeof window.requestAnimationFrame === "function") {
+        this.game.sceneMapScrollAnimationFrame = window.requestAnimationFrame(step);
+      } else {
+        this.game.sceneMapScrollAnimationFrame = setTimeout(step, 16);
+      }
+      return true;
     }
 
     restoreSceneMapViewport(mapState = null) {
@@ -5864,11 +6089,11 @@
       if (!viewportWidth || !viewportHeight) return false;
       const zoom = Number(this.game.sceneMapZoom) || DEFAULT_SCENE_MAP_ZOOM;
       const targetLeft = Math.max(0, Math.min(
-        Math.round((anchor.mapX * zoom) - anchor.offsetX),
+        Math.round((Number(mapState.stageOffsetX) || 0) + (anchor.mapX * zoom) - anchor.offsetX),
         Math.max(0, mapState.width - viewportWidth),
       ));
       const targetTop = Math.max(0, Math.min(
-        Math.round((anchor.mapY * zoom) - anchor.offsetY),
+        Math.round((Number(mapState.stageOffsetY) || 0) + (anchor.mapY * zoom) - anchor.offsetY),
         Math.max(0, mapState.height - viewportHeight),
       ));
       sceneMapScroll.scrollLeft = targetLeft;
@@ -5882,6 +6107,7 @@
       const viewportWidth = Number(sceneMapScroll.clientWidth) || Number(rect.width) || 0;
       const viewportHeight = Number(sceneMapScroll.clientHeight) || Number(rect.height) || 0;
       if (!viewportWidth || !viewportHeight) return false;
+      const layoutState = this.game.sceneMapLayoutState || null;
       const zoom = Number(this.game.sceneMapZoom) || DEFAULT_SCENE_MAP_ZOOM;
       const offsetX = Number.isFinite(options.offsetX)
         ? options.offsetX
@@ -5891,8 +6117,8 @@
         : (Number.isFinite(options.clientY) ? options.clientY - rect.top : viewportHeight / 2);
       this.game.sceneMapViewportAnchor = {
         scope: this.game.sceneMapScope || "world",
-        mapX: (sceneMapScroll.scrollLeft + offsetX) / zoom,
-        mapY: (sceneMapScroll.scrollTop + offsetY) / zoom,
+        mapX: (sceneMapScroll.scrollLeft + offsetX - (Number(layoutState?.stageOffsetX) || 0)) / zoom,
+        mapY: (sceneMapScroll.scrollTop + offsetY - (Number(layoutState?.stageOffsetY) || 0)) / zoom,
         offsetX,
         offsetY,
       };
@@ -5901,6 +6127,7 @@
 
     closeSceneMap() {
       if (!this.game.sceneMapVisible) return false;
+      this.cancelSceneMapScrollAnimation({ clearTransition: true });
       this.clearSceneMapCurrentIndicatorAnimation();
       this.game.sceneMapVisible = false;
       this.game.sceneMapScope = "world";
@@ -5911,6 +6138,7 @@
       this.game.sceneMapViewportAnchor = null;
       this.game.sceneMapViewportMode = null;
       this.game.sceneMapRenderCache = null;
+      this.game.sceneMapLayoutState = null;
       this.render();
       return true;
     }
@@ -5918,19 +6146,24 @@
     sceneMapBack() {
       if (!this.game.sceneMapVisible) return false;
       if (this.game.sceneMapScope === "world") return this.closeSceneMap();
+      this.cancelSceneMapScrollAnimation({ clearTransition: true });
       this.clearSceneMapCurrentIndicatorAnimation();
       const parentScope = this.game.sceneMapRenderCache?.state?.parentScope || "world";
+      const sourcePoint = this.game.sceneMapRenderCache?.state?.currentRoomCenterBase || null;
+      this.queueSceneMapScopeTransition(parentScope || "world", sourcePoint);
       this.game.sceneMapViewportAnchor = null;
       this.game.sceneMapViewportMode = null;
       this.game.sceneMapScope = parentScope || "world";
       this.game.sceneMapAutoFollow = false;
       this.game.sceneMapManualScope = true;
+      this.game.sceneMapLayoutState = null;
       this.renderSceneMap();
       return true;
     }
 
     adjustSceneMapZoom(delta = 0, options = {}) {
       if (!this.game.sceneMapVisible) return false;
+      this.cancelSceneMapScrollAnimation({ clearTransition: true });
       if (!options.skipCapture) this.captureSceneMapViewportAnchor();
       const next = Math.max(MIN_SCENE_MAP_ZOOM, Math.min(MAX_SCENE_MAP_ZOOM, Number((this.game.sceneMapZoom || DEFAULT_SCENE_MAP_ZOOM) + delta).toFixed(2)));
       if (next === this.game.sceneMapZoom) return false;
@@ -5941,6 +6174,7 @@
 
     resetSceneMapZoom() {
       if (!this.game.sceneMapVisible) return false;
+      this.cancelSceneMapScrollAnimation({ clearTransition: true });
       this.captureSceneMapViewportAnchor();
       this.game.sceneMapZoom = DEFAULT_SCENE_MAP_ZOOM;
       this.renderSceneMap();
@@ -5950,6 +6184,7 @@
     openSceneMapScope(scope = "world") {
       const normalized = String(scope || "world").trim() || "world";
       if (normalized !== "world" && !MAP_REGION_DEFINITIONS[normalized]) return false;
+      this.cancelSceneMapScrollAnimation({ clearTransition: true });
       this.clearSceneMapCurrentIndicatorAnimation();
       this.game.sceneMapViewportAnchor = null;
       this.game.sceneMapViewportMode = null;
@@ -5957,6 +6192,8 @@
       this.game.sceneMapAutoFollow = false;
       this.game.sceneMapManualScope = true;
       if (normalized !== "world") this.game.sceneMapShowAll = false;
+      this.game.sceneMapRenderCache = null;
+      this.game.sceneMapLayoutState = null;
       this.renderSceneMap();
       return true;
     }
@@ -6709,7 +6946,10 @@
       game.sceneMapViewportAnchor = null;
       game.sceneMapViewportMode = null;
       game.sceneMapRenderCache = null;
+      game.sceneMapLayoutState = null;
       game.sceneMapTravelAnimation = null;
+      game.sceneMapScopeTransition = null;
+      game.sceneMapScrollAnimationFrame = null;
       game.sceneMapCurrentIndicatorFrame = null;
       game.sceneMapCurrentIndicatorTimer = null;
       game.spiderEyesState = save.spiderEyesState || null;
@@ -8287,7 +8527,10 @@
       game.sceneMapViewportAnchor = null;
       game.sceneMapViewportMode = null;
       game.sceneMapRenderCache = null;
+      game.sceneMapLayoutState = null;
       game.sceneMapTravelAnimation = null;
+      game.sceneMapScopeTransition = null;
+      game.sceneMapScrollAnimationFrame = null;
       game.sceneMapCurrentIndicatorFrame = null;
       game.sceneMapCurrentIndicatorTimer = null;
       game.visitedRooms = new Set();
@@ -8565,6 +8808,7 @@
       game.sceneMapViewportAnchor = null;
       game.sceneMapViewportMode = null;
       game.sceneMapRenderCache = null;
+      game.sceneMapLayoutState = null;
       game.print("You study the paths already traced across Wilderland.");
       game.render();
     }
@@ -8584,6 +8828,7 @@
       game.sceneMapViewportAnchor = null;
       game.sceneMapViewportMode = null;
       game.sceneMapRenderCache = null;
+      game.sceneMapLayoutState = null;
       game.print("You unfurl a complete test map of Wilderland, with every known place marked upon it.");
       game.render();
     }
@@ -9136,7 +9381,10 @@
       this.sceneMapViewportAnchor = null;
       this.sceneMapViewportMode = null;
       this.sceneMapRenderCache = null;
+      this.sceneMapLayoutState = null;
       this.sceneMapTravelAnimation = null;
+      this.sceneMapScopeTransition = null;
+      this.sceneMapScrollAnimationFrame = null;
       this.sceneMapCurrentIndicatorFrame = null;
       this.sceneMapCurrentIndicatorTimer = null;
       this.visitedRooms = new Set();
@@ -10251,7 +10499,10 @@
       this.sceneMapViewportAnchor = null;
       this.sceneMapViewportMode = null;
       this.sceneMapRenderCache = null;
+      this.sceneMapLayoutState = null;
       this.sceneMapTravelAnimation = null;
+      this.sceneMapScopeTransition = null;
+      this.sceneMapScrollAnimationFrame = null;
       this.sceneMapCurrentIndicatorFrame = null;
       this.sceneMapCurrentIndicatorTimer = null;
       this.render();

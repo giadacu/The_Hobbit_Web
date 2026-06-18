@@ -437,3 +437,132 @@ Future debugging advice
   own; add a final “is the tracked target actually visible?” check.
 - If users report “the map is there but the place I am in is missing”, inspect
   stale viewport anchors before inspecting the SVG or node placement logic.
+
+
+Case 010 - 2026-06-18 - Scope swaps needed to preserve the full current-location frame, not only the node center
+---------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+When the player entered a location with its own local map, or backed out from a
+child map to its parent, the new scope could reopen with the active location
+feeling re-centered or slightly misaligned. The highlighted frame did not keep
+the same visual continuity across the scope change.
+
+Root cause
+----------
+Viewport rescue logic treated the current location mostly as a point target.
+That was good enough to keep the node center visible, but not enough to keep
+the full current-location frame safely inside the viewport with the expected
+visual continuity during scope transitions.
+
+Resolution
+----------
+The map viewport now treats the active location as its full indicator box.
+
+1. Added a scaled indicator-box helper for the current location.
+2. Visibility checks and gentle follow nudges now keep the whole frame inside
+   the viewport margins, not just the center point.
+3. Scope-transition regression tests were tightened so drilldown/back behavior
+   verifies:
+   - the captured anchor is restored before any extra pan
+   - any follow-up pan only happens as a minimal rescue
+   - the full indicator box ends up on screen after settling
+4. The “steady scroll” regression test was updated to use a viewport setup
+   where the full destination frame is already visible, matching the new rule.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+
+Future debugging advice
+-----------------------
+- For map transitions between parent and child scopes, validate frame-box
+  visibility rather than only node-center visibility.
+- If a scope swap appears to open “too centered”, inspect whether the viewport
+  rescue step is reasoning about the box edges or only the point center.
+
+
+Case 009 - 2026-06-18 - Cross-scope opening should not force a pan if the target is already visible
+-----------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After adding cross-scope opening from the source-node position, the new scope
+could still perform a scripted pan toward its centered viewport even when the
+current location was already visible as opened.
+
+Root cause
+----------
+The first cross-scope implementation always panned toward the scope's centered
+target after opening from the source-node anchor. That made the transition more
+active than the normal map behavior, which only moves when the current room
+would otherwise be offscreen.
+
+Resolution
+----------
+The scope-transition pan now reuses the same visibility rule as normal travel.
+
+1. The new scope still opens from the source-node position.
+2. The follow-up pan no longer targets full centering by default.
+3. Instead, it computes the same minimal visibility-adjusted viewport used by
+   standard map travel.
+4. If the current room is already visible, no extra pan runs at all.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+
+Future debugging advice
+-----------------------
+- Keep special transitions visually consistent with the base navigation rule;
+  otherwise map behavior will feel unpredictable between similar moves.
+
+
+Case 011 - 2026-06-18 - Small local maps could not preserve scope-swap anchors
+--------------------------------------------------------------------------------
+
+Symptom
+-------
+Moving from a world-map node into a small local map, such as Narrow Dangerous
+Path -> Beorn's House, still appeared to snap instantly into the local map's
+default position instead of reopening from the same on-screen frame position.
+
+Root cause
+----------
+There were two linked blockers.
+
+1. Some local maps at the active zoom were smaller than the visible viewport.
+   Example: Beorn's House at 60% rendered to about 660x491 inside an ~800x500
+   viewport. That left no horizontal scroll range, so preserving the incoming
+   world-map offset was impossible unless the map was given extra layout space.
+
+2. During scope swap, a stale viewport anchor from the previous world scope
+   could still be present. Because `prepareSceneMapScopeTransitionAnchor()`
+   aborted when *any* anchor existed, the new child-scope anchor was never
+   installed, so the render fell back to the clamped local-map position.
+
+Resolution
+----------
+1. Scene-map layout now adds dynamic stage padding when needed, so small maps
+   can still preserve the desired focus offset inside the viewport.
+2. The stage offset is included in:
+   - viewport capture/restore
+   - point-to-viewport offset calculations
+   - scaled indicator-box calculations
+3. Scope-transition anchor preparation now ignores stale anchors from other
+   scopes and replaces them with the correct anchor for the target scope.
+
+Files touched
+-------------
+- game.js
+- style.css
+- scripts/parser-tests.js
+
+Future debugging advice
+-----------------------
+- If a scope transition seems to ignore its anchor, check both:
+  - whether the target scope has any actual scrollable range
+  - whether an old anchor from another scope is blocking replacement

@@ -3239,32 +3239,43 @@ const gameCases = [
     ],
   },
   {
-    name: "map keeps scroll steady when destination stays visible",
+    name: "map keeps scroll steady when the full destination indicator stays visible",
     drive(game) {
       const scroll = document.getElementById("scene-map-scroll");
-      const originalSetTimeout = global.setTimeout;
-      global.setTimeout = (fn, delay = 0, ...args) => (Number(delay) > 100
-        ? 1
-        : originalSetTimeout(fn, delay, ...args));
-      try {
-        game.execute("jump beorn");
-        game.execute("south west");
-        game.execute("map");
-        game.sceneMapZoom = 1;
-        game.layout.renderSceneMap();
-        const beforeLeft = Number(scroll.scrollLeft) || 0;
-        const beforeTop = Number(scroll.scrollTop) || 0;
-        game.execute("east");
-        game.print(`Map keeps horizontal scroll for visible destination: ${Number(scroll.scrollLeft) === beforeLeft ? "yes" : "no"}`);
-        game.print(`Map keeps vertical scroll for visible destination: ${Number(scroll.scrollTop) === beforeTop ? "yes" : "no"}`);
-      } finally {
-        global.setTimeout = originalSetTimeout;
-      }
+      game.execute("jump beorn");
+      game.execute("south west");
+      game.execute("map");
+      game.sceneMapZoom = 1;
+      game.sceneMapScope = "world";
+      game.sceneMapAutoFollow = false;
+      game.sceneMapManualScope = true;
+      game.currentRoom = "beorns_house";
+      game.player.position = "beorns_house";
+      game.layout.renderSceneMap();
+      const state = game.sceneMapRenderCache?.state || null;
+      const targetState = state
+        ? {
+            ...state,
+            zoom: 1,
+            width: Number(state.baseWidth) || Number(state.width) || 0,
+            height: Number(state.baseHeight) || Number(state.height) || 0,
+          }
+        : null;
+      const targetBox = game.layout.sceneMapScaledIndicatorBoxForRoom(targetState, "beorns_house");
+      const maxScrollLeft = Math.max(0, (Number(targetState?.width) || 0) - (Number(scroll.clientWidth) || 800));
+      const maxScrollTop = Math.max(0, (Number(targetState?.height) || 0) - (Number(scroll.clientHeight) || 500));
+      scroll.scrollLeft = targetBox ? Math.max(0, Math.min(maxScrollLeft, Math.round(targetBox.left - 120))) : 0;
+      scroll.scrollTop = targetBox ? Math.max(0, Math.min(maxScrollTop, Math.round(targetBox.top - 120))) : 0;
+      const beforeLeft = Number(scroll.scrollLeft) || 0;
+      const beforeTop = Number(scroll.scrollTop) || 0;
+      game.layout.ensureSceneMapRoomVisible(targetState);
+      game.print(`Map keeps horizontal scroll when full destination indicator is already visible: ${Number(scroll.scrollLeft) === beforeLeft ? "yes" : "no"}`);
+      game.print(`Map keeps vertical scroll when full destination indicator is already visible: ${Number(scroll.scrollTop) === beforeTop ? "yes" : "no"}`);
     },
     expectedIncluded: [
       "You study the paths already traced across Wilderland.",
-      "Map keeps horizontal scroll for visible destination: yes",
-      "Map keeps vertical scroll for visible destination: yes",
+      "Map keeps horizontal scroll when full destination indicator is already visible: yes",
+      "Map keeps vertical scroll when full destination indicator is already visible: yes",
     ],
   },
   {
@@ -3331,6 +3342,190 @@ const gameCases = [
       "You study the paths already traced across Wilderland.",
       "Map rescues horizontal visibility after stale viewport restore: yes",
       "Map rescues vertical visibility after stale viewport restore: yes",
+    ],
+  },
+  {
+    name: "map drilldown opens from the source node before panning to center",
+    drive(game) {
+      const title = document.getElementById("scene-map-title");
+      const scroll = document.getElementById("scene-map-scroll");
+      const originalSetTimeout = global.setTimeout;
+      const originalRequestAnimationFrame = global.requestAnimationFrame;
+      const originalCancelAnimationFrame = global.cancelAnimationFrame;
+      const originalDateNow = Date.now;
+      const originalQueueScopeTransition = game.layout.queueSceneMapScopeTransition.bind(game.layout);
+      const delayedTimers = [];
+      const rafQueue = [];
+      let now = 1000;
+      let capturedTransition = null;
+      global.setTimeout = (fn, delay = 0, ...args) => {
+        if (Number(delay) > 100) {
+          delayedTimers.push(() => fn(...args));
+          return delayedTimers.length;
+        }
+        return originalSetTimeout(fn, delay, ...args);
+      };
+      global.requestAnimationFrame = (fn) => {
+        rafQueue.push(fn);
+        return rafQueue.length;
+      };
+      global.cancelAnimationFrame = () => {};
+      Date.now = () => now;
+      game.layout.queueSceneMapScopeTransition = (...args) => {
+        const result = originalQueueScopeTransition(...args);
+        if (game.sceneMapScopeTransition) capturedTransition = { ...game.sceneMapScopeTransition };
+        return result;
+      };
+      try {
+        game.execute("jump beorn");
+        game.execute("south west");
+        game.execute("map");
+        game.execute("east");
+        while (rafQueue.length) {
+          const frame = rafQueue.shift();
+          now += 16;
+          frame(now);
+        }
+        while (delayedTimers.length) {
+          const finishAnimation = delayedTimers.shift();
+          if (typeof finishAnimation === "function") finishAnimation();
+        }
+        const immediateLeft = Number(scroll.scrollLeft) || 0;
+        const immediateTop = Number(scroll.scrollTop) || 0;
+        const localMapState = game.sceneMapLayoutState || null;
+        const localBox = game.layout.sceneMapScaledIndicatorBoxForRoom(localMapState);
+        const viewportWidth = Number(scroll.clientWidth) || 800;
+        const viewportHeight = Number(scroll.clientHeight) || 500;
+        const localCenterX = localBox ? localBox.left + (localBox.width / 2) : null;
+        const localCenterY = localBox ? localBox.top + (localBox.height / 2) : null;
+        const expectedLeft = (capturedTransition && localCenterX !== null)
+          ? Math.max(0, Math.min(
+              Math.round(localCenterX - capturedTransition.offsetX),
+              Math.max(0, (Number(localMapState?.width) || 0) - viewportWidth),
+            ))
+          : null;
+        const expectedTop = (capturedTransition && localCenterY !== null)
+          ? Math.max(0, Math.min(
+              Math.round(localCenterY - capturedTransition.offsetY),
+              Math.max(0, (Number(localMapState?.height) || 0) - viewportHeight),
+            ))
+          : null;
+        game.print(`Map drilldown opens local scope immediately after frame move: ${title.textContent === "Beorn's House" ? "yes" : "no"}`);
+        game.print(`Map drilldown restores the captured horizontal anchor before any extra pan: ${expectedLeft !== null && immediateLeft === expectedLeft ? "yes" : "no"}`);
+        game.print(`Map drilldown restores the captured vertical anchor before any extra pan: ${expectedTop !== null && immediateTop === expectedTop ? "yes" : "no"}`);
+        while (rafQueue.length) {
+          const frame = rafQueue.shift();
+          now += 80;
+          frame(now);
+        }
+        const settledLeft = Number(scroll.scrollLeft) || 0;
+        const settledTop = Number(scroll.scrollTop) || 0;
+        const settledMapState = game.sceneMapLayoutState || null;
+        const settledBox = game.layout.sceneMapScaledIndicatorBoxForRoom(settledMapState);
+        const settledRight = settledBox ? settledBox.left + settledBox.width - settledLeft : null;
+        const settledBottom = settledBox ? settledBox.top + settledBox.height - settledTop : null;
+        game.print(`Map drilldown only pans further when needed: ${settledLeft >= immediateLeft || settledTop !== immediateTop ? "yes" : "no"}`);
+        game.print(`Map drilldown keeps the full indicator box on screen after settling: ${settledBox && settledBox.left >= settledLeft && settledBox.top >= settledTop && settledRight <= viewportWidth && settledBottom <= viewportHeight ? "yes" : "no"}`);
+        game.print(`Map drilldown stays in local scope after pan: ${title.textContent === "Beorn's House" ? "yes" : "no"}`);
+      } finally {
+        global.setTimeout = originalSetTimeout;
+        global.requestAnimationFrame = originalRequestAnimationFrame;
+        global.cancelAnimationFrame = originalCancelAnimationFrame;
+        Date.now = originalDateNow;
+        game.layout.queueSceneMapScopeTransition = originalQueueScopeTransition;
+      }
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "Map drilldown opens local scope immediately after frame move: yes",
+      "Map drilldown restores the captured horizontal anchor before any extra pan: yes",
+      "Map drilldown restores the captured vertical anchor before any extra pan: yes",
+      "Map drilldown only pans further when needed: yes",
+      "Map drilldown keeps the full indicator box on screen after settling: yes",
+      "Map drilldown stays in local scope after pan: yes",
+    ],
+  },
+  {
+    name: "map back can reopen parent scope from the child position",
+    drive(game) {
+      const title = document.getElementById("scene-map-title");
+      const scroll = document.getElementById("scene-map-scroll");
+      const originalRequestAnimationFrame = global.requestAnimationFrame;
+      const originalCancelAnimationFrame = global.cancelAnimationFrame;
+      const originalDateNow = Date.now;
+      const originalQueueScopeTransition = game.layout.queueSceneMapScopeTransition.bind(game.layout);
+      const rafQueue = [];
+      let now = 2000;
+      let capturedTransition = null;
+      global.requestAnimationFrame = (fn) => {
+        rafQueue.push(fn);
+        return rafQueue.length;
+      };
+      global.cancelAnimationFrame = () => {};
+      Date.now = () => now;
+      game.layout.queueSceneMapScopeTransition = (...args) => {
+        const result = originalQueueScopeTransition(...args);
+        if (game.sceneMapScopeTransition) capturedTransition = { ...game.sceneMapScopeTransition };
+        return result;
+      };
+      try {
+        game.execute("jump smaug");
+        game.execute("map");
+        game.layout.openSceneMapScope("elven_halls");
+        game.layout.openSceneMapScope("long_lake");
+        game.layout.sceneMapBack();
+        const immediateLeft = Number(scroll.scrollLeft) || 0;
+        const immediateTop = Number(scroll.scrollTop) || 0;
+        const parentMapState = game.sceneMapLayoutState || null;
+        const parentBox = game.layout.sceneMapScaledIndicatorBoxForRoom(parentMapState);
+        const viewportWidth = Number(scroll.clientWidth) || 800;
+        const viewportHeight = Number(scroll.clientHeight) || 500;
+        const parentCenterX = parentBox ? parentBox.left + (parentBox.width / 2) : null;
+        const parentCenterY = parentBox ? parentBox.top + (parentBox.height / 2) : null;
+        const expectedLeft = (capturedTransition && parentCenterX !== null)
+          ? Math.max(0, Math.min(
+              Math.round(parentCenterX - capturedTransition.offsetX),
+              Math.max(0, (Number(parentMapState?.width) || 0) - viewportWidth),
+            ))
+          : null;
+        const expectedTop = (capturedTransition && parentCenterY !== null)
+          ? Math.max(0, Math.min(
+              Math.round(parentCenterY - capturedTransition.offsetY),
+              Math.max(0, (Number(parentMapState?.height) || 0) - viewportHeight),
+            ))
+          : null;
+        game.print(`Map back opens parent scope immediately: ${title.textContent === "Elvenking's Halls" ? "yes" : "no"}`);
+        game.print(`Map back restores the captured horizontal anchor before any extra pan: ${expectedLeft !== null && immediateLeft === expectedLeft ? "yes" : "no"}`);
+        game.print(`Map back restores the captured vertical anchor before any extra pan: ${expectedTop !== null && immediateTop === expectedTop ? "yes" : "no"}`);
+        while (rafQueue.length) {
+          const frame = rafQueue.shift();
+          now += 80;
+          frame(now);
+        }
+        const settledLeft = Number(scroll.scrollLeft) || 0;
+        const settledTop = Number(scroll.scrollTop) || 0;
+        const settledMapState = game.sceneMapLayoutState || null;
+        const settledBox = game.layout.sceneMapScaledIndicatorBoxForRoom(settledMapState);
+        const settledRight = settledBox ? settledBox.left + settledBox.width - settledLeft : null;
+        const settledBottom = settledBox ? settledBox.top + settledBox.height - settledTop : null;
+        game.print(`Map back stays valid whether pan is needed or not: ${settledLeft >= 0 && settledTop >= 0 ? "yes" : "no"}`);
+        game.print(`Map back keeps the full indicator box on screen after settling: ${settledBox && settledBox.left >= settledLeft && settledBox.top >= settledTop && settledRight <= viewportWidth && settledBottom <= viewportHeight ? "yes" : "no"}`);
+        game.print(`Map back stays on parent scope after pan: ${title.textContent === "Elvenking's Halls" ? "yes" : "no"}`);
+      } finally {
+        global.requestAnimationFrame = originalRequestAnimationFrame;
+        global.cancelAnimationFrame = originalCancelAnimationFrame;
+        Date.now = originalDateNow;
+        game.layout.queueSceneMapScopeTransition = originalQueueScopeTransition;
+      }
+    },
+    expectedIncluded: [
+      "You study the paths already traced across Wilderland.",
+      "Map back opens parent scope immediately: yes",
+      "Map back restores the captured horizontal anchor before any extra pan: yes",
+      "Map back restores the captured vertical anchor before any extra pan: yes",
+      "Map back stays valid whether pan is needed or not: yes",
+      "Map back keeps the full indicator box on screen after settling: yes",
+      "Map back stays on parent scope after pan: yes",
     ],
   },
   {
