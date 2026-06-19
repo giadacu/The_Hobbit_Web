@@ -4847,6 +4847,23 @@ const gameCases = [
     ],
   },
   {
+    name: "smaug activity description stays in the dragon room",
+    drive(game) {
+      game.execute("jump smaug");
+      game.currentRoom = "erebor_treasure_approach";
+      game.player.position = "erebor_treasure_approach";
+      game.print(`Treasure approach Smaug activity: ${game.roomAtmosphericNarrative() || "none"}`);
+      game.currentRoom = "lower_halls";
+      game.player.position = "lower_halls";
+      game.print(`Lower halls Smaug activity: ${game.roomAtmosphericNarrative() || "none"}`);
+    },
+    expectedIncluded: [
+      "Jumped to Smaug.",
+      "Treasure approach Smaug activity: none",
+      "Lower halls Smaug activity: Smaug",
+    ],
+  },
+  {
     name: "idle advance behaves like wait when input is empty",
     drive(game) {
       const beforeTurn = game.turnCount;

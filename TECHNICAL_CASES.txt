@@ -1028,3 +1028,39 @@ Future debugging advice
   explicit confirmation state rather than calling the final action directly.
 - If a confirmation can happen during endgame as well as mid-play, store enough
   context to restore the right prompt when the player answers `no`.
+
+
+Case 020 - 2026-06-19 - Smaug activity text leaked into other Erebor room descriptions
+---------------------------------------------------------------------------------------
+
+Symptom
+-------
+While exploring Erebor before facing Smaug, room descriptions outside the
+dragon's chamber could include live activity text describing what Smaug was
+doing, even when he was not in the same visible room.
+
+Root cause
+----------
+`CONTEXTUAL_ROOM_NARRATIVE_RULES` applied `smaugRoomNarrative()` to every room
+in the Erebor outer/inner chapter whenever the dragon was alive. That was too
+broad: the text describes Smaug's immediate visible behavior, not just general
+atmosphere.
+
+Resolution
+----------
+- Added `liveDragonInRoom(roomId)` to check for a visible dragon in the actual
+  room being described.
+- Restricted the Smaug activity narrative rule to that same-room check.
+- Added a parser regression to confirm the activity text appears in
+  `lower_halls` but not in `erebor_treasure_approach`.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+
+Future debugging advice
+-----------------------
+- Keep broad atmospheric hints separate from same-room actor activity.
+- If a narrative line reads like a directly observed action, gate it by actual
+  room presence, not only by chapter or region.

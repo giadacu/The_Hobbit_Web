@@ -1002,13 +1002,38 @@
     ],
   };
 
+  const CONTEXTUAL_ROOM_IMAGE_RULES = {
+    hobbit_hole: [
+      {
+        when: ({ game }) => game.doorOpenByName("round green door"),
+        image: "hobbit_hole_open_door.png",
+      },
+    ],
+    bilbos_garden: [
+      {
+        when: ({ game }) => game.doorOpenByName("round green door"),
+        image: "bilbosgarden_open_door.png",
+      },
+    ],
+    erebor_hidden_door: [
+      {
+        when: ({ game }) => game.flags.secretdoorsun && game.doorOpenByName("secret door"),
+        image: "erebor_narrow_open_door.png",
+      },
+      {
+        when: ({ game }) => game.flags.secretdoorsun,
+        image: "erebor_narrow_revealed_door.png",
+      },
+    ],
+  };
+
   const CONTEXTUAL_ROOM_NARRATIVE_RULES = [
     {
       roomIds: ["deep_dark_lake"],
       text: ({ game }) => game.gollumRoomNarrative(),
     },
     {
-      when: ({ game, roomId }) => (IMMERSION_EREBOR_OUTER_ROOMS.has(roomId) || IMMERSION_EREBOR_INNER_ROOMS.has(roomId) || roomId === "front_gate") && game.liveDragon(),
+      when: ({ game, roomId }) => game.liveDragonInRoom(roomId),
       text: ({ game }) => game.smaugRoomNarrative(),
     },
     {
@@ -1417,13 +1442,13 @@
       ["laketown_warehouses", "Warehouses", "Heavy doors and tarred beams guard the warehouse district, where grain, salted fish, rope, and trade-goods lie stacked in the dim. It smells of river-water, labor, and careful counting.", "lake_town_warehouses.png", "relaxed"],
       ["laketown_bridges", "Bridges", "A web of bridges links the town's neighborhoods above the water. Looking down through the planks, you see the black lake moving quietly under all this human bustle.", "lake_town_bridges.png", "relaxed"],
       ["laketown_tavern", "Tavern", "The tavern is loud with cups, weather-talk, and brave opinions formed at safe distances from dragons. Even so, the people here watch the Mountain between jokes.", "lake_town_tavern.png", "relaxed"],
-      ["erebor_hidden_door", "Western Wall", "You stand on a narrow shelf beneath the western wall of the Mountain. The stone is old, stern, and close-lipped, showing nothing at first but weathering, shadow, and the patient silence of rock.", "Gate_Lonely_Mountain.jpeg", "adventure"],
+      ["erebor_hidden_door", "Western Wall", "You stand on a narrow shelf beneath the western wall of the Mountain. The stone is old, stern, and close-lipped, showing nothing at first but weathering, shadow, and the patient silence of rock.", "erebor_narrow_hidden_door.png", "adventure"],
       ["erebor_watch_chamber", "Watch Chamber", "This small chamber above the approach was plainly meant for quiet eyes and patient watches. Slits in the stone command the way below, and the dust has not quite smothered the old discipline of the place.", "erebor_watch_chamber.png", "adventure"],
       ["erebor_upper_tunnels", "Upper Tunnels", "The upper tunnels run on in exact dwarf-work, their walls scored with tool-marks, way-runes, and faint traces of old soot. Each turning feels deliberate, as though planned by minds that despised waste.", "erebor_upper_tunnels.png", "adventure"],
       ["erebor_ancient_armoury", "Ancient Armoury", "Racks and wall-hooks fill the old armoury, though many stand empty now. Broken helms, split shields, and a few surviving pieces of craft tell of a people who expected both war and ceremony.", "erebor_ancient_armoury.png", "adventure"],
       ["erebor_abandoned_workshop", "Abandoned Workshop", "Benches, tools, and half-finished work remain in the abandoned workshop as though the hands that used them expected to return at once. Dragon-fire and long neglect have only sharpened the sense of interruption.", "erebor_abandoned_workshop.png", "adventure"],
       ["erebor_great_hall", "Great Hall", "The great hall of Erebor opens wide and stately, its pillars carved with kings, hammers, and mountains under stars. Even emptied of life, it possesses a grandeur that seems to challenge ruin itself.", "erebor_great_hall.png", "adventure"],
-      ["erebor_treasure_approach", "Treasure Approach", "Gold-dust glitters in the cracks ahead, and the air grows warmer with every step. The silence here is not empty; it is the held breath of a house occupied by something too mighty to disturb lightly.", "Dragon.jpeg", "suspence"],
+      ["erebor_treasure_approach", "Treasure Approach", "Gold-dust glitters in the cracks ahead, and the air grows warmer with every step. The silence here is not empty; it is the held breath of a house occupied by something too mighty to disturb lightly.", "treasure_approach.png", "suspence"],
     ].forEach(([id, name, description, image, sound]) => ensureRoom(id, { name, description, image, sound }));
 
     ensureTwoWay("hobbit_hole", "east", "bilbos_garden", "west");
@@ -5533,7 +5558,7 @@
         roomImage.alt = "";
       } else if (room?.image) {
         roomImage.removeAttribute("hidden");
-        const src = assetUrl(IMAGE_ROOT, room.image);
+        const src = assetUrl(IMAGE_ROOT, game.contextualRoomImage(room));
         this.swapRoomImage(scene, src);
         roomImage.alt = room.name;
       } else {
@@ -10330,6 +10355,13 @@
       );
     }
 
+    contextualRoomImage(room = this.room()) {
+      if (!room) return "";
+      const context = this.narrativeContext({ room, roomId: room.id, chapter: this.companionDirector?.chapterForRoom(room.id) || "" });
+      const match = (CONTEXTUAL_ROOM_IMAGE_RULES[room.id] || []).find((rule) => !rule.when || rule.when(context));
+      return match?.image || room.image || "";
+    }
+
     clearIdleAdvanceTimer() {
       clearTimeout(this.idleAdvanceTimer);
       this.idleAdvanceTimer = null;
@@ -12575,6 +12607,10 @@
 
     liveDragon() {
       return Object.values(this.characters).some((character) => matches(character.name, "dragon") && character.visible !== false);
+    }
+
+    liveDragonInRoom(roomId = this.currentRoom) {
+      return this.peopleInRoom(roomId).some((character) => matches(character.name, "dragon") && character.visible !== false);
     }
 
     handleGo(command) {
