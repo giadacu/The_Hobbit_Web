@@ -64,6 +64,7 @@ function makeSeededRandom(seed) {
 }
 
 function makeElement(id = "") {
+  const listeners = new Map();
   return {
     id,
     value: "",
@@ -71,6 +72,7 @@ function makeElement(id = "") {
     innerHTML: "",
     className: "",
     children: [],
+    dataset: {},
     disabled: false,
     hidden: false,
     scrollLeft: 0,
@@ -90,8 +92,31 @@ function makeElement(id = "") {
       this.children = [];
       if (this.id === "output") outputLines.length = 0;
     },
-    addEventListener() {},
-    removeEventListener() {},
+    addEventListener(type, listener) {
+      const list = listeners.get(type) || [];
+      list.push(listener);
+      listeners.set(type, list);
+    },
+    removeEventListener(type, listener) {
+      const list = listeners.get(type) || [];
+      listeners.set(type, list.filter((entry) => entry !== listener));
+    },
+    dispatchEvent(event = {}) {
+      const type = event.type;
+      if (!type) return true;
+      const list = listeners.get(type) || [];
+      for (const listener of list) listener(event);
+      return !event.defaultPrevented;
+    },
+    click() {
+      this.dispatchEvent({
+        type: "click",
+        currentTarget: this,
+        target: this,
+        preventDefault() { this.defaultPrevented = true; },
+        defaultPrevented: false,
+      });
+    },
     removeAttribute(name) { delete this.attributes[name]; },
     getAttribute(name) { return this.attributes[name] || ""; },
     setAttribute(name, value) { this.attributes[name] = value; },
@@ -129,6 +154,7 @@ function bootGame() {
     "output",
     "command-input",
     "command-form",
+    "autoplay-stop",
     "game-shell",
     "room-image",
     "image-reveal",
@@ -1434,6 +1460,39 @@ const gameCases = [
     inputs: ["talk to gandalf", "speak to him"],
     expectedIncluded: ["Gandalf listens intently, expecting your words."],
     notExpectedIncluded: ["You speak, but only silence meets your words."],
+  },
+  {
+    name: "talk to previously encountered absent character remembers them",
+    setup(game) {
+      game.visiblePeopleInRoom();
+      game.characters.gandalf.position = "rivendell";
+    },
+    clearOutputAfterSetup: true,
+    inputs: ["talk to gandalf"],
+    expectedIncluded: ["Gandalf is not here just now."],
+    notExpectedIncluded: ["You speak, but only silence meets your words.", "There is no one named gandalf here."],
+  },
+  {
+    name: "ask previously encountered absent character remembers them",
+    setup(game) {
+      game.visiblePeopleInRoom();
+      game.characters.gandalf.position = "rivendell";
+    },
+    clearOutputAfterSetup: true,
+    inputs: ["ask gandalf for help"],
+    expectedIncluded: ["Gandalf is not here just now."],
+    notExpectedIncluded: ["You speak, but only silence meets your words.", "There is no one named gandalf here."],
+  },
+  {
+    name: "follow previously encountered absent character remembers them",
+    setup(game) {
+      game.visiblePeopleInRoom();
+      game.characters.gandalf.position = "rivendell";
+    },
+    clearOutputAfterSetup: true,
+    inputs: ["follow gandalf"],
+    expectedIncluded: ["Gandalf is not here just now."],
+    notExpectedIncluded: ["There is no one named gandalf here to follow."],
   },
   {
     name: "ask gandalf for help gives onboarding advice",
@@ -3049,6 +3108,24 @@ const gameCases = [
       "Autoplay stopped.",
       "Escape prevented default: yes",
       "Autoplay after escape: no",
+    ],
+  },
+  {
+    name: "autoplay stop button halts autoplay when clicked",
+    drive(game) {
+      const stopButton = document.getElementById("autoplay-stop");
+      game.execute("autoplay fast");
+      game.print(`Autoplay stop button visible after start: ${stopButton.hidden ? "no" : "yes"}`);
+      stopButton.click();
+      game.print(`Autoplay after stop button: ${game.autoplayRunning ? "yes" : "no"}`);
+      game.print(`Autoplay stop button visible after click: ${stopButton.hidden ? "no" : "yes"}`);
+    },
+    expectedIncluded: [
+      "Autoplay fast started. Type 'stop' to stop it.",
+      "Autoplay stop button visible after start: yes",
+      "Autoplay stopped.",
+      "Autoplay after stop button: no",
+      "Autoplay stop button visible after click: no",
     ],
   },
   {
@@ -4878,7 +4955,7 @@ const gameCases = [
       "Jump room: mirkwood_forest_path",
       "Has ring: yes",
       "Strength after Beorn: 6",
-      "Autoplay next in Mirkwood: east",
+      /Autoplay next in Mirkwood: (?:east|north west)/,
     ],
   },
   {
@@ -5008,6 +5085,101 @@ const gameCases = [
     expectedIncluded: [
       "Cellar autoplay path: open trap door -> throw barrel through trap door -> jump onto barrel",
       "Cellar autoplay room: long_lake",
+    ],
+  },
+  {
+    name: "autoplay avoids the cellar trap door shortcut when no barrel remains",
+    setup(game) {
+      game.execute("jump laketown");
+      movePlayerTo(game, "cellar");
+      game.flags.dragondefeated = true;
+      game.doors.porta_cellar_long_lake.open = true;
+      game.flags.barrelthrown = false;
+      const barrel = game.findKnownItem("barrel");
+      if (barrel) {
+        game.detachItem(barrel.id);
+        barrel.location = null;
+        barrel.visible = false;
+      }
+      const treasure = game.findKnownItem("treasure");
+      if (treasure) {
+        game.detachItem(treasure.id);
+        treasure.location = { type: "character", id: game.player.id };
+        if (!game.player.inventory.includes(treasure.id)) game.player.inventory.push(treasure.id);
+      }
+    },
+    drive(game) {
+      const command = game.nextAutoplayCommand();
+      game.print(`Cellar no-barrel autoplay command: ${command || "none"}`);
+      const path = game.autoplayPathTo("hobbit_hole") || [];
+      game.print(`Cellar no-barrel first leg: ${path[0] ? `${path[0].from}:${path[0].direction}->${path[0].to}` : "none"}`);
+    },
+    expectedIncluded: [
+      "Cellar no-barrel autoplay command: north",
+      "Cellar no-barrel first leg: cellar:north->elvenkings_halls",
+    ],
+    notExpectedIncluded: [
+      "Cellar no-barrel autoplay command: throw barrel through trap door",
+      "Cellar no-barrel first leg: cellar:down->strong_river",
+    ],
+  },
+  {
+    name: "autoplay repositions to bard before ordering the dragon shot",
+    setup(game) {
+      game.execute("jump smaug");
+      game.currentRoom = "lower_halls";
+      game.player.position = "lower_halls";
+      game.flags.dragondefeated = false;
+      game.flags.bardreadiedarrow = true;
+      game.characters.bard.position = "erebor_treasure_approach";
+      game.characters.bard.carriedBy = null;
+      game.characters.bard.movementMode = "follow";
+      const dragon = game.findKnownCharacter("dragon") || game.findKnownCharacter("smaug");
+      if (!dragon) throw new Error("Expected dragon character in Smaug autoplay regression setup.");
+      dragon.position = "lower_halls";
+      dragon.visible = true;
+    },
+    drive(game) {
+      const command = game.nextAutoplayCommand();
+      game.print(`Lower halls absent-bard autoplay command: ${command || "none"}`);
+    },
+    expectedIncluded: [
+      "Lower halls absent-bard autoplay command: west",
+    ],
+    notExpectedIncluded: [
+      "Lower halls absent-bard autoplay command: say to bard \"shoot dragon\"",
+    ],
+  },
+  {
+    name: "bard released after vertical travel stays in the destination room for autoplay",
+    setup(game) {
+      game.execute("jump laketown");
+      game.flags.dragondefeated = false;
+      game.flags.bardreadiedarrow = true;
+      game.currentRoom = "strong_river";
+      game.player.position = "strong_river";
+      game.characters.bard.position = "strong_river";
+      game.characters.bard.carriedBy = game.player.id;
+      game.characters.bard.movementMode = "on_first_meet";
+      game.characters.bard.followingPlayer = false;
+    },
+    drive(game) {
+      game.execute("up");
+      game.print(`Bard climb room: ${game.currentRoom}`);
+      game.print(`Bard room after climb: ${game.characters.bard.position}`);
+      game.print(`Bard follow after climb: ${game.characters.bard.followingPlayer ? "yes" : "no"}`);
+      game.print(`Next autoplay after bard climb: ${game.nextAutoplayCommand() || "none"}`);
+    },
+    expectedIncluded: [
+      "Bard climbs down from your shoulders and follows you.",
+      "Bard climb room: bleak_barren_land",
+      "Bard room after climb: bleak_barren_land",
+      "Bard follow after climb: yes",
+      "Next autoplay after bard climb: north",
+    ],
+    notExpectedIncluded: [
+      "Bard room after climb: strong_river",
+      "Next autoplay after bard climb: down",
     ],
   },
   {
@@ -5882,6 +6054,56 @@ const gameCases = [
       /(?:Close behind, Gollum's scream tears through the black passages|The dark carries Gollum's grief too well here|Somewhere in the deep ways Gollum gives a choking wail|A wet shriek races the walls behind you)/,
       "Gollum escape autosave: after escaping Gollum",
       "Ring flag after Gollum: yes",
+    ],
+  },
+  {
+    name: "gollum stays anchored at deep dark lake during autonomous movement",
+    setup(game) {
+      game.currentRoom = "deep_dark_lake";
+      game.player.position = "deep_dark_lake";
+      game.checkSpecialSituations();
+    },
+    drive(game) {
+      const startingRoom = game.characters.gollum?.position || "none";
+      game.decideCharacterMovement(game.characters.gollum, { forceMove: true });
+      game.print(`Gollum anchored: ${game.characters.gollum?.position === startingRoom ? "yes" : "no"}`);
+      game.print(`Gollum room after forced move: ${game.characters.gollum?.position || "none"}`);
+    },
+    expectedIncluded: [
+      "Gollum anchored: yes",
+      "Gollum room after forced move: deep_dark_lake",
+    ],
+  },
+  {
+    name: "deep dark lake atmosphere does not imply gollum when he is elsewhere",
+    setup(game) {
+      game.currentRoom = "deep_dark_lake";
+      game.player.position = "deep_dark_lake";
+      game.gollumState = game.createGollumState();
+      game.gollumState.met = true;
+      game.characters.gollum.position = "dark_stuffy_passage_13";
+      game.characters.gollum.visible = true;
+    },
+    drive(game) {
+      let triggered = false;
+      let line = "";
+      for (let seed = 1; seed <= 400 && !triggered; seed += 1) {
+        game.storySeed = seed;
+        game.turnCount = 0;
+        triggered = game.maybeAtmosphericEvent();
+        if (triggered) line = outputLines.at(-1) || "";
+      }
+      game.print(`Lake atmosphere triggered without Gollum: ${triggered ? "yes" : "no"}`);
+      game.print(`Gollum absent atmosphere line: ${line || "none"}`);
+    },
+    expectedIncluded: [
+      "Lake atmosphere triggered without Gollum: yes",
+      /Gollum absent atmosphere line: (?:A drip falls somewhere beyond sight, then another, and the dark seems to listen to the sound of its own water\.|Cold water laps once against the stones and then settles back into a silence too deep to trust\.|The cave answers itself in little echoes of dripping water, but nothing living shows upon the lake\.)/,
+    ],
+    notExpectedIncluded: [
+      /Something paddles once upon the black lake and then is still again\./,
+      /A faint wet muttering reaches you from the darkness and dies before the words can be made out\./,
+      /Gollum crouches low in his little boat, paddling a slow circle just beyond the edge of sight as though measuring the dark between you\./,
     ],
   },
   {

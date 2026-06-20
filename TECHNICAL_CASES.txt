@@ -2455,3 +2455,211 @@ Future debugging advice
   state, add it before the broader rule or it will never render.
 - For container-driven visuals, verify both the container open state and the
   contained item relationship in the same regression test.
+
+
+Case 054 - 2026-06-20 - Gollum could wander out of Deep Dark Lake while the riddle-state still treated him as present
+---------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Seeded autoplay could loop at `deep_dark_lake` issuing commands such as
+`ask gollum a riddle` or `say to gollum "what have i got in my pocket"` while
+the parser replied:
+
+- `There is no one named gollum here.`
+- `You speak, but only silence meets your words.`
+
+At the same time, ambient lake text could still imply something paddling or
+muttering on the water, making Gollum seem physically present.
+
+Root cause
+----------
+Two different systems had drifted apart.
+
+1. Gollum was still eligible for generic autonomous NPC movement. After Bilbo
+   met him, a later character-turn update could move the actual `gollum`
+   character out of `deep_dark_lake`.
+
+2. The Gollum encounter state (`gollumState`) and autoplay logic still assumed
+   the contest was active, so autoplay kept trying to talk to him.
+
+3. The lake's regional atmospheric pool always used Gollum-flavoured lines,
+   even when the `gollum` character was no longer actually in the room.
+
+4. `checkGollumEncounter()` only checked visibility, not room position, so the
+   encounter logic did not fully defend against this presence mismatch.
+
+Resolution
+----------
+- Exempted Gollum from generic autonomous character movement so he stays
+  anchored to the lake unless a dedicated scripted action moves him.
+- Hardened `checkGollumEncounter()` to require Gollum to be both visible and
+  actually positioned in `deep_dark_lake`.
+- Added a separate neutral atmospheric pool for `deep_dark_lake` when Gollum
+  is absent, so ambient text no longer implies that his boat or voice is still
+  there.
+- Added regression tests covering:
+  - forced NPC movement no longer dislodging Gollum from the lake
+  - lake atmosphere staying neutral when Gollum is elsewhere
+
+Verification
+------------
+- Reproduced the bug before the fix with:
+  - `node scripts/parser-tests.js --autoplay-batch-only --autoplay-batch=40 --autoplay-seed-start=1 --autoplay-step-limit=250`
+  - failing seeds included `3, 8, 24, 27, 30, 34` as `stuck_gollum`
+- After the fix, rerunning the same batch removed `stuck_gollum` entirely for
+  seeds `1-40`; the remaining failures were unrelated `death_smaug` cases.
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- For narrative set-pieces, do not leave key encounter actors on the generic
+  wandering-NPC path unless the scene is explicitly designed for that.
+- If ambience references a named hazard or actor, gate those lines on the same
+  presence check used by gameplay logic.
+- When autoplay says the parser is talking to nobody, compare:
+  - encounter flags
+  - actor room position
+  - ambient text sources
+
+
+Case 055 - 2026-06-20 - Previously encountered characters needed absence memory, not "no one named" amnesia
+------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+If Bilbo had already encountered a character and that character later left the
+room, commands such as talking to them, asking them for help, or following them
+could still answer as though the name were unknown or no one had ever been met:
+
+- `There is no one named Gandalf here.`
+- `There is no one named Gandalf here to follow.`
+- `You speak, but only silence meets your words.`
+
+Root cause
+----------
+The parser had two separate ideas of character knowledge:
+
+1. `resolveCharacterTarget()` only searched the current room.
+2. `findKnownCharacter()` could find a global character record, but most action
+   paths did not distinguish:
+   - never encountered
+   - encountered before, but absent now
+
+Also, encounter memory (`hasMetPlayer`) was not being recorded reliably just by
+seeing an NPC in the room or receiving an arrival notice.
+
+Resolution
+----------
+- Added explicit encounter marking whenever a visible NPC is present in the
+  room or enters it.
+- When a visible NPC is resolved directly as a target, that also now records
+  the encounter.
+- Added a shared absence response for encountered-but-absent characters:
+  - `X is not here just now.`
+- Wired that response into the main social and action paths, including:
+  - talk / greeting
+  - ask
+  - give / show
+  - follow
+  - attack
+  - generic social verbs like `thank` when aimed at an absent known character
+- Kept the old fallback for characters the player has not actually encountered.
+
+Verification
+------------
+Targeted harness checks now produce:
+
+- `talk to gandalf` -> `Gandalf is not here just now.`
+- `ask gandalf for help` -> `Gandalf is not here just now.`
+- `follow gandalf` -> `Gandalf is not here just now.`
+
+after first marking Gandalf as encountered and then moving him elsewhere.
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Treat "met before" as separate state from "currently targetable in the room".
+- If a command targets an absent known actor, prefer an absence line over a
+  generic parser failure.
+- Record encounter memory from perception as well as from direct dialogue, or
+  wandering NPCs will feel forgotten by the parser.
+
+
+Case 056 - 2026-06-20 - Follow-mode companions could drift out of sync with autoplay and create chase loops
+------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Seeded autoplay still found a Lake-town/Erebor loop after the earlier Gollum
+and absence-memory fixes. In seed `99`, Bilbo picked up Bard, climbed up from
+`strong_river`, and then autoplay got trapped chasing Bard around:
+
+- repeated `up` / `down` between `strong_river` and `bleak_barren_land`
+- later repeated `north` / `east` between `long_lake` and `wooden_town`
+- the run hit the step limit instead of finishing
+
+Root cause
+----------
+Two follower-state problems combined.
+
+1. When Bilbo carried Bard through a vertical move, the automatic release path
+   could still leave Bard effectively out of sync with the destination room.
+
+2. More importantly, characters with `movementMode === "follow"` were still
+   eligible for the generic random NPC wandering logic during the same turn.
+   That meant a companion could:
+   - follow Bilbo correctly during movement
+   - then immediately wander away before autoplay's next decision
+
+Autoplay would then route toward Bard's new position, creating a moving-target
+chase instead of progressing toward Smaug.
+
+Resolution
+----------
+- Hardened carried-character release so it can explicitly land the companion in
+  the movement destination room.
+- Stopped generic autonomous wandering for standard `follow` companions.
+- Kept Gandalf on his separate loose-follower logic, so only ordinary travel
+  companions were stabilized.
+- Added regression coverage for:
+  - Bard being released into the correct destination room after vertical travel
+  - autoplay continuing forward instead of stepping back down to chase him
+
+Verification
+------------
+- A dedicated absence probe over seeds `1-160` found no autoplay lines of the
+  form `X is not here just now.`
+- Before the fix:
+  - `node scripts/parser-tests.js --autoplay-batch-only --autoplay-batch=120 --autoplay-seed-start=1 --autoplay-step-limit=250`
+  - produced `113` victories, `1` step-limit seed (`99`), and `6`
+    `death_smaug` failures
+- After the fix, rerunning the same batch produced:
+  - `victory: 120`
+  - no failing seeds
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a companion is in `follow` mode, treat that as a movement contract, not
+  as permission to re-enter generic wandering AI.
+- For carried-character release logic, be explicit about whether placement
+  should use the source room or the destination room of the move.
+- When autoplay appears to chase a companion, log both:
+  - the planner's route to that companion
+  - the companion's movement mode and post-turn position

@@ -42,6 +42,7 @@
   const output = $("output");
   const input = $("command-input");
   const form = $("command-form");
+  const autoplayStopButton = $("autoplay-stop");
   const gameShell = $("game-shell");
   const roomImage = $("room-image");
   const imageReveal = $("image-reveal");
@@ -1019,6 +1020,12 @@
     "Gollum slips away into the darkness for a breathless moment; when his pale eyes show again over the water, they seem nearer than before.",
     "Gollum worries at a limp fish with quick fingers, muttering between tiny bites and glancing up as if wondering whether you would taste better.",
     "Gollum drifts close enough for the black water to tap softly at the stones by your feet, then eases back into the blind dark.",
+  ];
+
+  const DEEP_DARK_LAKE_EMPTY_ATMOSPHERIC_EVENT_POOLS = [
+    "A drip falls somewhere beyond sight, then another, and the dark seems to listen to the sound of its own water.",
+    "Cold water laps once against the stones and then settles back into a silence too deep to trust.",
+    "The cave answers itself in little echoes of dripping water, but nothing living shows upon the lake.",
   ];
 
   const SMAUG_STATE_DESCRIPTIONS = {
@@ -4689,11 +4696,11 @@
       return matches(character?.name, "bard") && ["up", "down"].includes(normalize(direction));
     }
 
-    releaseCarriedCharacter(character, { follow = false, message = "" } = {}) {
+    releaseCarriedCharacter(character, { follow = false, message = "", room = null } = {}) {
       const game = this.game;
       if (!character) return;
       character.carriedBy = null;
-      character.position = game.currentRoom;
+      character.position = room || game.currentRoom;
       character.justEntered = false;
       if (follow) {
         character.movementMode = "follow";
@@ -5286,7 +5293,9 @@
         const fallback = this.social.defaultConversationCharacter();
         if (fallback) return fallback;
       }
-      return game.peopleInRoom().find((p) => p.id !== game.player.id && matches(p.name, name)) || null;
+      const target = game.peopleInRoom().find((p) => p.id !== game.player.id && matches(p.name, name)) || null;
+      if (target) game.markCharacterEncountered(target);
+      return target;
     }
 
     findKnownCharacter(targetName) {
@@ -5493,6 +5502,18 @@
       ], normalized);
     }
 
+    absentEncounteredCharacter(targetName = "") {
+      const known = this.findKnownCharacter(targetName);
+      if (!known || !known.hasMetPlayer) return null;
+      return known;
+    }
+
+    absentEncounteredCharacterMessage(targetName = "") {
+      const known = this.absentEncounteredCharacter(targetName);
+      if (!known) return "";
+      return `${known.name} is not here just now.`;
+    }
+
     extractLeadingVisibleCharacter(text) {
       return this.parser.extractLeadingVisibleCharacter(text);
     }
@@ -5580,7 +5601,7 @@
       const item = game.findInInventory(intent.itemName);
       const target = this.resolveCharacterTarget(intent.targetName);
       if (!item) return game.print(game.heldItemMessage(intent.itemName) || `${game.player.name} does not have the ${intent.itemName}.`);
-      if (!target) return game.print(`There is no one named ${intent.targetName} here.`);
+      if (!target) return game.print(this.absentEncounteredCharacterMessage(intent.targetName) || `There is no one named ${intent.targetName} here.`);
       if (game.unexpectedParty?.blocksDirectInteraction(target, "gift")) return;
       if (target.id === game.player.id) return game.print(`${game.player.name} already has the ${item.name}.`);
       const protectedReason = this.protectedQuestGearGiftMessage(target, item);
@@ -5625,7 +5646,7 @@
       const item = game.findInInventory(intent.itemName);
       const target = this.resolveCharacterTarget(intent.targetName);
       if (!item) return game.print(game.heldItemMessage(intent.itemName) || `${game.player.name} does not have the ${intent.itemName}.`);
-      if (!target) return game.print(`There is no one named ${intent.targetName} here.`);
+      if (!target) return game.print(this.absentEncounteredCharacterMessage(intent.targetName) || `There is no one named ${intent.targetName} here.`);
       if (game.unexpectedParty?.blocksDirectInteraction(target, "gift")) return;
       game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "show")} the ${item.name} to ${displayCharacterName(target)}.`);
       this.reactToShownItem(target, item);
@@ -5658,7 +5679,7 @@
     askCharacterForItem(characterName, itemName) {
       const game = this.game;
       const character = this.resolveAskForCharacterTarget(characterName, itemName);
-      if (!character) return game.print(this.isolatedCompanionAppeal(characterName) || `There is no one named ${characterName} here.`);
+      if (!character) return game.print(this.isolatedCompanionAppeal(characterName) || this.absentEncounteredCharacterMessage(characterName) || `There is no one named ${characterName} here.`);
       if (game.unexpectedParty?.blocksDirectInteraction(character, "item")) return;
       const special = this.specialAskForResponse(character, itemName);
       if (special) {
@@ -5739,7 +5760,7 @@
     askCharacterTo(characterName, order) {
       const game = this.game;
       const character = this.resolveCharacterTarget(characterName);
-      if (!character) return game.print(this.isolatedCompanionAppeal(characterName) || `There is no one named ${characterName} here.`);
+      if (!character) return game.print(this.isolatedCompanionAppeal(characterName) || this.absentEncounteredCharacterMessage(characterName) || `There is no one named ${characterName} here.`);
       if (character.friendly === false) return this.respondToTalk(character);
       if (game.player.name === "You" && game.player.noticeable === false) return game.print(`${sentenceDisplayCharacterName(character)} says 'who's talking?'`);
       if (game.unexpectedParty?.blocksDirectInteraction(character, "order")) return;
@@ -5801,7 +5822,7 @@
     askCharacterAbout(characterName, topic) {
       const game = this.game;
       const character = this.resolveCharacterTarget(characterName);
-      if (!character) return game.print(this.isolatedCompanionAppeal(characterName) || `There is no one named ${characterName} here.`);
+      if (!character) return game.print(this.isolatedCompanionAppeal(characterName) || this.absentEncounteredCharacterMessage(characterName) || `There is no one named ${characterName} here.`);
       if (matches(character.name, "dragon")) {
         const special = game.specialConversationResponse(character, topic) || game.specialTalkResponse(character);
         return game.print(special);
@@ -5880,7 +5901,7 @@
       if (greeting?.mode === "broadcast") return game.hello();
       if (greeting?.mode === "targeted") {
         const character = this.resolveCharacterTarget(greeting.targetName);
-        if (!character) return game.print(this.isolatedCompanionAppeal(greeting.targetName) || "You speak, but only silence meets your words.");
+        if (!character) return game.print(this.isolatedCompanionAppeal(greeting.targetName) || this.absentEncounteredCharacterMessage(greeting.targetName) || "You speak, but only silence meets your words.");
         if (character.friendly === false) return this.respondToTalk(character);
         if (game.unexpectedParty?.blocksDirectInteraction(character, "talk")) return;
         this.rememberConversationCharacter(character);
@@ -5894,7 +5915,7 @@
         return game.print(`You could speak to ${joinNames(visiblePeople.map((character) => displayCharacterName(character)))}.`);
       }
       const character = this.resolveCharacterTarget(parsed.characterName);
-      if (!character) return game.print(this.isolatedCompanionAppeal(parsed.characterName) || "You speak, but only silence meets your words.");
+      if (!character) return game.print(this.isolatedCompanionAppeal(parsed.characterName) || this.absentEncounteredCharacterMessage(parsed.characterName) || "You speak, but only silence meets your words.");
       if (character.friendly === false) return this.respondToTalk(character);
       if (game.player.name === "You" && game.player.noticeable === false) return game.print(`${sentenceDisplayCharacterName(character)} says 'who's talking?'`);
       if (game.unexpectedParty?.blocksDirectInteraction(character, parsed.order ? "order" : "talk")) return;
@@ -8343,7 +8364,7 @@
       if (game.currentRoom !== "deep_dark_lake") return;
       if (!game.gollumState) game.gollumState = game.createGollumState();
       const gollum = game.currentGollum();
-      if (!gollum || !gollum.visible) return;
+      if (!gollum || !gollum.visible || gollum.position !== game.currentRoom) return;
 
       if (!game.gollumState.met) {
         game.recordAutosave("before meeting Gollum", { key: "hazard:gollum:room" });
@@ -8514,6 +8535,7 @@
       game.autoplayRunId = 0;
       game.autoplayCapturedText = "";
       game.autoplayCapturingOutput = false;
+      game.refreshAutoplayControls();
     }
 
     autoplay(object = "") {
@@ -8527,6 +8549,7 @@
       game.autoplayRunning = true;
       game.autoplayWaits = 0;
       game.autoplayRunId += 1;
+      game.refreshAutoplayControls();
       game.print(`Autoplay ${game.autoplayMode} started. Type 'stop' to stop it.`, "system");
       this.scheduleAutoplayStep();
     }
@@ -8595,6 +8618,7 @@
       game.autoplayRunning = false;
       game.autoplayRunId += 1;
       input.value = "";
+      game.refreshAutoplayControls();
       if (message) game.print(message, "system");
       game.scheduleIdleAdvance();
     }
@@ -8629,7 +8653,7 @@
       }
 
       if (game.currentRoom === "lower_halls" && game.liveDragon() && game.flags.bardreadiedarrow) {
-        return "say to bard \"shoot dragon\"";
+        return this.autoplayDirectedCharacterCommand("bard", "say to bard \"shoot dragon\"");
       }
 
       if (beforeDragonDefeat && !this.autoplayHas("firestone")) {
@@ -8668,7 +8692,7 @@
         const thorin = Object.values(game.characters).find((character) => matches(character.name, "thorin"));
         if (game.currentRoom !== "green_dragon_inn") return this.autoplayRouteCommandTo("green_dragon_inn");
         if (thorin?.position !== game.currentRoom) thorin.position = game.currentRoom;
-        return "say to thorin \"look through window\"";
+        return this.autoplayDirectedCharacterCommand("thorin", "say to thorin \"look through window\"");
       }
 
       if (beforeDragonDefeat && !game.visitedRooms.has("dreary") && game.currentRoom !== "dreary") {
@@ -8704,8 +8728,8 @@
 
       if (beforeDragonDefeat && !game.flags.mapread) {
         if (game.currentRoom !== "rivendell") return this.autoplayRouteCommandTo("rivendell");
-        if (!game.flags.rivendell_progress_talk) return "talk to elrond";
-        if (!game.flags.rivendell_progress_quest) return "ask elrond about journey";
+        if (!game.flags.rivendell_progress_talk) return this.autoplayDirectedCharacterCommand("elrond", "talk to elrond");
+        if (!game.flags.rivendell_progress_quest) return this.autoplayDirectedCharacterCommand("elrond", "ask elrond about journey");
       }
 
       if (beforeDragonDefeat && game.currentRoom === "deep_dark_lake" && !game.gollumState?.pocketQuestionAsked) {
@@ -8731,7 +8755,7 @@
           return this.autoplayHas("majestic sword") ? `kill ${goblin.name} with sword` : `kill ${goblin.name}`;
         }
         const helper = game.encounters.bestGoblinTunnelHelper();
-        if (helper && !attackers.has(helper.id)) return `ask ${normalize(helper.name)} to attack ${goblin.name}`;
+        if (helper && !attackers.has(helper.id)) return this.autoplayDirectedCharacterCommand(helper.name, `ask ${normalize(helper.name)} to attack ${goblin.name}`);
         return this.autoplayHas("majestic sword") ? `kill ${goblin.name} with sword` : `kill ${goblin.name}`;
       }
 
@@ -8797,8 +8821,8 @@
       if (game.currentRoom === "cellar") {
         const trapDoor = game.doors.porta_cellar_long_lake;
         if (trapDoor && !trapDoor.open) return "open trap door";
-        if (!game.flags.barrelthrown) return "throw barrel through trap door";
-        return "jump onto barrel";
+        if (game.flags.barrelthrown) return "jump onto barrel";
+        if (this.autoplayHasAccessibleBarrelForCellarEscape()) return "throw barrel through trap door";
       }
 
       const bard = Object.values(game.characters).find((character) => matches(character.name, "bard"));
@@ -8818,11 +8842,11 @@
           if (commandToBard) return commandToBard;
           return this.autoplayRouteCommandTo("west_bank");
         }
-        if (!game.flags.bardreadiedarrow) return "say to bard \"get strong arrow from quiver\"";
+        if (!game.flags.bardreadiedarrow) return this.autoplayDirectedCharacterCommand("bard", "say to bard \"get strong arrow from quiver\"");
       }
 
       if (game.currentRoom === "lower_halls" && !this.autoplayHas("treasure")) {
-        if (game.liveDragon()) return "say to bard \"shoot dragon\"";
+        if (game.liveDragon()) return this.autoplayDirectedCharacterCommand("bard", "say to bard \"shoot dragon\"");
         const prepTreasureLoad = this.autoplayTreasurePickupPrepCommand();
         if (prepTreasureLoad) return prepTreasureLoad;
         return "take treasure";
@@ -8848,6 +8872,12 @@
     autoplayHas(name) {
       const game = this.game;
       return [...game.player.inventory, ...(game.player.worn || [])].some((itemId) => matches(game.items[itemId]?.name, name));
+    }
+
+    autoplayHasAccessibleBarrelForCellarEscape() {
+      const game = this.game;
+      if (game.flags.barrelthrown) return true;
+      return Boolean(game.visibleSearch("barrel")?.item || game.findInInventory("barrel"));
     }
 
     autoplayTreasurePickupPrepCommand() {
@@ -8887,6 +8917,15 @@
     autoplayOnce(flag, command) {
       this.game.flags[flag] = true;
       return command;
+    }
+
+    autoplayDirectedCharacterCommand(characterName, command) {
+      const game = this.game;
+      const target = game.resolveCharacterTarget(characterName);
+      if (target) return command;
+      const known = game.findKnownCharacter(characterName);
+      if (known?.position) return this.autoplayRouteCommandTo(known.position);
+      return null;
     }
 
     autoplayRouteCommandTo(destination) {
@@ -8935,6 +8974,7 @@
       const game = this.game;
       if (game.rivendellWeaponGate(connection)) return this.autoplayHas("majestic sword");
       if (game.rivendellRopeGate(connection)) return this.autoplayHas("sturdy rope");
+      if (connection.from === "cellar" && connection.direction === "down" && !this.autoplayHasAccessibleBarrelForCellarEscape()) return false;
       if (game.narrativeTravelBlock(connection)) return false;
       const door = connection.door && game.doors[connection.door];
       if (!door || door.broken) return true;
@@ -9121,6 +9161,7 @@
       if (character) return game.examineCharacter(character);
       const scopedCharacter = game.findKnownCharacter(text.replace(/\s+(?:in|inside|into|at|under|behind|near|around|through|over|on)\s+.+$/, ""));
       const knownCharacter = scopedCharacter || game.findKnownCharacter(text);
+      if (knownCharacter?.hasMetPlayer) return game.print(`${knownCharacter.name} is not here just now.`);
       if (knownCharacter) return game.print(`There is no one named ${knownCharacter.name} here.`);
       const item = game.visibleSearch(text)?.item;
       if (!item) {
@@ -10163,6 +10204,10 @@
     }
 
     bind() {
+      autoplayStopButton?.addEventListener("click", () => {
+        if (!this.autoplayRunning) return;
+        this.stopAutoplay("Autoplay stopped.");
+      });
       form.addEventListener("submit", (event) => {
         event.preventDefault();
         const command = input.value.trim();
@@ -10287,6 +10332,7 @@
         window.addEventListener("resize", () => {
           this.applyLayoutMode(this.layoutModePreference);
           this.applyLayout2SceneWidth(this.layout2SceneWidth, { persist: false });
+          this.updateAutoplayControlPosition();
           if (typeof this.layout.applySceneMapEditorPanelPosition === "function") {
             this.layout.applySceneMapEditorPanelPosition();
           }
@@ -10308,6 +10354,28 @@
         return;
       }
       applyFocus();
+    }
+
+    refreshAutoplayControls() {
+      this.updateAutoplayControlPosition();
+      if (!autoplayStopButton) return;
+      const visible = Boolean(this.autoplayRunning && !this.endgame);
+      autoplayStopButton.hidden = !visible;
+      autoplayStopButton.disabled = !visible;
+      autoplayStopButton.setAttribute("aria-hidden", visible ? "false" : "true");
+      document.body.dataset.autoplay = visible ? "running" : "idle";
+    }
+
+    updateAutoplayControlPosition() {
+      if (!document?.body) return;
+      let offset = 18;
+      if (layoutSwitch && window.innerWidth > MOBILE_LAYOUT_MAX_WIDTH) {
+        const rect = layoutSwitch.getBoundingClientRect();
+        if (rect && Number.isFinite(rect.left) && rect.width > 0) {
+          offset = Math.max(18, Math.round(window.innerWidth - rect.left + 12));
+        }
+      }
+      document.body.style.setProperty("--autoplay-stop-right-offset", `${offset}px`);
     }
 
     scheduleInitialCommandFocus() {
@@ -10925,7 +10993,9 @@
 
     visiblePeopleInRoom() {
       if (this.roomIsDark()) return [];
-      return this.peopleInRoom().filter((character) => !character.carriedBy);
+      const visible = this.peopleInRoom().filter((character) => !character.carriedBy);
+      for (const character of visible) this.markCharacterEncountered(character);
+      return visible;
     }
 
     connectionsFromVisible(roomId) {
@@ -11043,6 +11113,7 @@
         this.arrivalNoticeTimers = this.arrivalNoticeTimers.filter((id) => id !== timer);
         const current = this.characters[characterId];
         if (!current || !current.visible || current.position !== this.currentRoom || current.position !== roomId) return;
+        this.markCharacterEncountered(current);
         this.print(this.characterArrivalMessage(current), current.friendly === false ? "danger" : "");
       }, delay);
       this.arrivalNoticeTimers.push(timer);
@@ -11210,6 +11281,11 @@
 
     peopleInRoom(roomId = this.currentRoom) {
       return this.world.peopleInRoom(roomId);
+    }
+
+    markCharacterEncountered(character) {
+      if (!character || character.id === this.player?.id) return;
+      character.hasMetPlayer = true;
     }
 
     characterPresence(character, options = {}) {
@@ -11398,8 +11474,8 @@
       return this.interactions.characterCannotFollowVertical(character, direction);
     }
 
-    releaseCarriedCharacter(character, { follow = false, message = "" } = {}) {
-      return this.interactions.releaseCarriedCharacter(character, { follow, message });
+    releaseCarriedCharacter(character, { follow = false, message = "", room = null } = {}) {
+      return this.interactions.releaseCarriedCharacter(character, { follow, message, room });
     }
 
     takeAll(objectName) {
@@ -11687,6 +11763,8 @@
       let pool = region && ATMOSPHERIC_EVENT_POOLS[region];
       if (region === "mirkwood") {
         pool = this.mirkwoodAtmosphericEventPool();
+      } else if (region === "gollum" && !this.isGollumPresentInLake()) {
+        pool = DEEP_DARK_LAKE_EMPTY_ATMOSPHERIC_EVENT_POOLS;
       }
       if (region === "bag_end_house" && !this.bagEndPartyHasEnteredHouse()) {
         pool = pool.filter((line) => !/\bdwarf\b|song|conversation|laughter/i.test(line));
@@ -12654,6 +12732,10 @@
       return this.social.findKnownCharacter(targetName);
     }
 
+    absentEncounteredCharacterMessage(targetName) {
+      return this.social.absentEncounteredCharacterMessage(targetName);
+    }
+
     lastConversationCharacter() {
       return this.social.lastConversationCharacter();
     }
@@ -12679,7 +12761,7 @@
       const targetName = command.split(" with ")[0];
       const weaponName = command.includes(" with ") ? command.split(" with ").slice(1).join(" with ") : "";
       const target = this.resolveCharacterTarget(targetName);
-      if (!target) return this.print(`There is no one named ${targetName} here to attack.`);
+      if (!target) return this.print(this.absentEncounteredCharacterMessage(targetName) || `There is no one named ${targetName} here to attack.`);
       const weapon = weaponName ? this.findCharacterItem(actor, weaponName)?.item : null;
       if (weaponName && !weapon) return this.print(this.heldItemMessage(weaponName) || `${actor.name} does not have the ${weaponName}.`);
       const result = this.attackCharacter(actor, target, weapon);
@@ -13105,7 +13187,7 @@
       const target = this.resolveCharacterTarget(objectName);
       if (!target) {
         if (this.handleMirkwoodFollow(objectName)) return;
-        return this.print(`There is no one named ${objectName} here to follow.`);
+        return this.print(this.absentEncounteredCharacterMessage(objectName) || `There is no one named ${objectName} here to follow.`);
       }
       if (this.commandIssuer && target.id === this.commandIssuer.id) {
         this.player.movementMode = "follow";
@@ -13132,6 +13214,8 @@
         this.print(messages[verb] || actorizeSecondPerson(this.player, `You ${verb} ${target.name}.`));
         return;
       }
+      const absentCharacterMessage = text ? this.absentEncounteredCharacterMessage(text.replace(/^(?:from|to)\s+/, "")) : "";
+      if (absentCharacterMessage) return this.print(absentCharacterMessage);
       this.print(actorizeSecondPerson(this.player, `You ${verb}${objectName ? ` ${objectName}` : ""}, but nothing useful happens.`));
     }
 
@@ -13605,6 +13689,7 @@
         if (this.characterCannotFollowVertical(character, direction)) {
           this.releaseCarriedCharacter(character, {
             follow: true,
+            room: toRoom,
             message: `${sentenceDisplayCharacterName(character)} climbs down from your shoulders and follows you.`,
           });
         }
@@ -14632,7 +14717,9 @@
       const { forceMove = false } = options;
       if (this.encounters?.isGoblinTunnelEncounterActive() && character.position === this.currentRoom) return;
       if (!character.visible || character.carriedBy || character.movementMode === "never") return;
+      if (matches(character.name, "gollum")) return;
       if (this.isLooseFollower(character)) return this.decideLooseFollowerMovement(character, { forceMove });
+      if (character.movementMode === "follow") return;
       if (character.movementMode === "on_first_meet" && !character.hasMetPlayer) {
         if (character.position !== this.currentRoom) return;
         character.hasMetPlayer = true;
