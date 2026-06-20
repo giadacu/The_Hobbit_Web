@@ -1199,6 +1199,11 @@
   const CONTEXTUAL_ROOM_IMAGE_RULES = {
     hobbit_hole: [
       {
+        when: ({ game }) => game.items.heavy_wooden_chest?.open
+          && game.isInside("heavy_wooden_chest", "treasure"),
+        image: "hobbit_hole_open_door_open_chest_with_treasure.png",
+      },
+      {
         when: ({ game }) => game.doorOpenByName("round green door") && game.items.heavy_wooden_chest?.open,
         image: "hobbit_hole_open_door_open_chest.png",
       },

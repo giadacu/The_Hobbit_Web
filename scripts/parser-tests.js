@@ -3379,8 +3379,15 @@ const gameCases = [
       game.print(`Hobbit hole base image: ${game.contextualRoomImage(game.room())}`);
       chest.open = true;
       game.print(`Hobbit hole open chest image: ${game.contextualRoomImage(game.room())}`);
+      game.detachItem("treasure");
+      chest.contents.push("treasure");
+      game.items.treasure.location = { type: "item", id: "heavy_wooden_chest" };
+      game.print(`Hobbit hole open chest with treasure image: ${game.contextualRoomImage(game.room())}`);
       frontDoor.open = true;
       frontDoor.locked = false;
+      game.print(`Hobbit hole open door chest and treasure image: ${game.contextualRoomImage(game.room())}`);
+      chest.contents = chest.contents.filter((id) => id !== "treasure");
+      game.items.treasure.location = null;
       game.print(`Hobbit hole open door and chest image: ${game.contextualRoomImage(game.room())}`);
       chest.open = false;
       game.print(`Hobbit hole open door image: ${game.contextualRoomImage(game.room())}`);
@@ -3388,6 +3395,8 @@ const gameCases = [
     expectedIncluded: [
       "Hobbit hole base image: hobbit_hole.jpeg",
       "Hobbit hole open chest image: hobbit_hole_open_chest.png",
+      "Hobbit hole open chest with treasure image: hobbit_hole_open_door_open_chest_with_treasure.png",
+      "Hobbit hole open door chest and treasure image: hobbit_hole_open_door_open_chest_with_treasure.png",
       "Hobbit hole open door and chest image: hobbit_hole_open_door_open_chest.png",
       "Hobbit hole open door image: hobbit_hole_open_door.png",
     ],

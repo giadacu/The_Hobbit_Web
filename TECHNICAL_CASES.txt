@@ -2412,3 +2412,46 @@ Future debugging advice
   existing state and add an explicit priority order for the combined case.
 - For AI-derived room variants that are visually close but not pixel-identical,
   a constrained local composite can be safer than regenerating the entire room.
+
+
+Case 053 - 2026-06-20 - Hobbit Hole needed a treasure-visible variant for the open chest state
+-----------------------------------------------------------------------------------------------
+
+Symptom
+-------
+A new front-hall image was added for the richer state where the round green
+door may be open or closed, the heavy wooden chest is open, and the treasure
+is already inside the chest, but the room-image selector could not ever choose
+it.
+
+Root cause
+----------
+`CONTEXTUAL_ROOM_IMAGE_RULES.hobbit_hole` already handled:
+- chest open only
+- door open only
+- door open + chest open
+
+but it had no more-specific rule for the treasure-inside-chest variant, so the
+generic door+chest image always won.
+
+Resolution
+----------
+- Added a higher-priority contextual image rule for:
+  - chest open
+  - `treasure` inside `heavy_wooden_chest`
+- Extended the Hobbit Hole regression test to assert the treasure-visible image
+  both with the front door closed and with it open, before falling back to the
+  plain open-door image.
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a new art variant represents a stricter subset of an existing room
+  state, add it before the broader rule or it will never render.
+- For container-driven visuals, verify both the container open state and the
+  contained item relationship in the same regression test.
