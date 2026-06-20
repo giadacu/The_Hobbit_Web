@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="it" translate="no" class="notranslate">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="google" content="notranslate">
+    <title>The Hobbit Autoplay Lab</title>
+    <link rel="stylesheet" href="autoplay-lab.css?v=20260620-007">
+  </head>
+  <body class="notranslate" translate="no">
+    <main class="lab-shell">
+      <aside class="lab-sidebar">
+        <h1>Autoplay Scenario Lab</h1>
+
+        <section class="lab-panel">
+          <h2>Scenario</h2>
+          <label class="lab-field">
+            <span>Start preset</span>
+            <select id="lab-start-preset"></select>
+          </label>
+          <label class="lab-field">
+            <span>Target</span>
+            <select id="lab-target"></select>
+          </label>
+          <label class="lab-field">
+            <span>Outcome filter</span>
+            <select id="lab-outcome-filter">
+              <option value="all">Successi, morti e stalli</option>
+              <option value="success">Solo successi</option>
+              <option value="death">Solo morti</option>
+            </select>
+          </label>
+          <label class="lab-field">
+            <span>Strategy</span>
+            <select id="lab-strategy"></select>
+          </label>
+        </section>
+
+        <section class="lab-panel">
+          <h2>Seeds</h2>
+          <div class="lab-grid">
+            <label class="lab-field">
+              <span>Seed start</span>
+              <input id="lab-seed-start" type="number" min="1" step="1" value="1">
+            </label>
+            <label class="lab-field">
+              <span>Seed count</span>
+              <input id="lab-seed-count" type="number" min="1" step="1" value="12">
+            </label>
+            <label class="lab-field">
+              <span>Step limit</span>
+              <input id="lab-step-limit" type="number" min="1" step="1" value="220">
+            </label>
+            <label class="lab-field">
+              <span>Replay speed</span>
+              <select id="lab-replay-speed">
+                <option value="instant">Instant</option>
+                <option value="fast">Fast</option>
+                <option value="slow">Slow</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="lab-panel">
+          <h2>Analyze</h2>
+          <div class="lab-actions">
+            <button id="lab-analyze" type="button">Analyze branches</button>
+            <button id="lab-continuous-start" type="button">Start continuous trial</button>
+            <button id="lab-reset" type="button">Reset view</button>
+            <button id="lab-continuous-stop" type="button" disabled>Stop continuous trial</button>
+            <button id="lab-audit-button" type="button">Audit fatal coverage</button>
+            <button id="lab-death-catalog-button" type="button">Death catalog</button>
+          </div>
+          <div id="lab-status" class="lab-status">Scegli un preset e un target, poi avvia l'analisi per costruire l'albero dei rami dell'autoplay.</div>
+        </section>
+
+        <section class="lab-panel">
+          <h2>Learned Memory</h2>
+          <div id="lab-memory-summary" class="lab-summary">Nessuna memoria esplorativa salvata.</div>
+        </section>
+
+        <section class="lab-panel">
+          <h2>Saved Trial Log</h2>
+          <div id="lab-continuous-log-summary" class="lab-summary">Nessun log continuo salvato.</div>
+        </section>
+
+        <section class="lab-panel">
+          <h2>Summary</h2>
+          <div id="lab-summary" class="lab-summary">Nessuna analisi eseguita.</div>
+        </section>
+      </aside>
+
+      <section class="lab-main">
+        <div class="lab-column">
+          <div class="lab-column__head">
+            <strong>Branch Tree</strong>
+            <span id="lab-tree-caption">I rami appariranno qui dopo la simulazione.</span>
+          </div>
+          <div id="lab-tree" class="lab-tree">
+            <div class="lab-empty">Nessun ramo da mostrare.</div>
+          </div>
+        </div>
+
+        <div class="lab-column lab-column--detail">
+          <div class="lab-column__head">
+            <strong>Branch Detail</strong>
+            <span id="lab-detail-caption">Seleziona un ramo foglia per vederne comandi, output e replay.</span>
+          </div>
+          <div id="lab-detail" class="lab-detail">
+            <div class="lab-empty">Nessun ramo selezionato.</div>
+          </div>
+          <div class="lab-column__head lab-column__head--secondary">
+            <strong>Replay Log</strong>
+            <span id="lab-replay-caption">Il replay usa il motore reale del gioco in un sandbox nascosto.</span>
+          </div>
+          <pre id="lab-replay-log" class="lab-replay-log">Nessun replay eseguito.</pre>
+        </div>
+      </section>
+    </main>
+
+    <div id="lab-overlay-backdrop" class="lab-overlay-backdrop" hidden></div>
+
+    <aside id="lab-audit-panel" class="lab-overlay-panel" hidden aria-hidden="true">
+      <div class="lab-overlay-panel__head">
+        <div>
+          <strong>Audit fatal coverage</strong>
+          <div class="lab-overlay-panel__copy">Controllo delle tratte principali senza far crescere la pagina.</div>
+        </div>
+        <button id="lab-audit-close" type="button" class="lab-overlay-panel__close">Close</button>
+      </div>
+      <div id="lab-audit" class="lab-overlay-panel__body lab-audit">Nessun audit eseguito.</div>
+    </aside>
+
+    <aside id="lab-death-panel" class="lab-overlay-panel" hidden aria-hidden="true">
+      <div class="lab-overlay-panel__head">
+        <div>
+          <strong>Death Catalog</strong>
+          <div class="lab-overlay-panel__copy">Inneschi fatali mappati nel lab con replay diretto del ramo di morte.</div>
+        </div>
+        <button id="lab-death-close" type="button" class="lab-overlay-panel__close">Close</button>
+      </div>
+      <div id="lab-death-catalog" class="lab-overlay-panel__body lab-death-catalog">Catalogo in caricamento.</div>
+    </aside>
+
+    <section class="lab-sandbox" aria-hidden="true" hidden>
+      <div id="layout-switch" class="layout-switch">
+        <button id="layout-mode-1" type="button">1</button>
+        <button id="layout-mode-2" type="button">2</button>
+      </div>
+      <main id="game-shell" class="game-shell">
+        <section class="scene">
+          <img id="room-image" src="" alt="">
+          <div id="image-reveal" class="image-reveal" hidden>
+            <img id="image-reveal-outline" alt="">
+            <img id="image-reveal-fill" alt="">
+          </div>
+          <div id="scene-map-overlay" class="scene-map-overlay" hidden>
+            <section class="scene-map-panel">
+              <div class="scene-map-toolbar">
+                <button id="scene-map-back" type="button" hidden>Back</button>
+                <div class="scene-map-toolbar__meta">
+                  <strong id="scene-map-title">Explored Map</strong>
+                  <span id="scene-map-subtitle">World overview</span>
+                </div>
+                <div class="scene-map-toolbar__actions">
+                  <button id="scene-map-zoom-out" type="button">-</button>
+                  <button id="scene-map-zoom-reset" type="button">60%</button>
+                  <button id="scene-map-zoom-in" type="button">+</button>
+                </div>
+              </div>
+              <div id="scene-map-scroll" class="scene-map-scroll">
+                <div id="scene-map-canvas" class="scene-map-canvas"></div>
+                <img id="scene-map-image" alt="" hidden>
+              </div>
+            </section>
+          </div>
+          <div id="scene-compass" class="scene-compass" hidden>
+            <div id="scene-compass-rose" class="scene-compass__rose">
+              <span id="scene-compass-north">N</span>
+              <span id="scene-compass-north-east">NE</span>
+              <span id="scene-compass-east">E</span>
+              <span id="scene-compass-south-east">SE</span>
+              <span id="scene-compass-south">S</span>
+              <span id="scene-compass-south-west">SW</span>
+              <span id="scene-compass-west">W</span>
+              <span id="scene-compass-north-west">NW</span>
+            </div>
+            <div id="scene-compass-vertical" hidden>
+              <span id="scene-compass-up" hidden>Up</span>
+              <span id="scene-compass-down" hidden>Dn</span>
+            </div>
+          </div>
+          <audio id="music-player" preload="none"></audio>
+        </section>
+
+        <div id="layout-divider" class="layout-divider"></div>
+
+        <section class="console">
+          <div id="output" class="output"></div>
+          <form id="command-form" class="command-form">
+            <label for="command-input">&gt;</label>
+            <input id="command-input" name="command" autocomplete="off" spellcheck="false">
+          </form>
+        </section>
+
+        <aside class="sidebar">
+          <section>
+            <p id="inventory-status"></p>
+            <ul id="inventory-list"></ul>
+          </section>
+          <section>
+            <ul id="exits-list"></ul>
+          </section>
+          <section>
+            <ul id="people-list"></ul>
+          </section>
+        </aside>
+      </main>
+
+      <div id="save-panel" class="save-panel" hidden>
+        <button id="save-panel-backdrop" type="button"></button>
+        <section class="save-panel__dialog">
+          <header>
+            <h2 id="save-panel-title">Safe Moments</h2>
+            <button id="save-panel-close" type="button">Close</button>
+          </header>
+          <div>
+            <button id="save-panel-latest-autosave" type="button">Resume Latest</button>
+            <div id="save-panel-autosave-list"></div>
+          </div>
+        </section>
+      </div>
+
+      <div id="mobile-scene-handle"></div>
+    </section>
+
+    <script src="assets/game-data.js?v=20260615-2258"></script>
+    <script src="assets/map-layout-data.js?v=20260617-0002"></script>
+    <script src="game.js?v=20260617-2224"></script>
+    <script src="autoplay-lab.js?v=20260620-007"></script>
+  </body>
+</html>

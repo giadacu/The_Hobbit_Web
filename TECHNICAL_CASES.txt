@@ -1064,3 +1064,1269 @@ Future debugging advice
 - Keep broad atmospheric hints separate from same-room actor activity.
 - If a narrative line reads like a directly observed action, gate it by actual
   room presence, not only by chapter or region.
+
+
+Case 021 - 2026-06-19 - Mirkwood spider rescue soft-locked autoplay at the final web
+--------------------------------------------------------------------------------------
+
+Symptom
+-------
+After adding the richer Mirkwood travel layer, the autoplay regression test no
+longer finished the adventure. It stalled in `place_of_black_spiders`, issuing
+repeated attempts against the last blocking web.
+
+Root cause
+----------
+The new spider-rescue gate required an extra step before leaving for
+`elvish_clearing`, which autoplay was updated to handle. But the route planner
+still tried to clear the final web with a bare `smash web` command.
+
+That had been acceptable before, but by the time Bilbo reached the last web he
+could arrive too worn down for an unarmed break attempt to succeed reliably.
+The web remained unbroken, so autoplay kept choosing the same command forever.
+
+Resolution
+----------
+- Kept the new dwarf-rescue step in place.
+- Updated autoplay route planning so that when a blocking web is present and
+  Bilbo has the sword, it now uses `break web with sword` instead of trying to
+  smash it bare-handed.
+- Verified the full parser/autoplay suite again after the change.
+
+Files touched
+-------------
+- game.js
+
+Future debugging advice
+-----------------------
+- When a new narrative gate is added to a route already covered by autoplay,
+  re-check not just the gate logic but also the exact command autoplay uses to
+  clear any old obstacle around it.
+- If autoplay loops on one command, inspect whether the obstacle has become
+  state-dependent rather than universally solvable.
+
+
+Case 022 - 2026-06-19 - Lost Mirkwood dagger changed rescue flow from direct action to delegation
+--------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After making Bilbo lose the `short strong dagger` during risky Mirkwood
+detours, the spider rescue could no longer be treated as a simple direct
+action. A companion might be the one holding the blade when the cocoons are
+found.
+
+Root cause
+----------
+The new dagger-loss state moved a critical tool from player inventory to a
+visible companion. The rescue logic correctly blocked Bilbo from cutting the
+cocoons bare-handed, but autoplay still assumed the old single-actor flow and
+always chose `help dwarves`.
+
+Resolution
+----------
+- Kept the dagger-loss consequence in place, with a companion recovering the
+  blade after the detour.
+- Taught autoplay to detect when a visible companion holds the dagger in the
+  spider rooms and issue `ask <companion> to cut cocoons with dagger` instead
+  of repeating the old direct rescue command.
+- Re-ran the parser suite to confirm the delegated flow did not regress the
+  main route.
+
+Files touched
+-------------
+- game.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- If a quest-critical item changes hands between player and companion, review
+  both parser affordances and autoplay assumptions.
+- Delegated solutions are often the lightest way to add depth without adding a
+  brand-new subsystem.
+
+
+Case 023 - 2026-06-19 - Jumped Mirkwood tests can silently reset manual lostness on first move
+-----------------------------------------------------------------------------------------------
+
+Symptom
+-------
+A parser regression for the new Mirkwood looping exits failed even though the
+feature logic was correct. The test set `mirkwoodlostness` and then moved, but
+the expected looping did not happen.
+
+Root cause
+----------
+`jump mirkwood` places Bilbo on `mirkwood_forest_path`, but it does not itself
+mark `mirkwoodjourneyactive`.
+
+On the first subsequent move, `noteMirkwoodTravel()` calls
+`ensureMirkwoodJourneyStarted()`, which initializes the journey state and resets
+`mirkwoodlostness` to 0. That silently wiped the test setup before the loop
+logic had a chance to evaluate it.
+
+Resolution
+----------
+- Kept the in-game journey initialization logic unchanged.
+- Updated the regression test to set `game.flags.mirkwoodjourneyactive = true`
+  before forcing a high lostness value.
+- Re-ran the full parser suite to confirm the looping-exit feature behaved as
+  expected in the normal journey flow.
+
+Files touched
+-------------
+- scripts/parser-tests.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- When a jump/checkpoint lands inside a travel subsystem, do not assume it has
+  also activated that subsystem's state machine.
+- For Mirkwood-specific tests that manipulate energy or lostness directly,
+  explicitly activate `mirkwoodjourneyactive` unless the setup already reaches
+  the forest through ordinary movement.
+
+
+Case 024 - 2026-06-19 - Replaced room art could stay visually stale because the browser kept the old cached file
+---------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After replacing local images for rooms such as `elvish_clearing` and
+`elvenkings_halls`, the game could still show the previous artwork even though
+the new files were already present in `assets/local-images/`.
+
+Root cause
+----------
+The room definitions still pointed to the correct filenames, but the browser
+was reusing a cached response for the same image URL. Since the asset URL only
+changes when `ASSET_VERSION` changes, replacing the file contents alone was
+not always enough to force a visible refresh.
+
+Resolution
+----------
+- Confirmed the room mappings still referenced the intended files.
+- Bumped `ASSET_VERSION` so all room image URLs receive a new cache-busting
+  query string and reload cleanly.
+
+Files touched
+-------------
+- game.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- If a local image has been replaced but the scene still shows the old art,
+  verify the filename mapping first and then bump `ASSET_VERSION`.
+- When reusing the same filenames for revised artwork, treat cache busting as
+  part of the update, not as an afterthought.
+
+
+Case 025 - 2026-06-19 - Immersion room overrides did not update images for rooms already defined in base data
+---------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Some rooms, notably `elvish_clearing` and `elvenkings_halls`, kept showing the
+older base-data artwork and prose even after new immersive versions were added
+in `game.js`.
+
+Root cause
+----------
+`applyImmersionExpansion()` used `ensureRoom()` only as a create-if-missing
+helper. When a room id already existed in `assets/game-data.js`, the function
+returned early and never applied the newer override fields such as `image`,
+`description`, or `sound`.
+
+Resolution
+----------
+- Updated `ensureRoom()` so existing rooms are refreshed with any explicitly
+  provided override fields instead of being left untouched.
+- This allows immersive room definitions to replace legacy base-data images
+  like `elvish_clearing.jpeg` and `elvenkings.jpeg` with the intended newer
+  files.
+
+Files touched
+-------------
+- game.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- When a content-expansion layer is meant to refine existing rooms, treat room
+  registration as a merge/override path, not only as a create-if-absent path.
+- If only some rooms ignore new assets while others update correctly, compare
+  whether the failing rooms already exist in the base dataset.
+
+
+Case 026 - 2026-06-19 - Barrel escape from the Elvenking's cellar was bypassing preparation and jumping straight to Long Lake
+------------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Opening the cellar trap door and simply going `down` moved Bilbo straight to
+`Long Lake`, skipping the barrel setup entirely. That made the escape feel too
+immediate and ignored the intended distinction between:
+
+- preparing an empty barrel and leaping after it
+- dropping into the black water without preparation
+
+Root cause
+----------
+There were two overlapping problems.
+
+1. The default room connection from `cellar` sent `down` directly to
+   `long_lake`, so ordinary movement bypassed the river hazard.
+2. Legacy `specialActions` for the old barrel sequence still intercepted
+   commands like `throw barrel through trap door` and `jump onto barrel`
+   before the newer interaction logic could handle them.
+
+Resolution
+----------
+- Redirected the normal `cellar -> down` travel connection toward
+  `strong_river`, so an unprepared descent now becomes a hazardous plunge.
+- Added cellar-specific handling for:
+  - opening the trap door with a stronger warning line
+  - throwing an empty barrel through the opening
+  - leaping after the barrel to reach `long_lake`
+  - jumping or going down without the barrel, which now sweeps Bilbo to
+    `strong_river` instead
+- Intercepted the old special-action barrel commands early so the updated
+  cellar logic takes precedence.
+- Updated autoplay to follow the intended sequence:
+  `open trap door -> throw barrel through trap door -> jump onto barrel`
+- Added parser regression coverage for both the hazardous plunge and the safe
+  barrel escape.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- When replacing legacy data-driven set-pieces with richer room logic, check
+  whether old `specialActions` are still intercepting the same verbs.
+- If a travel scene can be solved both by normal movement and by a scripted
+  set-piece, make sure the plain room connection still reflects the intended
+  failure mode rather than silently granting the successful outcome.
+
+
+Case 027 - 2026-06-19 - Wrong barrel escape plunge needed to be fatal rather than a recoverable relocation
+-----------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After the barrel escape rewrite, a mistaken descent through the trap door no
+longer killed Bilbo. It moved him to `strong_river` instead, which made the
+error feel too forgiving for the fiction of being swept away under the halls.
+
+Root cause
+----------
+The safer barrel sequence had been separated from the generic `down` movement,
+but the failure path still reused `completeSpecialTravel()` and routed the
+player into another room instead of ending the tale.
+
+Resolution
+----------
+- Kept the successful barrel leap as a special travel scene to `long_lake`.
+- Changed the failed trap-door plunge so it:
+  - records a fatal autosave for the cellar
+  - prints the drowning/current narration inline
+  - ends the game with a fatal result instead of relocating the player
+- Updated parser coverage to assert the death choice and cellar autosave.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- When a route has both a safe scripted success and an unsafe direct shortcut,
+  verify that the unsafe branch still carries the intended narrative weight.
+- Hazard rewrites should test not only destination rooms but also whether the
+  result is supposed to remain playable at all.
+
+
+Case 028 - 2026-06-20 - Seeded autoplay needed traces for alternative wins and reproducible deaths
+---------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The seeded autoplay batch was good at telling us how many seeds won or died,
+but not at showing:
+
+- which winning seeds represented less direct successful routes
+- which exact commands led a death seed to fail
+- how to replay one interesting seed as a focused regression candidate
+
+Root cause
+----------
+`scripts/parser-tests.js` kept only summary counts plus a failure list. The
+batch runner did not expose winning seeds in detail and did not print command
+traces for selected seeds.
+
+Resolution
+----------
+Extended the autoplay batch CLI with three focused debugging flags:
+
+- `--autoplay-show-victories`
+- `--autoplay-trace-seeds=<csv>`
+- `--autoplay-trace-limit=<n>`
+
+The runner can now list all winning seeds with their step counts and print the
+command history plus output tail for selected seeds, whether they end in
+victory or death.
+
+Files touched
+-------------
+- scripts/parser-tests.js
+
+Future debugging advice
+-----------------------
+- Use a broad seeded batch to discover interesting winners and losers first.
+- Promote high-step victories into "alternative success" coverage, and rerun
+  specific death seeds with tracing before turning them into targeted tests.
+
+
+Case 029 - 2026-06-20 - Separate autoplay analysis tool needed the real game engine without polluting the main UI
+------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+We wanted an autoplay scenario lab similar in spirit to the map editor, but
+without pushing debug controls, branch trees, and seeded analysis UI into the
+main adventure page.
+
+Root cause
+----------
+The autoplay logic lives in `game.js` and assumes the normal game DOM exists.
+Building a separate tool by re-implementing the logic would have created a
+second source of truth, but mounting `game.js` directly in a new page still
+needed the expected DOM ids.
+
+Resolution
+----------
+Created a dedicated `autoplay-lab.html` module that:
+
+- provides its own analysis UI
+- includes a hidden sandbox DOM with the ids expected by `game.js`
+- loads the real game engine unchanged
+- drives analysis through the existing autoplay methods rather than duplicating
+  route logic
+
+This keeps the lab separate from the main game while still using the real
+autoplay behavior for branch analysis and replay.
+
+Files touched
+-------------
+- `autoplay-lab.html`
+- `autoplay-lab.css`
+- `autoplay-lab.js`
+
+Future debugging advice
+-----------------------
+- For future debug tools, prefer hidden sandbox DOM plus the real game engine
+  over duplicating adventure logic in a second module.
+- If a separate tool starts failing after game UI refactors, check first
+  whether the hidden sandbox still provides every required DOM id.
+
+
+Case 030 - 2026-06-20 - Autoplay lab presets could land in the right room without activating the room logic
+------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+In the separate autoplay lab, the scenario `Before Gollum -> Have Ring` could
+hit the step limit while looping on `light lantern` and repeated `look`
+commands, never starting the riddle sequence.
+
+Root cause
+----------
+The lab reset applied jump presets and then started autoplay immediately.
+Some checkpoints, like `jump gollum`, place Bilbo in the correct room but rely
+on the normal room-entry special-situation logic to fully initialize the
+encounter state. In the lab that logic had not been run yet.
+
+Resolution
+----------
+After each preset reset, the lab now calls the real game's
+`checkSpecialSituations()` before analysis or replay begins. This keeps the
+separate tool aligned with the actual encounter setup used by the game engine.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+
+Future debugging advice
+-----------------------
+- If a lab preset reaches the right room but autoplay behaves as if nothing is
+  happening, verify whether the room still needs a special-situation trigger to
+  finish initializing the scene.
+
+
+Case 031 - 2026-06-20 - The autoplay lab needed strategy profiles, not just seeded runs of the optimal autoplay
+-----------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+When the lab analyzed a path such as `Rivendell Ready -> Have Ring`, filtering
+to deaths could still show nothing, even though players can really die on that
+route from hazards like the hulking goblin ambush or the Gollum contest.
+
+Root cause
+----------
+The lab was only replaying the current `nextAutoplayCommand()` policy. That
+policy is designed to survive, so the death filter meant "show me runs where
+the optimal autoplay happened to die", not "show me fatal branches that exist
+between these milestones".
+
+Resolution
+----------
+Added a strategy selector to the separate autoplay lab:
+
+- `Optimal autoplay`
+- `Alternative success`
+- `Failure probes`
+
+The lab now injects alternative or risky commands only at known decision points
+already supported by the real game logic, such as:
+
+- the hulking goblin tunnel ambush
+- the Gollum riddle exchange
+- the barrel-cellar plunge
+
+This keeps the tool separate from the main adventure while making death-focused
+analysis meaningful.
+
+Files touched
+-------------
+- `autoplay-lab.html`
+- `autoplay-lab.css`
+- `autoplay-lab.js`
+
+Future debugging advice
+-----------------------
+- If a death filter looks empty under `Optimal autoplay`, retry the same
+  scenario with `Failure probes` before assuming no fatal branches exist.
+
+
+Case 032 - 2026-06-20 - The Gollum checkpoint can place the ring in Bilbo's pocket before the branch is actually resolved
+------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+In the separate autoplay lab, `Before Gollum -> Have Ring` could appear as
+already complete at step 0 for every seed, especially under alternative or
+failure-oriented strategies.
+
+Root cause
+----------
+Entering the Deep Dark Lake scene runs the real encounter setup, and that setup
+can call `ensureLakeRingInPocket()`. The generic `Have Ring` target was using
+`bilboHasRecoveredRing()` directly, so the lab treated the branch as complete
+before Bilbo had actually resolved the Gollum encounter.
+
+Resolution
+----------
+Adjusted the lab-only `Have Ring` target so it does not count as complete while
+Bilbo is still in `deep_dark_lake` with Gollum met but before the pocket
+question / escape phase has begun.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+
+Future debugging advice
+-----------------------
+- For checkpoint-based targets, prefer milestone-aware success checks over raw
+  inventory checks when the real scene setup can pre-place critical items.
+
+
+Case 033 - 2026-06-20 - Mirkwood failure probes need explicit spider-room delays to expose real spider deaths
+----------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+In the separate autoplay lab, `At Beorn -> Mirkwood Cleared` with
+`Failure probes` could still show only successful runs, even though Mirkwood
+contains visible hostile spiders and spider-themed hazards.
+
+Root cause
+----------
+The lab's failure strategy had probes for Gollum, the goblin ambush, and the
+cellar plunge, but none for Mirkwood's spider rooms. As a result, the lab kept
+following the winning autoplay through the spider grove instead of lingering
+until the hostile spiders attacked.
+
+Resolution
+----------
+Extended the lab's failure strategy to probe Mirkwood-specific bad choices:
+
+- delay in rooms with visible hostile spiders
+- drink from the enchanted stream
+- follow the white deer
+- follow the wandering lights
+
+Also added a dedicated `Death by Spiders` classification so spider fatalities
+do not get lumped into generic deaths.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+
+Future debugging advice
+-----------------------
+- If a branch contains visible hostiles, make failure probes include at least
+  one "do nothing / waste time" action, because many fatal encounters are
+  turn-pressure systems rather than single bad commands.
+
+
+Case 034 - 2026-06-20 - Fatal coverage across the main progression routes needs a dedicated audit, not just one scenario at a time
+-------------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Checking one preset/target pair at a time made it too easy to miss whole
+regions where fatal outcomes were either not being probed or were masked by a
+too-safe checkpoint loadout.
+
+Root cause
+----------
+The lab could analyze a chosen scenario deeply, but it had no built-in way to
+recheck the fatal coverage of the main adventure routes as a set.
+
+Resolution
+----------
+Added two lab-side improvements:
+
+- a `Mirkwood Vulnerable` preset that strips Bilbo's strong blades and lowers
+  his Mirkwood stamina so spider failures are easier to expose
+- an `Audit fatal coverage` action that runs the main route presets against
+  their next milestone targets with `Failure probes` and summarizes which fatal
+  outcomes were actually found
+
+Files touched
+-------------
+- `autoplay-lab.html`
+- `autoplay-lab.css`
+- `autoplay-lab.js`
+
+Future debugging advice
+-----------------------
+- Use the audit first to spot routes with zero fatal outcomes, then drill into
+  those routes with the branch tree before changing the probes.
+
+
+Case 035 - 2026-06-20 - Failure probes work better when they target real death triggers instead of generic bad play
+-------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Even after adding a failure strategy, some routes still looked too safe because
+the lab was choosing broadly bad or noisy commands rather than the specific
+mistakes that actually kill Bilbo in the real game.
+
+Root cause
+----------
+The lab was mixing together:
+
+- direct death triggers
+- risky but non-fatal mistakes
+- generic delays
+
+That made the simulation less useful for "what if the player gets this wrong?"
+testing, because the run could wander into harmless detours instead of touching
+the exact fatal mechanism.
+
+Resolution
+----------
+Changed `Failure probes` to behave like this:
+
+- follow the real autoplay until a known fatal trigger becomes available
+- then choose the command that directly provokes that fatal branch
+
+Examples now covered by trigger-driven failure probes:
+
+- `take large key` with live trolls
+- wrong Gollum answers / wrong pocket question / delaying after the pocket scene
+- `jump trap door` in the cellar
+- waiting during the goblin ambush
+- waiting in visible spider-threat rooms
+- `take treasure` in the dragon hall before securing the safe resolution
+
+Files touched
+-------------
+- `autoplay-lab.js`
+
+Future debugging advice
+-----------------------
+- When a route still shows no death under `Failure probes`, inspect whether the
+  missing piece is a new fatal trigger, not just a missing random bad choice.
+
+
+Case 036 - 2026-06-20 - A separate death catalog makes fatal autoplay probes easier to replay than browsing the branch tree manually
+-----------------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Once the lab could discover real fatal branches, it was still awkward to use as
+a focused "show me how Bilbo dies here" tool. The user had to remember which
+preset/target pair exposed each death, run the analysis, and then pick the
+right leaf from the tree before replaying it.
+
+Root cause
+----------
+The lab had route analysis and replay, but no curated index of known fatal
+triggers tied to the presets that expose them best.
+
+Resolution
+----------
+Added a `Death Catalog` panel to the separate autoplay lab. Each entry now:
+
+- names a mapped fatal trigger
+- explains the exact mistake that kills Bilbo
+- points to the preset/target route that exposes it
+- offers a one-click replay that runs failure probes, selects a matching fatal
+  branch, and replays it in the hidden real-game sandbox
+
+Files touched
+-------------
+- `autoplay-lab.html`
+- `autoplay-lab.css`
+- `autoplay-lab.js`
+
+Future debugging advice
+-----------------------
+- Keep the death catalog curated around reliable fatal triggers, not every
+  possible bad command.
+- If a death is hard to replay consistently, prefer a dedicated vulnerable
+  preset over widening the probe into noisy random mistakes.
+
+
+Case 037 - 2026-06-20 - Audit and death tooling work better as overlay panels than as long sidebar sections
+-----------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Even after compacting the sidebar, opening the death catalog or reading the
+fatal audit still pushed useful controls out of view and forced page scrolling.
+
+Root cause
+----------
+`Audit fatal coverage` and `Death Catalog` are support tools with long content,
+but they were rendered inline inside the sidebar flow. That made them compete
+with scenario controls for the same vertical space.
+
+Resolution
+----------
+Moved both tools into fixed overlay panels inside the separate autoplay lab:
+
+- `Audit fatal coverage` now opens its own panel and renders results there
+- `Death Catalog` now opens from a dedicated button instead of expanding inline
+- both panels use internal scrolling, backdrop dismiss, and `Esc` close
+
+Files touched
+-------------
+- `autoplay-lab.html`
+- `autoplay-lab.css`
+- `autoplay-lab.js`
+
+Future debugging advice
+-----------------------
+- If a lab feature is used occasionally but produces a long readout, prefer an
+  overlay or drawer over adding more vertical bulk to the main control column.
+
+
+Case 038 - 2026-06-20 - Alternative-success probes should include waiting out troll dawn after the careful key theft
+-------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+In the separate autoplay lab, `Before Trolls -> Rivendell Complete` with
+`Alternative success` only showed the direct branch that steals the key and
+pushes onward immediately. It did not expose the still-successful branch where
+Bilbo gets clear and then waits out dawn before continuing.
+
+Root cause
+----------
+The real game supports an offscreen troll-dawn resolution after the careful key
+theft, but the lab's `Alternative success` strategy had no troll-specific
+alternative probe for that moment.
+
+Resolution
+----------
+Extended the lab's alternative strategy so that, once Bilbo has taken the troll
+key carefully and left the clearing while the trolls are still alive, it can
+choose `wait` as a success-preserving variant until dawn transforms the trolls.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+
+Future debugging advice
+-----------------------
+- When a route has a slower but still safe resolution path, expose it in
+  `Alternative success` even if the golden autoplay prefers the faster branch.
+
+
+Case 039 - 2026-06-20 - Alternative-success probes are more useful when they are driven by real game situations, not by ad hoc single-route tweaks
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The lab's `Alternative success` mode could show one-off variants such as a
+different Gollum answer or the troll-dawn wait, but it still missed other real
+successful detours because alternatives were being added piecemeal.
+
+Root cause
+----------
+The lab had no situation-driven selector for positive branch variants comparable
+to the fatal-trigger selector used by `Failure probes`.
+
+Resolution
+----------
+Added an `alternativeSuccessDecision()` layer to the separate autoplay lab.
+It now looks for real gameplay situations that admit more than one successful
+resolution and chooses a mapped alternative branch when available, including:
+
+- troll dawn after the careful key theft
+- goblin ambush helper-vs-Bilbo rescue variants
+- alternate correct Gollum answers
+- Mirkwood detours through stream, deer, and lights when the loadout is strong enough
+- `climb barrel` as a safe cellar-escape variant
+- alternative Bard command phrasings for readying the arrow and taking the shot
+
+Files touched
+-------------
+- `autoplay-lab.js`
+
+Future debugging advice
+-----------------------
+- For future branch coverage, curate alternative-success probes around
+  stateful scene situations, not around isolated command synonyms alone.
+
+
+Case 040 - 2026-06-20 - Some alternative-success branches depend on earlier preparation, not only on the final fork itself
+-------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The separate autoplay lab initially missed the valid Mirkwood branch that leads
+through `follow lights` to `west_bank`, then across the river by boat toward
+the elves.
+
+Root cause
+----------
+That branch is not just a local choice at `mirkwood_ruined_clearing`. It can
+depend on earlier preparation at Beorn, such as:
+
+- taking and wearing the `woods cloak` before entering Mirkwood
+- carrying the `meal` long enough to eat it later at a more useful moment
+
+Without that upstream preparation, the lab could reach the lights fork with too
+little Mirkwood energy and wrongly conclude that the whole route was absent.
+
+Resolution
+----------
+Extended the lab's alternative-success selector so it can recognize and choose
+some upstream preparation variants when the active target still requires a full
+Mirkwood traversal, including:
+
+- the Beorn stable detour for `woods cloak`
+- eating a saved `meal` later at `mirkwood_ruined_clearing` when that state is reached
+
+Files touched
+-------------
+- `autoplay-lab.js`
+
+Future debugging advice
+-----------------------
+- When an alternative branch seems missing, inspect whether the real blocker is
+  an earlier resource-preparation choice rather than the branch point itself.
+
+
+Case 041 - 2026-06-20 - Exploratory autoplay needs speculative probes that restore both game state and lab output
+---------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The new `Trial and error` strategy for the separate autoplay lab needed to
+evaluate several plausible commands before choosing one, but naive probing
+would have polluted the visible transcript and could have left the game in a
+mutated intermediate state.
+
+Root cause
+----------
+The lab runs against the real browser game engine. Executing candidate
+commands, even only for scoring, still produces normal side effects:
+
+- world-state changes
+- output lines appended to the sandbox transcript
+- scene-specific flags and transient hazards progressing
+
+Without a full rollback, the exploratory chooser would end up "cheating"
+against a state already altered by its own discarded probes.
+
+Resolution
+----------
+Implemented the exploratory chooser around real engine snapshots:
+
+- capture a snapshot before each speculative command
+- execute the candidate command
+- score the resulting state against the active target and general milestones
+- trim sandbox output back to the pre-probe length
+- restore the snapshot before testing the next candidate
+
+This keeps the exploratory mode isolated while still letting it reason over
+real consequences instead of a duplicated ruleset.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+
+Future debugging advice
+-----------------------
+- Any future lab mode that "tries out" commands before committing must roll
+  back both the game snapshot and the accumulated output, not just one of them.
+
+
+Case 042 - 2026-06-20 - Continuous autoplay lab needed persistent learning and event-loop yields even at instant speed
+---------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The separate autoplay lab needed a true continuous `Trial and error` mode that:
+
+- keeps running until explicitly stopped
+- can be stopped both with `Esc` and a visible button
+- remembers successful exploratory choices across runs and page reloads
+
+An early implementation risk also appeared in `instant` speed: a continuous
+loop could keep chaining steps without yielding enough for UI stop events to be
+processed promptly.
+
+Root cause
+----------
+The original lab architecture was batch-oriented:
+
+- `generateReport()` and `simulateRun()` executed finite seeded runs
+- exploratory history existed only in transient in-memory trackers
+- there was no persistent storage for learned exploratory outcomes
+- there was no dedicated continuous-session control surface in the lab UI
+
+Also, a continuous async loop that only waited when replay speed was non-zero
+could starve the browser event loop in `instant` mode, delaying the stop
+button or `Esc`.
+
+Resolution
+----------
+Implemented a lab-only continuous exploratory mode with persistent memory.
+
+- Added start/stop controls to the lab sidebar.
+- Added `Esc` handling for the continuous session itself.
+- Stored learned exploratory command outcomes in local storage under a lab
+  memory key, keyed by normalized exploration state and command.
+- Folded that memory back into exploratory scoring so successful unlock/setup
+  commands get reused in later runs.
+- Added a live session/log view and memory summary in the lab UI.
+- Ensured the continuous loop always yields with at least `wait(0)` between
+  steps, even at `instant` speed, so stop interactions remain responsive.
+
+Files touched
+-------------
+- `autoplay-lab.html`
+- `autoplay-lab.css`
+- `autoplay-lab.js`
+
+Future debugging advice
+-----------------------
+- For any continuous lab/autoplay mode, do not rely on non-zero delays to keep
+  the UI responsive; explicitly yield even at "instant" speed.
+- If exploratory learning should survive reloads, keep the persisted memory
+  separate from game save snapshots so restart/load flows stay deterministic.
+
+
+Case 043 - 2026-06-20 - Continuous trial mode overvalued low-signal chatter and missed narrative waits at the start of the quest
+----------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+In the autoplay lab continuous `Trial and error` mode, routes such as
+`Beginning -> Rivendell Complete` could get stuck repeating harmless commands
+like:
+
+- `talk to gandalf`
+- `talk to dwalin`
+- `look`
+- `exits`
+
+instead of progressing the Bag End opening sequence toward the actual road.
+
+Root cause
+----------
+Two exploration-policy gaps combined:
+
+1. The exploratory candidate set did not surface the startup `wait` that the
+   real game uses to let the unexpected-party / quest-briefing sequence advance
+   before the pony phase begins.
+
+2. Low-signal commands (`talk`, `look`, `exits`, and similar) were not being
+   punished strongly enough when they produced no structural change. They could
+   still look mildly positive because they generated output text, and the
+   repeat limiter allowed too many retries in effectively the same state.
+
+Resolution
+----------
+- Added an explicit exploratory `wait` candidate while the opening Bag End
+  quest has not begun and the pony phase has not started.
+- Added state-aware repeat tracking so low-signal commands are capped more
+  aggressively per normalized state, not just per room.
+- Tightened the exploratory reward and memory bias so low-signal commands that
+  do not change room, inventory, doors, flags, or frontier get marked as
+  no-ops and rapidly lose priority.
+- Bumped the persisted explore-memory key version so old noisy memories do not
+  keep biasing the improved policy.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+
+Future debugging advice
+-----------------------
+- If exploratory mode seems "busy" but not progressive, inspect whether the
+  candidate set is missing the narrative gate action itself, not only whether
+  movement is underweighted.
+- Generated output text is not the same as progress. Commands that only create
+  flavor text should not retain positive bias unless they unlock something.
+
+
+Case 044 - 2026-06-20 - Exploratory learning needed retroactive credit for setup actions like opening containers and taking enabling items
+---------------------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Even after reducing repeated low-signal chatter, the autoplay lab could still
+underlearn preparatory actions whose value appears one or two moves later, such
+as:
+
+- opening a container before the useful item becomes available
+- taking a tool that matters only when a later gate is reached
+- wearing or readying something that unlocks a future branch
+
+Root cause
+----------
+The exploratory memory mostly rewarded the command that produced the immediate
+visible progress. That was good for direct movement or pickups, but weaker for
+setup chains where the payoff is delayed.
+
+As a result, commands like `open X` or `take Y` could look merely neutral in
+the moment, even when they were the real reason the next step became possible.
+
+Resolution
+----------
+Added lightweight retroactive credit for recent setup actions in the autoplay
+lab:
+
+- introduced a setup-command classifier focused on enabling actions
+- tracked a short queue of recent exploratory transitions
+- when a later step produced important progress, granted assist credit back to
+  the recent setup commands that made that progress possible
+- folded assist credit into the persistent memory bias, so the lab learns to
+  value opening, taking, unlocking, wearing, and similar preparation steps
+
+Files touched
+-------------
+- `autoplay-lab.js`
+
+Future debugging advice
+-----------------------
+- If a branch depends on "prepare now, benefit later", immediate reward alone
+  will usually underfit it. Add some form of causal or short-horizon credit.
+- Keep retroactive credit shallow; a small window of recent setup actions is
+  usually enough and avoids teaching the wrong cause.
+
+
+Case 045 - 2026-06-20 - Continuous autoplay lab needed its own persisted log archive, separate from learned policy memory
+--------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The autoplay lab could run a useful continuous `Trial and error` session, but
+its live log disappeared once the page was reloaded or the view was reset.
+That made later inspection of the exploratory path much harder.
+
+Root cause
+----------
+The lab already persisted learned exploratory command bias, but the continuous
+session transcript itself still lived only in the in-memory `continuousSession`
+object and the visible replay panel.
+
+Resolution
+----------
+Added a dedicated local log archive for continuous sessions in the autoplay
+lab:
+
+- stores recent continuous-session snapshots separately from the explore-memory
+  policy store
+- persists preset/target metadata, counters, current run info, and the log
+- updates the archive while the session is running, not only at the end
+- restores the latest saved continuous log into the lab UI after reload/reset
+
+Files touched
+-------------
+- `autoplay-lab.html`
+- `autoplay-lab.js`
+
+Future debugging advice
+-----------------------
+- Keep learned policy memory and human-readable session logs in separate local
+  keys; they evolve at different rates and are useful for different tasks.
+- For long-running exploratory tools, persist partial logs during execution so
+  a mid-session reload still leaves something inspectable.
+
+
+Case 046 - 2026-06-20 - Autoplay lab kept repeating Bag End chatter because time-gated progress was invisible to exploration memory
+-------------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+From `Beginning` toward `Rivendell Complete`, the autoplay lab kept producing
+logs dominated by repeated `talk to ...`, `look`, and `exits` commands instead
+of advancing through the Bag End opening and then learning object-setup steps.
+
+Root cause
+----------
+Three things were working against the exploratory policy:
+
+1. The Bag End opening is mostly advanced by timed story progression, so
+   `wait` is meaningful there, but the exploratory scorer still treated it as
+   low-signal unless a more obvious state change happened.
+
+2. The normalized exploratory state did not include the unexpected-party /
+   Thorin briefing phase, so the lab could not "see" that narrative progress
+   was happening between waits.
+
+3. Older local explore-memory data from the earlier noisy policy was still
+   persisted and could keep biasing the lab toward stale chatter-heavy habits.
+
+Resolution
+----------
+- Added Bag End narrative-progress tracking to the exploratory state and
+  milestone score, so timed arrivals and briefing progress now count as real
+  advancement.
+- Added contextual bias so `wait` is strongly preferred when it is the correct
+  way to advance the opening sequence.
+- Added a generic visible-object action bias so `open`, `take`, and `examine`
+  around visible containers/items are preferred more consistently.
+- Added explicit exploratory rope-security commands on `hidden_valley_path`,
+  because reaching Rivendell can require trying rope setup actions that are not
+  discoverable from plain movement alone.
+- Bumped the explore-memory schema version so the improved policy starts from a
+  clean local memory instead of inheriting stale bias from the older runs.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+
+Future debugging advice
+-----------------------
+- If exploratory mode stalls inside a narrative sequence, check whether the
+  state model includes the hidden phase variables that actually mark progress.
+- Persisted learning is only useful if the reward policy is still compatible
+  with it; when heuristics change substantially, version the stored memory.
+
+
+Case 047 - 2026-06-20 - Continuous autoplay lab could exhaust localStorage and silently block learned-memory saves
+-------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+While running continuous `Trial and error` sessions in the autoplay lab, the
+left sidebar could start showing:
+
+- `Memoria esplorativa non salvata: The quota has been exceeded.`
+
+At that point the learned memory stopped persisting reliably, even though the
+lab kept running and the saved-trial summary still appeared to update.
+
+Root cause
+----------
+The autoplay lab was storing both:
+
+- persistent exploratory learning
+- persistent continuous-trial archives
+
+in `localStorage`, but the continuous archive could grow too large. When that
+happened, later writes for the much smaller learned-memory payload also failed
+with the same browser quota error.
+
+Resolution
+----------
+- Added explicit quota-error detection inside `autoplay-lab.js`.
+- Compacted the persisted continuous archive automatically before saving:
+  fewer stored sessions, fewer stored log entries, shorter stored log text,
+  and only the tail of the current command list.
+- Added quota-recovery retries that reclaim space before retrying saves.
+- During recovery, the lab now rewrites a compacted continuous-log payload and,
+  if needed, prunes older game autosaves so exploratory learning can keep being
+  saved instead of being blocked by the archive.
+- Gave priority to preserving learned memory over keeping a large verbose
+  continuous transcript.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+
+Future debugging advice
+-----------------------
+- If the autoplay lab seems to "forget" improvements after long continuous
+  runs, inspect browser storage limits before tuning rewards again.
+- Persistent logs should always have a bounded storage footprint; otherwise
+  they can starve smaller but more important state such as learned policy
+  memory.
+
+
+Case 048 - 2026-06-20 - Continuous autoplay lab needed per-seed performance metrics, not only success/failure and raw step counts
+-------------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+When the continuous autoplay lab stalled repeatedly on a long route such as
+`Beginning -> Rivendell Complete`, the UI mostly exposed:
+
+- run counts
+- success/death/stall totals
+- raw step counts
+
+That was not enough to see whether the lab was actually learning something
+useful from seed to seed. A later seed could be worse than an earlier one even
+if both ended as stalls.
+
+Root cause
+----------
+The continuous-trial session model tracked transcripts and outcomes, but it did
+not compute or surface intermediate quality indicators for each seed.
+
+Without run-level metrics, regressions looked the same as harmless plateaus.
+
+Resolution
+----------
+Added per-seed performance tracking to `autoplay-lab.js`, including:
+
+- newly discovered rooms
+- useful item discoveries
+- opened doors
+- total distinct rooms seen in the run
+- effective NPC interactions
+- successful setup actions
+- recovery-mode steps
+- max progress score reached
+
+The continuous lab now:
+
+- tracks these metrics live during each seed
+- compares each seed against the previous completed one
+- highlights the best seed seen so far in the session
+- writes compact metric summaries into the continuous log archive
+
+Files touched
+-------------
+- `autoplay-lab.js`
+
+Future debugging advice
+-----------------------
+- For long exploratory runs, do not judge performance only by final target
+  success. Intermediate metrics often reveal whether the policy is actually
+  improving or merely wandering differently.
+- Persisting a compact best-run summary is often more useful than storing only
+  the latest verbose transcript.
+
+
+Case 049 - 2026-06-20 - State-local exploratory memory was too narrow; the lab needed route-level learning across seeds
+------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The autoplay lab could accumulate a large amount of learned memory while still
+showing no practical improvement across continuous seeds on the same route.
+For example, `Beginning -> Rivendell Complete` kept stalling even after many
+saved steps and dozens of known state/command pairs.
+
+Root cause
+----------
+The exploratory memory mainly learned at the exact normalized-state level.
+That helped avoid repeating the same mistake in the exact same state, but it
+generalized poorly across nearby route variants.
+
+As a result, commands that were broadly useful for a route, such as opening
+important containers or taking enabling items early, could still fail to gain
+enough cross-seed weight.
+
+Resolution
+----------
+Added a second learning layer in `autoplay-lab.js` keyed by route:
+
+- route key = `presetId::targetId`
+- tracks command reward, unlocks, failures, and no-ops across seeds
+- feeds a route-level bias back into exploratory candidate scoring
+- is active for both report simulation and continuous trial runs
+
+This keeps exact-state memory, but supplements it with a more general
+"commands that tend to help on this route" signal.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+
+Future debugging advice
+-----------------------
+- If an exploratory agent remembers a lot but still does not improve, inspect
+  whether the memory is too specific to individual states and not general
+  enough to shape route-level behavior.
+- Route-level learning is especially valuable on long sequential scenarios
+  where many good commands stay useful even when the exact local state shifts.
+
+
+Case 050 - 2026-06-20 - Informational commands were advancing time, and combat death text mishandled second person
+-------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+- Informational commands such as `exits` were consuming a full turn, letting
+  hazards and enemy pressure advance even when the player only asked for
+  information.
+- In some combat-loss sequences the narration could produce broken second
+  person text such as `You tries ...`, and player death finishes could also
+  slip into third-person-style verb forms.
+
+Root cause
+----------
+- The main execute loop always called `advanceCharacterTurn()` after processing
+  a command line, regardless of whether the commands were informational or
+  action-bearing.
+- Part of the combat narration was assembled from strings that assumed a
+  third-person subject, even when the target or loser was `You`.
+
+Resolution
+----------
+- Added an explicit non-turn command classification so informational/perception
+  commands such as `look`, `examine`, `read`, `inventory`, `map`, `status`,
+  `tips`, `save/load`, and `exits` no longer advance time on their own.
+- Kept turn advancement for movement, dialogue, and normal action verbs.
+- Added player-specific combat narration branches for the affected exchange and
+  defeat lines so second-person grammar remains correct in death sequences.
+
+Files touched
+-------------
+- `game.js`
+
+Future debugging advice
+-----------------------
+- Keep "UI/info" commands separate from "world state" commands at the turn
+  scheduler level, not only in individual handlers.
+- For narrated combat text, check any template that capitalizes a display name
+  and then appends a conjugated verb; that pattern often breaks for `You`.

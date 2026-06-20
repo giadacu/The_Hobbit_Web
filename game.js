@@ -2,8 +2,8 @@
   const DATA = applyImmersionExpansion(window.HOBBIT_DATA);
   const IMAGE_ROOT = "assets/local-images/";
   const MUSIC_ROOT = "assets/local-music/";
-  const ASSET_VERSION = "20260615-1200";
-  const ASSET_QUERY_SUFFIX = window.location.protocol === "file:" ? "" : `?v=${ASSET_VERSION}`;
+  const ASSET_VERSION = "20260619-2215";
+  const ASSET_QUERY_SUFFIX = `?v=${ASSET_VERSION}`;
   const TEMPORARY_IMAGE_ALIASES = {
     "thrors-map": "Thrors_map.jpg",
     "thrors map": "Thrors_map.jpg",
@@ -132,14 +132,26 @@
     "investigate", "examine", "inspect", "watch", "eavesdrop", "scout",
     "eat", "drink", "cook",
   ]);
+  const NON_TURN_COMMAND_VERBS = new Set([
+    "look", "examine", "inspect", "search", "explore", "investigate", "read",
+    "listen", "smell", "sniff", "watch", "eavesdrop", "scout",
+    "touch", "feel", "knock",
+    "inventory", "inv", "i",
+    "save", "load", "autosave", "mysaves",
+    "exits", "exit",
+    "tips", "hint", "help", "verbs", "commands",
+    "map", "location", "status", "music",
+    "pause", "undo", "restart", "jumps",
+  ]);
 
   const EDIBLE_ITEMS = new Set([
     "food", "meal", "dinner", "lunch", "breakfast", "snack", "appetizer",
-    "dessert", "brunch", "supper", "salad",
+    "dessert", "brunch", "supper", "salad", "honey cakes", "honey cake",
+    "seed cakes", "cheese", "cold chicken",
   ]);
 
   const DRINKABLE_ITEMS = new Set([
-    "wine", "ale", "beer",
+    "wine", "ale", "beer", "waterskin",
   ]);
 
   const NATURAL_VERBS = [
@@ -610,6 +622,68 @@
     "mirkwood_ruined_clearing",
   ]);
 
+  const MIRKWOOD_TRAVEL_ROOMS = new Set([
+    ...IMMERSION_MIRKWOOD_ROOMS,
+    "forest_road",
+    "forest_road_2",
+    "forest",
+    "waterfall",
+    "running_river",
+    "elvish_clearing",
+  ]);
+
+  const MIRKWOOD_ENERGY_ROOM_COST = {
+    gate_to_mirkwood: 0,
+    forest_road: 0,
+    mirkwood_forest_path: 1,
+    mirkwood_dark_glade: 1,
+    mirkwood_enchanted_stream: 1,
+    mirkwood_fallen_tree_crossing: 1,
+    mirkwood_spider_grove: 1,
+    mirkwood_ruined_clearing: 1,
+    place_of_black_spiders: 1,
+  };
+
+  const MIRKWOOD_LOOP_CONNECTIONS = [
+    {
+      from: "mirkwood_dark_glade",
+      direction: "north",
+      to: "mirkwood_forest_path",
+      minLostness: 2,
+      key: "dark_glade_north",
+    },
+    {
+      from: "mirkwood_enchanted_stream",
+      direction: "north",
+      to: "mirkwood_dark_glade",
+      minLostness: 3,
+      key: "enchanted_stream_north",
+      when: ({ game }) => game.flags.mirkwooddrankstream || game.mirkwoodLostness() >= 3,
+    },
+    {
+      from: "mirkwood_fallen_tree_crossing",
+      direction: "east",
+      to: "mirkwood_dark_glade",
+      minLostness: 3,
+      key: "fallen_tree_east",
+    },
+  ];
+
+  const MIRKWOOD_LOOP_MESSAGE_VARIANTS = {
+    dark_glade_north: [
+      "You keep north as best you can, yet the trunks gather and separate in a pattern so alike that when you break through the dark you are met by a stretch of path you know too well. You have the uneasy feeling that you have already been this way.",
+      "The ground seems to lead onward, but the trees have their own design. After longer going than feels honest, the path ahead looks horribly familiar. You have the uneasy feeling that you have already been this way.",
+    ],
+    enchanted_stream_north: [
+      "You leave the black stream behind, but the wood refuses the courtesy of a straight departure. When at last the way opens again, it is not where it ought to be. You have the uneasy feeling that you have already been this way.",
+      "The same roots, the same black trunks, the same stale air: the road north from the stream folds in upon itself until you can no longer tell progress from repetition. You have the uneasy feeling that you have already been this way.",
+    ],
+    fallen_tree_east: [
+      "You cross the fallen trunk and press on, only for the dark ahead to settle into a shape your memory resents recognizing. You have the uneasy feeling that you have already been this way.",
+      "For a little while the way seems to hold true beyond the crossing; then branch and shadow arrange themselves into an old mistake. You have the uneasy feeling that you have already been this way.",
+    ],
+  };
+
   const IMMERSION_ELVEN_HALLS_ROOMS = new Set([
     "elvenkings_halls",
     "dark_dungeon",
@@ -820,6 +894,126 @@
     ],
   };
 
+  const MIRKWOOD_ROOM_NARRATIVE_VARIANTS = {
+    gate_to_mirkwood: [
+      "Behind you lies the open world; before you the forest waits with the patience of something that does not need to hurry.",
+      "The eaves of Mirkwood hang over the path like a warning not yet spoken aloud.",
+      "Even here at the threshold, the wood gives little welcome and less comfort.",
+    ],
+    forest_road: [
+      "The road still remembers daylight, but only just; already the shadows under the trees seem too ready to close ranks.",
+      "For a little while the way is broad enough to promise honesty, though the branches on either side do not look honest at all.",
+      "The first stretch of road is plain enough, which somehow makes the dark beyond it seem all the more deliberate.",
+    ],
+    mirkwood_forest_path: [
+      "The black boughs turn distance into guesswork, and every yard ahead seems borrowed from the same meagre pattern.",
+      "The path keeps on, but with so little change from root to root that memory begins to lose its grip on direction.",
+      "There is a dry oppressive stillness here, as though the wood were saving its breath for some later unkindness.",
+    ],
+    mirkwood_dark_glade: [
+      "This glade offers space without relief, and the open patch feels less like mercy than a pause in being watched.",
+      "The moss and dimness underfoot invite rest while somehow making rest feel like surrender.",
+      "Even the slight openness here does nothing to ease the sense that the forest is listening for weakness.",
+    ],
+    mirkwood_enchanted_stream: [
+      "The dark stream has an ugly quiet about it, as though it would rather be tasted than heard.",
+      "The water catches what little light there is and gives it back with a look too cold to be friendly.",
+      "Thirst speaks here more boldly than caution, which is reason enough to distrust the place.",
+    ],
+    mirkwood_deer_trail: [
+      "The pale marks of the deer promise swiftness and cleaner ways, which in this wood is itself suspicious.",
+      "Something graceful has passed this way, leaving behind exactly the sort of hope Mirkwood most likes to misuse.",
+      "The trail is scarcely there at all, yet it draws the eye more strongly than the safer road behind you.",
+    ],
+    mirkwood_fallen_tree_crossing: [
+      "The fallen trunk looks like a rough convenience left by chance, though nothing in this forest feels truly accidental.",
+      "Bark hangs from the crossing in strips, and the black runnel beneath it gives no cheerful sound of water.",
+      "The way over is plain enough, but plain necessities have a habit of feeling like tests in Mirkwood.",
+    ],
+    mirkwood_spider_grove: [
+      "The webbed branches turn the grove into a sick parody of winter, all pale hanging threads and hidden malice.",
+      "Every silk-strung gap between the trunks looks as though it may tremble into life if touched too boldly.",
+      "The air here has the closeness of a place used by hungry things that do not care to be interrupted.",
+    ],
+    mirkwood_ruined_clearing: [
+      "Broken stones lie under root and fern like the remains of some old warning the forest has not quite managed to swallow.",
+      "The ruin lends the clearing a memory older than your road, and not one that makes the place kinder.",
+      "Something about the shattered foundations suggests that others once hoped this patch might resist the wood and lost the argument.",
+    ],
+    place_of_black_spiders: [
+      "Here the wood gives up even the pretence of being merely gloomy and shows itself in webs, poison, and patient hunger.",
+      "The branches seem tied together by old malice, and the whole place has the feel of a trap long practiced in its work.",
+      "Whatever else is true of Mirkwood, here it plainly belongs to the spiders first and intruders only afterward.",
+    ],
+    green_forest: [
+      "The green wood ahead feels almost kindly after the black road, though the memory of Mirkwood has not left your nerves yet.",
+      "Beyond the worst of the dark, even ordinary trees look like a form of grace.",
+    ],
+    bewitched_gloomy_place: [
+      "This side-path gloom has the blurred quality of a place reached by enchantment rather than intention.",
+      "Nothing here looks chosen; everything looks suffered.",
+    ],
+    west_bank: [
+      "The black river offers movement where the forest offered only sameness, but it is not a friendly change.",
+      "At the riverbank the wood draws back a little, only to leave you in the company of darker water and poorer choices.",
+    ],
+  };
+
+  const MIRKWOOD_ATMOSPHERIC_EVENT_POOLS = {
+    gate_to_mirkwood: [
+      "A breath of colder air comes out from under the first boughs, carrying leaf-mould and old secrecy.",
+      "The quiet beneath the trees seems to begin a few paces too early, as though the forest had already leaned out to meet you.",
+    ],
+    forest_road: [
+      "A branch creaks high overhead, though there is little wind to excuse it.",
+      "Somewhere off the road, dead leaves stir and then settle before you can tell what moved among them.",
+    ],
+    mirkwood_forest_path: [
+      "Dry leaves whisper together under the trees with no clear footfall among them.",
+      "A faint ticking of twigs carries through the black trunks, too scattered to place and too steady to ignore.",
+    ],
+    mirkwood_dark_glade: [
+      "The silence in the glade holds a little too long, until even a breath seems like an interruption.",
+      "A soft patter falls from the branches above, though no rain has begun.",
+    ],
+    mirkwood_enchanted_stream: [
+      "The black water slides past without sparkle or song, and the lack of sound is somehow more tempting than a cheerful brook would be.",
+      "For a moment the stream smells astonishingly fresh, almost sweet, before the odour flattens back into cold nothing.",
+    ],
+    mirkwood_deer_trail: [
+      "A pale flicker moves between the trunks as if some white creature had just passed beyond proper sight.",
+      "Bent grasses recover slowly from a passage so light that it might have been memory rather than movement.",
+    ],
+    mirkwood_fallen_tree_crossing: [
+      "A strip of bark peels loose from the fallen trunk and drops into the dark runnel below without a splash worth trusting.",
+      "The trunk gives a low complaining creak, as though even dead timber disliked being used in this place.",
+    ],
+    mirkwood_spider_grove: [
+      "A thread of web catches at your sleeve, though no breeze should have carried it so far.",
+      "Something in the silk above gives the faintest trembling shiver and then is still.",
+    ],
+    mirkwood_ruined_clearing: [
+      "From beyond the broken stones comes a breath of warmth and roast-meat smell that vanishes almost before hunger can answer it.",
+      "The ruin seems briefly gentler when a flicker of golden light touches one stone and is gone again.",
+    ],
+    place_of_black_spiders: [
+      "High in the webbed dark, a dry clicking starts and stops, like many little thoughts agreeing on hunger.",
+      "A strand overhead tightens with a sound no louder than a drawn breath.",
+    ],
+    green_forest: [
+      "Birdsong returns here in uncertain scraps, as though even the lighter wood has not wholly forgotten its neighbour.",
+      "A cleaner wind moves among the branches, and for a moment the whole company seems to breathe more freely.",
+    ],
+    bewitched_gloomy_place: [
+      "The air here feels stale with sleep and bad dreams, as though enchantment itself had gone drowsy among the roots.",
+      "A dimness clings to the place that seems less like shadow than like a thought half remembered and not wanted back.",
+    ],
+    west_bank: [
+      "The river laps once against the bank and then runs on with the indifference of dark water that has seen too many fools already.",
+      "From across the black water comes no welcome sound at all, only distance.",
+    ],
+  };
+
   const GOLLUM_ACTIVITY_LINES = [
     "Gollum crouches low in his little boat, paddling a slow circle just beyond the edge of sight as though measuring the dark between you.",
     "Gollum slips away into the darkness for a breathless moment; when his pale eyes show again over the water, they seem nearer than before.",
@@ -1025,6 +1219,62 @@
         image: "erebor_narrow_revealed_door.png",
       },
     ],
+    mirkwood_enchanted_stream: [
+      {
+        when: ({ game }) => !game.flags.mirkwooddrankstream,
+        image: "mirkwood_enchanted_stream_temptation.png",
+      },
+    ],
+    bewitched_gloomy_place: [
+      {
+        when: ({ game }) => game.flags.mirkwooddrankstream,
+        image: "mirkwood_enchanted_stream_aftermath.png",
+      },
+    ],
+    mirkwood_deer_trail: [
+      {
+        when: ({ game }) => game.flags.mirkwoodfolloweddeer,
+        image: "mirkwood_deer_trail_lost_chase.png",
+      },
+      {
+        image: "mirkwood_deer_trail_white_deer.png",
+      },
+    ],
+    mirkwood_ruined_clearing: [
+      {
+        when: ({ game }) => game.flags.mirkwoodfollowedlights,
+        image: "mirkwood_ruined_clearing_after_lights.png",
+      },
+      {
+        image: "mirkwood_ruined_clearing_lights.png",
+      },
+    ],
+    mirkwood_spider_grove: [
+      {
+        when: ({ game }) => game.flags.mirkwooddwarvesfreed,
+        image: "mirkwood_spider_grove_rescue.png",
+      },
+      {
+        image: "mirkwood_spider_grove_cocoons.png",
+      },
+    ],
+    place_of_black_spiders: [
+      {
+        when: ({ game }) => game.flags.mirkwooddwarvesfreed,
+        image: "place_of_black_spiders_rescue.png",
+      },
+    ],
+    west_bank: [
+      {
+        when: ({ game }) => game.mirkwoodJourneyActive() && (
+          game.mirkwoodEnergy() <= 0
+          || game.flags.mirkwoodfollowedlights
+          || game.flags.mirkwooddrankstream
+          || game.mirkwoodLostness() >= 2
+        ),
+        image: "west_bank_exhausted.png",
+      },
+    ],
   };
 
   const CONTEXTUAL_ROOM_NARRATIVE_RULES = [
@@ -1037,8 +1287,11 @@
       text: ({ game }) => game.smaugRoomNarrative(),
     },
     {
-      when: ({ roomId }) => IMMERSION_MIRKWOOD_ROOMS.has(roomId) && roomId !== "place_of_black_spiders",
-      text: "Hunger, weariness, and the sameness of the trees make it hard to believe in straight roads.",
+      when: ({ roomId }) => (
+        IMMERSION_MIRKWOOD_ROOMS.has(roomId)
+        || ["forest_road", "bewitched_gloomy_place", "west_bank", "green_forest", "gate_to_mirkwood"].includes(roomId)
+      ),
+      text: ({ game, roomId }) => game.mirkwoodRoomNarrative(roomId),
     },
     {
       roomIds: ["misty_mountain"],
@@ -1296,7 +1549,14 @@
     data.__immersionExpansionApplied = true;
 
     const ensureRoom = (id, config) => {
-      if (data.rooms[id]) return data.rooms[id];
+      if (data.rooms[id]) {
+        if (config.name) data.rooms[id].name = config.name;
+        if (config.description) data.rooms[id].description = config.description;
+        if (Object.prototype.hasOwnProperty.call(config, "image")) data.rooms[id].image = config.image || null;
+        if (Object.prototype.hasOwnProperty.call(config, "transformedImage")) data.rooms[id].transformedImage = config.transformedImage || null;
+        if (config.sound) data.rooms[id].sound = config.sound;
+        return data.rooms[id];
+      }
       data.rooms[id] = {
         id,
         name: config.name,
@@ -1325,6 +1585,8 @@
       || (connection.from === "front_gate" && connection.to === "lower_halls")
       || (connection.from === "lower_halls" && connection.to === "front_gate")
     ));
+    const cellarTrapDoorConnection = data.connections.find((connection) => connection.from === "cellar" && connection.direction === "down");
+    if (cellarTrapDoorConnection) cellarTrapDoorConnection.to = "strong_river";
 
     const ensureItem = (id, config) => {
       if (data.items[id]) return data.items[id];
@@ -1394,6 +1656,8 @@
     data.rooms.rivendell.description = "You are in the heart of Rivendell, where carved stone, running water, and old trees are woven together so gently that no hand seems to dominate the place. Light falls softly through leaves and arches alike, and song lingers even when no singer is near.";
     data.rooms.deep_dark_lake.description = "You are beside the black underground lake. The air is cold, wet, and close; drops fall from unseen heights, whispers echo where no one should be standing, and the darkness feels alive with hidden movement beyond the reach of your hands. No answering voice of Gandalf or the dwarves reaches you here; somewhere in the goblin dark you have been cut off from the company.";
     data.rooms.beorns_house.description = "You are in Beorn's great house, built broad and strong of timber, with a central fire, long tables, and the scent of bread, honey, and clean straw. Everything is orderly, sturdy, and touched by the curious discipline of a household in which beasts and men alike keep good manners.";
+    data.rooms.gate_to_mirkwood.description = "You are at the gate to Mirkwood, where the open lands fall behind and the first black boughs gather ahead with an unwelcoming patience. The air is colder under the trees, and the forest entrance looks less like a road than like a warning made practical.";
+    data.rooms.forest_road.description = "You are on the forest road beneath the eaves of Mirkwood. For a little while the way is still broad enough to seem trustworthy, but the trees already lean close and the light has begun to lose heart.";
     data.rooms.wooden_town.description = "You are in Lake-town, a forest of timber halls, jetties, and plank bridges raised above the dark water. Merchants call, boats creak at their moorings, and the talk of trade, weather, and the Mountain moves continually through the town.";
     data.rooms.front_gate.description = "You stand before the Front Gate of Erebor, where vast stonework, weathered carvings, and old dwarf-craft still command awe despite ruin and neglect. The entrance itself stands mute and forbidding, giving no sign that it was ever meant to yield to strangers now.";
     data.rooms.lower_halls.description = "You enter the lower halls of Erebor, a mighty chamber of pillars, carvings, and treasure under the Mountain's ancient stone. The air is warm, close, and faintly tainted by dragon-smoke, while every footfall seems an impertinence in a kingdom too old to forget itself.";
@@ -1431,6 +1695,8 @@
       ["mirkwood_deer_trail", "Deer Trail", "A pale trail, hardly more than bent grass and delicate prints, slips among the trees here. It feels like the work of swift clean creatures from a brighter wood than this one.", "mirkwood_deer_trail.png", "suspence"],
       ["mirkwood_fallen_tree_crossing", "Fallen Tree Crossing", "A mighty trunk has fallen across a murky runnel, making a crossing too narrow for comfort and too useful to ignore. Bark peels from it in long strips like weathered skin.", "mirkwood_fallen_tree_crossing.png", "suspence"],
       ["mirkwood_ruined_clearing", "Ruined Clearing", "Broken stones and choked foundations lie in this clearing, half swallowed by root and fern. Whatever stood here belonged to another age, and the wood has taken it back with ill grace.", "mirkwood_ruined_clearing.png", "suspence"],
+      ["elvish_clearing", "Elvish Clearing", "A green wood opens here after the black oppression of Mirkwood, and the very air seems lighter for it. Yet the place is not unwatched: there is order in the trees, secrecy in the paths, and the sense that unseen eyes have long known you were coming.", "elvish_clearing.png", "relaxed"],
+      ["elvenkings_halls", "Elvenking's Halls", "You stand in the great halls of the Elvenking, where carved wood, lantern-light, and hidden strength meet in a beauty that does not trouble to be soft. The place is rich without waste, secret without confusion, and wholly under watch.", "elvenkings_halls.png", "relaxed"],
       ["elven_prison_cells", "Prison Cells", "Rows of stout wooden cells stand here under lantern-light, each built more for dignity than cruelty but still secure enough to smother hope. The smell of damp wood and river-water clings to the place.", "elven_prison_cells.png", "suspence"],
       ["elven_guard_post", "Guard Post", "A narrow post looks out over a junction of ways through the halls. Spears, lanterns, and a small gaming board suggest long watches kept by folk who dislike being surprised.", "elven_guard_post.png", "suspence"],
       ["elven_feast_hall", "Feast Hall", "Long tables, carved pillars, and hanging lamps give the feast hall a secret splendor. Even empty, it feels one song away from laughter, wine, and a company entirely too alert to be called careless.", "elven_feast_hall.png", "relaxed"],
@@ -1590,11 +1856,14 @@
       ["lookout_cairn", "cairn", "a little cairn of guiding stones set by earlier mountain hands"],
       ["storm_shelter_supply_niche", "supply niche", "a dry niche in the rock where travelers might leave small stores", { container: true }],
       ["beorn_honey_crock", "honey crock", "a heavy crock of dark golden honey"],
+      ["beorn_honey_cakes", "honey cakes", "a cloth-wrapped stack of dense honey cakes fit for a hard road", { portable: true, weight: 1 }],
       ["beorn_harness", "harness", "clean harness hung in exact order upon pegs"],
       ["beorn_bench", "oak bench", "a heavy oak bench made for broad backs and plain company"],
       ["beorn_tack_chest", "tack chest", "a stout chest for harness, straps, and stable order", { container: true }],
       ["beorn_seed_box", "seed box", "a practical wooden box filled with paper seed packets and twine", { container: true }],
       ["beorn_feed_trough", "feed trough", "a clean trough laid ready for beasts that know better than to waste food"],
+      ["beorn_waterskin", "waterskin", "a sound leather waterskin, freshly filled for the road", { portable: true, weight: 1 }],
+      ["beorn_woods_cloak", "woods cloak", "a weathered dark-green cloak suited to cold boughs and long miles", { portable: true, wearable: true, weight: 1 }],
       ["mirkwood_web_cocoons", "cocoons", "web-wrapped shapes hanging disturbingly from the branches"],
       ["mirkwood_white_antlers", "white antlers", "a glimpse of white antlers caught for a moment among the deeper trees"],
       ["spider_egg_sac", "egg sac", "a pale swollen sac wrapped in gray silk"],
@@ -1699,9 +1968,12 @@
       ["mountain_lookout", "lookout_cairn"],
       ["storm_shelter", "storm_shelter_supply_niche"],
       ["beorn_great_hall", "beorn_honey_crock"],
+      ["beorn_great_hall", "beorn_honey_cakes"],
       ["beorn_great_hall", "beorn_bench"],
       ["beorn_stable", "beorn_harness"],
       ["beorn_stable", "beorn_tack_chest"],
+      ["beorn_stable", "beorn_waterskin"],
+      ["beorn_stable", "beorn_woods_cloak"],
       ["beorn_garden", "beorn_seed_box"],
       ["beorn_animal_yard", "beorn_feed_trough"],
       ["mirkwood_spider_grove", "mirkwood_web_cocoons"],
@@ -3230,6 +3502,34 @@
     }
 
     companionPoseOptions(character, roomId, index = 0) {
+      const region = this.companionPoseRegion(roomId);
+      const mirkwoodCharacterPoses = {
+        thorin: [
+          "carries his weariness like an insult, refusing to let the wood think it has mastered him",
+          "looks as though hunger has only sharpened his impatience with every black mile of the road",
+          "holds himself with grim pride, as if yielding even to discomfort would be a kind of surrender to the forest",
+        ],
+        balin: [
+          "studies each dark turning with bright careful eyes, as though the wood might reveal its trick if watched long enough",
+          "moves thoughtfully through the black wood, measuring paths and silences with equal suspicion",
+          "keeps an observant calm that looks less like ease than long practice in enduring bad roads wisely",
+        ],
+        dwalin: [
+          "stands with the practical stubbornness of one determined to outlast the wood by blunt endurance alone",
+          "looks at the trees as if he would rather knock them flat than keep guessing what they intend",
+          "keeps going with hard plain resolve, the sort that has small patience for enchantment or nonsense",
+        ],
+        bombur: [
+          "looks especially oppressed by the hunger and bad light, as though Mirkwood had chosen precisely the right miseries to offend him",
+          "moves with the dogged unhappiness of one who feels every mile in his feet and every missed meal in his soul",
+          "wears the black road poorly and honestly, as if the wood had offended both his appetite and his dignity",
+        ],
+        bofur: [
+          "tries to keep a little heart about him, though the black wood plainly gives him scant material for it",
+          "bears the gloom more lightly than most, as though cheer were a tool he refuses to lay aside just yet",
+          "keeps a rough traveller's good humor in reserve, using it sparingly against the worst moods of the forest",
+        ],
+      };
       const posesByRoom = {
         bilbos_garden: [
           "stands among the flowers with the air of a guest surprised by so much gardening",
@@ -3261,9 +3561,64 @@
           "watches the yard and the road with a traveller's caution",
           "stands beneath the inn sign, looking as though he would rather be on the road than idle",
         ],
+        mirkwood_forest_path: [
+          "looks worn by hunger and bad light",
+          "keeps glancing back along the path as though mistrusting how quickly it disappears behind him",
+          "walks with the careful reluctance of one who would gladly trade all these trees for a bare hillside",
+          "listens to the dry hush of the wood as though expecting it to answer back",
+        ],
+        mirkwood_dark_glade: [
+          "watches the dim glade with the suspicion one gives a silence too complete to be innocent",
+          "tests the mossy ground with short doubtful steps, as if softness itself might be a trick here",
+          "holds himself ready to move on, unwilling to grant even this open patch the dignity of trust",
+          "keeps his eyes moving among the trunks, unwilling to believe the glade is truly empty",
+        ],
+        mirkwood_enchanted_stream: [
+          "eyes the black stream with a thirst made cautious by bad stories and worse instinct",
+          "keeps a little back from the water, as though its stillness were reason enough for fear",
+          "watches the dark current like one expecting it to offer a bargain not worth the price",
+          "studies the stream with the look of someone trying hard not to imagine how good the water might taste",
+        ],
+        mirkwood_deer_trail: [
+          "stares after the pale trail with the unwilling fascination of one who knows a lure when he sees it",
+          "watches the bent grasses as though they had written a promise too fair to trust",
+          "keeps his doubts plain, even while the white signs among the trees tug at the eye",
+          "looks from the safer road to the deer-trail and back again, plainly disliking both choices",
+        ],
+        mirkwood_fallen_tree_crossing: [
+          "tests the crossing with a practical eye, as though plain necessities are often the sharpest snares",
+          "keeps his balance carefully near the fallen trunk, unwilling to give the wood even a small advantage",
+          "looks at the dark runnel below with the flat dislike reserved for places where slipping would be memorable",
+          "moves as though the rotten bark might choose exactly the wrong moment to betray him",
+        ],
+        mirkwood_spider_grove: [
+          "keeps his weapon ready and his dislike plainer still at the sight of so much silk overhead",
+          "watches the hanging cocoons with a face set hard against whatever may be inside them",
+          "moves under the webbed branches like one expecting the whole grove to twitch into hunger",
+          "keeps glancing upward, unwilling to let the silk-dark above out of his notice even for a breath",
+        ],
+        mirkwood_ruined_clearing: [
+          "studies the broken stones with the grim attention one gives old places that may remember better days than their present company",
+          "keeps his face turned toward the deeper trees, where warmth and laughter seem almost possible and therefore dangerous",
+          "looks about the ruin as though the forest had swallowed something here and might yet be chewing",
+          "holds himself between hunger and caution, plainly trusting neither the ruin nor the promise beyond it",
+        ],
+        place_of_black_spiders: [
+          "keeps close watch on every strand and shadow, as though the wood here had at last dropped all pretence",
+          "moves with the grim patience of one who knows that webs are only the visible part of the trap",
+          "looks about with open disgust, as if even Mirkwood had managed to become fouler than before",
+          "stands in the web-dark with the fierce stillness of someone refusing to yield another inch to spiders",
+        ],
       };
-      if (posesByRoom[roomId]?.length) {
-        return posesByRoom[roomId];
+      const roomSpecificPoses = posesByRoom[roomId] || [];
+      const characterSpecificMirkwood = region === "mirkwood"
+        ? (mirkwoodCharacterPoses[character?.id] || [])
+        : [];
+      if (roomSpecificPoses.length && characterSpecificMirkwood.length) {
+        return [...characterSpecificMirkwood, ...roomSpecificPoses];
+      }
+      if (roomSpecificPoses.length) {
+        return roomSpecificPoses;
       }
       const contextualPose = this.game.resolveNarrativeText(
         CONTEXTUAL_COMPANION_POSE_RULES,
@@ -3292,15 +3647,28 @@
           "stands with shoulders tight, listening for boots, claws, or worse",
           "waits in the foul dark like one expecting the mountain itself to betray him",
         ],
-        mirkwood: ["looks worn by hunger and bad light", "watches the branches overhead with undisguised mistrust", "moves like someone afraid the trees may be listening"],
+        mirkwood: [
+          "looks worn by hunger and bad light",
+          "watches the branches overhead with undisguised mistrust",
+          "moves like someone afraid the trees may be listening",
+          "keeps his shoulders tight, as though expecting the wood itself to lean nearer",
+          "walks with the patience of one enduring a road he has no liking for",
+          "glances often into the deeper dark between the trunks, unwilling to ignore what might be there",
+          "wears the hungry road like an insult he means to outlast",
+          "keeps close to the path, as though even a few careless steps might be too much invitation",
+          "listens with a frown, as though the forest had been whispering just below the edge of sense",
+          "looks as if he would rather face open weather than another mile of this black wood",
+        ],
         elves: ["keeps quiet under the eyes of the Elvenking's folk", "studies the halls as though measuring chances of escape", "waits with dwarf patience and dwarf resentment"],
         laketown_town: ["watches the water and the people with equal suspicion", "seems steadier for the sound of human trade and labor", "keeps his cloak close in the lake-wind"],
         laketown_outlands: ["studies the lake and distant town with a wary, measuring look", "keeps his cloak close against the open wind off the water", "looks as though the nearness of the Mountain matters more than the town below"],
         erebor_outer: ["stares toward the Mountain's depths with a hunger older than the journey", "has little attention left for anything but the halls ahead", "runs a hand absently over old stone as if greeting kin"],
         erebor_inner: ["remains outside the treasure halls, unwilling to risk the whole company at once", "waits beyond the deeper passages, watching and listening", "holds himself near the threshold, torn between caution and longing"],
       };
-      const region = this.companionPoseRegion(roomId);
-      return posesByRoom[roomId] || posesByRegion[region] || posesByRegion.journey;
+      if (characterSpecificMirkwood.length) {
+        return [...characterSpecificMirkwood, ...(posesByRegion[region] || posesByRegion.journey)];
+      }
+      return posesByRegion[region] || posesByRegion.journey;
     }
 
     pickCompanionPoseText(character, roomId, index = 0, usedPoses = new Set()) {
@@ -3340,6 +3708,27 @@
       return variants[Math.abs(seed) % variants.length];
     }
 
+    highlightedCompanions(companions, roomId = this.game.currentRoom) {
+      if (!companions.length) return [];
+      const chapter = this.chapterForRoom(roomId);
+      const highlightCount = chapter === "mirkwood"
+        ? Math.min(companions.length, 2)
+        : Math.min(companions.length, 3);
+      if (chapter !== "mirkwood" || companions.length <= highlightCount) {
+        return companions.slice(0, highlightCount);
+      }
+      return companions
+        .map((character, index) => ({
+          character,
+          index,
+          score: Math.abs(hashString(`${this.game.storySeed}:${roomId}:highlight:${character.id}`)),
+        }))
+        .sort((a, b) => a.score - b.score || a.index - b.index)
+        .slice(0, highlightCount)
+        .sort((a, b) => a.index - b.index)
+        .map(({ character }) => character);
+    }
+
     roomCompanionNarrative(roomId = this.game.currentRoom) {
       const companions = this.visibleCompanions(roomId);
       if (!companions.length) {
@@ -3348,13 +3737,17 @@
         }
         return "";
       }
+      const highlighted = this.highlightedCompanions(companions, roomId);
+      const highlightedIds = new Set(highlighted.map((character) => character.id));
       const usedPoses = new Set();
-      const highlights = companions.slice(0, 3).map((character, index) => {
+      const highlights = highlighted.map((character, index) => {
         const pose = this.pickCompanionPoseText(character, roomId, index, usedPoses);
         if (pose) usedPoses.add(pose);
         return pose ? `${character.name} ${pose}` : `${character.name} is nearby`;
       }).filter(Boolean);
-      const overflowCompanions = companions.slice(highlights.length).map((character) => character.name);
+      const overflowCompanions = companions
+        .filter((character) => !highlightedIds.has(character.id))
+        .map((character) => character.name);
       const overflow = overflowCompanions.length
         ? ` ${this.overflowCompanionNarrative(overflowCompanions, roomId)}`
         : "";
@@ -4426,7 +4819,11 @@
         if (door.locked) return game.print(`The ${door.name} is locked.`);
         door.open = true;
         game.setFlag(`${compact(door.name)}open`, true);
-        return game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "open")} the ${door.name}.`);
+        game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "open")} the ${door.name}.`);
+        if (game.currentRoom === "cellar" && matches(door.name, "large trap door")) {
+          game.print("Black water hurries below the opening, shouldering past the piles and posts under the halls with unpleasant force.");
+        }
+        return;
       }
       const item = game.visibleSearch(objectName)?.item;
       if (!item) return game.print(game.heldItemMessage(objectName) || "I don't see that here.");
@@ -7447,7 +7844,16 @@
       }
       if (matches(character.name, "beorn")) {
         if (matchesAny(text, ["mirkwood", "forest", "wood"])) {
-          return "Beorn says 'The forest ahead is black with old hunger. Keep to the path, and trust no feast that waits for you in silence.'";
+          return game.beornWarningSummary();
+        }
+        if (matchesAny(text, ["path", "road", "track", "trail"])) {
+          return "Beorn says 'The path is there to be obeyed, not improved upon by cleverness.'";
+        }
+        if (matchesAny(text, ["water", "stream", "brook", "drink"])) {
+          return "Beorn says 'Drink what you carry. The wood has waters of its own, and they are not for guests.'";
+        }
+        if (matchesAny(text, ["lights", "feast", "banquet", "fire"])) {
+          return "Beorn says 'If lights appear in that black place, let them shine for someone else. Hungry men see too much and understand too little.'";
         }
         if (matchesAny(text, ["goblins", "wargs", "wolves"])) {
           return "Beorn snorts. 'Goblins breed mischief as marshes breed flies, and wargs are seldom far behind them.'";
@@ -7967,6 +8373,9 @@
         dark_stuffy_passage_14: { label: "before the goblin ambush in the upper tunnels", key: "hazard:goblins:tunnel-ambush" },
         west_bank: { label: "before testing the fast river", key: "hazard:river:west-bank" },
         cellar: { label: "before the barrel escape", key: "hazard:river:cellar" },
+        mirkwood_enchanted_stream: { label: "before risking the black stream", key: "hazard:mirkwood:stream" },
+        mirkwood_ruined_clearing: { label: "before the wandering lights", key: "hazard:mirkwood:lights" },
+        place_of_black_spiders: { label: "before the black spiders close in", key: "hazard:mirkwood:spiders" },
         forest_road_2: { label: "along the forest road", key: "hazard:spiders:forest-road-2" },
         forest_road: { label: "deeper along the forest road", key: "hazard:spiders:forest-road" },
       };
@@ -8302,6 +8711,18 @@
 
       if (beforeDragonDefeat && game.visitedTrollsClearing && this.autoplayHas("large key") && !game.trollsTransformed && game.currentRoom !== "trolls_clearing") return "wait";
 
+      if (
+        beforeDragonDefeat
+        && !game.flags.mirkwooddwarvesfreed
+        && ["mirkwood_spider_grove", "place_of_black_spiders"].includes(game.currentRoom)
+      ) {
+        const daggerHolder = game.findVisibleCharacterHolding("short strong dagger")?.character || null;
+        if (game.flags.mirkwoodbladelost && daggerHolder && daggerHolder.id !== game.player.id) {
+          return `ask ${normalize(daggerHolder.name)} to cut cocoons with dagger`;
+        }
+        return "help dwarves";
+      }
+
       if (beforeDragonDefeat && !this.autoplayHas("golden ring")) {
         if (game.currentRoom === "deep_dark_lake") {
           if (!game.gollumState?.met) return "look";
@@ -8347,7 +8768,8 @@
       if (game.currentRoom === "cellar") {
         const trapDoor = game.doors.porta_cellar_long_lake;
         if (trapDoor && !trapDoor.open) return "open trap door";
-        return "down";
+        if (!game.flags.barrelthrown) return "throw barrel through trap door";
+        return "jump onto barrel";
       }
 
       const bard = Object.values(game.characters).find((character) => matches(character.name, "bard"));
@@ -8447,7 +8869,7 @@
       const actualConnection = visibleConnection || connection;
       if (game.rivendellRopeGate(actualConnection)) return "tie rope to roots";
       const web = game.blockingWebFor(connection);
-      if (web && !web.broken) return "smash web";
+      if (web && !web.broken) return this.autoplayHas("majestic sword") ? "break web with sword" : "smash web";
       const woodElf = Object.values(game.characters).find((character) => matches(character.name, "wood elf") && character.visible);
       if (woodElf?.position === connection.to && this.autoplayHas("golden ring") && game.player.noticeable !== false) return "wear ring";
       const door = actualConnection.door && game.doors[actualConnection.door];
@@ -8814,11 +9236,25 @@
         return game.print("There are no useful trees or branches here.");
       }
 
+      if (game.currentRoom === "mirkwood_deer_trail" && matchesAny(text, ["deer", "white deer", "tracks", "antlers"])) {
+        return game.print("The signs are maddeningly clean and light, as though some bright creature had passed this dark place without truly belonging to it.");
+      }
+
       if (matchesAny(text, ["river", "water", "stream", "lake", "boat", "shore", "bank"])) {
+        if (game.currentRoom === "mirkwood_enchanted_stream") {
+          return game.print("The stream looks pure enough to tempt thirst, yet there is something wrong in its silence. It runs like a warning that has learned to lie softly.");
+        }
         if (lower.includes("river") || lower.includes("water") || lower.includes("stream") || lower.includes("lake") || lower.includes("bank")) {
           return game.print(`${subject} ${actorVerb(game.player, "examine")} the water and its banks. The current looks important, but ${game.player.name === "You" ? "you find" : `${game.player.name} finds`} nothing loose.`);
         }
         return game.print("There is no useful water here.");
+      }
+
+      if (game.currentRoom === "mirkwood_ruined_clearing" && matchesAny(text, ["lights", "light", "feast", "banquet", "laughter"])) {
+        return game.print("They seem always just beyond the next tree or stone: warm, merry, and entirely untrustworthy.");
+      }
+      if (["mirkwood_spider_grove", "place_of_black_spiders"].includes(game.currentRoom) && matchesAny(text, ["cocoons", "cocoon", "webs", "webbing", "dwarves"])) {
+        return game.print("The cocoons twist faintly. Whatever hangs inside them is alive enough still to need help soon.");
       }
 
       if (matchesAny(text, ["fire", "embers", "pit", "ashes", "smoke"])) {
@@ -9024,6 +9460,15 @@
       const game = this.game;
       const roomName = game.room().name;
       const adverb = game.splitter.lastAdverb;
+      const normalizedObject = normalize(objectText);
+      if (game.currentRoom === "cellar") {
+        if (verb === "throw" && /\bbarrel\b/.test(normalizedObject)) return game.handleCellarBarrelThrow(objectText);
+        if ((verb === "jump" || verb === "climb") && /\bbarrel\b/.test(normalizedObject)) return game.handleCellarBarrelBoard(objectText);
+        if (verb === "jump" && /\btrap door\b/.test(normalizedObject)) {
+          game.resolveCellarTrapDoorPlunge();
+          return true;
+        }
+      }
       if (this.tryRivendellDescentAction(verb, objectText)) return true;
       for (const action of game.data.specialActions) {
         if (action.verb !== verb) continue;
@@ -10014,15 +10459,19 @@
         const commands = this.splitter.split(rawCommand);
         const commandContexts = this.splitter.commandContexts || [];
         let forceNpcMovement = false;
+        let shouldAdvanceTurn = false;
         for (const [index, command] of commands.entries()) {
           if (normalize(command) === "wait") forceNpcMovement = true;
           const moved = this.processCommand(command);
+          if (this.commandConsumesTurn(command)) shouldAdvanceTurn = true;
           if (this.shouldRememberSharedDelegatedContext(command)) {
             this.rememberSharedDelegatedContext(commandContexts[index]);
           }
           if (moved || this.pendingClarification) break;
         }
-        if (!this.endgame && !this.pendingClarification) this.advanceCharacterTurn({ forceMove: forceNpcMovement });
+        if (shouldAdvanceTurn && !this.endgame && !this.pendingClarification) {
+          this.advanceCharacterTurn({ forceMove: forceNpcMovement });
+        }
         this.render();
       } finally {
         this.scheduleIdleAdvance();
@@ -10126,6 +10575,17 @@
       } finally {
         if (rememberedChoice && sameChoice(this.forcedChoice, rememberedChoice)) this.forcedChoice = null;
       }
+    }
+
+    commandConsumesTurn(command = "") {
+      const normalizedCommand = normalizeNaturalCommand(String(command || "").toLowerCase());
+      if (!normalizedCommand) return false;
+      if (this.isDirection(normalizedCommand)) return true;
+      if (normalizedCommand.startsWith("go ")) return true;
+      if (this.isTalkCommand(normalizedCommand)) return true;
+      const { verb } = this.parseStructuredCommand(normalizedCommand);
+      if (!verb) return false;
+      return !NON_TURN_COMMAND_VERBS.has(verb);
     }
 
     missingObjectPrompt(verb) {
@@ -11196,6 +11656,9 @@
     maybeAtmosphericEvent() {
       const region = this.atmosphereRegionKey();
       let pool = region && ATMOSPHERIC_EVENT_POOLS[region];
+      if (region === "mirkwood") {
+        pool = this.mirkwoodAtmosphericEventPool();
+      }
       if (region === "bag_end_house" && !this.bagEndPartyHasEnteredHouse()) {
         pool = pool.filter((line) => !/\bdwarf\b|song|conversation|laughter/i.test(line));
       }
@@ -11207,6 +11670,25 @@
       this.flags[cooldownKey] = this.turnCount + 5 + (Math.abs(seed) % 3);
       this.print(pool[Math.abs(seed) % pool.length]);
       return true;
+    }
+
+    mirkwoodAtmosphericEventPool(roomId = this.currentRoom) {
+      const generic = ATMOSPHERIC_EVENT_POOLS.mirkwood || [];
+      const local = MIRKWOOD_ATMOSPHERIC_EVENT_POOLS[roomId] || [];
+      const pool = [...local, ...generic];
+      if (this.mirkwoodJourneyActive() && this.mirkwoodEnergy() <= 1) {
+        pool.push(
+          "Weariness makes every root look like a warning and every shadow like the beginning of a mistake.",
+          "Hunger sharpens the smell of imagined food until the whole wood seems to be practicing deceit upon you."
+        );
+      }
+      if (this.mirkwoodJourneyActive() && this.mirkwoodLostness() >= 2) {
+        pool.push(
+          "For a troubling instant the trees seem arranged in a pattern you almost recognize, until the likeness slips away and leaves you none the wiser.",
+          "You could swear you have passed this way before, though nothing proves it except your own growing distrust."
+        );
+      }
+      return pool;
     }
 
     advanceGollumActivity() {
@@ -11312,7 +11794,10 @@
           : strength <= 15
             ? "You feel a little travel-worn."
             : "You feel fit enough for the road.";
-      this.print(`Strength: ${strength}. ${condition} ${this.carryLoadSummary()}`);
+      const mirkwoodText = this.mirkwoodJourneyActive() && !this.flags.mirkwoodjourneycomplete
+        ? ` Mirkwood energy: ${this.mirkwoodEnergy()}/${this.maxMirkwoodEnergy()}. ${this.mirkwoodEnergyCondition()}`
+        : "";
+      this.print(`Strength: ${strength}. ${condition}${mirkwoodText} ${this.carryLoadSummary()}`);
     }
 
     verbs() {
@@ -12173,6 +12658,7 @@
     }
 
     breakThing(command) {
+      if (this.handleMirkwoodWebAction("break", command)) return;
       const targetName = command.split(" with ")[0];
       const weaponName = command.includes(" with ") ? command.split(" with ").slice(1).join(" with ") : "";
       const weapon = weaponName ? this.findInInventory(weaponName) : null;
@@ -12280,6 +12766,7 @@
     }
 
     cutTrim(verb, objectName = "") {
+      if (this.handleMirkwoodWebAction("cut", objectName)) return;
       const parsed = this.parseToolCommand(objectName);
       if (!parsed.targetName) return this.print(`${capitalize(verb)} what?`);
       const item = this.visibleSearch(parsed.targetName)?.item;
@@ -12372,6 +12859,119 @@
       this.print(actorizeSecondPerson(this.player, `You ${action} the ${item.name}.`));
     }
 
+    cellarTrapDoor() {
+      return this.doors.porta_cellar_long_lake || null;
+    }
+
+    handleCellarBarrelThrow(command = "") {
+      if (this.currentRoom !== "cellar") return false;
+      const text = normalize(command);
+      if (!/\bbarrel\b/.test(text)) return false;
+      const trapDoor = this.cellarTrapDoor();
+      if (!trapDoor?.open) {
+        this.print("The large trap door is still closed.");
+        return true;
+      }
+      if (this.flags.barrelthrown) {
+        this.print("An empty barrel is already bobbing away below the trap door.");
+        return true;
+      }
+      const barrel = this.visibleSearch("barrel")?.item || this.findInInventory("barrel");
+      if (!barrel || !matches(barrel.name, "barrel")) {
+        this.print(this.heldItemMessage("barrel") || "There is no barrel ready to hand.");
+        return true;
+      }
+      if (this.player.insideContainer === barrel.id) this.player.insideContainer = null;
+      this.detachItem(barrel.id);
+      barrel.location = { type: "room", id: "long_lake" };
+      barrel.visible = false;
+      barrel.open = false;
+      this.flags.barrelthrown = true;
+      this.print("You wrestle an empty barrel to the opening and heave it through. It strikes the black water below with a hollow, violent crash, vanishes among the piles and foaming shadows for one dreadful instant, and then shoots out again, bobbing wildly as the current claims it.");
+      return true;
+    }
+
+    handleCellarBarrelBoard(objectName = "") {
+      if (this.currentRoom !== "cellar") return false;
+      const text = normalize(objectName);
+      if (!/\bbarrel\b/.test(text)) return false;
+      const trapDoor = this.cellarTrapDoor();
+      if (!trapDoor?.open) {
+        this.print("The large trap door is still closed.");
+        return true;
+      }
+      if (!this.flags.barrelthrown) {
+        this.print("The barrel you need is not under you yet. Best get an empty one through the trap door first.");
+        return true;
+      }
+      return this.resolveCellarBarrelEscape();
+    }
+
+    completeSpecialTravel(destination, direction, options = {}) {
+      const { preDescriptionLines = [], danger = false } = options;
+      const previousRoom = this.currentRoom;
+      if (this.sceneMapVisible && previousRoom !== destination) {
+        this.sceneMapTravelAnimation = buildSceneMapTravelAnimationPlan(previousRoom, destination);
+        this.sceneMapViewportMode = "travel";
+        this.sceneMapAutoFollow = true;
+        this.sceneMapManualScope = false;
+        this.sceneMapShowAll = false;
+      } else {
+        this.sceneMapTravelAnimation = null;
+        this.sceneMapViewportMode = null;
+      }
+      this.currentRoom = destination;
+      this.player.position = destination;
+      this.moveFollowers(previousRoom, destination, direction);
+      if (this.commandIssuer) {
+        this.print(`${this.player.name} goes ${direction}.`);
+        return true;
+      }
+      preDescriptionLines.forEach((line) => this.print(line, danger ? "danger" : ""));
+      this.describeRoom();
+      this.noteMirkwoodTravel(previousRoom, destination, direction);
+      this.triggerSpiderEyesEncounter(previousRoom, destination, direction);
+      this.hazards?.maybeProgressAutosave(previousRoom, destination);
+      this.maybeAutosaveForRoom(destination);
+      this.checkSpecialSituations();
+      return true;
+    }
+
+    resolveCellarBarrelEscape() {
+      this.player.insideContainer = null;
+      this.flags.barrelthrown = false;
+      return this.completeSpecialTravel("long_lake", "down", {
+        preDescriptionLines: [
+          "You seize your moment, spring through the open trap door, and come down half upon the barrel and half into the freezing black rush beneath the halls.",
+          "For one sickening instant there is nothing but thunder, blind water, striking timber, and the certainty that the whole desperate plan has failed.",
+          "Then the barrel lurches upright under you, the current catches it cleanly, and Bilbo goes spinning away through black arches and broken flashes of lantern-light toward the open day beyond.",
+          "By the time the halls fall behind, you are drenched, breathless, clinging to slippery wood with both arms, but still afloat and borne onward at the speed of the river.",
+          "At last the racing black water widens, the low roof of branches breaks apart above you, and Long Lake opens ahead in cold daylight like a deliverance almost too sudden to trust.",
+        ],
+      });
+    }
+
+    resolveCellarTrapDoorPlunge() {
+      this.player.insideContainer = null;
+      const hadBarrelBelow = Boolean(this.flags.barrelthrown);
+      this.flags.barrelthrown = false;
+      const lines = hadBarrelBelow
+        ? [
+          "You drop through the trap door, snatching wildly for the barrel below, but the black water twists you aside before your hands can find it.",
+          "Timber, spray, and darkness strike together beneath the halls, and in an instant you are no rider of barrels at all but a creature flung helplessly into the racing flood.",
+          "The black water seizes you at once and drags you away under the halls before you can do more than snatch one desperate breath.",
+        ]
+        : [
+          "You drop through the trap door straight into the black water below, and the shock of it cuts thought in two.",
+          "Up becomes down at once. The beams above vanish, the cold bites like iron, and the river hurls you along as though you weighed no more than a leaf.",
+          "The current catches you like an iron hand and sweeps you away under the halls before you can master yourself.",
+        ];
+      this.recordAutosave("before the barrel escape", { key: "hazard:river:cellar", force: true });
+      lines.forEach((line) => this.print(line, "danger"));
+      this.endGame("The racing river bears you under the halls and gives you back no more", { fatal: true });
+      return true;
+    }
+
     climb(objectName) {
       const text = normalize(objectName);
       if (!text) return this.print("Climb where?");
@@ -12379,6 +12979,7 @@
         const preferredAdvance = this.preferredBeornMountainAdvance();
         if (preferredAdvance) return this.move(preferredAdvance.direction);
       }
+      if (this.handleCellarBarrelBoard(text)) return;
       if (this.currentRoom === "hidden_valley_path" && matchesAny(text, ["down", "downward", "downwards", "descent", "drop"])) {
         const descent = this.connectionsFrom(this.currentRoom).find((connection) => connection.to === "rivendell");
         if (descent && this.narrativeTravelBlock(descent)) {
@@ -12414,6 +13015,21 @@
       if (verb === "run" && this.currentRoom === "deep_dark_lake" && this.gollumState?.awaitingPlayerRiddle) {
         this.print(this.gollumEscapeInterception("north"));
         return;
+      }
+      if (verb === "jump" && this.handleCellarBarrelBoard(objectName)) return;
+      if (verb === "jump" && this.currentRoom === "cellar" && /\btrap door\b/.test(normalize(objectName))) {
+        this.resolveCellarTrapDoorPlunge();
+        return;
+      }
+      if (verb === "help" && this.handleMirkwoodWebAction("help", objectName)) return;
+      if (verb === "rest" && this.mirkwoodJourneyActive() && !this.flags.mirkwoodjourneycomplete) {
+        if (this.mirkwoodEnergy() <= 0) {
+          this.resolveMirkwoodExhaustion("You stop to rest, but in Mirkwood rest becomes surrender. The wood takes your strength and gives you back a black river instead.");
+          return;
+        }
+        if (this.mirkwoodEnergy() < this.maxMirkwoodEnergy()) {
+          this.restoreMirkwoodEnergy(1, "You force yourself to breathe steadily and gather what little strength the wood will allow.");
+        }
       }
       const text = normalize(objectName);
       const command = [verb, text].filter(Boolean).join(" ");
@@ -12458,7 +13074,10 @@
 
     followCharacter(objectName = "") {
       const target = this.resolveCharacterTarget(objectName);
-      if (!target) return this.print(`There is no one named ${objectName} here to follow.`);
+      if (!target) {
+        if (this.handleMirkwoodFollow(objectName)) return;
+        return this.print(`There is no one named ${objectName} here to follow.`);
+      }
       if (this.commandIssuer && target.id === this.commandIssuer.id) {
         this.player.movementMode = "follow";
         this.player.followingPlayer = true;
@@ -12514,10 +13133,14 @@
       if (!EDIBLE_ITEMS.has(normalize(item.name))) return this.print("I would not eat that.");
       this.detachItem(item.id);
       this.player.strength += 5;
+      if (this.mirkwoodJourneyActive() && !this.flags.mirkwoodjourneycomplete) {
+        this.restoreMirkwoodEnergy(2, `The ${item.name} puts a little heart back into you for the black road ahead.`);
+      }
       this.print(this.player.name === "You" ? `You eat the ${item.name} and gain strength.` : `${this.player.name} eats the ${item.name} and gains strength.`);
     }
 
     drink(objectName) {
+      if (this.handleMirkwoodDrink(objectName)) return;
       const normalizedObject = normalize(objectName);
       const item = normalizedObject
         ? this.findInInventory(objectName)
@@ -12535,6 +13158,7 @@
 
     throwItem(command) {
       if (!command) return this.print("What would you like to throw?");
+      if (this.handleCellarBarrelThrow(command)) return;
       const normalizedCommand = command
         .replace(/\s+across\s+/, " at ")
         .replace(/\s+against\s+/, " at ")
@@ -12827,6 +13451,14 @@
         this.print(narrativeBlock);
         return false;
       }
+      if (
+        connection.from === "place_of_black_spiders"
+        && connection.to === "elvish_clearing"
+        && !this.flags.mirkwooddwarvesfreed
+      ) {
+        this.print("The cries from the cocoons still ring behind you. Better free the webbed dwarves before trying to force the last way through.");
+        return false;
+      }
       const web = this.blockingWebFor(connection);
       if (web && !web.broken) {
         this.print("A thick spider web blocks your path.");
@@ -12845,46 +13477,56 @@
         this.print(`The ${door.name} is locked.`);
         return false;
       }
+      if (connection.from === "cellar" && direction === "down") {
+        return this.resolveCellarTrapDoorPlunge();
+      }
+      const mirkwoodLoop = this.mirkwoodLoopConnection(connection);
+      const effectiveConnection = mirkwoodLoop?.connection || connection;
+      if (mirkwoodLoop?.message) {
+        this.print(mirkwoodLoop.message, "danger");
+        this.drainMirkwoodEnergy(1, "You press on, but the black wood quietly turns you about.");
+      }
       const triggerTrollEncounterOnEntry = (
-        connection.to === "trolls_clearing"
+        effectiveConnection.to === "trolls_clearing"
         && !this.trollsTransformed
         && (!this.visitedTrollsClearing || Boolean(this.flags.debugforcetrollencounter))
       );
       const previousRoom = this.currentRoom;
       const movedInTotalDarkness = this.roomIsDark(previousRoom);
-      if (this.sceneMapVisible && previousRoom !== connection.to) {
-        this.sceneMapTravelAnimation = buildSceneMapTravelAnimationPlan(previousRoom, connection.to);
+      if (this.sceneMapVisible && previousRoom !== effectiveConnection.to) {
+        this.sceneMapTravelAnimation = buildSceneMapTravelAnimationPlan(previousRoom, effectiveConnection.to);
         this.sceneMapViewportMode = "travel";
       } else {
         this.sceneMapTravelAnimation = null;
         this.sceneMapViewportMode = null;
       }
-      this.currentRoom = connection.to;
-      this.player.position = connection.to;
+      this.currentRoom = effectiveConnection.to;
+      this.player.position = effectiveConnection.to;
       if (this.sceneMapVisible) {
         this.sceneMapAutoFollow = true;
         this.sceneMapManualScope = false;
         this.sceneMapShowAll = false;
       }
-      if (connection.to === "beorns_house" && BEORN_MOUNTAIN_APPROACH_ROOMS.has(previousRoom)) {
+      if (effectiveConnection.to === "beorns_house" && BEORN_MOUNTAIN_APPROACH_ROOMS.has(previousRoom)) {
         this.flags.beorn_mountain_arrival_complete = true;
       }
       if (previousRoom === "deep_dark_lake" && this.gollumState?.pocketQuestionAsked && this.player.noticeable === false && !this.gollumState.escaped && this.isGollumPresentInLake()) {
         this.gollumState.escaped = true;
         this.print(this.gollumRingEscapeMessage());
       }
-      if (movedInTotalDarkness && this.applyDarkMovementHazard(previousRoom, direction, connection.to)) return true;
-      this.moveFollowers(previousRoom, connection.to, direction);
+      if (movedInTotalDarkness && this.applyDarkMovementHazard(previousRoom, direction, effectiveConnection.to)) return true;
+      this.moveFollowers(previousRoom, effectiveConnection.to, direction);
       if (this.commandIssuer) {
         this.print(`${this.player.name} goes ${direction}.`);
         return true;
       }
-      const transitionNarrative = this.movementTransitionNarrative(previousRoom, connection.to, direction);
+      const transitionNarrative = this.movementTransitionNarrative(previousRoom, effectiveConnection.to, direction);
       if (transitionNarrative) this.print(transitionNarrative);
       this.describeRoom();
-      this.triggerSpiderEyesEncounter(previousRoom, connection.to, direction);
-      this.hazards?.maybeProgressAutosave(previousRoom, connection.to);
-      if (!triggerTrollEncounterOnEntry) this.maybeAutosaveForRoom(connection.to);
+      this.noteMirkwoodTravel(previousRoom, effectiveConnection.to, direction);
+      this.triggerSpiderEyesEncounter(previousRoom, effectiveConnection.to, direction);
+      this.hazards?.maybeProgressAutosave(previousRoom, effectiveConnection.to);
+      if (!triggerTrollEncounterOnEntry) this.maybeAutosaveForRoom(effectiveConnection.to);
       if (triggerTrollEncounterOnEntry) {
         this.checkTrollsClearing();
       } else {
@@ -13295,7 +13937,19 @@
       if (!this.flags.initiative_beorn_warning) {
         return {
           flag: "initiative_beorn_warning",
-          message: "Beorn says 'Keep to the path in Mirkwood. The wood is black-hearted, and an old hunger walks beneath its boughs.'",
+          message: this.beornWarningSummary(),
+        };
+      }
+      if (!this.flags.initiative_beorn_water_warning) {
+        return {
+          flag: "initiative_beorn_water_warning",
+          message: "Beorn adds 'Trust your own bottle before any stream under those boughs.'",
+        };
+      }
+      if (!this.flags.initiative_beorn_lights_warning) {
+        return {
+          flag: "initiative_beorn_lights_warning",
+          message: "Beorn says 'And if the wood offers lights and laughter, keep your feet and let your hunger complain.'",
         };
       }
       if ((this.player.strength || 0) < 6 && !this.flags.initiative_beorn_food) {
@@ -13413,6 +14067,368 @@
       }[this.currentRoom];
       if (!priority) return null;
       return this.roomConnections().find((connection) => connection.to === priority) || null;
+    }
+
+    mirkwoodJourneyActive() {
+      return Boolean(this.flags.mirkwoodjourneyactive || MIRKWOOD_TRAVEL_ROOMS.has(this.currentRoom));
+    }
+
+    maxMirkwoodEnergy() {
+      return 5;
+    }
+
+    mirkwoodEnergy() {
+      return Math.max(0, Math.min(this.maxMirkwoodEnergy(), Number(this.flags.mirkwoodenergy ?? this.maxMirkwoodEnergy()) || 0));
+    }
+
+    setMirkwoodEnergy(value) {
+      this.flags.mirkwoodenergy = Math.max(0, Math.min(this.maxMirkwoodEnergy(), Number(value) || 0));
+      return this.mirkwoodEnergy();
+    }
+
+    mirkwoodLostness() {
+      return Math.max(0, Number(this.flags.mirkwoodlostness || 0));
+    }
+
+    setMirkwoodLostness(value) {
+      this.flags.mirkwoodlostness = Math.max(0, Number(value) || 0);
+      return this.mirkwoodLostness();
+    }
+
+    wearingMirkwoodCloak() {
+      return this.player.worn?.some((itemId) => matches(this.items[itemId]?.name || "", "woods cloak"));
+    }
+
+    beornWarningSummary() {
+      return "Beorn says 'Keep to the path. Drink no water that runs black under the wood. Follow no lights, however fair they seem.'";
+    }
+
+    mirkwoodRoomNarrative(roomId = this.currentRoom) {
+      const local = MIRKWOOD_ROOM_NARRATIVE_VARIANTS[roomId] || [];
+      const pool = [...local];
+      if (this.mirkwoodJourneyActive()) {
+        if (!local.length) {
+          pool.push("Hunger, weariness, and the sameness of the trees make it hard to believe in straight roads.");
+        }
+        if (this.mirkwoodEnergy() <= 1) {
+          pool.push(
+            "Your thoughts come more slowly here, as though the wood were taking a toll not only from your feet but from your judgment.",
+            "Weariness has made the whole forest feel one degree more hostile, and every choice a little less certain."
+          );
+        } else if (this.mirkwoodEnergy() <= 3) {
+          pool.push(
+            "The road is still manageable, but only by the sort of attention that grows costly after too many dark miles.",
+            "You can still master yourself, though not without feeling how much of your strength the wood has already claimed."
+          );
+        }
+        if (this.mirkwoodLostness() >= 2) {
+          pool.push(
+            "Nothing in the arrangement of trunk, root, and shadow seems willing to remain distinct in memory for long.",
+            "The black wood has begun to confuse not only your course but your confidence in remembering it."
+          );
+        }
+      }
+      if (!pool.length) return "";
+      return this.cyclingVariant(`mirkwood-room-narrative:${roomId}`, pool, `${this.mirkwoodEnergy()}:${this.mirkwoodLostness()}`);
+    }
+
+    mirkwoodEnergyCondition() {
+      const energy = this.mirkwoodEnergy();
+      if (energy <= 0) return "You are at the end of your strength and scarcely master your own steps.";
+      if (energy === 1) return "You are near spent, and the wood feels stronger than your will.";
+      if (energy <= 3) return "You are hungry, tired, and in need of care.";
+      return "You still have enough in hand to master the road.";
+    }
+
+    ensureMirkwoodJourneyStarted(roomId = this.currentRoom) {
+      if (!MIRKWOOD_TRAVEL_ROOMS.has(roomId)) return false;
+      if (this.flags.mirkwoodjourneyactive) return false;
+      this.flags.mirkwoodjourneyactive = true;
+      this.setMirkwoodEnergy(this.maxMirkwoodEnergy());
+      this.setMirkwoodLostness(0);
+      return true;
+    }
+
+    restoreMirkwoodEnergy(amount, reason = "") {
+      const before = this.mirkwoodEnergy();
+      const after = this.setMirkwoodEnergy(before + amount);
+      if (reason && after > before) this.print(reason);
+      return after > before;
+    }
+
+    drainMirkwoodEnergy(amount, message = "") {
+      if (!amount) return false;
+      const before = this.mirkwoodEnergy();
+      const after = this.setMirkwoodEnergy(before - amount);
+      if (message && after < before) this.print(`${message} Mirkwood energy: ${after}.`, "danger");
+      return after < before;
+    }
+
+    nudgeMirkwoodLostness(amount, message = "") {
+      if (!amount) return false;
+      this.setMirkwoodLostness(this.mirkwoodLostness() + amount);
+      if (message) this.print(message);
+      return true;
+    }
+
+    mirkwoodLoopFlag(connection) {
+      if (!connection?.from || !connection?.direction) return "";
+      return `mirkwoodloop_${connection.from}_${compact(connection.direction)}`;
+    }
+
+    mirkwoodLoopConnection(connection) {
+      if (!connection || !this.mirkwoodJourneyActive() || this.flags.mirkwoodjourneycomplete) return null;
+      const spec = MIRKWOOD_LOOP_CONNECTIONS.find((candidate) => (
+        candidate.from === connection.from
+        && candidate.direction === connection.direction
+      ));
+      if (!spec) return null;
+      if (this.mirkwoodLostness() < Number(spec.minLostness || 0)) return null;
+      if (typeof spec.when === "function" && !spec.when({ game: this, connection, spec })) return null;
+      const flag = this.mirkwoodLoopFlag(connection);
+      if (flag && this.flags[flag]) return null;
+      const messagePool = MIRKWOOD_LOOP_MESSAGE_VARIANTS[spec.key] || [
+        "The trees close over your sense of direction until the path ahead feels sickeningly familiar. You have the uneasy feeling that you have already been this way.",
+      ];
+      if (flag) this.flags[flag] = true;
+      this.setMirkwoodLostness(this.mirkwoodLostness() + 1);
+      const message = this.cyclingVariant(`mirkwood-loop:${spec.key}`, messagePool, `${connection.from}:${connection.direction}:${this.mirkwoodLostness()}`);
+      return {
+        connection: { ...connection, to: spec.to },
+        message,
+      };
+    }
+
+    mirkwoodFoodInInventory() {
+      return this.player.inventory
+        .map((itemId) => this.items[itemId])
+        .find((item) => item && EDIBLE_ITEMS.has(normalize(item.name)));
+    }
+
+    mirkwoodBladeHolder() {
+      const item = this.items.short_strong_dagger;
+      if (!item?.location?.type) return null;
+      if (item.location.type === "character") return this.characters[item.location.id] || null;
+      return null;
+    }
+
+    findMirkwoodBladeRecoverer() {
+      const priority = TRAVELING_COMPANION_NAMES.filter((name) => name !== "gandalf");
+      for (const id of priority) {
+        const character = this.characters[id];
+        if (!character || character.id === this.player.id) continue;
+        if (character.position !== this.currentRoom || !character.visible) continue;
+        return character;
+      }
+      return null;
+    }
+
+    stageMirkwoodBladeLoss(reason = "") {
+      const dagger = this.findInInventory("short strong dagger");
+      if (!dagger || this.flags.mirkwoodbladelost || this.flags.mirkwoodbladelosspending) return false;
+      this.flags.mirkwoodbladelosspending = true;
+      this.flags.mirkwoodbladelossreason = reason || "In the confusion of the black wood, your dagger is lost from your own keeping.";
+      return true;
+    }
+
+    resolvePendingMirkwoodBladeRecovery() {
+      if (!this.flags.mirkwoodbladelosspending) return false;
+      const dagger = this.findInInventory("short strong dagger");
+      if (!dagger) {
+        this.flags.mirkwoodbladelosspending = false;
+        return false;
+      }
+      const recoverer = this.findMirkwoodBladeRecoverer();
+      if (!recoverer) return false;
+      this.detachItem(dagger.id);
+      dagger.location = { type: "character", id: recoverer.id };
+      recoverer.inventory.push(dagger.id);
+      this.flags.mirkwoodbladelosspending = false;
+      this.flags.mirkwoodbladelost = true;
+      this.flags.mirkwoodbladerecoverer = recoverer.id;
+      const lead = this.flags.mirkwoodbladelossreason || "In the confusion of the black wood, your dagger is lost from your own keeping.";
+      this.flags.mirkwoodbladelossreason = "";
+      this.print(`${lead} ${recoverer.name} finds the short strong dagger and keeps it safe for the moment rather than risk losing it again in the dark.`);
+      return true;
+    }
+
+    mirkwoodTravelDetour(destination, message, direction = "forward") {
+      const previousRoom = this.currentRoom;
+      this.currentRoom = destination;
+      this.player.position = destination;
+      this.moveFollowers(previousRoom, destination, direction);
+      this.resolvePendingMirkwoodBladeRecovery();
+      if (message) this.print(message, "danger");
+      this.describeRoom();
+      this.noteMirkwoodTravel(previousRoom, destination, direction);
+      this.hazards?.maybeProgressAutosave(previousRoom, destination);
+      this.checkSpecialSituations();
+      return true;
+    }
+
+    resolveMirkwoodExhaustion(reason = "") {
+      this.setMirkwoodEnergy(0);
+      this.setMirkwoodLostness(this.mirkwoodLostness() + 1);
+      return this.mirkwoodTravelDetour(
+        "west_bank",
+        reason || "At last the black boughs and the sameness of the road overcome you. When your wits return, you are far from the path, standing by a dark river you do not remember seeking.",
+      );
+    }
+
+    noteMirkwoodTravel(previousRoom = "", currentRoom = this.currentRoom, direction = "") {
+      if (!MIRKWOOD_TRAVEL_ROOMS.has(currentRoom)) return false;
+      this.ensureMirkwoodJourneyStarted(currentRoom);
+      if (IMMERSION_ELVEN_HALLS_ROOMS.has(currentRoom) || currentRoom === "elvish_clearing") {
+        this.flags.mirkwoodjourneycomplete = true;
+        return false;
+      }
+
+      const pressureFlag = `mirkwoodpressure_${currentRoom}`;
+      const baseCost = MIRKWOOD_ENERGY_ROOM_COST[currentRoom] || 0;
+      const cost = this.wearingMirkwoodCloak() ? Math.max(0, baseCost - 1) : baseCost;
+      if (!this.flags[pressureFlag]) {
+        this.flags[pressureFlag] = true;
+        if (cost > 0) {
+          this.drainMirkwoodEnergy(cost, "The road through Mirkwood takes its due from you.");
+        }
+      }
+
+      if (currentRoom === "mirkwood_deer_trail" && !this.flags.mirkwooddeerseen) {
+        this.flags.mirkwooddeerseen = true;
+        this.print("For a moment a white deer passes among the trunks ahead, impossibly bright against the black wood.");
+      }
+      if (currentRoom === "mirkwood_ruined_clearing" && !this.flags.mirkwoodlightsseen) {
+        this.flags.mirkwoodlightsseen = true;
+        this.print("Beyond the broken stones, warm lights flicker for an instant, and with them comes the faintest promise of laughter and a feast.");
+      }
+      if (currentRoom === "mirkwood_spider_grove" && !this.flags.mirkwooddwarvesnoted) {
+        this.flags.mirkwooddwarvesnoted = true;
+        this.print("From among the hanging cocoons there comes a muffled dwarvish cry. Someone is webbed up here, and not for comfort.");
+      }
+      if (
+        currentRoom === "place_of_black_spiders"
+        && this.flags.mirkwoodfolloweddeer
+        && this.mirkwoodLostness() >= 2
+        && !this.flags.mirkwooddeershortsighted
+      ) {
+        this.flags.mirkwooddeershortsighted = true;
+        this.print("The deer's false shortcut has brought you faster into the worst of the webs, and the wood seems now to know your weakness.");
+      }
+      return false;
+    }
+
+    handleMirkwoodDrink(objectName = "") {
+      const text = normalize(objectName);
+      if (!this.mirkwoodJourneyActive()) return false;
+      if (this.currentRoom === "mirkwood_enchanted_stream" && matchesAny(text, ["stream", "water", "dark stream", "black water"])) {
+        if (this.flags.mirkwooddrankstream) {
+          this.print("You have had enough of that black water already.");
+          return true;
+        }
+        this.flags.mirkwooddrankstream = true;
+        this.restoreMirkwoodEnergy(2, "The dark water is cold and startlingly sweet. For a few breaths your weariness seems to loosen.");
+        this.nudgeMirkwoodLostness(2, "Then a black sleep steals over your thoughts, and when you recover you know the wood has turned you aside.");
+        this.stageMirkwoodBladeLoss("When you wake from the black sleep, your hand goes to your belt and finds it lighter than it should be.");
+        this.mirkwoodTravelDetour(
+          "bewitched_gloomy_place",
+          "The feast of strength passes quickly. You wake chilled and unsteady in a gloomy place off the path, with no clear memory of how you came there.",
+        );
+        return true;
+      }
+      if (matchesAny(text, ["waterskin", "water skin"])) {
+        const waterskin = this.findInInventory("waterskin");
+        if (!waterskin) return false;
+        this.detachItem(waterskin.id);
+        this.restoreMirkwoodEnergy(1, "You take a careful draught from the waterskin and feel a little steadier.");
+        this.print(this.player.name === "You" ? "You drink the waterskin." : `${this.player.name} drinks the waterskin.`);
+        return true;
+      }
+      return false;
+    }
+
+    handleMirkwoodFollow(objectName = "") {
+      const text = normalize(objectName);
+      if (!this.mirkwoodJourneyActive()) return false;
+      if (this.currentRoom === "mirkwood_deer_trail" && matchesAny(text, ["deer", "white deer", "tracks", "trail", "antlers"])) {
+        if (this.mirkwoodEnergy() <= 0) {
+          return this.resolveMirkwoodExhaustion("You try to follow the pale creature, but your strength fails first; the wood takes your purpose from you and leaves only wandering.");
+        }
+        this.flags.mirkwoodfolloweddeer = true;
+        this.nudgeMirkwoodLostness(2, "The white deer slips always just beyond reach, and before long the path behind you has ceased to mean anything.");
+        this.drainMirkwoodEnergy(1, "The chase costs you breath and steadiness.");
+        this.stageMirkwoodBladeLoss("In leaping fallen roots and tearing after the white deer, you lose the dagger from your belt without noticing until too late.");
+        return this.mirkwoodTravelDetour(
+          "mirkwood_ruined_clearing",
+          "At last the deer is gone. In its place you come suddenly into a ruined clearing, having gained ground at the price of certainty.",
+          "north east",
+        );
+      }
+      if (this.currentRoom === "mirkwood_ruined_clearing" && matchesAny(text, ["lights", "light", "feast", "banquet", "laughter"])) {
+        if (this.mirkwoodEnergy() <= 0) {
+          return this.resolveMirkwoodExhaustion("You move toward the lights like a sleepwalker, and when sense returns there is only the black river and the shame of having trusted the wood.");
+        }
+        if (!this.flags.mirkwoodfollowedlights) this.restoreMirkwoodEnergy(1, "Warmth, music, and the smell of food seem almost near enough to touch, and your heart lifts despite itself.");
+        this.flags.mirkwoodfollowedlights = true;
+        this.nudgeMirkwoodLostness(2, "The lights go out in mockery, and the wood leaves you far from where you meant to stand.");
+        this.stageMirkwoodBladeLoss("You come back to yourself after the vanished feast with your belt snagged and the dagger gone from it.");
+        return this.mirkwoodTravelDetour(
+          "west_bank",
+          "You follow the lights until they vanish. In their place there is only a black river under dark branches and the sour knowledge that Beorn was right to warn you.",
+          "south east",
+        );
+      }
+      return false;
+    }
+
+    attemptMirkwoodDwarfRescue(mode = "help", toolName = "") {
+      if (!["mirkwood_spider_grove", "place_of_black_spiders"].includes(this.currentRoom)) return false;
+      if (this.flags.mirkwooddwarvesfreed) {
+        this.print("The dwarves are already cut loose from the worst of the webs.");
+        return true;
+      }
+      const tool = toolName
+        ? this.findInInventory(toolName)
+        : (this.findInInventory("short strong dagger") || this.findInInventory("majestic sword"));
+      const daggerHere = this.findInInventory("short strong dagger");
+      const daggerHolder = this.findVisibleCharacterHolding("short strong dagger")?.character || null;
+      if (this.flags.mirkwoodbladelost && !daggerHere) {
+        if (daggerHolder && daggerHolder.id !== this.player.id) {
+          this.print(`${daggerHolder.name} has the short strong dagger. Ask ${daggerHolder.name} for the dagger, or ask ${daggerHolder.name} to cut the cocoons with it.`);
+          return true;
+        }
+        this.print("Without the short strong dagger, the webs are too close-packed and dangerous to clear cleanly around the trapped dwarves.");
+        return true;
+      }
+      const bladeReady = Boolean(tool && matchesAny(tool.name, ["dagger", "sword", "knife"]));
+      if (!bladeReady && (this.player.strength || 0) < 8) {
+        this.drainMirkwoodEnergy(1, "You tear at the webs with bare hands, but they cling and drag at you.");
+        if (this.mirkwoodEnergy() <= 0) {
+          return this.resolveMirkwoodExhaustion("You struggle in the spiders' work until weakness and confusion master you; the next thing you know, the wood has spilled you out by the black river.");
+        }
+        this.print("Without a good blade, you cannot free the webbed dwarves properly.");
+        return true;
+      }
+      this.flags.mirkwooddwarvesfreed = true;
+      this.drainMirkwoodEnergy(1, "The rescue is hard, breathless work in choking silk.");
+      this.print(
+        bladeReady
+          ? `With the ${tool.name}, you saw and slash through the clinging webs until at last the trapped dwarves can fight and stumble free.`
+          : "By stubborn force alone, you tear enough of the webbing apart to drag the trapped dwarves free."
+      );
+      return true;
+    }
+
+    handleMirkwoodWebAction(action, command = "") {
+      const text = normalize(command);
+      if (!["mirkwood_spider_grove", "place_of_black_spiders"].includes(this.currentRoom)) return false;
+      const rescueTarget = this.currentRoom === "mirkwood_spider_grove"
+        ? matchesAny(text, ["cocoons", "cocoon", "dwarves", "webbed dwarves", "webs"])
+        : matchesAny(text, ["cocoons", "cocoon", "dwarves", "webbed dwarves"]);
+      if (rescueTarget) {
+        const toolName = command.includes(" with ") ? command.split(" with ").slice(1).join(" with ").trim() : "";
+        return this.attemptMirkwoodDwarfRescue(action, toolName);
+      }
+      return false;
     }
 
     inRivendellForPreparations() {
@@ -13742,6 +14758,7 @@
       const targetName = displayCharacterName(target);
       const attackerIsPlayer = attacker.id === this.data.player;
       const targetIsPlayer = target.id === this.data.player;
+      const loserIsPlayer = loser.id === this.data.player;
       const sequence = this.combatNarrativeSequence();
       const weaponType = this.combatWeaponType(weapon);
       const environment = this.combatEnvironmentCategory();
@@ -13820,7 +14837,9 @@
         ? this.combatPick([
           attackerIsPlayer
             ? `Bilbo scarcely knows how he manages it, but ${targetName} is checked and driven back before the answer can come.`
-            : `${capitalize(targetName)} tries to answer the stroke, but cannot wholly recover the ground already lost.`,
+            : targetIsPlayer
+              ? "You try to answer the stroke, but cannot wholly recover the ground already lost."
+              : `${capitalize(targetName)} tries to answer the stroke, but cannot wholly recover the ground already lost.`,
           attackerIsPlayer
             ? `For an instant ${targetName} shows ${critical ? "something very like fear" : "a flicker of uncertainty"}, and that is enough.`
             : `${capitalize(attackerName)} presses the advantage with ${winnerEmotion === "rage" ? "hot fury" : winnerEmotion === "arrogance" ? "grim confidence" : "dogged desperation"}.`,
@@ -13846,39 +14865,39 @@
 
       const finishPools = {
         goblin: [
-          `${capitalize(displayCharacterName(loser))} collapses among the stones and lies still.`,
-          `${capitalize(displayCharacterName(loser))} falls in a heap upon the rock and does not rise again.`,
-          `${capitalize(displayCharacterName(loser))} crumples into the cavern dust, and the malice goes out of it.`,
+          loserIsPlayer ? "You collapse among the stones and lie still." : `${capitalize(displayCharacterName(loser))} collapses among the stones and lies still.`,
+          loserIsPlayer ? "You fall in a heap upon the rock and do not rise again." : `${capitalize(displayCharacterName(loser))} falls in a heap upon the rock and does not rise again.`,
+          loserIsPlayer ? "You crumple into the cavern dust, and the fight goes out of you." : `${capitalize(displayCharacterName(loser))} crumples into the cavern dust, and the malice goes out of it.`,
         ],
         troll: [
-          `${capitalize(displayCharacterName(loser))} crashes down with a weight that seems to shake the ground itself.`,
-          `${capitalize(displayCharacterName(loser))} topples like a felled trunk and lies motionless.`,
-          `${capitalize(displayCharacterName(loser))} comes down heavily, and even the earth seems to grudge the blow.`,
+          loserIsPlayer ? "You crash down with a weight that seems to shake the ground itself." : `${capitalize(displayCharacterName(loser))} crashes down with a weight that seems to shake the ground itself.`,
+          loserIsPlayer ? "You topple like a felled trunk and lie motionless." : `${capitalize(displayCharacterName(loser))} topples like a felled trunk and lies motionless.`,
+          loserIsPlayer ? "You come down heavily, and even the earth seems to grudge the blow." : `${capitalize(displayCharacterName(loser))} comes down heavily, and even the earth seems to grudge the blow.`,
         ],
         spider: [
-          `${capitalize(displayCharacterName(loser))} folds in upon itself and lies twisted among leaf and shadow.`,
-          `${capitalize(displayCharacterName(loser))} drops and curls inward, its fury spent at last.`,
-          `${capitalize(displayCharacterName(loser))} sinks into the dark tangle and does not stir again.`,
+          loserIsPlayer ? "You fold in upon yourself and lie twisted among leaf and shadow." : `${capitalize(displayCharacterName(loser))} folds in upon itself and lies twisted among leaf and shadow.`,
+          loserIsPlayer ? "You drop and curl inward, all strength spent at last." : `${capitalize(displayCharacterName(loser))} drops and curls inward, its fury spent at last.`,
+          loserIsPlayer ? "You sink into the dark tangle and do not stir again." : `${capitalize(displayCharacterName(loser))} sinks into the dark tangle and does not stir again.`,
         ],
         wolf: [
-          `${capitalize(displayCharacterName(loser))} rolls over among the stones and lies still.`,
-          `${capitalize(displayCharacterName(loser))} goes down in a snarl that ends abruptly.`,
-          `${capitalize(displayCharacterName(loser))} collapses in the dust, all its rush gone out of it.`,
+          loserIsPlayer ? "You roll over among the stones and lie still." : `${capitalize(displayCharacterName(loser))} rolls over among the stones and lies still.`,
+          loserIsPlayer ? "You go down with a cry cut short at once." : `${capitalize(displayCharacterName(loser))} goes down in a snarl that ends abruptly.`,
+          loserIsPlayer ? "You collapse in the dust, all your rush gone out of you." : `${capitalize(displayCharacterName(loser))} collapses in the dust, all its rush gone out of it.`,
         ],
         gollum: [
-          `${capitalize(displayCharacterName(loser))} reels in the dark by the water and is lost to sight among stone and blackness.`,
-          `${capitalize(displayCharacterName(loser))} pitches away into the shadows by the lake and moves no more.`,
-          `${capitalize(displayCharacterName(loser))} falls among the wet stones, swallowed at once by dark and echo.`,
+          loserIsPlayer ? "You reel in the dark by the water and are lost to sight among stone and blackness." : `${capitalize(displayCharacterName(loser))} reels in the dark by the water and is lost to sight among stone and blackness.`,
+          loserIsPlayer ? "You pitch away into the shadows by the lake and move no more." : `${capitalize(displayCharacterName(loser))} pitches away into the shadows by the lake and moves no more.`,
+          loserIsPlayer ? "You fall among the wet stones, swallowed at once by dark and echo." : `${capitalize(displayCharacterName(loser))} falls among the wet stones, swallowed at once by dark and echo.`,
         ],
         dragon: [
-          `${capitalize(displayCharacterName(loser))} shudders, falters, and falls in ruinous might.`,
-          `${capitalize(displayCharacterName(loser))} sinks at last, and the terror of it is ended.`,
-          `${capitalize(displayCharacterName(loser))} goes down like a storm breaking itself upon the earth.`,
+          loserIsPlayer ? "You shudder, falter, and fall under ruinous might." : `${capitalize(displayCharacterName(loser))} shudders, falters, and falls in ruinous might.`,
+          loserIsPlayer ? "You sink at last, and your part in the terror is ended." : `${capitalize(displayCharacterName(loser))} sinks at last, and the terror of it is ended.`,
+          loserIsPlayer ? "You go down like a small thing broken by a storm." : `${capitalize(displayCharacterName(loser))} goes down like a storm breaking itself upon the earth.`,
         ],
         foe: [
-          `${capitalize(displayCharacterName(loser))} falls and lies still.`,
-          `${capitalize(displayCharacterName(loser))} collapses at last, and the fight is done.`,
-          `${capitalize(displayCharacterName(loser))} goes down hard, and rises no more.`,
+          loserIsPlayer ? "You fall and lie still." : `${capitalize(displayCharacterName(loser))} falls and lies still.`,
+          loserIsPlayer ? "You collapse at last, and the fight is done." : `${capitalize(displayCharacterName(loser))} collapses at last, and the fight is done.`,
+          loserIsPlayer ? "You go down hard, and rise no more." : `${capitalize(displayCharacterName(loser))} goes down hard, and rises no more.`,
         ],
       };
       const finish = this.combatPick(finishPools[foeKind] || finishPools.foe, `combat-finish:${foeKind}:${loser.id}`, sequence);

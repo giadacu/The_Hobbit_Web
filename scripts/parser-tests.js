@@ -11,6 +11,9 @@ function parseCliOptions(argv = []) {
     autoplayBatchSeedStart: 1,
     autoplayBatchStepLimit: 500,
     autoplayBatchStrict: false,
+    autoplayShowVictories: false,
+    autoplayTraceSeeds: new Set(),
+    autoplayTraceLimit: 80,
   };
   for (const arg of argv) {
     if (arg === "--autoplay-batch-only") {
@@ -19,6 +22,10 @@ function parseCliOptions(argv = []) {
     }
     if (arg === "--autoplay-batch-strict") {
       options.autoplayBatchStrict = true;
+      continue;
+    }
+    if (arg === "--autoplay-show-victories") {
+      options.autoplayShowVictories = true;
       continue;
     }
     if (arg.startsWith("--autoplay-batch=")) {
@@ -31,6 +38,18 @@ function parseCliOptions(argv = []) {
     }
     if (arg.startsWith("--autoplay-step-limit=")) {
       options.autoplayBatchStepLimit = Math.max(1, Number.parseInt(arg.split("=")[1], 10) || options.autoplayBatchStepLimit);
+      continue;
+    }
+    if (arg.startsWith("--autoplay-trace-seeds=")) {
+      const seeds = arg.split("=")[1]
+        .split(",")
+        .map((value) => Number.parseInt(value.trim(), 10))
+        .filter((value) => Number.isFinite(value) && value > 0);
+      options.autoplayTraceSeeds = new Set(seeds);
+      continue;
+    }
+    if (arg.startsWith("--autoplay-trace-limit=")) {
+      options.autoplayTraceLimit = Math.max(1, Number.parseInt(arg.split("=")[1], 10) || options.autoplayTraceLimit);
     }
   }
   return options;
@@ -288,6 +307,8 @@ function runAutoplaySeedBatch(options = {}) {
     count = 20,
     seedStart = 1,
     stepLimit = 500,
+    traceSeeds = new Set(),
+    traceLimit = 80,
   } = options;
   const game = window.hobbitGame;
   const originalRandom = Math.random;
@@ -313,6 +334,9 @@ function runAutoplaySeedBatch(options = {}) {
         endgame: Boolean(game.endgame),
         lastCommand: issued.at(-1) || "",
         outcome,
+        trace: traceSeeds.has(seed) ? issued.slice(0, traceLimit) : null,
+        traceTruncated: traceSeeds.has(seed) && issued.length > traceLimit,
+        outputTail: traceSeeds.has(seed) ? outputLines.slice(-8) : null,
       });
     }
   } finally {
@@ -328,20 +352,48 @@ function runAutoplaySeedBatch(options = {}) {
 }
 
 function printAutoplayBatchReport(report, options = {}) {
-  const { count = report.runs.length, seedStart = 1, stepLimit = 500 } = options;
+  const {
+    count = report.runs.length,
+    seedStart = 1,
+    stepLimit = 500,
+    showVictories = false,
+    traceSeeds = new Set(),
+  } = options;
   console.log(`\nAUTOPLAY BATCH REPORT (${count} seed(s), seeds ${seedStart}-${seedStart + count - 1}, step limit ${stepLimit})`);
   const sortedCounts = [...report.counts.entries()].sort((left, right) => left[0].localeCompare(right[0]));
   for (const [code, amount] of sortedCounts) {
     console.log(`  ${code}: ${amount}`);
   }
+  if (showVictories) {
+    const victories = report.runs
+      .filter((run) => run.outcome.code === "victory")
+      .sort((left, right) => left.steps - right.steps || left.seed - right.seed);
+    if (!victories.length) {
+      console.log("  No winning seeds found.");
+    } else {
+      console.log("  Winning seeds:");
+      for (const run of victories) {
+        console.log(`    seed ${run.seed}: ${run.outcome.detail}; room=${run.room}; last="${run.lastCommand}"`);
+      }
+    }
+  }
   const failures = report.runs.filter((run) => run.outcome.code !== "victory");
   if (!failures.length) {
     console.log("  No failing seeds found.");
-    return;
+  } else {
+    console.log("  Failing seeds:");
+    for (const run of failures) {
+      console.log(`    seed ${run.seed}: ${run.outcome.code} (${run.outcome.detail}); steps=${run.steps}; room=${run.room}; dragonDefeated=${run.dragonDefeated ? "yes" : "no"}; last="${run.lastCommand}"; output="${run.outcome.lastLine || ""}"`);
+    }
   }
-  console.log("  Failing seeds:");
-  for (const run of failures) {
-    console.log(`    seed ${run.seed}: ${run.outcome.code} (${run.outcome.detail}); steps=${run.steps}; room=${run.room}; dragonDefeated=${run.dragonDefeated ? "yes" : "no"}; last="${run.lastCommand}"; output="${run.outcome.lastLine || ""}"`);
+  const tracedRuns = report.runs.filter((run) => traceSeeds.has(run.seed));
+  if (!tracedRuns.length) return;
+  console.log("  Traces:");
+  for (const run of tracedRuns) {
+    const commands = run.trace?.length ? run.trace.join(" -> ") : "(no commands captured)";
+    const tail = run.outputTail?.length ? run.outputTail.join(" | ") : "(no output)";
+    console.log(`    seed ${run.seed}: ${run.outcome.code}; commands=${commands}${run.traceTruncated ? " -> ..." : ""}`);
+    console.log(`      output=${tail}`);
   }
 }
 
@@ -3145,6 +3197,8 @@ const gameCases = [
       game.execute("look");
       game.execute("inventory");
       game.execute("wait");
+      game.execute("wait");
+      game.execute("wait");
       game.execute("examine drawer");
       const clarificationCount = outputLines.filter((line) => line.includes("Do you mean") && line.includes("drawer")).length;
       game.print(`Drawer clarification count after expiry: ${clarificationCount}`);
@@ -4242,7 +4296,7 @@ const gameCases = [
     ],
   },
   {
-    name: "ordinary turns advance troll dawn after stealing the key and leaving",
+    name: "informational commands do not advance troll dawn after stealing the key and leaving",
     drive(game) {
       game.execute("jump trolls");
       game.execute("east");
@@ -4255,8 +4309,28 @@ const gameCases = [
     expectedIncluded: [
       "Jumped to Troll Approach.",
       "You take the large key.",
+      "Trolls transformed after ordinary turns with theft: no",
+    ],
+    notExpectedIncluded: [
       "Day dawns.",
-      "Trolls transformed after ordinary turns with theft: yes",
+    ],
+  },
+  {
+    name: "waiting still advances troll dawn after stealing the key and leaving",
+    drive(game) {
+      game.execute("jump trolls");
+      game.execute("east");
+      game.execute("carefully take large key and south west");
+      game.execute("wait");
+      game.execute("wait");
+      game.execute("wait");
+      game.print(`Trolls transformed after waits with theft: ${game.trollsTransformed ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Jumped to Troll Approach.",
+      "You take the large key.",
+      "Day dawns.",
+      "Trolls transformed after waits with theft: yes",
     ],
   },
   {
@@ -4755,6 +4829,25 @@ const gameCases = [
     ],
   },
   {
+    name: "high lostness can bend a Mirkwood exit once and create deja vu",
+    drive(game) {
+      game.execute("jump mirkwood");
+      game.flags.mirkwoodjourneyactive = true;
+      game.setMirkwoodLostness(2);
+      game.execute("east");
+      game.execute("north");
+      game.print(`After first north: ${game.currentRoom}`);
+      game.execute("east");
+      game.execute("north");
+      game.print(`After second north: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "You have the uneasy feeling that you have already been this way.",
+      "After first north: mirkwood_forest_path",
+      "After second north: mirkwood_deer_trail",
+    ],
+  },
+  {
     name: "spider-road safe moments stay single and non-spoilery",
     setup(game) {
       game.flags.dragondefeated = true;
@@ -4803,6 +4896,65 @@ const gameCases = [
       "Bard here: yes",
       "Strength after Beorn: 6",
       "Autoplay next in Lake-town: pick up bard",
+    ],
+  },
+  {
+    name: "cellar down without a barrel ends in a fatal river plunge",
+    setup(game) {
+      movePlayerTo(game, "cellar");
+    },
+    drive(game) {
+      game.execute("open trap door");
+      game.execute("down");
+      game.print(`Cellar death choice: ${game.pendingEndgameChoice || "none"}`);
+      game.print(`Cellar autosave room: ${game.autosaveMeta?.roomId || "none"}`);
+    },
+    expectedIncluded: [
+      "A safe moment is marked here: before the barrel escape.",
+      "The current catches you like an iron hand and sweeps you away under the halls before you can master yourself.",
+      "Cellar death choice: death",
+      "Cellar autosave room: cellar",
+      "Type 'load' to open your safe moments in cellar, or 'restart' to begin the tale again.",
+    ],
+  },
+  {
+    name: "cellar barrel throw and jump reaches long lake",
+    setup(game) {
+      movePlayerTo(game, "cellar");
+    },
+    drive(game) {
+      game.execute("open trap door");
+      game.execute("throw barrel through the large trap door");
+      game.execute("jump onto barrel");
+      game.print(`Cellar barrel room: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "You wrestle an empty barrel to the opening and heave it through.",
+      "You seize your moment, spring through the open trap door, and come down half upon the barrel and half into the freezing black rush beneath the halls.",
+      "At last the racing black water widens, the low roof of branches breaks apart above you, and Long Lake opens ahead in cold daylight like a deliverance almost too sudden to trust.",
+      "Cellar barrel room: long_lake",
+    ],
+  },
+  {
+    name: "autoplay prepares the barrel escape before leaving the cellar",
+    setup(game) {
+      game.execute("jump laketown");
+      movePlayerTo(game, "cellar");
+    },
+    drive(game) {
+      const commands = [];
+      for (let step = 0; step < 3; step += 1) {
+        const command = game.nextAutoplayCommand();
+        if (!command) throw new Error(`Expected autoplay command in cellar at step ${step}.`);
+        commands.push(command);
+        game.execute(command);
+      }
+      game.print(`Cellar autoplay path: ${commands.join(" -> ")}`);
+      game.print(`Cellar autoplay room: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "Cellar autoplay path: open trap door -> throw barrel through trap door -> jump onto barrel",
+      "Cellar autoplay room: long_lake",
     ],
   },
   {
@@ -5579,6 +5731,7 @@ const gameCases = [
     },
     drive(game) {
       game.execute("look");
+      game.execute("wait");
       game.execute("wait");
       game.execute("wait");
       game.print(`Goblin ambush endgame: ${game.pendingEndgameChoice || "none"}`);
@@ -6556,11 +6709,15 @@ if (cliOptions.autoplayBatchCount > 0) {
     count: cliOptions.autoplayBatchCount,
     seedStart: cliOptions.autoplayBatchSeedStart,
     stepLimit: cliOptions.autoplayBatchStepLimit,
+    traceSeeds: cliOptions.autoplayTraceSeeds,
+    traceLimit: cliOptions.autoplayTraceLimit,
   });
   printAutoplayBatchReport(report, {
     count: cliOptions.autoplayBatchCount,
     seedStart: cliOptions.autoplayBatchSeedStart,
     stepLimit: cliOptions.autoplayBatchStepLimit,
+    showVictories: cliOptions.autoplayShowVictories,
+    traceSeeds: cliOptions.autoplayTraceSeeds,
   });
   if (cliOptions.autoplayBatchStrict) {
     const failures = report.runs.filter((run) => run.outcome.code !== "victory");
