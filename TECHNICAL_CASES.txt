@@ -2663,3 +2663,102 @@ Future debugging advice
 - When autoplay appears to chase a companion, log both:
   - the planner's route to that companion
   - the companion's movement mode and post-turn position
+
+
+Case 057 - 2026-06-20 - Wood elf mixed social warning dialogue with unrelated auto-capture
+--------------------------------------------------------------------------------------------
+
+Symptom
+-------
+In `elvish_clearing`, the wood elf could speak like a cautious but interactable
+watcher and still sometimes behave like an immediate prison trigger. This felt
+especially inconsistent around ring visibility changes:
+
+- invisible Bilbo could be acknowledged as unseen
+- visible Bilbo could receive the warning
+  `This wood listens more kindly...`
+- `talk to elf` then used a generic neutral fallback
+- in other moments the same elf could abruptly send Bilbo to `dark_dungeon`
+
+Root cause
+----------
+The wood elf had no dedicated encounter state.
+
+- `characterInitiative()` treated the elf as a neutral speaker with a warning.
+- `checkKidnapping()` independently captured Bilbo whenever a visible wood elf
+  shared the room, regardless of whether the current space was the guarded
+  outer clearing or the inner halls.
+- The generic talk/ask fallbacks also made the elf sound more open than the
+  hazard logic implied.
+- On capture, the elf was incorrectly repositioned to `beorns_house`, which
+  was unrelated to the whole encounter.
+
+Resolution
+----------
+- Split the behavior into a clearer escalation:
+  - in `elvish_clearing`, a visible Bilbo now gets the warning but is not
+    auto-captured
+  - inside the Elvenking's halls, the same encounter escalates into capture
+- Added dedicated `talk` and `ask` responses for the wood elf so dialogue stays
+  guarded and specific instead of falling back to generic neutral text.
+- Repositioned the elf after capture to the elven guard area instead of the
+  unrelated Beorn chapter.
+- Added regression tests for:
+  - ring invisibility plus warning coherence in the clearing
+  - specific wood-elf ask responses
+  - hall capture escalation and post-capture elf placement
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If an NPC can both warn and punish, model the escalation explicitly instead
+  of letting separate systems infer incompatible behavior.
+- For chapter-specific hazards, verify post-capture repositioning targets stay
+  inside the same narrative space.
+- When a character has special narrative authority, avoid generic conversation
+  fallbacks unless they truly match that tone.
+
+
+Case 058 - 2026-06-20 - Butler did not share the wood elf capture bug, but still fell back to generic hostile dialogue
+-----------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The butler in the elven cellar did not auto-capture Bilbo, but his tone could
+still feel inconsistent:
+
+- initiative gave him a specific line about barrels
+- `talk to butler` fell back to the generic
+  `The butler glares at you, unimpressed.`
+- broad `ask` topics could fall back to the generic unclear-answer line
+
+Root cause
+----------
+Unlike the wood elf, the butler had no separate hazard logic. The issue was
+not structural gameplay conflict, but missing bespoke conversation text for a
+chapter-specific NPC with a clear role.
+
+Resolution
+----------
+- Added dedicated `talk` and `ask` responses for the butler in `game.js`.
+- Kept the behavior non-hazardous: no extra capture or punishment logic was
+  added, because none existed and none was needed.
+- Added regression coverage so the butler keeps a guarded cellar-specific voice
+  instead of reverting to the generic fallback.
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Distinguish true logic conflicts from tone-only fallback problems.
+- If an NPC already has a strong initiative line, make sure `talk` and `ask`
+  do not undercut it with unrelated generic fallback text.

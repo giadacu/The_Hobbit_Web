@@ -7819,6 +7819,15 @@
       if (game.unexpectedParty?.isAmbientDwarf(character)) {
         return game.unexpectedParty.dwarfProfile(character).talk;
       }
+      if (matches(character.name, "wood elf")) {
+        if (game.currentRoom === "elvish_clearing") {
+          return "The wood elf says 'Speak plainly, then. The trees have long ears, and I have little love for riddling strangers.'";
+        }
+        return "The wood elf says 'You are too far under our roofs to wander unchallenged.'";
+      }
+      if (matches(character.name, "butler")) {
+        return "The butler says 'If you must speak, be brief. Wine, keys, and quiet order all have their proper places here.'";
+      }
       if (matches(character.name, "elrond") && game.currentRoom === "rivendell") {
         return "Elrond folds his hands and says 'Speak without haste. In Rivendell, even quiet words may be worth the hearing.'";
       }
@@ -7855,6 +7864,24 @@
       const text = normalize(topic);
       const configuredResponse = characterConfiguredTopicResponse(character, text);
       if (configuredResponse) return configuredResponse;
+      if (matches(character.name, "wood elf")) {
+        if (matchesAny(text, ["wood", "forest", "mirkwood", "trees", "road", "path", "trail"])) {
+          return "The wood elf says 'Few roads stay true in this wood for those who do not belong to it.'";
+        }
+        if (matchesAny(text, ["king", "halls", "feast", "cellar", "prison", "barrel", "barrels"])) {
+          return "The wood elf says 'Ask less of halls that are not yours, and you may keep out of their darker corners.'";
+        }
+        return "The wood elf says 'If you have business, speak it quickly. This is not a place for idle questions.'";
+      }
+      if (matches(character.name, "butler")) {
+        if (matchesAny(text, ["barrel", "barrels", "wine", "cellar"])) {
+          return "The butler says 'The barrels go where they are meant to go, and not one inch nearer mischief than duty requires.'";
+        }
+        if (matchesAny(text, ["key", "keys", "red key", "door", "doors"])) {
+          return "The butler says 'Keys are trusted to steady hands. Doors are happier when they are used for their intended business.'";
+        }
+        return "The butler says 'I have no leisure for gossip. Ask, if you must, about something that belongs in a cellar.'";
+      }
       if (IMMERSION_RIVENDELL_ROOMS.has(game.currentRoom) && !game.rivendellPreparationsComplete()) {
         if (matches(character.name, "gandalf") && matchesAny(text, ["journey", "road", "departure", "depart", "leave", "leaving", "east"])) {
           return "Gandalf says 'Patience. Wisdom often travels more slowly than feet.'";
@@ -8505,12 +8532,24 @@
         game.print("The wood elf cannot see you because you are wearing the ring.");
         return;
       }
+      if (game.currentRoom === "elvish_clearing") {
+        if (!game.flags.initiative_wood_elf_warning) {
+          game.flags.initiative_wood_elf_warning = true;
+          game.print("The wood elf watches you closely and says 'This wood listens more kindly to honest footsteps than to hurried tongues.'");
+        }
+        return;
+      }
       const dungeon = game.rooms.dark_dungeon;
       if (!dungeon) return;
-      game.print("The wood elf captures you");
+      game.print("The wood elf's patience hardens. 'You have come far enough,' he says.");
+      game.print("The wood elf captures you.");
       game.player.position = "dark_dungeon";
       game.currentRoom = "dark_dungeon";
-      woodElf.position = game.rooms.beorns_house ? "beorns_house" : woodElf.position;
+      woodElf.position = game.rooms.elven_guard_post
+        ? "elven_guard_post"
+        : game.rooms.elvenkings_halls
+          ? "elvenkings_halls"
+          : woodElf.position;
       game.describeRoom();
     }
   }

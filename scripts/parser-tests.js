@@ -6239,6 +6239,102 @@ const gameCases = [
     ],
   },
   {
+    name: "wood elf warning stays non-capturing in the clearing and uses guarded talk",
+    setup(game) {
+      movePlayerTo(game, "elvish_clearing");
+      game.debugSetCharacterRoom("wood_elf", "elvish_clearing", { visible: true, movementMode: "never" });
+      giveItemToCharacter(game, "golden_ring", game.player.id);
+      game.flags.initiative_wood_elf_warning = false;
+    },
+    drive(game) {
+      game.execute("wear ring");
+      game.checkSpecialSituations();
+      game.execute("remove ring");
+      game.checkSpecialSituations();
+      game.execute("talk to elf");
+      game.print(`Wood elf clearing room: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      /You (?:wear the golden ring and become unnoticeable\.|slip the golden ring on and fade from notice\.|draw the golden ring onto your finger and pass from sight\.)/,
+      "The wood elf looks around, puzzled, unable to see who is there.",
+      "The wood elf cannot see you because you are wearing the ring.",
+      /You (?:remove the golden ring and become noticeable again\.|slip the golden ring off and return to sight\.|tug the golden ring free and become visible once more\.)/,
+      "The wood elf watches you closely and says 'This wood listens more kindly to honest footsteps than to hurried tongues.'",
+      "The wood elf says 'Speak plainly, then. The trees have long ears, and I have little love for riddling strangers.'",
+      "Wood elf clearing room: elvish_clearing",
+    ],
+    notExpectedIncluded: [
+      "The wood elf captures you.",
+      "The wood elf listens intently, expecting your words.",
+    ],
+  },
+  {
+    name: "wood elf ask responses stay specific instead of generic",
+    setup(game) {
+      movePlayerTo(game, "elvish_clearing");
+      game.debugSetCharacterRoom("wood_elf", "elvish_clearing", { visible: true, movementMode: "never" });
+      game.flags.initiative_wood_elf_warning = true;
+    },
+    inputs: [
+      "ask elf about road",
+      "ask elf about king",
+      "ask elf about moon",
+    ],
+    expectedIncluded: [
+      "The wood elf says 'Few roads stay true in this wood for those who do not belong to it.'",
+      "The wood elf says 'Ask less of halls that are not yours, and you may keep out of their darker corners.'",
+      "The wood elf says 'If you have business, speak it quickly. This is not a place for idle questions.'",
+    ],
+    notExpectedIncluded: [
+      "The wood elf considers treasure, but gives no clear answer.",
+    ],
+  },
+  {
+    name: "wood elf capture escalates inside the elven halls",
+    setup(game) {
+      movePlayerTo(game, "elvenkings_halls");
+      game.debugSetCharacterRoom("wood_elf", "elvenkings_halls", { visible: true, movementMode: "never" });
+      game.flags.initiative_wood_elf_warning = true;
+    },
+    drive(game) {
+      game.checkSpecialSituations();
+      game.print(`Wood elf capture room: ${game.currentRoom}`);
+      game.print(`Wood elf after capture: ${game.characters.wood_elf.position}`);
+    },
+    expectedIncluded: [
+      "The wood elf's patience hardens. 'You have come far enough,' he says.",
+      "The wood elf captures you.",
+      "Wood elf capture room: dark_dungeon",
+      "Wood elf after capture: elven_guard_post",
+    ],
+    notExpectedIncluded: [
+      "Wood elf after capture: beorns_house",
+    ],
+  },
+  {
+    name: "butler keeps a coherent guarded voice on talk and ask",
+    setup(game) {
+      movePlayerTo(game, "cellar");
+      game.debugSetCharacterRoom("butler", "cellar", { visible: true, movementMode: "never" });
+    },
+    inputs: [
+      "talk to butler",
+      "ask butler about barrels",
+      "ask butler about key",
+      "ask butler about moon",
+    ],
+    expectedIncluded: [
+      "The butler says 'If you must speak, be brief. Wine, keys, and quiet order all have their proper places here.'",
+      "The butler says 'The barrels go where they are meant to go, and not one inch nearer mischief than duty requires.'",
+      "The butler says 'Keys are trusted to steady hands. Doors are happier when they are used for their intended business.'",
+      "The butler says 'I have no leisure for gossip. Ask, if you must, about something that belongs in a cellar.'",
+    ],
+    notExpectedIncluded: [
+      "The butler glares at you, unimpressed.",
+      "The butler considers moon, but gives no clear answer.",
+    ],
+  },
+  {
     name: "beorn road is storm-blocked before ring",
     setup(game) {
       game.currentRoom = "narrow_place";
