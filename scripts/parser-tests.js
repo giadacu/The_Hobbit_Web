@@ -2438,6 +2438,7 @@ const gameCases = [
       /Thorin Oakenshield|Thorin says/,
       /Erebor/,
       /Smaug/,
+      /secret ways|Mountain again|win our road/,
       /burglar/,
       "Thorin pacing ok: yes",
       "Quest briefing done: yes",
@@ -3346,6 +3347,49 @@ const gameCases = [
     },
     expectedIncluded: [
       "From here, north leads to the parlour.",
+    ],
+  },
+  {
+    name: "guest room image updates when the guest trunk is opened",
+    drive(game) {
+      game.currentRoom = "bag_end_guest_room";
+      game.player.position = "bag_end_guest_room";
+      const beforeImage = game.contextualRoomImage(game.room());
+      game.execute("open guest trunk");
+      const afterImage = game.contextualRoomImage(game.room());
+      game.print(`Guest room closed trunk image: ${beforeImage === "bag_end_guest_room.jpeg" ? "yes" : "no"}`);
+      game.print(`Guest room open trunk image: ${afterImage === "bag_end_guest_room_open_trunk.png" ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You open the guest trunk.",
+      "Guest room closed trunk image: yes",
+      "Guest room open trunk image: yes",
+    ],
+  },
+  {
+    name: "hobbit hole image supports chest door and combined open states",
+    drive(game) {
+      game.currentRoom = "hobbit_hole";
+      game.player.position = "hobbit_hole";
+      const chest = game.items.heavy_wooden_chest;
+      const doorFound = game.findDoor("round green door");
+      if (!chest || !doorFound?.door) throw new Error("Expected hobbit-hole chest and round green door to exist.");
+      const frontDoor = doorFound.door;
+
+      game.print(`Hobbit hole base image: ${game.contextualRoomImage(game.room())}`);
+      chest.open = true;
+      game.print(`Hobbit hole open chest image: ${game.contextualRoomImage(game.room())}`);
+      frontDoor.open = true;
+      frontDoor.locked = false;
+      game.print(`Hobbit hole open door and chest image: ${game.contextualRoomImage(game.room())}`);
+      chest.open = false;
+      game.print(`Hobbit hole open door image: ${game.contextualRoomImage(game.room())}`);
+    },
+    expectedIncluded: [
+      "Hobbit hole base image: hobbit_hole.jpeg",
+      "Hobbit hole open chest image: hobbit_hole_open_chest.png",
+      "Hobbit hole open door and chest image: hobbit_hole_open_door_open_chest.png",
+      "Hobbit hole open door image: hobbit_hole_open_door.png",
     ],
   },
   {

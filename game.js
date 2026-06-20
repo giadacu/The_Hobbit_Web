@@ -1199,6 +1199,14 @@
   const CONTEXTUAL_ROOM_IMAGE_RULES = {
     hobbit_hole: [
       {
+        when: ({ game }) => game.doorOpenByName("round green door") && game.items.heavy_wooden_chest?.open,
+        image: "hobbit_hole_open_door_open_chest.png",
+      },
+      {
+        when: ({ game }) => game.items.heavy_wooden_chest?.open,
+        image: "hobbit_hole_open_chest.png",
+      },
+      {
         when: ({ game }) => game.doorOpenByName("round green door"),
         image: "hobbit_hole_open_door.png",
       },
@@ -1207,6 +1215,12 @@
       {
         when: ({ game }) => game.doorOpenByName("round green door"),
         image: "bilbosgarden_open_door.png",
+      },
+    ],
+    bag_end_guest_room: [
+      {
+        when: ({ game }) => game.items.guest_room_trunk?.open,
+        image: "bag_end_guest_room_open_trunk.png",
       },
     ],
     erebor_hidden_door: [
@@ -2428,7 +2442,7 @@
         currentArrival: validArrival,
         arrived,
         fullHouseAnnounced: Boolean(savedState?.fullHouseAnnounced),
-        thorinStage: Number.isFinite(savedState?.thorinStage) ? Math.max(0, Math.min(6, savedState.thorinStage)) : 0,
+        thorinStage: Number.isFinite(savedState?.thorinStage) ? Math.max(0, Math.min(7, savedState.thorinStage)) : 0,
         thorinArrived: Boolean(savedState?.thorinArrived),
         questBriefingDone: Boolean(savedState?.questBriefingDone),
       };
@@ -2928,11 +2942,21 @@
       }
       if (this.state.thorinStage === 5) {
         return {
+          message: "Thorin says 'We mean to go back by secret ways, if fortune allows, and win our road into the Mountain again.'",
+          cooldown: 2,
+          apply: () => {
+            thorin.position = "hobbit_hole";
+            this.state.thorinStage = 6;
+          },
+        };
+      }
+      if (this.state.thorinStage === 6) {
+        return {
           message: "Thorin's gaze settles on you. 'And you, Master Baggins, are meant to be our burglar.' Gandalf adds softly, 'The world is wider than your garden gate, Master Baggins.'",
           cooldown: 3,
           apply: () => {
             thorin.position = "bag_end_parlour";
-            this.state.thorinStage = 6;
+            this.state.thorinStage = 7;
             this.state.questBriefingDone = true;
           },
         };
@@ -3290,7 +3314,7 @@
       party.state.arrived = party.roster.map((entry) => entry.id);
       party.state.arrivalIndex = party.roster.length;
       party.state.currentArrival = null;
-      party.state.thorinStage = 6;
+      party.state.thorinStage = 7;
       party.state.thorinArrived = true;
       party.state.questBriefingDone = true;
       party.state.fullHouseAnnounced = true;
@@ -12006,7 +12030,7 @@
       party.state.arrived = party.roster.map((entry) => entry.id);
       party.state.arrivalIndex = party.roster.length;
       party.state.currentArrival = null;
-      party.state.thorinStage = 6;
+      party.state.thorinStage = 7;
       party.state.thorinArrived = true;
       party.state.questBriefingDone = true;
       party.state.fullHouseAnnounced = true;

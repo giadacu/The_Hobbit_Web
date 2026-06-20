@@ -2330,3 +2330,85 @@ Future debugging advice
   scheduler level, not only in individual handlers.
 - For narrated combat text, check any template that capitalizes a display name
   and then appends a conjugated verb; that pattern often breaks for `You`.
+
+
+Case 051 - 2026-06-20 - Thorin's Bag End briefing skipped the explicit mission beat
+------------------------------------------------------------------------------------
+
+Symptom
+-------
+During Thorin's late Bag End briefing, the narration jumped from the loss of
+Erebor and Smaug's occupation straight to Bilbo being named burglar, making
+the purpose of the expedition feel abridged or missing.
+
+Root cause
+----------
+The briefing sequence in `nextQuestBriefingEvent()` only had three closing
+beats:
+- Erebor lost
+- Smaug in the Mountain
+- Bilbo as burglar
+
+There was no intermediate line stating the company's actual plan to return and
+regain a way into the Mountain.
+
+Resolution
+----------
+- Added a new Thorin briefing beat between the Smaug line and the burglar line.
+- The new beat states that the company means to go back by secret ways and win
+  a road into the Mountain again.
+- Shifted the final `thorinStage` completion value from `6` to `7`.
+- Updated the Bag End quest briefing regression test to assert the mission beat.
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+
+Future debugging advice
+-----------------------
+- When a scene feels narratively incomplete, inspect the staged event sequence
+  itself and not only timing/cooldown logic.
+- Preserve later reveal moments: early mission briefings should explain the
+  objective without stealing higher-payoff revelations from later chapters.
+
+
+Case 052 - 2026-06-20 - Hobbit Hole needed a combined open-door and open-chest room image
+-------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The front hall gained a single-state chest-open image, but there was no image
+for the combined state where the round green door and the heavy wooden chest
+were both open at once.
+
+Root cause
+----------
+`CONTEXTUAL_ROOM_IMAGE_RULES.hobbit_hole` only knew how to switch to the
+open-door variant. Once a chest-open variant was introduced, the image logic
+still needed:
+- a chest-only rule
+- a higher-priority combined rule for door + chest together
+
+Resolution
+----------
+- Created `hobbit_hole_open_door_open_chest.png` by compositing the existing
+  open-door and open-chest variants.
+- Added contextual image rules for:
+  - chest open only
+  - door open + chest open
+- Added a regression test covering the base, chest-only, door-only, and
+  combined-image selection states.
+
+Files touched
+-------------
+- `assets/local-images/hobbit_hole_open_door_open_chest.png`
+- `game.js`
+- `scripts/parser-tests.js`
+
+Future debugging advice
+-----------------------
+- When adding a new room-image state, check whether it can overlap with an
+  existing state and add an explicit priority order for the combined case.
+- For AI-derived room variants that are visually close but not pixel-identical,
+  a constrained local composite can be safer than regenerating the entire room.
