@@ -4969,7 +4969,7 @@ const gameCases = [
     ],
   },
   {
-    name: "autoplay can free room for beorns meal if needed",
+    name: "autoplay takes beorns meal directly when weight still allows it",
     drive(game) {
       game.execute("jump rivendell");
       for (let step = 0; step < 400 && game.currentRoom !== "beorns_house" && !game.endgame; step += 1) {
@@ -4986,7 +4986,7 @@ const gameCases = [
       game.print(`Autoplay next at Beorn while overloaded: ${command}`);
     },
     expectedIncluded: [
-      "Autoplay next at Beorn while overloaded: drop large key",
+      "Autoplay next at Beorn while overloaded: take meal",
     ],
   },
   {

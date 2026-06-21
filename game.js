@@ -8779,6 +8779,17 @@
 
       if (beforeDragonDefeat && this.autoplayShouldLightLantern()) return "light lantern";
 
+      if (beforeDragonDefeat && game.encounters?.isGoblinTunnelEncounterActive()) {
+        const goblin = game.encounters.goblinTunnelGoblin();
+        const attackers = game.encounters.goblinTunnelAttackerIds();
+        if (!attackers.has(game.player.id)) {
+          return this.autoplayHas("majestic sword") ? `kill ${goblin.name} with sword` : `kill ${goblin.name}`;
+        }
+        const helper = game.encounters.bestGoblinTunnelHelper();
+        if (helper && !attackers.has(helper.id)) return this.autoplayDirectedCharacterCommand(helper.name, `ask ${normalize(helper.name)} to attack ${goblin.name}`);
+        return this.autoplayHas("majestic sword") ? `kill ${goblin.name} with sword` : `kill ${goblin.name}`;
+      }
+
       if (beforeDragonDefeat && !game.flags.seenpony) {
         if (!game.bagEndQuestHasBegun()) return "wait";
         const thorin = Object.values(game.characters).find((character) => matches(character.name, "thorin"));
@@ -8844,17 +8855,6 @@
       if (beforeDragonDefeat && game.currentRoom === "deep_dark_lake" && game.gollumState?.pocketQuestionAsked) {
         if (game.player.noticeable !== false) return "wear ring";
         return "north";
-      }
-
-      if (beforeDragonDefeat && game.encounters?.isGoblinTunnelEncounterActive()) {
-        const goblin = game.encounters.goblinTunnelGoblin();
-        const attackers = game.encounters.goblinTunnelAttackerIds();
-        if (!attackers.has(game.player.id)) {
-          return this.autoplayHas("majestic sword") ? `kill ${goblin.name} with sword` : `kill ${goblin.name}`;
-        }
-        const helper = game.encounters.bestGoblinTunnelHelper();
-        if (helper && !attackers.has(helper.id)) return this.autoplayDirectedCharacterCommand(helper.name, `ask ${normalize(helper.name)} to attack ${goblin.name}`);
-        return this.autoplayHas("majestic sword") ? `kill ${goblin.name} with sword` : `kill ${goblin.name}`;
       }
 
       const hostile = game.peopleInRoom().find((character) => character.visible && character.friendly === false && !matches(character.name, "dragon"));

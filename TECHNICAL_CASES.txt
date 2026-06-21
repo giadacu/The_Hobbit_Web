@@ -2970,3 +2970,48 @@ Future debugging advice
   are enough.
 - For "patient timing" puzzles, separate "time passed" from "the player chose
   to wait"; they are not the same design signal.
+
+
+Case 062 - 2026-06-21 - Goblin ambush autoplay must outrank long-range progression goals
+-----------------------------------------------------------------------------------------
+
+Symptom
+-------
+`node scripts/parser-tests.js` started failing again on:
+
+`Autoplay failed to resolve goblin ambush`
+
+The failing goblin-tunnel test showed autoplay issuing non-combat progression
+commands during an already active hulking-goblin rescue scene.
+
+Root cause
+----------
+The recent "carry the curious map before leaving Rivendell / use it at Erebor"
+changes added a new autoplay priority:
+
+- recover the quest map when `!playerHasQuestMap()`
+
+That branch sat above the goblin-ambush emergency handling in
+`nextAutoplayCommand()`. In the focused tunnel test setup, Bilbo did not carry
+the curious map, so autoplay tried to route back toward Rivendell instead of
+joining the fight, even though the ambush flag was still active.
+
+Resolution
+----------
+Moved the active goblin-ambush autoplay branch earlier in
+`nextAutoplayCommand()`, immediately after the lantern check. This keeps the
+existing "light lantern first if needed" behavior, but once the emergency is in
+progress it now outranks longer-range goals like map recovery, ring routing,
+or strength restocking.
+
+Files touched
+-------------
+- `game.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Active hazard-resolution branches should sit above inventory or route
+  recovery goals in autoplay priority order.
+- When a new progression prerequisite is added, rerun focused hazard autoplay
+  tests to catch priority inversions.
