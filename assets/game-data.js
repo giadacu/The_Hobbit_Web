@@ -1354,26 +1354,6 @@ window.HOBBIT_DATA = {
       "reveals": null,
       "specialChar": null
     },
-    "regal_necklace": {
-      "id": "regal_necklace",
-      "name": "regal necklace",
-      "description": "a gold necklace with a magnificent gem fit for a king",
-      "container": false,
-      "keyFor": null,
-      "portable": true,
-      "weight": 1,
-      "strength": 10,
-      "visible": true,
-      "open": false,
-      "locked": false,
-      "requiredKey": null,
-      "weapon": false,
-      "noLid": false,
-      "wearable": true,
-      "worn": false,
-      "reveals": null,
-      "specialChar": null
-    },
     "curious_map": {
       "id": "curious_map",
       "name": "curious map",
@@ -2407,6 +2387,15 @@ window.HOBBIT_DATA = {
       "name": "Bard",
       "friendly": true,
       "strength": 15,
+      "position": null,
+      "movementMode": "on_first_meet",
+      "visible": true
+    },
+    "master": {
+      "id": "master",
+      "name": "Master",
+      "friendly": true,
+      "strength": 6,
       "position": null,
       "movementMode": "on_first_meet",
       "visible": true
@@ -4071,12 +4060,8 @@ window.HOBBIT_DATA = {
       "item": "sturdy_rope"
     },
     {
-      "room": "trolls_cave",
+      "room": "lower_halls",
       "item": "gilded_vault"
-    },
-    {
-      "room": "flags",
-      "item": "regal_necklace"
     },
     {
       "room": "hobbit_hole",
@@ -4387,6 +4372,10 @@ window.HOBBIT_DATA = {
     {
       "room": "wooden_town",
       "character": "bard"
+    },
+    {
+      "room": "laketown_town_square",
+      "character": "master"
     },
     {
       "room": "trolls_clearing",
@@ -5349,19 +5338,5 @@ window.HOBBIT_DATA = {
       "weapon": false,
       "wearable": true
     },
-    "('arkenstone', 'gold necklace')": {
-      "nome": "regal necklace",
-      "descrizione": "a gold necklace with a magnificent gem fit for a king",
-      "visibile": true,
-      "needs_to_be_picked_up": true,
-      "peso": 1,
-      "resistenza": 10.0,
-      "aperto": false,
-      "contenitore": false,
-      "chiuso_a_chiave": false,
-      "has_no_lid": false,
-      "weapon": false,
-      "wearable": true
-    }
   }
 };

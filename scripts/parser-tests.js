@@ -311,7 +311,7 @@ function autoplayBatchOutcome({ game, issued, stepLimit }) {
     return { code: "victory", detail: `victory in ${issued.length} step(s)`, lastLine: output.at(-1) || "" };
   }
   if (game.endgame) {
-    if (!game.flags.dragondefeated && ["lower_halls", "front_gate", "lonely_mountain"].includes(game.currentRoom)) {
+    if (!game.flags.dragondefeated && ["lower_halls", "front_gate", "lonely_mountain", "stoe_of_ravenhill"].includes(game.currentRoom)) {
       return { code: "death_smaug", detail: "fatal endgame triggered in Erebor before the dragon was defeated", lastLine: output.at(-1) || "" };
     }
     if (game.currentRoom === "deep_dark_lake" || /Gollum/i.test(tail)) {
@@ -322,7 +322,7 @@ function autoplayBatchOutcome({ game, issued, stepLimit }) {
   if (game.currentRoom === "deep_dark_lake" || issued.slice(-6).every((command) => ["ask gollum a riddle", "wear ring", "north"].includes(command))) {
     return { code: "stuck_gollum", detail: `step limit ${stepLimit} reached in ${game.currentRoom} after "${lastCommand}"`, lastLine: output.at(-1) || "" };
   }
-  if (["lower_halls", "front_gate", "lonely_mountain"].includes(game.currentRoom) && !game.flags.dragondefeated) {
+  if (["lower_halls", "front_gate", "lonely_mountain", "stoe_of_ravenhill"].includes(game.currentRoom) && !game.flags.dragondefeated) {
     return { code: "stuck_smaug", detail: `step limit ${stepLimit} reached in Erebor before dragon defeat after "${lastCommand}"`, lastLine: output.at(-1) || "" };
   }
   return { code: "step_limit", detail: `step limit ${stepLimit} reached in ${game.currentRoom} after "${lastCommand}"`, lastLine: output.at(-1) || "" };
@@ -2161,11 +2161,12 @@ const gameCases = [
   {
     name: "vocative modal order to bard can slay dragon",
     setup(game) {
-      game.currentRoom = "lower_halls";
-      game.player.position = "lower_halls";
+      game.currentRoom = "stoe_of_ravenhill";
+      game.player.position = "stoe_of_ravenhill";
       placeCharacterWithPlayer(game, "bard");
       game.characters.bard.movementMode = "follow";
       game.flags.bardreadiedarrow = true;
+      game.flags.smaug_weakspot_known = true;
       game.flags.dragondefeated = false;
       game.characters.red_golden_dragon.position = "lower_halls";
       game.characters.red_golden_dragon.visible = true;
@@ -2177,11 +2178,12 @@ const gameCases = [
   {
     name: "bard understands take the shot phrasing",
     setup(game) {
-      game.currentRoom = "lower_halls";
-      game.player.position = "lower_halls";
+      game.currentRoom = "stoe_of_ravenhill";
+      game.player.position = "stoe_of_ravenhill";
       placeCharacterWithPlayer(game, "bard");
       game.characters.bard.movementMode = "follow";
       game.flags.bardreadiedarrow = true;
+      game.flags.smaug_weakspot_known = true;
       game.flags.dragondefeated = false;
       game.characters.red_golden_dragon.position = "lower_halls";
       game.characters.red_golden_dragon.visible = true;
@@ -2193,11 +2195,12 @@ const gameCases = [
   {
     name: "bard understands loose the arrow phrasing",
     setup(game) {
-      game.currentRoom = "lower_halls";
-      game.player.position = "lower_halls";
+      game.currentRoom = "stoe_of_ravenhill";
+      game.player.position = "stoe_of_ravenhill";
       placeCharacterWithPlayer(game, "bard");
       game.characters.bard.movementMode = "follow";
       game.flags.bardreadiedarrow = true;
+      game.flags.smaug_weakspot_known = true;
       game.flags.dragondefeated = false;
       game.characters.red_golden_dragon.position = "lower_halls";
       game.characters.red_golden_dragon.visible = true;
@@ -2209,11 +2212,12 @@ const gameCases = [
   {
     name: "bard understands fire at dragon phrasing",
     setup(game) {
-      game.currentRoom = "lower_halls";
-      game.player.position = "lower_halls";
+      game.currentRoom = "stoe_of_ravenhill";
+      game.player.position = "stoe_of_ravenhill";
       placeCharacterWithPlayer(game, "bard");
       game.characters.bard.movementMode = "follow";
       game.flags.bardreadiedarrow = true;
+      game.flags.smaug_weakspot_known = true;
       game.flags.dragondefeated = false;
       game.characters.red_golden_dragon.position = "lower_halls";
       game.characters.red_golden_dragon.visible = true;
@@ -3156,6 +3160,103 @@ const gameCases = [
       "Type 'restart' to begin the tale again.",
     ],
     notExpectedIncluded: ["You leave the", "You drop the"],
+  },
+  {
+    name: "waiting after thorins farewell begins the homeward journey chapter",
+    drive(game) {
+      movePlayerTo(game, "stoe_of_ravenhill");
+      game.flags.dragondefeated = true;
+      game.flags.erebor_standoff_started = true;
+      game.flags.battle_won = true;
+      game.flags.thorin_fallen = true;
+      game.flags.thorin_reconciled = true;
+      game.execute("wait");
+      game.print(`Homeward journey started: ${game.flags.homeward_journey_started ? "yes" : "no"}`);
+      game.print(`Homeward room: ${game.currentRoom}`);
+      game.print(`Homeward autosave: ${game.autosaveMeta?.label || "none"}`);
+    },
+    expectedIncluded: [
+      "After Thorin's farewell, the road turns west at last. Long miles pass, the seasons soften, and the Mountain falls away behind memory into tale.",
+      "In time you come again beneath your own Hill, only to find home less patient than you had imagined. Word has run ahead of you in the Shire more quickly than you have.",
+      "Homeward journey started: yes",
+      "Homeward room: lane_beneath_hill",
+      "Homeward autosave: after returning at last to the Hill",
+    ],
+  },
+  {
+    name: "returning to hobbit hole reveals bag end nearly lost",
+    drive(game) {
+      movePlayerTo(game, "hobbit_hole");
+      game.flags.homeward_journey_started = true;
+      game.flags.final_return_started = true;
+      game.checkSpecialSituations();
+      game.print(`Bag End auction seen: ${game.flags.bag_end_auction_seen ? "yes" : "no"}`);
+      game.print(`Epilogue started: ${game.flags.epilogue_started ? "yes" : "no"}`);
+      game.print(`Bag End auction autosave: ${game.autosaveMeta?.label || "none"}`);
+    },
+    expectedIncluded: [
+      "The sight within stops you short: labels, bundles, and inquisitive hands have plainly been at work in Bag End, as though its master were safely dead and his goods fit for division.",
+      "You have returned just in time to save your house from being lost piecemeal, though its peace and order have been badly shaken by the attempt.",
+      "Bag End auction seen: yes",
+      "Epilogue started: yes",
+      "Bag End auction autosave: after finding Bag End nearly lost",
+    ],
+  },
+  {
+    name: "putting treasure in chest after the return home starts the final quiet stretch instead of immediate victory",
+    drive(game) {
+      movePlayerTo(game, "hobbit_hole");
+      giveItemToCharacter(game, "treasure", game.player.id);
+      game.flags.dragondefeated = true;
+      game.flags.mapread = true;
+      game.flags.homeward_journey_started = true;
+      game.flags.final_return_started = true;
+      game.flags.bag_end_auction_seen = true;
+      game.flags.epilogue_started = true;
+      const dragon = Object.values(game.characters).find((character) => /dragon/i.test(character.name));
+      if (dragon) dragon.visible = false;
+      game.items.heavy_wooden_chest.locked = false;
+      game.items.heavy_wooden_chest.open = true;
+      game.execute("put treasure in chest");
+      game.print(`Dragon arc complete: ${game.flags.dragon_arc_complete ? "yes" : "no"}`);
+      game.print(`Endgame after chest: ${game.endgame ? "yes" : "no"}`);
+      game.print(`Treasure-home autosave: ${game.autosaveMeta?.label || "none"}`);
+    },
+    expectedIncluded: [
+      "You settle the treasure safely into the heavy wooden chest. At last it is home, yet the tale does not feel wholly ended.",
+      "Dragon arc complete: yes",
+      "Endgame after chest: no",
+      "Treasure-home autosave: after bringing the treasure home",
+    ],
+    notExpectedIncluded: ["Congratulations. You have killed Smaug and found the treasure - a real thief."],
+  },
+  {
+    name: "waiting at bag end after storing the treasure still resolves the provisional ending",
+    drive(game) {
+      movePlayerTo(game, "hobbit_hole");
+      giveItemToCharacter(game, "treasure", game.player.id);
+      game.flags.dragondefeated = true;
+      game.flags.mapread = true;
+      game.flags.homeward_journey_started = true;
+      game.flags.final_return_started = true;
+      game.flags.bag_end_auction_seen = true;
+      game.flags.epilogue_started = true;
+      const dragon = Object.values(game.characters).find((character) => /dragon/i.test(character.name));
+      if (dragon) dragon.visible = false;
+      game.items.heavy_wooden_chest.locked = false;
+      game.items.heavy_wooden_chest.open = true;
+      game.execute("put treasure in chest");
+      game.execute("wait");
+      game.print(`Endgame after homecoming wait: ${game.endgame ? "yes" : "no"}`);
+      game.print(`Epilogue complete: ${game.flags.epilogue_complete ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "At length there comes a comfortable knock at Bag End, and before long Gandalf is seated by the fire with Balin beside him.",
+      "They look from Bilbo to the chest and back again, and for a while the talk is of roads, losses, wonders, and the queer shape a well-ended tale may take.",
+      "Congratulations. You have killed Smaug and found the treasure - a real thief.",
+      "Endgame after homecoming wait: yes",
+      "Epilogue complete: yes",
+    ],
   },
   {
     name: "autoplay takes rope during same trolls cave visit as sword",
@@ -4516,6 +4617,27 @@ const gameCases = [
     ],
   },
   {
+    name: "troll key fatal branch maps to the stealing death image",
+    drive(game) {
+      game.print(`Troll key death image: ${game.specialActions.specialActionFatalImage({ location: "Trolls clearing", verb: "take", obj1: "*large key", destination: "endgame" }) || "none"}`);
+    },
+    expectedIncluded: [
+      "Troll key death image: troll_catches_bilbo_stealing_key_death.png",
+    ],
+  },
+  {
+    name: "attacking a live troll shows the desperate troll death image",
+    drive(game) {
+      game.execute("jump trolls");
+      game.execute("east");
+      game.execute("kill troll");
+      game.print(`Troll attack death image: ${game.temporaryImage?.file || "none"}`);
+    },
+    expectedIncluded: [
+      "Troll attack death image: bilbo_troll_desperate_attack_death.png",
+    ],
+  },
+  {
     name: "jump gollum applies a coherent pre-riddle state",
     drive(game) {
       game.execute("jump gollum");
@@ -4553,6 +4675,8 @@ const gameCases = [
       game.execute("jump beorn");
       game.print(`Jump room: ${game.currentRoom}`);
       game.print(`Has ring: ${game.findInInventory("golden ring") ? "yes" : "no"}`);
+      game.print(`Eagles rescued: ${game.flags.eagles_rescued_company ? "yes" : "no"}`);
+      game.print(`Beorn dinner seen: ${game.flags.beorn_dinner_seen ? "yes" : "no"}`);
       game.print(`Beorn here: ${game.characters.beorn?.position === game.currentRoom ? "yes" : "no"}`);
       game.print(`Strength at Beorn: ${game.player.strength}`);
       game.print(`Visited Green Dragon Inn: ${game.visitedRooms.has("green_dragon_inn") ? "yes" : "no"}`);
@@ -4561,12 +4685,15 @@ const gameCases = [
       game.print(`Visited Dry Cave: ${game.visitedRooms.has("large_dry_cave") ? "yes" : "no"}`);
       game.print(`Visited Deep Dark Lake: ${game.visitedRooms.has("deep_dark_lake") ? "yes" : "no"}`);
       game.print(`Visited Goblins Gate Outside: ${game.visitedRooms.has("outside_goblins_gate") ? "yes" : "no"}`);
+      game.print(`Visited Great River: ${game.visitedRooms.has("great_river") ? "yes" : "no"}`);
       game.print(`Autoplay next at Beorn: ${game.nextAutoplayCommand()}`);
     },
     expectedIncluded: [
       "Jumped to Beorn's House.",
       "Jump room: beorns_house",
       "Has ring: yes",
+      "Eagles rescued: yes",
+      "Beorn dinner seen: yes",
       "Beorn here: yes",
       "Strength at Beorn: 5",
       "Visited Green Dragon Inn: yes",
@@ -4575,7 +4702,131 @@ const gameCases = [
       "Visited Dry Cave: yes",
       "Visited Deep Dark Lake: yes",
       "Visited Goblins Gate Outside: yes",
+      "Visited Great River: yes",
       "Autoplay next at Beorn: open curtain",
+    ],
+  },
+  {
+    name: "beorn arrival now stages the uncanny hospitality scene",
+    drive(game) {
+      game.execute("jump beorn");
+      game.print(`Beorn dinner seen: ${game.flags.beorn_dinner_seen ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "great dogs pad in on their hind legs with trays",
+      "the board is soon spread with bread, honey, cream, and a prodigious supper",
+      "Beorn dinner seen: yes",
+    ],
+  },
+  {
+    name: "reaching the open ground after gollum starts the warg escape scene",
+    setup(game) {
+      game.currentRoom = "treeless_opening";
+      game.player.position = "treeless_opening";
+      game.gollumState = game.createGollumState();
+      game.gollumState.met = true;
+      game.gollumState.pocketQuestionAsked = true;
+      game.gollumState.escaped = true;
+    },
+    drive(game) {
+      game.checkSpecialSituations();
+      game.print(`Warg escape started: ${game.flags.warg_escape_started ? "yes" : "no"}`);
+      game.print(`Gandalf here: ${game.characters.gandalf?.position === game.currentRoom ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Bursting out from the goblin gate at last, you find Gandalf and the dwarves hard pressed in the open below the mountain.",
+      "Warg escape started: yes",
+      "Gandalf here: yes",
+    ],
+  },
+  {
+    name: "climbing into the pines and waiting brings the eagles to the great river",
+    setup(game) {
+      game.currentRoom = "treeless_opening";
+      game.player.position = "treeless_opening";
+      game.gollumState = game.createGollumState();
+      game.gollumState.met = true;
+      game.gollumState.pocketQuestionAsked = true;
+      game.gollumState.escaped = true;
+      game.beginWargEscape();
+    },
+    drive(game) {
+      game.execute("climb tree");
+      game.execute("wait");
+      game.print(`Eagles rescued: ${game.flags.eagles_rescued_company ? "yes" : "no"}`);
+      game.print(`Room after rescue: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "With wolves already sweeping the clearing, you scramble up among the pines as Gandalf and the dwarves do the same.",
+      "Eagles stoop from above the mountain, seize the company out of smoke and branches, and bear you far from the goblins' fury.",
+      "Eagles rescued: yes",
+      "Room after rescue: great_river",
+    ],
+  },
+  {
+    name: "waiting in the open during the warg escape is fatal",
+    setup(game) {
+      game.currentRoom = "treeless_opening";
+      game.player.position = "treeless_opening";
+      game.gollumState = game.createGollumState();
+      game.gollumState.met = true;
+      game.gollumState.pocketQuestionAsked = true;
+      game.gollumState.escaped = true;
+      game.beginWargEscape();
+    },
+    drive(game) {
+      game.execute("wait");
+      game.print(`Endgame after open wait: ${game.endgame ? "yes" : "no"}`);
+      game.print(`Warg death image: ${game.temporaryImage?.file || "none"}`);
+    },
+    expectedIncluded: [
+      "You wait in the open for one instant too long.",
+      "The wargs rush in before the trees can be reached, and the night under the mountain ends in teeth and trampling.",
+      "Endgame after open wait: yes",
+      "Warg death image: warg_kills_bilbo_death.png",
+    ],
+  },
+  {
+    name: "autoplay carries the warg escape through eagles to beorn",
+    setup(game) {
+      game.debugCompleteUnexpectedParty();
+      game.debugMarkPonyProgress();
+      game.debugMarkTrollRoadProgress();
+      game.debugMarkMountainProgress();
+      game.debugMarkGoblinTunnelProgress();
+      game.debugMarkGoblinEscapeProgress();
+      game.transformTrolls();
+      game.flags.mapread = true;
+      game.flags.rivendell_preparations_complete = true;
+      game.flags.rivendellropesecured = true;
+      game.debugGiveJourneyCheckpointLoadout({ ring: true });
+      game.currentRoom = "treeless_opening";
+      game.player.position = "treeless_opening";
+      game.gollumState = game.createGollumState();
+      game.gollumState.met = true;
+      game.gollumState.pocketQuestionAsked = true;
+      game.gollumState.escaped = true;
+      game.beginWargEscape();
+    },
+    drive(game) {
+      const issued = [];
+      for (let step = 0; step < 20 && game.currentRoom !== "beorns_house" && !game.endgame; step += 1) {
+        const command = game.nextAutoplayCommand();
+        if (!command) throw new Error(`Autoplay stopped unexpectedly at step ${step} in ${game.currentRoom}.`);
+        issued.push(command);
+        game.execute(command);
+      }
+      if (game.currentRoom !== "beorns_house") {
+        throw new Error(`Autoplay did not reach Beorn's house. Commands: ${issued.join(" | ")}`);
+      }
+      game.print(`Autoplay used tree climb: ${issued.includes("climb tree") ? "yes" : "no"}`);
+      game.print(`Autoplay used eagle wait: ${issued.includes("wait") ? "yes" : "no"}`);
+      game.print(`Autoplay Beorn arrival room: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "Autoplay used tree climb: yes",
+      "Autoplay used eagle wait: yes",
+      "Autoplay Beorn arrival room: beorns_house",
     ],
   },
   {
@@ -5065,6 +5316,12 @@ const gameCases = [
       game.execute("jump laketown");
       game.print(`Jump room: ${game.currentRoom}`);
       game.print(`Bard here: ${game.characters.bard?.position === game.currentRoom ? "yes" : "no"}`);
+      game.print(`Thorin in town: ${game.characters.thorin?.position === "wooden_town" ? "yes" : "no"}`);
+      game.print(`Master in town square: ${game.characters.master?.position === "laketown_town_square" ? "yes" : "no"}`);
+      game.print(`Lake-town barrel arrival seen: ${game.flags.laketown_barrel_arrival_seen ? "yes" : "no"}`);
+      const ambientIds = game.unexpectedParty.roster.map((entry) => entry.id);
+      const townCount = ambientIds.filter((id) => ["wooden_town", "laketown_town_square", "laketown_marketplace", "laketown_bridges", "laketown_docks", "laketown_warehouses"].includes(game.characters[id]?.position)).length;
+      game.print(`Ambient dwarves in town: ${townCount}`);
       game.print(`Strength after Beorn: ${game.player.strength}`);
       game.print(`Autoplay next in Lake-town: ${game.nextAutoplayCommand()}`);
     },
@@ -5072,8 +5329,65 @@ const gameCases = [
       "Jumped to Lake-town.",
       "Jump room: wooden_town",
       "Bard here: yes",
+      "Thorin in town: yes",
+      "Master in town square: yes",
+      "Lake-town barrel arrival seen: yes",
+      "Ambient dwarves in town: 12",
       "Strength after Beorn: 6",
       "Autoplay next in Lake-town: pick up bard",
+    ],
+  },
+  {
+    name: "thorin in lake-town acknowledges the town, the master, bard, and the mountain",
+    setup(game) {
+      movePlayerTo(game, "wooden_town");
+      game.flags.laketown_barrel_arrival_seen = true;
+      game.debugSetCharacterRoom("thorin", "wooden_town", { visible: true, movementMode: "never" });
+    },
+    inputs: [
+      "talk to thorin",
+      "ask thorin about town",
+      "ask thorin about master",
+      "ask thorin about bard",
+      "ask thorin about dragon",
+    ],
+    expectedIncluded: [
+      "Thorin says 'These lake-folk have given us roof and breathing-space, and I do not forget it. Yet every hour spent here is only a pause with the Mountain still before us.'",
+      "Thorin says 'It is a strange city, half ship and half marketplace, yet there is hard usefulness in it. A people who can build thus upon dark water are not to be dismissed as soft.'",
+      "Thorin says 'The Master hears profit rustling even in trouble. That may serve a town well enough, provided bolder men are near when profit proves dangerous company.'",
+      "Thorin says 'Bard has the look of one who sees farther than most and says less than he knows. I would rather have such a man beside a dragon than a hall full of flatterers.'",
+      "Thorin says 'Smaug is near enough to trouble every plank in this town, and nearer still to my thought. Lake-town may shelter us for a night, but it cannot end our business.'",
+    ],
+  },
+  {
+    name: "the master of lake-town has a distinct political voice",
+    drive(game) {
+      game.execute("jump laketown");
+      game.execute("north west");
+      game.execute("talk to master");
+      game.execute("ask master about bard");
+      game.print(`Master met: ${game.flags.laketown_master_met ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "The Master smooths his robe and says 'Lake-town prospers when sober heads govern it. Excitement is a poor substitute for order, and heroics poorer still when trade must go on.'",
+      "The Master smiles thinly and says 'Bard is useful in rough weather and with a bow in his hand, but towns are not governed by grim warnings alone. A people must be steadied as well as stirred.'",
+      "Master met: yes",
+    ],
+  },
+  {
+    name: "hearing bard after the master marks the support split in lake-town",
+    drive(game) {
+      game.execute("jump laketown");
+      game.execute("north west");
+      game.execute("ask master about lake-town");
+      game.execute("south east");
+      game.execute("ask bard about town");
+      game.print(`Lake-town support split: ${game.flags.laketown_support_split ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "The Master spreads his hands and says 'Lake-town lives by traffic, timber, and prudent management. If the Mountain yields profit again, wise men must see that the town benefits from it rather than merely boasting of brave speeches after the fact.'",
+      "Bard says 'The Master thinks first of order, speeches, and what may be made to prosper afterward. I think of burned roofs, hungry folk, and what the Mountain has already cost the town before anyone speaks of profit from it.'",
+      "Lake-town support split: yes",
     ],
   },
   {
@@ -5086,12 +5400,14 @@ const gameCases = [
       game.execute("down");
       game.print(`Cellar death choice: ${game.pendingEndgameChoice || "none"}`);
       game.print(`Cellar autosave room: ${game.autosaveMeta?.roomId || "none"}`);
+      game.print(`Cellar death image: ${game.temporaryImage?.file || "none"}`);
     },
     expectedIncluded: [
       "A safe moment is marked here: before the barrel escape.",
       "The current catches you like an iron hand and sweeps you away under the halls before you can master yourself.",
       "Cellar death choice: death",
       "Cellar autosave room: cellar",
+      "Cellar death image: bilbo_falls_from_trap_door_river_death.png",
       "Type 'load' to open your safe moments in cellar, or 'restart' to begin the tale again.",
     ],
   },
@@ -5134,6 +5450,58 @@ const gameCases = [
     ],
   },
   {
+    name: "arkenstone vault now lives in lower halls instead of trolls cave",
+    drive(game) {
+      const vaultLocation = game.items.gilded_vault?.location || null;
+      const stoneLocation = game.items.arkenstone?.location || null;
+      game.print(`Gilded vault room: ${vaultLocation?.type === "room" ? vaultLocation.id : "none"}`);
+      game.print(`Arkenstone container: ${stoneLocation?.type === "item" ? stoneLocation.id : "none"}`);
+    },
+    expectedIncluded: [
+      "Gilded vault room: lower_halls",
+      "Arkenstone container: gilded_vault",
+    ],
+    notExpectedIncluded: [
+      "Gilded vault room: trolls_cave",
+    ],
+  },
+  {
+    name: "looking around the opened gilded vault reveals the arkenstone as a distinct discovery",
+    drive(game) {
+      movePlayerTo(game, "lower_halls");
+      game.items.gilded_vault.locked = false;
+      game.items.gilded_vault.open = true;
+      const dragon = Object.values(game.characters).find((character) => /dragon/i.test(character.name));
+      if (dragon) dragon.visible = false;
+      game.execute("look");
+      game.print(`Arkenstone seen: ${game.flags.arkenstone_seen ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Within the opened hoard, one great pale jewel catches the least light and masters it, burning with a cold fire of its own.",
+      "It is plainly no common treasure-piece, but some chief wonder of the Mountain long remembered and long desired.",
+      "Arkenstone seen: yes",
+    ],
+  },
+  {
+    name: "taking the arkenstone identifies it and marks it taken",
+    drive(game) {
+      movePlayerTo(game, "lower_halls");
+      game.items.gilded_vault.locked = false;
+      game.items.gilded_vault.open = true;
+      const dragon = Object.values(game.characters).find((character) => /dragon/i.test(character.name));
+      if (dragon) dragon.visible = false;
+      game.execute("take arkenstone");
+      game.print(`Arkenstone identified: ${game.arkenstoneIdentified() ? "yes" : "no"}`);
+      game.print(`Arkenstone taken flag: ${game.flags.arkenstone_taken ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You take the arkenstone from the gilded vault.",
+      "Even Bilbo can guess what no dwarf of Thorin's house could mistake: this is the Arkenstone, the Heart of the Mountain.",
+      "Arkenstone identified: yes",
+      "Arkenstone taken flag: yes",
+    ],
+  },
+  {
     name: "autoplay prepares the barrel escape before leaving the cellar",
     setup(game) {
       game.execute("jump laketown");
@@ -5153,6 +5521,72 @@ const gameCases = [
     expectedIncluded: [
       "Cellar autoplay path: open trap door -> throw barrel through trap door -> jump onto barrel",
       "Cellar autoplay room: long_lake",
+    ],
+  },
+  {
+    name: "cellar scene now makes the dwarf barrel-loading explicit once they are freed",
+    setup(game) {
+      movePlayerTo(game, "cellar");
+      game.flags.cellar_feast_scene_seen = true;
+      game.flags.mirkwooddwarvesfreed = true;
+    },
+    drive(game) {
+      game.checkSpecialSituations();
+      game.print(`Barrel company prepared: ${game.flags.barrel_company_prepared ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "The worst labor is not your own barrel at all, but the dwarves'.",
+      "the whole desperate escape has become a matter not of one barrel, but of a miserable little fleet",
+      "Barrel company prepared: yes",
+    ],
+  },
+  {
+    name: "barrel escape can carry the sense of the whole company onto the long lake",
+    setup(game) {
+      movePlayerTo(game, "cellar");
+      game.flags.cellar_feast_scene_seen = true;
+      game.flags.mirkwooddwarvesfreed = true;
+      game.flags.barrel_company_prepared = true;
+      game.doors.porta_cellar_long_lake.open = true;
+    },
+    drive(game) {
+      game.execute("throw barrel through the large trap door");
+      game.execute("jump onto barrel");
+      game.print(`Barrel company afloat: ${game.flags.barrel_company_afloat ? "yes" : "no"}`);
+      game.print(`Long Lake company desc: ${game.contextualRoomDescription(game.rooms.long_lake)}`);
+    },
+    expectedIncluded: [
+      "Barrel company afloat: yes",
+      "Long Lake company desc: You are on the Long Lake, cold and broad under an exposed sky, with more than one barrel still bobbing nearby in miserable fellowship.",
+      "outraged dwarf-mutterings of companions who have escaped the Elvenking's halls",
+    ],
+  },
+  {
+    name: "barrel escape into lake-town now stages a human landing scene in wooden town",
+    setup(game) {
+      movePlayerTo(game, "cellar");
+      game.flags.cellar_feast_scene_seen = true;
+      game.flags.mirkwooddwarvesfreed = true;
+      game.flags.barrel_company_prepared = true;
+      game.doors.porta_cellar_long_lake.open = true;
+    },
+    drive(game) {
+      game.execute("throw barrel through the large trap door");
+      game.execute("jump onto barrel");
+      game.execute("east");
+      game.print(`Lake-town arrival seen: ${game.flags.laketown_barrel_arrival_seen ? "yes" : "no"}`);
+      game.print(`Lake-town arrival pending: ${game.flags.laketown_barrel_arrival_pending ? "yes" : "no"}`);
+      game.print(`Barrel company afloat after arrival: ${game.flags.barrel_company_afloat ? "yes" : "no"}`);
+      game.print(`Wooden Town arrival desc: ${game.contextualRoomDescription(game.rooms.wooden_town)}`);
+    },
+    expectedIncluded: [
+      "Cold hands haul you in from the lake-side landing at last, more like driftwood than travelers.",
+      "Soon other barrels are being hooked in and broken open amid spluttering outrage, and the dwarves come out of them one after another stiff, bruised, furious, and indisputably alive.",
+      "Bard is among the first to look on you without foolishness.",
+      "Lake-town arrival seen: yes",
+      "Lake-town arrival pending: no",
+      "Barrel company afloat after arrival: no",
+      "Wooden Town arrival desc: You are in Lake-town, where wet planks, boat-ropes, and curious faces surround the long labor of a town built upon dark water.",
     ],
   },
   {
@@ -5192,7 +5626,7 @@ const gameCases = [
     ],
   },
   {
-    name: "autoplay repositions to bard before ordering the dragon shot",
+    name: "autoplay investigates smaug before ordering the dragon shot",
     setup(game) {
       game.execute("jump smaug");
       game.currentRoom = "lower_halls";
@@ -5212,7 +5646,7 @@ const gameCases = [
       game.print(`Lower halls absent-bard autoplay command: ${command || "none"}`);
     },
     expectedIncluded: [
-      "Lower halls absent-bard autoplay command: west",
+      "Lower halls absent-bard autoplay command: ask smaug about treasure",
     ],
     notExpectedIncluded: [
       "Lower halls absent-bard autoplay command: say to bard \"shoot dragon\"",
@@ -5343,7 +5777,191 @@ const gameCases = [
       "Arrow with Bard: yes",
       "Dragon alive: yes",
       "Strength after Beorn: 6",
-      "Autoplay next with Smaug: pick up bard",
+      "Autoplay next with Smaug: ask smaug about treasure",
+    ],
+  },
+  {
+    name: "post-smaug exterior arrival starts the erebor standoff state",
+    drive(game) {
+      game.execute("jump smaug");
+      game.flags.bardreadiedarrow = true;
+      game.flags.smaug_weakspot_known = true;
+      game.currentRoom = "stoe_of_ravenhill";
+      game.player.position = "stoe_of_ravenhill";
+      game.characters.bard.carriedBy = game.player.id;
+      game.characters.bard.position = "stoe_of_ravenhill";
+      game.characters.bard.followingPlayer = false;
+      game.characters.bard.movementMode = "follow";
+      game.execute('say to bard "shoot dragon"');
+      game.execute("east");
+      game.print(`Erebor standoff started: ${game.flags.erebor_standoff_started ? "yes" : "no"}`);
+      game.print(`Bard camp active: ${game.flags.bard_camp_active ? "yes" : "no"}`);
+      game.print(`Thorin inside Erebor: ${game.flags.thorin_inside_erebor ? "yes" : "no"}`);
+      game.print(`Bard room after standoff: ${game.characters.bard.position}`);
+      game.print(`Gandalf room after standoff: ${game.characters.gandalf.position}`);
+      game.print(`Thorin room after standoff: ${game.characters.thorin.position}`);
+      game.print(`Standoff autosave: ${game.autosaveMeta?.label || "none"}`);
+    },
+    expectedIncluded: [
+      "By the time you come again beneath the Gate, men from the Lake have gathered among the ruins of Dale and made a wary camp there.",
+      "Thorin has gone within Erebor with the dwarves, while Bard and Gandalf remain without, watching the Mountain as though Smaug's fall had cleared the way for a different danger.",
+      "Erebor standoff started: yes",
+      "Bard camp active: yes",
+      "Thorin inside Erebor: yes",
+      "Bard room after standoff: ruins_of_the_town_of_dale",
+      "Gandalf room after standoff: ruins_of_the_town_of_dale",
+      "Thorin room after standoff: erebor_great_hall",
+      "Standoff autosave: after the camps gather beneath Erebor",
+    ],
+  },
+  {
+    name: "asking smaug about treasure reveals the weak spot",
+    drive(game) {
+      game.execute("jump smaug");
+      game.execute("ask smaug about treasure");
+      game.print(`Weak spot known: ${game.flags.smaug_weakspot_known ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Smaug says 'My armour is like tenfold shields, my teeth are swords, my claws are spears, and this wealth is mine by fire and fear.' As the dragon rolls and gloats among the treasure, you catch sight of one small bare place in the jeweled mail of his left breast.",
+      "Weak spot known: yes",
+    ],
+  },
+  {
+    name: "bard refuses the dragon shot before the weak spot is known",
+    drive(game) {
+      game.execute("jump smaug");
+      game.flags.bardreadiedarrow = true;
+      game.execute('say to bard "shoot dragon"');
+      game.print(`Dragon alive after blind shot: ${game.liveDragon() ? "yes" : "no"}`);
+      game.print(`Dragon defeated after blind shot: ${game.flags.dragondefeated ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Bard steadies the bow, then lowers it again. 'Not yet,' he says. 'Against such a beast a blind shot is only waste. We need his weakness, not courage alone.'",
+      "Dragon alive after blind shot: yes",
+      "Dragon defeated after blind shot: no",
+    ],
+  },
+  {
+    name: "bard shoots once the weak spot is known and the thrush message is sent",
+    drive(game) {
+      game.execute("jump smaug");
+      game.flags.bardreadiedarrow = true;
+      game.flags.smaug_weakspot_known = true;
+      game.flags.thrush_message_sent = false;
+      game.execute('say to bard "shoot dragon"');
+      game.print(`Bard ready at Ravenhill: ${game.flags.bard_ready_at_ravenhill ? "yes" : "no"}`);
+      game.print(`Black arrow committed: ${game.flags.black_arrow_committed ? "yes" : "no"}`);
+      game.print(`Dragon alive after true shot: ${game.liveDragon() ? "yes" : "no"}`);
+      game.print(`Dragon defeated after true shot: ${game.flags.dragondefeated ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Bard studies the Mountain and shakes his head. 'Not from here,' he says. 'If the black arrow is to fly true, it must be from Ravenhill, where the mark may be taken cleanly.'",
+      "Bard ready at Ravenhill: no",
+      "Black arrow committed: no",
+      "Dragon alive after true shot: yes",
+      "Dragon defeated after true shot: no",
+    ],
+  },
+  {
+    name: "bard shoots from Ravenhill once the weak spot is known",
+    drive(game) {
+      game.execute("jump smaug");
+      game.flags.bardreadiedarrow = true;
+      game.flags.smaug_weakspot_known = true;
+      game.flags.thrush_message_sent = false;
+      game.currentRoom = "stoe_of_ravenhill";
+      game.player.position = "stoe_of_ravenhill";
+      game.characters.bard.carriedBy = game.player.id;
+      game.characters.bard.position = "stoe_of_ravenhill";
+      game.characters.bard.followingPlayer = false;
+      game.characters.bard.movementMode = "follow";
+      game.execute('say to bard "shoot dragon"');
+      game.print(`Thrush message sent: ${game.flags.thrush_message_sent ? "yes" : "no"}`);
+      game.print(`Bard ready at Ravenhill: ${game.flags.bard_ready_at_ravenhill ? "yes" : "no"}`);
+      game.print(`Black arrow committed: ${game.flags.black_arrow_committed ? "yes" : "no"}`);
+      game.print(`Dragon alive after true shot: ${game.liveDragon() ? "yes" : "no"}`);
+      game.print(`Dragon defeated after true shot: ${game.flags.dragondefeated ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Bard steps onto the old stone of Ravenhill and measures the sky above the Mountain. 'Here,' he says softly. 'If ever there was a place for the last shot, it is this one.'",
+      "A thrush flutters down nearby and chatters urgently, and between bird-sign and Bilbo's word the truth becomes plain: there is a bare patch in Smaug's left breast.",
+      "Bard hears, nods once, and his whole attention narrows to that one chance.",
+      "Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky.",
+      "Thrush message sent: yes",
+      "Bard ready at Ravenhill: yes",
+      "Black arrow committed: yes",
+      "Dragon alive after true shot: no",
+      "Dragon defeated after true shot: yes",
+    ],
+  },
+  {
+    name: "autoplay seeks smaugs weak spot before ordering the dragon shot",
+    drive(game) {
+      game.execute("jump smaug");
+      game.flags.bardreadiedarrow = true;
+      game.characters.bard.carriedBy = game.player.id;
+      game.characters.bard.position = game.currentRoom;
+      game.characters.bard.followingPlayer = false;
+      game.characters.bard.movementMode = "follow";
+      game.print(`Autoplay before weak-spot knowledge: ${game.nextAutoplayCommand()}`);
+    },
+    expectedIncluded: [
+      "Autoplay before weak-spot knowledge: ask smaug about treasure",
+    ],
+    notExpectedIncluded: [
+      "Autoplay before weak-spot knowledge: say to bard \"shoot dragon\"",
+    ],
+  },
+  {
+    name: "autoplay retreats to Ravenhill once the weak spot is known",
+    drive(game) {
+      game.execute("jump smaug");
+      game.flags.bardreadiedarrow = true;
+      game.flags.smaug_weakspot_known = true;
+      game.characters.bard.carriedBy = game.player.id;
+      game.characters.bard.position = game.currentRoom;
+      game.characters.bard.followingPlayer = false;
+      game.characters.bard.movementMode = "follow";
+      game.print(`Autoplay after weak-spot knowledge: ${game.nextAutoplayCommand()}`);
+    },
+    expectedIncluded: [
+      "Autoplay after weak-spot knowledge: east",
+    ],
+    notExpectedIncluded: [
+      "Autoplay after weak-spot knowledge: say to bard \"shoot dragon\"",
+    ],
+  },
+  {
+    name: "autoplay leaves the mountain to trigger the exterior standoff after smaug",
+    drive(game) {
+      game.execute("jump smaug");
+      game.flags.dragondefeated = true;
+      const dragon = Object.values(game.characters).find((character) => /dragon/i.test(character.name));
+      if (dragon) dragon.visible = false;
+      game.currentRoom = "stoe_of_ravenhill";
+      game.player.position = "stoe_of_ravenhill";
+      game.print(`Autoplay after dragon at Ravenhill: ${game.nextAutoplayCommand()}`);
+    },
+    expectedIncluded: [
+      "Autoplay after dragon at Ravenhill: east",
+    ],
+  },
+  {
+    name: "autoplay orders the dragon shot once Ravenhill is reached",
+    drive(game) {
+      game.execute("jump smaug");
+      game.flags.bardreadiedarrow = true;
+      game.flags.smaug_weakspot_known = true;
+      game.currentRoom = "stoe_of_ravenhill";
+      game.player.position = "stoe_of_ravenhill";
+      game.characters.bard.carriedBy = game.player.id;
+      game.characters.bard.position = "stoe_of_ravenhill";
+      game.characters.bard.followingPlayer = false;
+      game.characters.bard.movementMode = "follow";
+      game.print(`Autoplay at Ravenhill: ${game.nextAutoplayCommand()}`);
+    },
+    expectedIncluded: [
+      "Autoplay at Ravenhill: say to bard \"shoot dragon\"",
     ],
   },
   {
@@ -5414,18 +6032,24 @@ const gameCases = [
     drive(game) {
       game.trollsTransformed = true;
       game.flags.dragondefeated = true;
+      game.flags.erebor_standoff_started = true;
+      game.flags.bard_camp_active = true;
       const dragon = Object.values(game.characters).find((character) => /dragon/i.test(character.name));
       if (dragon) dragon.visible = false;
       game.print(`Trolls clearing after dawn: ${game.contextualRoomDescription(game.rooms.trolls_clearing)}`);
       game.print(`Treasure approach after dragon: ${game.contextualRoomDescription(game.rooms.erebor_treasure_approach)}`);
       game.print(`Lower halls after dragon: ${game.contextualRoomDescription(game.rooms.lower_halls)}`);
       game.print(`Wooden Town after dragon: ${game.contextualRoomDescription(game.rooms.wooden_town)}`);
+      game.print(`Front Gate during standoff: ${game.contextualRoomDescription(game.rooms.front_gate)}`);
+      game.print(`Dale camp during standoff: ${game.contextualRoomDescription(game.rooms.ruins_of_the_town_of_dale)}`);
     },
     expectedIncluded: [
       "Trolls clearing after dawn: You are in the trolls' clearing. Dawn has ended the quarrel forever",
       "Treasure approach after dragon: Gold-dust still glitters in the cracks ahead, but the held-breath stillness has broken.",
       "Lower halls after dragon: You enter the lower halls of Erebor",
       "Wooden Town after dragon: You are in Lake-town, where hammers, shouted orders, and relieved exhaustion travel the plankways together",
+      "Front Gate during standoff: You stand before the Front Gate of Erebor. The great doors now lie open to a kingdom reclaimed",
+      "Dale camp during standoff: You stand among the ruins of Dale, where rough shelters, watch-fires, and hurried councils now occupy the broken streets.",
     ],
     notExpectedIncluded: [
       "occupied by something too mighty to disturb lightly",
@@ -5614,6 +6238,459 @@ const gameCases = [
     ],
     notExpectedIncluded: [
       "Those objects do not combine into anything useful.",
+    ],
+  },
+  {
+    name: "arkenstone no longer combines with gold necklace",
+    setup(game) {
+      giveItemToCharacter(game, "arkenstone", game.player.id);
+      giveItemToCharacter(game, "gold_necklace", game.player.id);
+    },
+    drive(game) {
+      game.execute("combine arkenstone with gold necklace");
+    },
+    expectedIncluded: [
+      "Those objects do not combine into anything useful.",
+    ],
+    notExpectedIncluded: [
+      "You combine the arkenstone with the gold necklace",
+      "regal necklace",
+    ],
+  },
+  {
+    name: "asking thorin about the arkenstone while bilbo keeps it hidden stays guarded",
+    drive(game) {
+      movePlayerTo(game, "front_gate");
+      game.debugSetCharacterRoom("thorin", "front_gate", { visible: true, movementMode: "never" });
+      giveItemToCharacter(game, "arkenstone", game.player.id);
+      game.flags.arkenstone_seen = true;
+      game.markArkenstoneIdentified();
+      game.flags.arkenstone_taken = true;
+      game.flags.arkenstone_hidden_from_thorin = true;
+      game.execute("ask thorin about arkenstone");
+    },
+    expectedIncluded: [
+      "Thorin says 'If the Arkenstone has indeed come to light again, then the heart of the Mountain is no lost memory only.'",
+    ],
+    notExpectedIncluded: [
+      "Thorin's gaze fixes at once.",
+    ],
+  },
+  {
+    name: "showing the arkenstone to thorin reveals it openly",
+    drive(game) {
+      movePlayerTo(game, "front_gate");
+      game.debugSetCharacterRoom("thorin", "front_gate", { visible: true, movementMode: "never" });
+      giveItemToCharacter(game, "arkenstone", game.player.id);
+      game.flags.arkenstone_seen = true;
+      game.markArkenstoneIdentified();
+      game.flags.arkenstone_taken = true;
+      game.flags.arkenstone_hidden_from_thorin = true;
+      game.execute("show arkenstone to thorin");
+      game.print(`Hidden from Thorin: ${game.flags.arkenstone_hidden_from_thorin ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You show the arkenstone to Thorin.",
+      "Thorin's gaze fixes at once. 'The Arkenstone,' he says softly. 'The Heart of the Mountain. No heir of my house could look on it lightly.'",
+      "Hidden from Thorin: no",
+    ],
+  },
+  {
+    name: "showing the arkenstone to gandalf marks him as knowing while thorin remains uninformed",
+    drive(game) {
+      movePlayerTo(game, "front_gate");
+      game.debugSetCharacterRoom("gandalf", "front_gate", { visible: true, movementMode: "never" });
+      giveItemToCharacter(game, "arkenstone", game.player.id);
+      game.flags.arkenstone_seen = true;
+      game.markArkenstoneIdentified();
+      game.flags.arkenstone_taken = true;
+      game.flags.arkenstone_hidden_from_thorin = true;
+      game.execute("show arkenstone to gandalf");
+      game.print(`Gandalf knows Arkenstone: ${game.flags.gandalf_knows_arkenstone ? "yes" : "no"}`);
+      game.print(`Hidden from Thorin after Gandalf: ${game.flags.arkenstone_hidden_from_thorin ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You show the arkenstone to Gandalf.",
+      "Gandalf's eyes sharpen at once. 'So that is the Heart of the Mountain,' he murmurs. 'Keep your own counsel a little longer, Bilbo. Such a stone can move more than dwarves.'",
+      "Gandalf knows Arkenstone: yes",
+      "Hidden from Thorin after Gandalf: yes",
+    ],
+  },
+  {
+    name: "giving the arkenstone to bard marks the diplomatic handoff",
+    drive(game) {
+      movePlayerTo(game, "front_gate");
+      game.debugSetCharacterRoom("bard", "front_gate", { visible: true, movementMode: "never" });
+      giveItemToCharacter(game, "arkenstone", game.player.id);
+      game.flags.arkenstone_seen = true;
+      game.markArkenstoneIdentified();
+      game.flags.arkenstone_taken = true;
+      game.flags.arkenstone_hidden_from_thorin = true;
+      game.execute("give arkenstone to bard");
+      const bardHasStone = game.findCharacterItem(game.characters.bard, "arkenstone")?.item?.id === "arkenstone";
+      game.print(`Arkenstone given to Bard: ${game.flags.arkenstone_given_to_bard ? "yes" : "no"}`);
+      game.print(`Bard has Arkenstone: ${bardHasStone ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You give the arkenstone to Bard.",
+      "Bard receives the Arkenstone without triumph. 'This may yet do what swords cannot,' he says quietly. 'If talk is still possible, this stone will weigh in it.'",
+      "Arkenstone given to Bard: yes",
+      "Bard has Arkenstone: yes",
+    ],
+  },
+  {
+    name: "asking bard about negotiation starts the standoff parley beat",
+    drive(game) {
+      movePlayerTo(game, "ruins_of_the_town_of_dale");
+      game.flags.dragondefeated = true;
+      game.flags.erebor_standoff_started = true;
+      game.flags.bard_camp_active = true;
+      game.flags.thorin_inside_erebor = true;
+      game.debugSetCharacterRoom("bard", "ruins_of_the_town_of_dale", { visible: true, movementMode: "never" });
+      game.execute("ask bard about negotiation");
+      game.print(`Negotiation started: ${game.flags.negotiation_started ? "yes" : "no"}`);
+      game.print(`Negotiation softened: ${game.flags.negotiation_softened_by_arkenstone ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Bard says 'Without some pledge or pressure greater than my word alone, Thorin will hear only one old claim set against another. We need more than indignation to begin this talk well.'",
+      "Negotiation started: yes",
+      "Negotiation softened: no",
+    ],
+  },
+  {
+    name: "asking thorin about negotiation stays hard before the arkenstone intervenes",
+    drive(game) {
+      movePlayerTo(game, "front_gate");
+      game.flags.dragondefeated = true;
+      game.flags.erebor_standoff_started = true;
+      game.flags.bard_camp_active = true;
+      game.flags.thorin_inside_erebor = true;
+      game.debugSetCharacterRoom("thorin", "front_gate", { visible: true, movementMode: "never" });
+      game.execute("ask thorin about negotiation");
+      game.print(`Negotiation started: ${game.flags.negotiation_started ? "yes" : "no"}`);
+      game.print(`Negotiation failed: ${game.flags.negotiation_failed ? "yes" : "no"}`);
+      game.print(`Negotiation resolved: ${game.flags.negotiation_resolved ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Thorin says 'If Bard comes to my gate with demands, he shall hear my answer from the stone itself: what is mine is not to be haggled over in the hour of its recovery.'",
+      "Negotiation started: yes",
+      "Negotiation failed: yes",
+      "Negotiation resolved: no",
+    ],
+  },
+  {
+    name: "showing the arkenstone to bard softens the negotiation and changes gandalfs reading of thorin",
+    drive(game) {
+      game.currentRoom = "front_gate";
+      game.player.position = "front_gate";
+      game.flags.dragondefeated = true;
+      game.flags.erebor_standoff_started = true;
+      game.flags.bard_camp_active = true;
+      game.flags.thorin_inside_erebor = true;
+      game.debugSetCharacterRoom("bard", "front_gate", { visible: true, movementMode: "never" });
+      game.debugSetCharacterRoom("gandalf", "front_gate", { visible: true, movementMode: "never" });
+      giveItemToCharacter(game, "arkenstone", game.player.id);
+      game.flags.arkenstone_seen = true;
+      game.markArkenstoneIdentified();
+      game.flags.arkenstone_taken = true;
+      game.flags.arkenstone_hidden_from_thorin = true;
+      game.execute("show arkenstone to bard");
+      game.debugSetCharacterRoom("gandalf", "front_gate", { visible: true, movementMode: "never" });
+      game.execute("ask gandalf about thorin");
+      game.print(`Negotiation softened: ${game.flags.negotiation_softened_by_arkenstone ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You show the arkenstone to Bard.",
+      "Bard studies the white jewel in silence, then says 'A stone like that may weigh upon hearts more heavily than mail or iron.'",
+      "Gandalf says 'Thorin is still proud enough, but pride is easier to reason with when the Arkenstone itself has entered the matter. He may yet hear more than his own grievance.'",
+      "Negotiation softened: yes",
+    ],
+  },
+  {
+    name: "showing the arkenstone to bard changes thorins tone on negotiation",
+    drive(game) {
+      game.currentRoom = "front_gate";
+      game.player.position = "front_gate";
+      game.flags.dragondefeated = true;
+      game.flags.erebor_standoff_started = true;
+      game.flags.bard_camp_active = true;
+      game.flags.thorin_inside_erebor = true;
+      game.debugSetCharacterRoom("bard", "front_gate", { visible: true, movementMode: "never" });
+      game.debugSetCharacterRoom("thorin", "front_gate", { visible: true, movementMode: "never" });
+      giveItemToCharacter(game, "arkenstone", game.player.id);
+      game.flags.arkenstone_seen = true;
+      game.markArkenstoneIdentified();
+      game.flags.arkenstone_taken = true;
+      game.flags.arkenstone_hidden_from_thorin = true;
+      game.execute("show arkenstone to bard");
+      game.debugSetCharacterRoom("thorin", "front_gate", { visible: true, movementMode: "never" });
+      game.execute("ask thorin about negotiation");
+      game.print(`Negotiation failed: ${game.flags.negotiation_failed ? "yes" : "no"}`);
+      game.print(`Negotiation resolved: ${game.flags.negotiation_resolved ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Thorin says 'I will not be schooled before my own gate; yet for the Arkenstone's sake, and for the honor of my word, I will hear what Bard asks before I answer him finally.'",
+      "Negotiation failed: no",
+      "Negotiation resolved: yes",
+    ],
+  },
+  {
+    name: "waiting twice after negotiation starts brings dain and his reinforcements",
+    drive(game) {
+      movePlayerTo(game, "ruins_of_the_town_of_dale");
+      game.flags.dragondefeated = true;
+      game.flags.erebor_standoff_started = true;
+      game.flags.bard_camp_active = true;
+      game.flags.thorin_inside_erebor = true;
+      game.debugSetCharacterRoom("bard", "ruins_of_the_town_of_dale", { visible: true, movementMode: "never" });
+      game.execute("ask bard about negotiation");
+      game.execute("wait");
+      game.execute("wait");
+      game.print(`Dain arrived: ${game.flags.dain_arrived ? "yes" : "no"}`);
+      game.print(`Dwarf reinforcements present: ${game.flags.dwarf_reinforcements_present ? "yes" : "no"}`);
+      game.print(`Dain arrival autosave: ${game.autosaveMeta?.label || "none"}`);
+    },
+    expectedIncluded: [
+      "Bard says 'Without some pledge or pressure greater than my word alone, Thorin will hear only one old claim set against another. We need more than indignation to begin this talk well.'",
+      "Messengers come and go between the ruins and the northern watch, and more than one voice begins to speak uneasily of dwarf-standards on the march from the Iron Hills.",
+      "A stir runs through the camp: mail-clad dwarves have come at last from the Iron Hills under Dain, and their coming is more fit for battle than for patient speech.",
+      "Dain arrived: yes",
+      "Dwarf reinforcements present: yes",
+      "Dain arrival autosave: after Dain reaches Dale",
+    ],
+  },
+  {
+    name: "asking gandalf about dain after arrival frames the new danger",
+    drive(game) {
+      movePlayerTo(game, "ruins_of_the_town_of_dale");
+      game.flags.dragondefeated = true;
+      game.flags.erebor_standoff_started = true;
+      game.flags.bard_camp_active = true;
+      game.flags.thorin_inside_erebor = true;
+      game.flags.negotiation_started = true;
+      game.flags.dain_arrived = true;
+      game.flags.dwarf_reinforcements_present = true;
+      game.debugSetCharacterRoom("gandalf", "ruins_of_the_town_of_dale", { visible: true, movementMode: "never" });
+      game.execute("ask gandalf about dain");
+    },
+    expectedIncluded: [
+      "Gandalf says 'Dain has come swiftly from the Iron Hills, and he has not marched in mail so that this matter may remain a mere exchange of courtesies. Every axe beneath the Mountain makes peace narrower and battle easier.'",
+    ],
+  },
+  {
+    name: "asking thorin about negotiation after dain arrives hardens the standoff",
+    drive(game) {
+      movePlayerTo(game, "front_gate");
+      game.flags.dragondefeated = true;
+      game.flags.erebor_standoff_started = true;
+      game.flags.bard_camp_active = true;
+      game.flags.thorin_inside_erebor = true;
+      game.flags.negotiation_started = true;
+      game.flags.dain_arrived = true;
+      game.flags.dwarf_reinforcements_present = true;
+      game.debugSetCharacterRoom("thorin", "front_gate", { visible: true, movementMode: "never" });
+      game.execute("ask thorin about negotiation");
+      game.print(`Negotiation failed: ${game.flags.negotiation_failed ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Thorin says 'With Dain come axes enough that I need not bargain out of fear. If Bard seeks terms, he will learn that my patience is not surrender.'",
+      "Negotiation failed: yes",
+    ],
+  },
+  {
+    name: "waiting after dain arrives begins the compact battle sequence",
+    drive(game) {
+      movePlayerTo(game, "ruins_of_the_town_of_dale");
+      game.flags.dragondefeated = true;
+      game.flags.erebor_standoff_started = true;
+      game.flags.bard_camp_active = true;
+      game.flags.thorin_inside_erebor = true;
+      game.flags.negotiation_started = true;
+      game.flags.dain_arrived = true;
+      game.flags.dwarf_reinforcements_present = true;
+      game.flags.battle_wait_armed = true;
+      game.execute("wait");
+      game.print(`Battle started: ${game.flags.battle_started ? "yes" : "no"}`);
+      game.print(`Battle stage 1: ${game.flags.battle_stage_1 ? "yes" : "no"}`);
+      game.print(`Battle autosave: ${game.autosaveMeta?.label || "none"}`);
+    },
+    expectedIncluded: [
+      "Before any bargain can ripen, a black tide of goblins and wargs comes pouring out of the north. Horns answer horns, and the whole valley below Erebor turns in a moment from standoff to war.",
+      "Gandalf's voice cuts through the uproar: 'Choose quickly, Bilbo. Follow me, stand with Thorin, help Bard, or retreat while retreat is still possible.'",
+      "Battle started: yes",
+      "Battle stage 1: yes",
+      "Battle autosave: after the Battle of Five Armies begins",
+    ],
+  },
+  {
+    name: "following gandalf then helping bard wins the compact battle",
+    drive(game) {
+      movePlayerTo(game, "ruins_of_the_town_of_dale");
+      game.flags.dragondefeated = true;
+      game.flags.erebor_standoff_started = true;
+      game.flags.bard_camp_active = true;
+      game.flags.thorin_inside_erebor = true;
+      game.flags.negotiation_started = true;
+      game.flags.dain_arrived = true;
+      game.flags.dwarf_reinforcements_present = true;
+      game.beginBattleOfFiveArmies();
+      game.execute("follow gandalf");
+      game.print(`After Gandalf room: ${game.currentRoom}`);
+      game.print(`Battle stage 2: ${game.flags.battle_stage_2 ? "yes" : "no"}`);
+      game.execute("help bard");
+      game.print(`Battle won: ${game.flags.battle_won ? "yes" : "no"}`);
+      game.print(`Beorn battle aid seen: ${game.flags.beorn_battle_aid_seen ? "yes" : "no"}`);
+      game.print(`Battle survival autosave: ${game.autosaveMeta?.label || "none"}`);
+    },
+    expectedIncluded: [
+      "You race after Gandalf toward Ravenhill, where the whole field may be read in one dreadful glance.",
+      "After Gandalf room: stoe_of_ravenhill",
+      "Battle stage 2: yes",
+      "You help Bard steady the battered line until the counterstroke goes in at the right moment, and from that moment the goblin host begins at last to buckle.",
+      "Then the eagles are among the enemy in earnest, and with them comes Beorn in a wrath beyond reason, tearing into the goblin host until its last hard courage gives way.",
+      "When the tumult clears, the goblins are broken and scattered. Erebor stands, but the cost of the day is written everywhere among the stones.",
+      "Battle won: yes",
+      "Beorn battle aid seen: yes",
+      "Battle survival autosave: after surviving the Battle of Five Armies",
+    ],
+  },
+  {
+    name: "standing with thorin advances the compact battle to its second stage",
+    drive(game) {
+      movePlayerTo(game, "ruins_of_the_town_of_dale");
+      game.flags.dragondefeated = true;
+      game.flags.erebor_standoff_started = true;
+      game.flags.bard_camp_active = true;
+      game.flags.thorin_inside_erebor = true;
+      game.flags.negotiation_started = true;
+      game.flags.dain_arrived = true;
+      game.flags.dwarf_reinforcements_present = true;
+      game.beginBattleOfFiveArmies();
+      game.execute("stand with thorin");
+      game.print(`After Thorin room: ${game.currentRoom}`);
+      game.print(`Battle stage 2 after Thorin: ${game.flags.battle_stage_2 ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You hurry to Thorin at the Gate, where dwarf-axes are already ringing against shield and stone.",
+      "Thorin's mood is terrible and kingly together. 'Then stand fast,' he says. 'If Erebor is to be held indeed, it will be held in battle now.'",
+      "After Thorin room: front_gate",
+      "Battle stage 2 after Thorin: yes",
+    ],
+  },
+  {
+    name: "waiting after the battle leads bilbo to thorin on ravenhill",
+    drive(game) {
+      movePlayerTo(game, "ruins_of_the_town_of_dale");
+      game.flags.dragondefeated = true;
+      game.flags.erebor_standoff_started = true;
+      game.flags.bard_camp_active = true;
+      game.flags.thorin_inside_erebor = true;
+      game.flags.negotiation_started = true;
+      game.flags.dain_arrived = true;
+      game.flags.dwarf_reinforcements_present = true;
+      game.beginBattleOfFiveArmies();
+      game.execute("follow gandalf");
+      game.execute("help bard");
+      game.execute("wait");
+      game.print(`Thorin fallen: ${game.flags.thorin_fallen ? "yes" : "no"}`);
+      game.print(`Aftermath room: ${game.currentRoom}`);
+      game.print(`Beorn bore Thorin: ${game.flags.beorn_bore_thorin_seen ? "yes" : "no"}`);
+      game.print(`Beorn at Ravenhill: ${game.characters.beorn?.position === "stoe_of_ravenhill" ? "yes" : "no"}`);
+      game.print(`Thorin fall autosave: ${game.autosaveMeta?.label || "none"}`);
+    },
+    expectedIncluded: [
+      "When the first hard business of victory is under way, word comes quietly that Thorin has been brought to Ravenhill, sorely wounded and asking for Bilbo.",
+      "You go up among the broken stones and find Gandalf beside him. The fury of battle is gone from Thorin now, and there is little strength left to him.",
+      "Beorn stands nearby, still grim from battle, and it is plain from the bearing of the dwarves that he was the one who bore Thorin wounded out of the ruin of the field.",
+      "Thorin fallen: yes",
+      "Aftermath room: stoe_of_ravenhill",
+      "Beorn bore Thorin: yes",
+      "Beorn at Ravenhill: yes",
+      "Thorin fall autosave: after finding Thorin on Ravenhill",
+    ],
+  },
+  {
+    name: "beorn on ravenhill acknowledges bearing thorin from the field",
+    drive(game) {
+      movePlayerTo(game, "stoe_of_ravenhill");
+      game.flags.dragondefeated = true;
+      game.flags.erebor_standoff_started = true;
+      game.flags.bard_camp_active = true;
+      game.flags.thorin_inside_erebor = true;
+      game.flags.battle_won = true;
+      game.flags.thorin_fallen = true;
+      game.flags.beorn_bore_thorin_seen = true;
+      game.debugSetCharacterRoom("beorn", "stoe_of_ravenhill", { visible: true, movementMode: "never" });
+      game.execute("ask beorn about thorin");
+      game.execute("talk to beorn");
+    },
+    expectedIncluded: [
+      "Beorn says 'He was no light burden to bear, nor would I have had him be one. A king should come out of battle as a king, even when battle has beaten him.'",
+      "Beorn says 'He fought hard and fell hard. I brought him out when the crush was blackest; now let him spend his last strength in peace, if peace can still be given him.'",
+    ],
+  },
+  {
+    name: "talking to thorin on ravenhill resolves the reconciliation scene",
+    drive(game) {
+      movePlayerTo(game, "stoe_of_ravenhill");
+      game.flags.dragondefeated = true;
+      game.flags.erebor_standoff_started = true;
+      game.flags.bard_camp_active = true;
+      game.flags.thorin_inside_erebor = true;
+      game.flags.battle_won = true;
+      game.flags.thorin_fallen = true;
+      game.debugSetCharacterRoom("thorin", "stoe_of_ravenhill", { visible: true, movementMode: "never" });
+      game.debugSetCharacterRoom("gandalf", "stoe_of_ravenhill", { visible: true, movementMode: "never" });
+      game.execute("talk to thorin");
+      game.print(`Thorin reconciled: ${game.flags.thorin_reconciled ? "yes" : "no"}`);
+      game.print(`Thorin farewell autosave: ${game.autosaveMeta?.label || "none"}`);
+    },
+    expectedIncluded: [
+      "Thorin opens his eyes and says 'Farewell, good thief. There is more in you of good than you know: courage and wisdom, blended in measure. If more of us valued food and cheer and song above hoarded gold, it would be a merrier world.'",
+      "Thorin reconciled: yes",
+      "Thorin farewell autosave: after Thorin's farewell on Ravenhill",
+    ],
+  },
+  {
+    name: "thorins final reconciliation is not available before victory",
+    drive(game) {
+      movePlayerTo(game, "front_gate");
+      game.flags.dragondefeated = true;
+      game.flags.erebor_standoff_started = true;
+      game.flags.bard_camp_active = true;
+      game.flags.thorin_inside_erebor = true;
+      game.flags.battle_started = true;
+      game.flags.battle_stage_1 = true;
+      game.debugSetCharacterRoom("thorin", "front_gate", { visible: true, movementMode: "never" });
+      game.execute("talk to thorin");
+      game.print(`Thorin reconciled before victory: ${game.flags.thorin_reconciled ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Thorin says 'Stand fast now, Master Baggins. There will be time enough for speech when the goblins are broken or we are.'",
+      "Thorin reconciled before victory: no",
+    ],
+    notExpectedIncluded: [
+      "Farewell, good thief.",
+    ],
+  },
+  {
+    name: "retreating once the battle starts is an early failure",
+    drive(game) {
+      movePlayerTo(game, "front_gate");
+      game.flags.dragondefeated = true;
+      game.flags.erebor_standoff_started = true;
+      game.flags.bard_camp_active = true;
+      game.flags.thorin_inside_erebor = true;
+      game.flags.negotiation_started = true;
+      game.flags.dain_arrived = true;
+      game.flags.dwarf_reinforcements_present = true;
+      game.beginBattleOfFiveArmies();
+      game.execute("retreat");
+      game.print(`Battle retreat endgame: ${game.endgame ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You turn from the field while there is still a gap to do it, but in the confusion of broken stone, fleeing men, and the first rush of goblins, retreat becomes rout. The battle sweeps over you before you can win clear.",
+      "Battle retreat endgame: yes",
     ],
   },
   {
@@ -5928,6 +7005,28 @@ const gameCases = [
     expectedIncluded: ["Beorn says 'There is food and a roof for honest guests. Help yourself, but do not mistake hospitality for weakness.'"],
   },
   {
+    name: "beorn answers about his animals as disciplined household servants",
+    setup(game) {
+      game.currentRoom = "beorns_house";
+      game.player.position = "beorns_house";
+      game.flags.beorn_dinner_seen = true;
+    },
+    inputs: ["ask beorn about animals"],
+    expectedIncluded: ["Beorn says 'My beasts know their work better than many men do. Treat them with courtesy, and you will find them more sensible company than most travelers.'"],
+  },
+  {
+    name: "beorn great hall reflects the hospitality scene after arrival",
+    drive(game) {
+      game.execute("jump beorn");
+      game.execute("east");
+      game.print(`Beorn great hall after dinner: ${game.contextualRoomDescription(game.rooms.beorn_great_hall)}`);
+    },
+    expectedIncluded: [
+      "Beorn great hall after dinner: You are in Beorn's great hall, where the long table still looks half ready for another enormous supper.",
+      "The smell of honey, warm bread, and woodsmoke hangs pleasantly in the timbered air",
+    ],
+  },
+  {
     name: "combat narration reflects swordplay and goblin cave atmosphere",
     setup(game) {
       movePlayerTo(game, "goblins_dungeon");
@@ -5950,11 +7049,27 @@ const gameCases = [
     drive(game) {
       game.attackCharacter(game.characters.test_goblin, game.player, null, { forced: true });
       game.print(`Combat death choice: ${game.pendingEndgameChoice || "none"}`);
+      game.print(`Combat death image: ${game.temporaryImage?.file || "none"}`);
     },
     expectedIncluded: [
       /(you|your)/i,
       /(rush|strik|grapple|blow|guard)/i,
       "Combat death choice: death",
+      "Combat death image: bilbo_goblins_around_him_death.png",
+    ],
+  },
+  {
+    name: "combat death against a spider uses the spider kill death image",
+    setup(game) {
+      movePlayerTo(game, "mirkwood_spider_grove");
+      addHostileTestCharacter(game, "test_spider", { name: "great spider", strength: 12 });
+    },
+    drive(game) {
+      game.attackCharacter(game.characters.test_spider, game.player, null, { forced: true });
+      game.print(`Spider combat death image: ${game.temporaryImage?.file || "none"}`);
+    },
+    expectedIncluded: [
+      "Spider combat death image: spider_kills_bilbo_death.png",
     ],
   },
   {
@@ -6083,10 +7198,12 @@ const gameCases = [
       game.execute("wait");
       game.execute("wait");
       game.print(`Goblin ambush endgame: ${game.pendingEndgameChoice || "none"}`);
+      game.print(`Goblin ambush death image: ${game.temporaryImage?.file || "none"}`);
     },
     expectedIncluded: [
       "One more heartbeat of delay will be too late.",
       "Goblin ambush endgame: death",
+      "Goblin ambush death image: hulking_goblin_attack_death.png",
     ],
   },
   {
@@ -6426,12 +7543,108 @@ const gameCases = [
     },
     expectedIncluded: [
       "The wood elf's patience hardens. 'You have come far enough,' he says.",
+      "You are led at last before the Elvenking, who questions you coolly about your name, your companions, and what business has brought such travelers through his wood.",
+      "Bilbo keeps his own counsel.",
       "The wood elf captures you.",
       "Wood elf capture room: dark_dungeon",
       "Wood elf after capture: elven_guard_post",
     ],
     notExpectedIncluded: [
       "Wood elf after capture: beorns_house",
+    ],
+  },
+  {
+    name: "wood elf in the dungeon recalls the kings questioning",
+    setup(game) {
+      movePlayerTo(game, "dark_dungeon");
+      game.flags.elvenking_prisoner_seen = true;
+      game.debugSetCharacterRoom("wood_elf", "dark_dungeon", { visible: true, movementMode: "never" });
+    },
+    inputs: [
+      "talk to elf",
+      "ask elf about king",
+      "ask elf about prison",
+    ],
+    expectedIncluded: [
+      "The wood elf says 'The king asked for truth and got silence. Be grateful it was only darkness you earned by it.'",
+      "The wood elf says 'The king asked you for honest answers and offered fair hearing for them. Since you kept your counsel, you may now keep the dungeon besides.'",
+      "The wood elf says 'Your friends and your secrets have brought you no further than a locked door. If you mean to keep both, learn patience.'",
+    ],
+  },
+  {
+    name: "elves chapter now keeps the dwarves visibly dispersed through the prison rooms before rescue",
+    setup(game) {
+      movePlayerTo(game, "dark_dungeon");
+      game.flags.elvenking_prisoner_seen = true;
+    },
+    drive(game) {
+      game.companionDirector.sync();
+      const ambientIds = game.unexpectedParty.roster.map((entry) => entry.id);
+      const prisonCount = ambientIds.filter((id) => ["dark_dungeon", "elven_prison_cells"].includes(game.characters[id]?.position)).length;
+      game.print(`Prison dwarves placed: ${prisonCount}`);
+      game.print(`Thorin prison room: ${game.characters.thorin?.position || "none"}`);
+      game.print(`Prison cells desc: ${game.contextualRoomDescription(game.rooms.elven_prison_cells)}`);
+    },
+    expectedIncluded: [
+      "Prison dwarves placed: 12",
+      "Thorin prison room: elven_prison_cells",
+      "Prison cells desc: You are among the prison cells beneath the Elvenking's halls, where stout timbers, lantern-light, and the smell of river-damp make captivity feel orderly rather than merciful.",
+    ],
+  },
+  {
+    name: "cellar arrival frames the feast-heavy barrel escape opportunity",
+    setup(game) {
+      movePlayerTo(game, "cellar");
+    },
+    drive(game) {
+      game.checkSpecialSituations();
+      game.print(`Cellar feast scene seen: ${game.flags.cellar_feast_scene_seen ? "yes" : "no"}`);
+      game.print(`Cellar contextual desc: ${game.contextualRoomDescription(game.rooms.cellar)}`);
+    },
+    expectedIncluded: [
+      "The king's feasting has told on the place below.",
+      "Empty barrels stand ready by the running water, and the butler's vigilance has plainly been dulled by duty, fatigue, and a cup or two beyond strict necessity.",
+      "Cellar feast scene seen: yes",
+      "Cellar contextual desc: You are in the Elvenking's cellar, where great casks, damp stone, and the black rushing of the underground water gather under the halls.",
+    ],
+  },
+  {
+    name: "freed dwarves regroup in the cellar before the barrel escape",
+    setup(game) {
+      movePlayerTo(game, "cellar");
+      game.flags.mirkwooddwarvesfreed = true;
+      game.flags.barrel_company_prepared = true;
+    },
+    drive(game) {
+      game.companionDirector.sync();
+      const ambientIds = game.unexpectedParty.roster.map((entry) => entry.id);
+      const cellarCount = ambientIds.filter((id) => game.characters[id]?.position === "cellar").length;
+      game.print(`Cellar dwarves regrouped: ${cellarCount}`);
+      game.print(`Thorin regroup room: ${game.characters.thorin?.position || "none"}`);
+      game.print(`Regrouped cellar desc: ${game.contextualRoomDescription(game.rooms.cellar)}`);
+    },
+    expectedIncluded: [
+      "Cellar dwarves regrouped: 12",
+      "Thorin regroup room: cellar",
+      "Regrouped cellar desc: You are in the Elvenking's cellar, where great casks, damp stone, and the black rushing of the underground water gather under the halls. The dwarves are with you again at last",
+    ],
+  },
+  {
+    name: "bard in wooden town acknowledges the barrel-soaked arrival",
+    setup(game) {
+      movePlayerTo(game, "wooden_town");
+      game.flags.laketown_barrel_arrival_seen = true;
+      game.debugSetCharacterRoom("bard", "wooden_town", { visible: true, movementMode: "never" });
+    },
+    inputs: [
+      "talk to bard",
+      "ask bard about town",
+      "ask bard about dwarves",
+    ],
+    expectedIncluded: [
+      "Bard says 'You look as though the river has tried hard to keep you. Best get warm if you can, then tell what has driven dwarves and strangers out of the wood and down to our lake.'",
+      "Bard says 'Lake-town takes strangers in when there is cause, but it asks questions while it does so. A town on the water learns thrift, memory, and caution all together.'",
+      "Bard says 'Dwarves coming secretly out of the wood and over the water are not an ordinary matter. If the Mountain is stirring again, the town will feel it soon enough.'",
     ],
   },
   {
@@ -6455,6 +7668,24 @@ const gameCases = [
     notExpectedIncluded: [
       "The butler glares at you, unimpressed.",
       "The butler considers moon, but gives no clear answer.",
+    ],
+  },
+  {
+    name: "butler in the cellar acknowledges feast, wine, and the barrel traffic",
+    setup(game) {
+      movePlayerTo(game, "cellar");
+      game.flags.cellar_feast_scene_seen = true;
+      game.debugSetCharacterRoom("butler", "cellar", { visible: true, movementMode: "never" });
+    },
+    inputs: [
+      "talk to butler",
+      "ask butler about wine",
+      "ask butler about barrels",
+    ],
+    expectedIncluded: [
+      "The butler steadies himself against a cask and says 'If you must speak, do it quietly. The wine has gone where it belongs, the feast is above us, and the barrels will be gone in due order when the stream is ready for them.'",
+      "The butler blinks and says 'There is feasting in the king's house tonight, and the wine has been honored as wine should be. That is no business of yours, except not to get underfoot while honest servants finish theirs.'",
+      "The butler says 'The barrels go downriver when they are emptied and marked for it. Tonight there are enough of them to keep a sober servant busy and a tired one from becoming any soberer.'",
     ],
   },
   {
@@ -6663,11 +7894,13 @@ const gameCases = [
       game.player.ringTimer = 1;
       game.execute("wait");
       game.print(`Ring expiry endgame: ${game.endgame ? "yes" : "no"}`);
+      game.print(`Ring expiry death image: ${game.temporaryImage?.file || "none"}`);
     },
     expectedIncluded: [
       /The golden ring .*pocket\./,
       /Gollum .*?(triumph|dark|struggle|finger)/,
       "Ring expiry endgame: yes",
+      "Ring expiry death image: gollum_ring_effect_ends_death.png",
     ],
   },
   {
@@ -6701,11 +7934,13 @@ const gameCases = [
       game.execute("answer toaster");
       game.print(`Death choice: ${game.pendingEndgameChoice || "none"}`);
       game.print(`Autosave room: ${game.autosaveMeta?.roomId || "none"}`);
+      game.print(`Gollum death image: ${game.temporaryImage?.file || "none"}`);
     },
     expectedIncluded: [
       /Gollum.*(Wrong|False|dark|water|stones)/,
       "Death choice: death",
       "Autosave room: deep_dark_lake",
+      "Gollum death image: gollum_wrong_answer_to_riddle_death.png",
       "Type 'load' to open your safe moments in Deep Dark Lake, or 'restart' to begin the tale again.",
     ],
   },
@@ -6800,10 +8035,12 @@ const gameCases = [
       game.execute("jump into river");
       game.print(`River autosave room: ${game.autosaveMeta?.roomId || "none"}`);
       game.print(`River death choice: ${game.pendingEndgameChoice || "none"}`);
+      game.print(`River death image: ${game.temporaryImage?.file || "none"}`);
     },
     expectedIncluded: [
       "River autosave room: west_bank",
       "River death choice: death",
+      "River death image: bilbo_black_river_death.png",
       "Type 'load' to open your safe moments in West Bank, or 'restart' to begin the tale again.",
     ],
   },
@@ -6824,6 +8061,69 @@ const gameCases = [
     ],
     notExpectedIncluded: [
       "The tale goes no farther from here.",
+    ],
+  },
+  {
+    name: "spider eyes death shows the dedicated spider death image",
+    setup(game) {
+      game.currentRoom = "forest_road_2";
+      game.player.position = "forest_road_2";
+      game.spiderEyesState = {
+        active: true,
+        room: "forest_road_2",
+        waits: 2,
+        safeDirections: ["west"],
+        safeDestination: null,
+      };
+    },
+    drive(game) {
+      game.execute("wait");
+      game.print(`Spider death image: ${game.temporaryImage?.file || "none"}`);
+    },
+    expectedIncluded: [
+      "Spider death image: spider_stings_death.png",
+    ],
+  },
+  {
+    name: "smaug fatal speech branch maps to the lower halls death image",
+    drive(game) {
+      game.print(`Smaug death image: ${game.specialActions.specialActionFatalImage({ desc2: "Smaug grows weary of your voice. With a sudden roar he floods the chamber with fire, and all your brave words are ashes in a breath." }) || "none"}`);
+    },
+    expectedIncluded: [
+      "Smaug death image: smaug_incinirates_bilbo_lower_halls_death.png",
+    ],
+  },
+  {
+    name: "disgusting goblin fatal speech branch maps to the pit death image",
+    drive(game) {
+      game.print(`Goblin pit death image: ${game.resolveFatalEndgameImage("The disgusting goblin recoils from your presence, hurls you into a black pit, and leaves your cries to the dark.") || "none"}`);
+    },
+    expectedIncluded: [
+      "Goblin pit death image: goblin_bilbo_pit_death.png",
+    ],
+  },
+  {
+    name: "fatal dark-tunnel hazard uses the exhausted tunnels death image",
+    setup(game) {
+      game.currentRoom = "dark_stuffy_passage_1";
+      game.player.position = "dark_stuffy_passage_1";
+      game.player.strength = 1;
+    },
+    drive(game) {
+      for (let seed = 1; seed <= 64 && !game.endgame; seed += 1) {
+        game.storySeed = seed;
+        game.turnCount = 0;
+        game.pendingEndgameChoice = null;
+        game.endgame = false;
+        game.temporaryImage = null;
+        game.applyDarkMovementHazard("dark_stuffy_passage_1", "east", "dark_stuffy_passage_2");
+      }
+      game.print(`Dark hazard endgame: ${game.endgame ? "yes" : "no"}`);
+      game.print(`Dark hazard image: ${game.temporaryImage?.file || "none"}`);
+    },
+    expectedIncluded: [
+      "Dark hazard endgame: yes",
+      "Dark hazard image: exhausted_tunnels_death.png",
     ],
   },
   {

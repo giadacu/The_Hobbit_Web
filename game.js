@@ -2,7 +2,7 @@
   const DATA = applyImmersionExpansion(window.HOBBIT_DATA);
   const IMAGE_ROOT = "assets/local-images/";
   const MUSIC_ROOT = "assets/local-music/";
-  const ASSET_VERSION = "20260619-2215";
+  const ASSET_VERSION = "20260621-1945";
   const ASSET_QUERY_SUFFIX = `?v=${ASSET_VERSION}`;
   const TEMPORARY_IMAGE_ALIASES = {
     "thrors-map": "Thrors_map.jpg",
@@ -289,6 +289,7 @@
         game.debugMarkMountainProgress();
         game.debugMarkGoblinTunnelProgress();
         game.debugMarkGoblinEscapeProgress();
+        game.debugMarkWargEscapeProgress();
         game.transformTrolls();
         game.flags.mapread = true;
         game.flags.rivendell_preparations_complete = true;
@@ -311,6 +312,7 @@
         game.debugMarkMountainProgress();
         game.debugMarkGoblinTunnelProgress();
         game.debugMarkGoblinEscapeProgress();
+        game.debugMarkWargEscapeProgress();
         game.transformTrolls();
         game.flags.mapread = true;
         game.flags.rivendell_preparations_complete = true;
@@ -337,8 +339,11 @@
         game.flags.mapread = true;
         game.flags.rivendell_preparations_complete = true;
         game.flags.rivendellropesecured = true;
+        game.flags.mirkwooddwarvesfreed = true;
         game.debugGiveJourneyCheckpointLoadout({ ring: true });
         game.debugMarkBeornRecovery();
+        game.beginDwarfBarrelLoadingScene({ silent: true });
+        game.beginLaketownBarrelArrival({ silent: true });
         game.debugMovePlayer("wooden_town", { markRoute: true });
         game.debugSetCharacterRoom("bard", "wooden_town");
       },
@@ -1094,6 +1099,16 @@
         text: "pale runes or seams in the stone, too faint to resolve fully without a more favorable light",
       },
     ],
+    arkenstone: [
+      {
+        when: ({ game }) => game.arkenstoneIdentified(),
+        text: "the Arkenstone itself, a great white gem holding a cold fire deep within",
+      },
+      {
+        when: () => true,
+        text: "a great pale jewel whose inward light sets it apart from the surrounding treasure at once",
+      },
+    ],
   };
 
   const CONTEXTUAL_ROOM_DESCRIPTION_RULES = {
@@ -1145,10 +1160,22 @@
     ],
     treeless_opening: [
       {
+        when: ({ game }) => game.wargEscapeActive() && !game.flags.warg_escape_in_trees,
+        text: "You are in a rough open clearing below the mountain gate, where a ragged ring of pines stands against the night like the last poor refuge in a land otherwise surrendered to rock and wind. Wargs prowl out of the dark beyond the grass, yellow eyes kindling one by one, while goblin-cries answer from higher slopes. It is plain enough that the ground is already lost.",
+      },
+      {
+        when: ({ game }) => game.wargEscapeActive() && game.flags.warg_escape_in_trees,
+        text: "You cling among the high pines above the rough clearing, where the bark is rough under your hands and the branches sway with every gust. Below, wargs circle and snap beneath the roots, while from the mountain-side goblin voices howl encouragement and mischief into the dark.",
+      },
+      {
         text: "You are in a treeless opening where the mountain land begins to ease at last into broader reaches. Yet there is little softness in it: coarse grass lies bent beneath the wind, scattered stones show through the earth, and the sky above seems too large and changeable to trust for long. It feels less like peace than a place where shelter might be near, if the weather allows it.",
       },
     ],
     great_river: [
+      {
+        when: ({ game }) => game.eaglesRescuedCompany() && !game.beornMountainArrivalComplete(),
+        text: "You are at the Great River after the eagles' rescue. Dawn lies pale on the broad water, and the wild tumult of wolves, goblins, and burning pines already feels like something suffered in another night. Yet the weariness of it clings to the company, and the lands below promise shelter more than ease.",
+      },
       {
         text: "You are at the Great River, broad and cold under a wide unsettled sky. Its waters move with grave strength between dark slopes and lower wooded lands, while shifting light and racing cloud give the whole valley a look of grandeur touched with warning. The banks promise a road onward, but not one to be taken lightly.",
       },
@@ -1156,6 +1183,46 @@
     mountains: [
       {
         text: "You are among the mountains. Their ridges rise in stern ranks of stone and snow, with deep valleys, hanging clouds, and far-off waters falling in white threads through the dark. Whatever beauty they possess is of the severe kind, fit more to humble travelers than to comfort them.",
+      },
+    ],
+    beorns_house: [
+      {
+        when: ({ game }) => game.flags.beorn_dinner_seen,
+        text: "You are in Beorn's great house, broad-beamed and strong, with the hearth burning steady and the lingering signs of astonishing hospitality still about the place. Heavy tables, good bread, honey, cream, and clean timber speak of plenty honestly kept, while the uncanny order of the household makes it plain that even the beasts here understand service and discipline.",
+      },
+    ],
+    beorn_great_hall: [
+      {
+        when: ({ game }) => game.flags.beorn_dinner_seen,
+        text: "You are in Beorn's great hall, where the long table still looks half ready for another enormous supper. The smell of honey, warm bread, and woodsmoke hangs pleasantly in the timbered air, and every bench and platter suggests a hospitality as formidable as the master of the house himself.",
+      },
+    ],
+    dark_dungeon: [
+      {
+        when: ({ game }) => game.flags.elvenking_prisoner_seen,
+        text: "You are in the dark dungeon beneath the Elvenking's halls, where damp stone, iron, and old restraint have none of the woodland grace shown above. The memory of lantern-light, the king's measured questions, and your own stubborn silence still hangs over the place more heavily than the chains.",
+      },
+    ],
+    elven_prison_cells: [
+      {
+        when: ({ game }) => !game.flags.mirkwooddwarvesfreed,
+        text: "You are among the prison cells beneath the Elvenking's halls, where stout timbers, lantern-light, and the smell of river-damp make captivity feel orderly rather than merciful. More than one dwarvish cough, mutter, or angry thump carries from behind the doors, and it is plain enough that you are not the only prisoner these halls are keeping apart.",
+      },
+    ],
+    cellar: [
+      {
+        when: ({ game }) => game.flags.mirkwooddwarvesfreed && game.flags.barrel_company_prepared,
+        text: "You are in the Elvenking's cellar, where great casks, damp stone, and the black rushing of the underground water gather under the halls. The dwarves are with you again at last, crowded into a whispered, miserable conspiracy among the barrels, and every moment now feels stolen from the king's people overhead.",
+      },
+      {
+        when: ({ game }) => game.flags.cellar_feast_scene_seen,
+        text: "You are in the Elvenking's cellar, where great casks, damp stone, and the black rushing of the underground water gather under the halls. Tonight the place bears the slack, wine-heavy disorder of a feast above: empty barrels stand ready to be sent away, and the whole business feels less guarded than such a dangerous convenience ought to be.",
+      },
+    ],
+    long_lake: [
+      {
+        when: ({ game }) => game.flags.barrel_company_afloat,
+        text: "You are on the Long Lake, cold and broad under an exposed sky, with more than one barrel still bobbing nearby in miserable fellowship. From those dark casks come the thumps, groans, and outraged dwarf-mutterings of companions who have escaped the Elvenking's halls without in the least consenting to the comfort of the method.",
       },
     ],
     trolls_clearing: [
@@ -1166,13 +1233,69 @@
     ],
     wooden_town: [
       {
+        when: ({ game }) => game.flags.laketown_barrel_arrival_seen && !game.flags.dragondefeated,
+        text: "You are in Lake-town, where wet planks, boat-ropes, and curious faces surround the long labor of a town built upon dark water. Word of bedraggled strangers out of the river has run ahead of you, and the place now feels full of shrewd questions, rough hospitality, and a watchfulness that turns naturally toward the Mountain.",
+      },
+      {
         when: ({ game }) => game.flags.dragondefeated,
         text: "You are in Lake-town, where hammers, shouted orders, and relieved exhaustion travel the plankways together above the dark water. Boats still knock at their moorings, but the talk is of rebuilding, losses, and what may yet come from the Mountain.",
       },
     ],
     front_gate: [
       {
+        when: ({ game }) => game.flags.battle_won && !game.flags.thorin_fallen,
+        text: "You stand before the Front Gate of Erebor after battle. The shouting has fallen away into groans, orders, and the labor of the wounded, and even victory feels grave in the shadow of what it has cost.",
+      },
+      {
+        when: ({ game }) => game.flags.battle_started && !game.flags.battle_won,
+        text: "You stand before the Front Gate of Erebor while battle roars across the broken stones below. Dwarf-axes flash by the gate, arrows hiss up from the ruins, and every shout seems to be swallowed at once by a greater tumult rolling out from the north.",
+      },
+      {
+        when: ({ game }) => game.flags.dain_arrived,
+        text: "You stand before the Front Gate of Erebor. Below and about the broken stones now move armed dwarves newly come, grim from the Iron Hills and plainly not meant for ceremony. The gate is no longer merely a threshold; it has become the front edge of a quarrel gathering strength.",
+      },
+      {
+        when: ({ game }) => game.flags.erebor_standoff_started,
+        text: "You stand before the Front Gate of Erebor. The great doors now lie open to a kingdom reclaimed, yet no welcome comes from within. Men keep watch among the broken stones below, and the silence between gate and camp feels more dangerous than the dragon-smoke that has only lately faded.",
+      },
+      {
         text: "You stand before the Front Gate of Erebor. Vast stonework and weathered carvings still command awe here, but the enormous entrance stands silent, sealed by age, ruin, and shadow. Whatever welcome it once gave, it gives none now.",
+      },
+    ],
+    ruins_of_the_town_of_dale: [
+      {
+        when: ({ game }) => game.flags.battle_won && !game.flags.thorin_fallen,
+        text: "You stand among the ruins of Dale after the battle. The goblin host is broken, yet the broken streets now hold stretchers, weary victors, and the hush that comes when survival has not felt in the least like triumph.",
+      },
+      {
+        when: ({ game }) => game.flags.battle_started && !game.flags.battle_won,
+        text: "You stand among the ruins of Dale while the Battle of Five Armies rages in earnest. Men cry orders behind broken walls, arrows flick from shattered windows and fallen stones, and beyond the camp the black press of goblins and wargs has turned the whole valley into a single hard struggle.",
+      },
+      {
+        when: ({ game }) => game.flags.dain_arrived,
+        text: "You stand among the ruins of Dale, now crowded with men of the Lake, wary messengers, and mail-clad dwarves lately arrived from the Iron Hills. What had been a tense camp has become something nearer an army waiting for one more wrong word.",
+      },
+      {
+        when: ({ game }) => game.flags.bard_camp_active,
+        text: "You stand among the ruins of Dale, where rough shelters, watch-fires, and hurried councils now occupy the broken streets. The dragon is gone, yet no true peace has followed him; every tent and guard-post seems to face the Mountain as much as the night.",
+      },
+    ],
+    stoe_of_ravenhill: [
+      {
+        when: ({ game }) => game.flags.thorin_fallen && game.flags.beorn_bore_thorin_seen,
+        text: "You are on Ravenhill after the battle, where the wind moves gently now over broken standards, spent weapons, and the grim stillness of costly victory. Thorin lies here under guard and care, far from healed and with little time left to him, while Beorn keeps a huge and silent watch nearby like some last strength of the wild not yet wholly withdrawn from war.",
+      },
+      {
+        when: ({ game }) => game.flags.thorin_fallen,
+        text: "You are on Ravenhill after the battle, where the wind moves gently now over broken standards, spent weapons, and the grim stillness of costly victory. Thorin lies here under guard and care, far from healed and with little time left to him.",
+      },
+      {
+        when: ({ game }) => game.flags.battle_won && !game.flags.thorin_fallen,
+        text: "You are on Ravenhill after the fighting, where the field below lies strewn with the wreck of battle. The eagles have passed on, the cries are fewer, and the whole desolation seems to be taking stock of its dead.",
+      },
+      {
+        when: ({ game }) => game.flags.battle_started && !game.flags.battle_won,
+        text: "You are on Ravenhill above the desolation, where the battle below can be seen in harsh and terrible clarity. Standards reel, dark masses surge and break among the stones, and the whole field looks one bad moment away from ruin.",
       },
     ],
     erebor_hidden_door: [
@@ -1199,6 +1322,18 @@
       {
         when: ({ game }) => !game.liveDragon(),
         text: "You enter the lower halls of Erebor, a mighty chamber of pillars, carvings, and treasure under the Mountain's ancient stone. The air is still warm and close, but the dragon-smoke is fading, leaving a heavy silence in which triumph and unease are not yet sorted.",
+      },
+    ],
+    hobbit_hole: [
+      {
+        when: ({ game }) => game.flags.bag_end_auction_seen,
+        text: "You are in Bilbo's front hall at Bag End, but the old comfort has been broken open by other hands. Tags, bundled goods, and the disordered remains of an auction make it plain that the house was very near to passing out of his keeping altogether.",
+      },
+    ],
+    lane_beneath_hill: [
+      {
+        when: ({ game }) => game.homewardJourneyStarted(),
+        text: "You are in the lane beneath the Hill, where the country is as green and decent as ever, yet homecoming is not as simple as the sight ought to make it. More than one hobbit glances your way with the unsettled curiosity usually reserved for ghosts, lawsuits, or both together.",
       },
     ],
   };
@@ -1375,6 +1510,26 @@
       when: ({ game }) => game.flags.dragondefeated,
       text: "Relief and rebuilding move together through the town; every hammer-blow sounds like work snatched back from disaster.",
     },
+    {
+      roomIds: ["ruins_of_the_town_of_dale"],
+      when: ({ game }) => game.flags.bard_camp_active,
+      text: "Men of the Lake move between fallen stones with bundles, spears, and wary purpose, as though rebuilding and wariness have become the same labor.",
+    },
+    {
+      roomIds: ["front_gate"],
+      when: ({ game }) => game.flags.dain_arrived,
+      text: "New dwarf-banners stir among the stones below, and every watchfire now seems to burn with twice the challenge.",
+    },
+    {
+      roomIds: ["front_gate"],
+      when: ({ game }) => game.flags.erebor_standoff_started,
+      text: "Farther down among the ruins, campfires glimmer where Bard's people have made their stand beneath the Mountain.",
+    },
+    {
+      roomIds: ["ruins_of_the_town_of_dale"],
+      when: ({ game }) => game.flags.dain_arrived,
+      text: "Hard voices in a northern dwarf-speech answer the night from one ruined street to another, and the camp's unease has turned sharper for it.",
+    },
   ];
 
   const CONTEXTUAL_COMPANION_POSE_RULES = [
@@ -1444,6 +1599,18 @@
       when: ({ game }) => game.flags.dragondefeated,
       text: "walks the halls like a wary guest inside somebody else's hard-won ending",
     },
+    {
+      characterIds: ["bard"],
+      roomIds: ["ruins_of_the_town_of_dale"],
+      when: ({ game }) => game.flags.bard_camp_active,
+      text: "keeps his place among the broken stones like a captain who expects words to fail before steel does",
+    },
+    {
+      characterIds: ["gandalf"],
+      roomIds: ["ruins_of_the_town_of_dale"],
+      when: ({ game }) => game.flags.bard_camp_active,
+      text: "moves through the camp with the look of someone measuring how little folly would be needed to spoil a victory",
+    },
   ];
 
   const CONTEXTUAL_COMPANION_COMMENT_RULES = [
@@ -1470,6 +1637,11 @@
       chapters: ["erebor_outer", "erebor_inner"],
       when: ({ game }) => game.flags.dragondefeated,
       text: "Bard says 'A dead dragon leaves work behind him almost as large as the fear he kept alive.'",
+    },
+    {
+      roomIds: ["ruins_of_the_town_of_dale", "front_gate"],
+      when: ({ game }) => game.flags.dain_arrived,
+      text: "Gandalf says 'An armed kinsman arrived at the wrong moment can do almost as much harm as an enemy, if pride is ready to make use of him.'",
     },
   ];
 
@@ -3302,15 +3474,20 @@
     }
 
     chapterForRoom(roomId = this.game.currentRoom) {
+      if (this.game.homewardJourneyStarted() && (IMMERSION_BAG_END_ROOMS.has(roomId) || IMMERSION_SHIRE_ROOMS.has(roomId) || ["lane_beneath_hill", "party_field", "bywater_bridge"].includes(roomId))) return "homecoming";
       if (["green_dragon_inn", "green_dragon_inn_outside"].includes(roomId)) return "green_dragon";
       if (IMMERSION_SHIRE_ROOMS.has(roomId)) return "shire";
       if (IMMERSION_BAG_END_ROOMS.has(roomId)) return "bag_end";
       if (roomId === "deep_dark_lake") return "isolation";
+      if (this.game.wargEscapeActive() && roomId === "treeless_opening") return "warg_escape";
       if (IMMERSION_GOBLIN_ROOMS.has(roomId)) return "goblins";
       if (IMMERSION_RIVENDELL_ROOMS.has(roomId)) return "rivendell";
       if (IMMERSION_BEORN_ROOMS.has(roomId) || ["treeless_opening", "great_river"].includes(roomId)) return "beorn";
       if (IMMERSION_MIRKWOOD_ROOMS.has(roomId) || ["forest_road", "forest_road_2", "forest", "waterfall", "running_river"].includes(roomId)) return "mirkwood";
       if (IMMERSION_ELVEN_HALLS_ROOMS.has(roomId) || roomId === "elvish_clearing") return "elves";
+      if (this.game.flags.thorin_fallen && ["front_gate", "ruins_of_the_town_of_dale", "stoe_of_ravenhill", "little_steep_bay"].includes(roomId)) return "erebor_aftermath";
+      if (this.game.battleActive() && ["front_gate", "ruins_of_the_town_of_dale", "stoe_of_ravenhill", "little_steep_bay"].includes(roomId)) return "erebor_battle";
+      if (this.game.flags.erebor_standoff_started && ["front_gate", "ruins_of_the_town_of_dale", "stoe_of_ravenhill", "little_steep_bay"].includes(roomId)) return "erebor_standoff";
       if (IMMERSION_LAKETOWN_ROOMS.has(roomId) || ["bleak_barren_land", "ruins_of_the_town_of_dale", "stoe_of_ravenhill"].includes(roomId)) return "laketown";
       if (IMMERSION_EREBOR_OUTER_ROOMS.has(roomId)) return "erebor_outer";
       if (IMMERSION_EREBOR_INNER_ROOMS.has(roomId)) return "erebor_inner";
@@ -3348,6 +3525,34 @@
         this.syncBagEndLeaders();
         return;
       }
+      if (chapter === "homecoming") {
+        this.syncHomecoming();
+        return;
+      }
+      if (chapter === "warg_escape") {
+        this.syncWargEscape();
+        return;
+      }
+      if (chapter === "elves") {
+        this.syncElves();
+        return;
+      }
+      if (chapter === "laketown") {
+        this.syncLaketown();
+        return;
+      }
+      if (chapter === "erebor_aftermath") {
+        this.syncEreborAftermath();
+        return;
+      }
+      if (chapter === "erebor_battle") {
+        this.syncEreborBattle();
+        return;
+      }
+      if (chapter === "erebor_standoff") {
+        this.syncEreborStandoff();
+        return;
+      }
 
       const focusRoom = this.game.currentRoom;
       const dwarfIds = this.ambientDwarfIds();
@@ -3370,6 +3575,200 @@
       this.syncThorin(chapter, focusRoom);
     }
 
+    syncElves() {
+      const freed = Boolean(this.game.flags.mirkwooddwarvesfreed);
+      const focusRoom = this.game.currentRoom;
+      const prisonRooms = ["elven_prison_cells", "dark_dungeon"];
+      const regroupRoom = "cellar";
+      const ambientIds = this.ambientDwarfIds();
+      for (let index = 0; index < ambientIds.length; index += 1) {
+        const dwarf = this.game.characters[ambientIds[index]];
+        if (!dwarf) continue;
+        dwarf.followingPlayer = false;
+        dwarf.movementMode = "never";
+        dwarf.visible = true;
+        dwarf.partyBound = true;
+        if (freed) {
+          dwarf.position = regroupRoom;
+          continue;
+        }
+        const spread = focusRoom === "cellar" ? prisonRooms : [focusRoom, ...prisonRooms];
+        dwarf.position = spread[index % spread.length] || "elven_prison_cells";
+      }
+      const thorin = this.game.characters.thorin;
+      if (thorin) {
+        thorin.followingPlayer = false;
+        thorin.movementMode = "never";
+        thorin.visible = true;
+        thorin.position = freed ? regroupRoom : "elven_prison_cells";
+      }
+      const gandalf = this.game.characters.gandalf;
+      if (gandalf) {
+        gandalf.position = null;
+        gandalf.followingPlayer = false;
+        gandalf.movementMode = "never";
+      }
+    }
+
+    syncLaketown() {
+      const focusRoom = this.game.currentRoom;
+      const townRooms = ["wooden_town", "laketown_town_square", "laketown_marketplace", "laketown_bridges", "laketown_docks", "laketown_warehouses"];
+      const outlandRooms = ["long_lake", "strong_river", "bleak_barren_land"];
+      const ambientIds = this.ambientDwarfIds();
+      const inTown = IMMERSION_LAKETOWN_ROOMS.has(focusRoom);
+      for (let index = 0; index < ambientIds.length; index += 1) {
+        const dwarf = this.game.characters[ambientIds[index]];
+        if (!dwarf) continue;
+        dwarf.followingPlayer = false;
+        dwarf.movementMode = "never";
+        dwarf.visible = true;
+        dwarf.partyBound = true;
+        if (inTown) {
+          const spread = [focusRoom, "wooden_town", "laketown_town_square", "laketown_marketplace", "laketown_bridges", "laketown_docks"];
+          dwarf.position = spread[index % spread.length] || "wooden_town";
+        } else {
+          const spread = [focusRoom, "strong_river", "long_lake"];
+          dwarf.position = spread[index % spread.length] || focusRoom;
+        }
+      }
+      const thorin = this.game.characters.thorin;
+      if (thorin) {
+        thorin.followingPlayer = false;
+        thorin.movementMode = "never";
+        thorin.visible = true;
+        thorin.position = inTown ? "wooden_town" : (outlandRooms.includes(focusRoom) ? focusRoom : "wooden_town");
+      }
+      const bard = this.game.characters.bard;
+      if (bard && !this.game.flags.dragondefeated) {
+        if (!bard.followingPlayer && !bard.carriedBy) {
+          bard.followingPlayer = false;
+          bard.movementMode = "never";
+          bard.visible = true;
+          if (!bard.position || !([...townRooms, ...outlandRooms].includes(bard.position))) {
+            bard.position = inTown ? "wooden_town" : focusRoom;
+          }
+        }
+      }
+      const gandalf = this.game.characters.gandalf;
+      if (gandalf) {
+        gandalf.position = null;
+        gandalf.followingPlayer = false;
+        gandalf.movementMode = "never";
+      }
+    }
+
+    syncEreborStandoff() {
+      const insideRoom = "erebor_great_hall";
+      for (const dwarfId of this.ambientDwarfIds()) {
+        const dwarf = this.game.characters[dwarfId];
+        if (!dwarf) continue;
+        dwarf.position = insideRoom;
+        dwarf.followingPlayer = false;
+        dwarf.movementMode = "never";
+        dwarf.visible = true;
+        dwarf.partyBound = true;
+      }
+      const thorin = this.game.characters.thorin;
+      if (thorin) {
+        thorin.position = insideRoom;
+        thorin.followingPlayer = false;
+        thorin.movementMode = "never";
+        thorin.visible = true;
+      }
+      const bard = this.game.characters.bard;
+      if (bard) {
+        bard.position = "ruins_of_the_town_of_dale";
+        bard.followingPlayer = false;
+        bard.movementMode = "never";
+        bard.visible = true;
+      }
+      const gandalf = this.game.characters.gandalf;
+      if (gandalf) {
+        gandalf.position = "ruins_of_the_town_of_dale";
+        gandalf.followingPlayer = false;
+        gandalf.movementMode = "never";
+        gandalf.visible = true;
+      }
+    }
+
+    syncEreborBattle() {
+      const battleChoice = this.game.flags.battle_stage_1_choice || "";
+      const gandalfRoom = battleChoice === "follow_gandalf" ? "stoe_of_ravenhill" : "ruins_of_the_town_of_dale";
+      const bardRoom = "ruins_of_the_town_of_dale";
+      const thorinRoom = "front_gate";
+      for (const dwarfId of this.ambientDwarfIds()) {
+        const dwarf = this.game.characters[dwarfId];
+        if (!dwarf) continue;
+        dwarf.position = thorinRoom;
+        dwarf.followingPlayer = false;
+        dwarf.movementMode = "never";
+        dwarf.visible = true;
+        dwarf.partyBound = true;
+      }
+      const thorin = this.game.characters.thorin;
+      if (thorin) {
+        thorin.position = thorinRoom;
+        thorin.followingPlayer = false;
+        thorin.movementMode = "never";
+        thorin.visible = true;
+      }
+      const bard = this.game.characters.bard;
+      if (bard) {
+        bard.position = bardRoom;
+        bard.followingPlayer = false;
+        bard.movementMode = "never";
+        bard.visible = true;
+      }
+      const gandalf = this.game.characters.gandalf;
+      if (gandalf) {
+        gandalf.position = gandalfRoom;
+        gandalf.followingPlayer = false;
+        gandalf.movementMode = "never";
+        gandalf.visible = true;
+      }
+    }
+
+    syncEreborAftermath() {
+      const thorinRoom = "stoe_of_ravenhill";
+      for (const dwarfId of this.ambientDwarfIds()) {
+        const dwarf = this.game.characters[dwarfId];
+        if (!dwarf) continue;
+        dwarf.position = "front_gate";
+        dwarf.followingPlayer = false;
+        dwarf.movementMode = "never";
+        dwarf.visible = true;
+        dwarf.partyBound = true;
+      }
+      const thorin = this.game.characters.thorin;
+      if (thorin) {
+        thorin.position = thorinRoom;
+        thorin.followingPlayer = false;
+        thorin.movementMode = "never";
+        thorin.visible = true;
+      }
+      const gandalf = this.game.characters.gandalf;
+      if (gandalf) {
+        gandalf.position = thorinRoom;
+        gandalf.followingPlayer = false;
+        gandalf.movementMode = "never";
+        gandalf.visible = true;
+      }
+      const bard = this.game.characters.bard;
+      if (bard) {
+        bard.position = "ruins_of_the_town_of_dale";
+        bard.followingPlayer = false;
+        bard.movementMode = "never";
+        bard.visible = true;
+      }
+      const beorn = this.game.characters.beorn;
+      if (beorn) {
+        beorn.position = thorinRoom;
+        beorn.followingPlayer = false;
+        beorn.movementMode = "never";
+        beorn.visible = true;
+      }
+    }
+
     syncBagEndLeaders() {
       const gandalf = this.game.characters.gandalf;
       if (gandalf && !["green_dragon_inn", "green_dragon_inn_outside"].includes(this.game.currentRoom)) {
@@ -3385,6 +3784,50 @@
         if (!thorin.position || !IMMERSION_BAG_END_ROOMS.has(thorin.position)) {
           thorin.position = party?.state?.questBriefingDone ? "bag_end_parlour" : "hobbit_hole";
         }
+      }
+    }
+
+    syncHomecoming() {
+      for (const dwarfId of this.ambientDwarfIds()) {
+        const dwarf = this.game.characters[dwarfId];
+        if (!dwarf) continue;
+        dwarf.position = null;
+        dwarf.followingPlayer = false;
+        dwarf.movementMode = "never";
+      }
+      for (const id of ["gandalf", "thorin", "bard"]) {
+        const character = this.game.characters[id];
+        if (!character) continue;
+        character.position = null;
+        character.followingPlayer = false;
+        character.movementMode = "never";
+      }
+    }
+
+    syncWargEscape() {
+      const focusRoom = "treeless_opening";
+      for (const dwarfId of this.ambientDwarfIds()) {
+        const dwarf = this.game.characters[dwarfId];
+        if (!dwarf) continue;
+        dwarf.position = focusRoom;
+        dwarf.followingPlayer = false;
+        dwarf.movementMode = "never";
+        dwarf.visible = true;
+        dwarf.partyBound = true;
+      }
+      const gandalf = this.game.characters.gandalf;
+      if (gandalf) {
+        gandalf.position = focusRoom;
+        gandalf.followingPlayer = false;
+        gandalf.movementMode = "never";
+        gandalf.visible = true;
+      }
+      const thorin = this.game.characters.thorin;
+      if (thorin) {
+        thorin.position = focusRoom;
+        thorin.followingPlayer = false;
+        thorin.movementMode = "never";
+        thorin.visible = true;
       }
     }
 
@@ -4627,7 +5070,9 @@
         item.location = { type: "character", id: game.player.id };
         game.player.inventory.push(item.id);
         if (matches(item.name, "treasure")) game.flags.treasuretaken = true;
-        return game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "take")} the ${item.name} from the ${container.name}.`);
+        game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "take")} the ${item.name} from the ${container.name}.`);
+        game.noteArkenstoneTaken(item);
+        return;
       }
       const fromMatch = objectName.split(" from ");
       const request = parseAllTarget(fromMatch[0]);
@@ -4648,7 +5093,9 @@
           item.location = { type: "character", id: game.player.id };
           game.player.inventory.push(item.id);
           if (matches(item.name, "treasure")) game.flags.treasuretaken = true;
-          return game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "take")} the ${item.name} from the ${container.name}.`);
+          game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "take")} the ${item.name} from the ${container.name}.`);
+          game.noteArkenstoneTaken(item);
+          return;
         }
       }
       const found = game.visibleSearch(targetName);
@@ -4677,6 +5124,7 @@
       if (matches(item.name, "treasure")) game.flags.treasuretaken = true;
       const source = found.parent?.id ? ` from the ${found.parent.name}` : "";
       game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "take")} the ${item.name}${source}.`);
+      game.noteArkenstoneTaken(item);
     }
 
     carryCharacter(character) {
@@ -4728,6 +5176,7 @@
         item.location = { type: "character", id: game.player.id };
         game.player.inventory.push(item.id);
         if (matches(item.name, "treasure")) game.flags.treasuretaken = true;
+        game.noteArkenstoneTaken(item);
         taken.push(item.name);
       }
       if (taken.length) {
@@ -4833,7 +5282,22 @@
         game.print("The treasure is safely home, but Smaug still lives.");
         return;
       }
-      game.winGame("Congratulations. You have killed Smaug and found the treasure - a real thief!");
+      if (game.flags.epilogue_complete) return;
+      if (!game.homewardJourneyStarted()) {
+        game.print("You settle the treasure away, but the road from the Mountain is not yet truly ended.");
+        return;
+      }
+      if (!game.flags.dragon_arc_complete) {
+        game.flags.dragon_arc_complete = true;
+        game.print("You settle the treasure safely into the heavy wooden chest. At last it is home, yet the tale does not feel wholly ended.");
+        game.recordProgressAutosave(
+          "autosave_milestone_treasure_home",
+          "after bringing the treasure home",
+          "ending:treasure-home",
+        );
+        return;
+      }
+      game.print("The treasure is home, but some last quiet turn of the tale still seems to wait upon Bag End.");
     }
 
     isInside(containerId, itemId) {
@@ -5450,10 +5914,24 @@
         game.print("Bard checks his gear, but he lacks the bow and arrow needed to face the dragon.");
         return true;
       }
+      if (!game.smaugWeakSpotKnown()) {
+        game.print("Bard steadies the bow, then lowers it again. 'Not yet,' he says. 'Against such a beast a blind shot is only waste. We need his weakness, not courage alone.'");
+        return true;
+      }
       if (!dragon || dragon.visible === false) {
         game.print("Bard says the dragon has already been slain.");
         return true;
       }
+      if (!game.bardDragonShotRoomReady()) {
+        game.print("Bard studies the Mountain and shakes his head. 'Not from here,' he says. 'If the black arrow is to fly true, it must be from Ravenhill, where the mark may be taken cleanly.'");
+        return true;
+      }
+      if (!game.flags.bard_ready_at_ravenhill) {
+        game.flags.bard_ready_at_ravenhill = true;
+        game.print("Bard steps onto the old stone of Ravenhill and measures the sky above the Mountain. 'Here,' he says softly. 'If ever there was a place for the last shot, it is this one.'");
+      }
+      if (!game.thrushMessageSent()) game.deliverThrushMessage();
+      game.flags.black_arrow_committed = true;
       dragon.visible = false;
       dragon.attackFlag = 0;
       game.flags.dragondefeated = true;
@@ -5654,6 +6132,22 @@
 
     reactToShownItem(character, item) {
       const game = this.game;
+      if (matches(character.name, "gandalf") && matches(item.name, "arkenstone")) {
+        game.flags.gandalf_knows_arkenstone = true;
+        game.flags.arkenstone_hidden_from_thorin = true;
+        game.print("Gandalf's eyes sharpen at once. 'So that is the Heart of the Mountain,' he murmurs. 'Keep your own counsel a little longer, Bilbo. Such a stone can move more than dwarves.'");
+        return;
+      }
+      if (matches(character.name, "thorin") && matches(item.name, "arkenstone")) {
+        game.flags.arkenstone_hidden_from_thorin = false;
+        game.print("Thorin's gaze fixes at once. 'The Arkenstone,' he says softly. 'The Heart of the Mountain. No heir of my house could look on it lightly.'");
+        return;
+      }
+      if (matches(character.name, "bard") && matches(item.name, "arkenstone")) {
+        if (game.flags.erebor_standoff_started) game.softenNegotiationWithArkenstone();
+        game.print("Bard studies the white jewel in silence, then says 'A stone like that may weigh upon hearts more heavily than mail or iron.'");
+        return;
+      }
       if ((matches(character.name, "gandalf") || matches(character.name, "elrond")) && matches(item.name, "curious map")) {
         game.print(`${sentenceDisplayCharacterName(character)} studies the ${item.name} carefully.`);
         game.noteElrondPreparationInteraction(character, { mode: "show-map", item });
@@ -7823,9 +8317,15 @@
         if (game.currentRoom === "elvish_clearing") {
           return "The wood elf says 'Speak plainly, then. The trees have long ears, and I have little love for riddling strangers.'";
         }
+        if (game.currentRoom === "dark_dungeon" && game.flags.elvenking_prisoner_seen) {
+          return "The wood elf says 'The king asked for truth and got silence. Be grateful it was only darkness you earned by it.'";
+        }
         return "The wood elf says 'You are too far under our roofs to wander unchallenged.'";
       }
       if (matches(character.name, "butler")) {
+        if (game.currentRoom === "cellar" && game.flags.cellar_feast_scene_seen) {
+          return "The butler steadies himself against a cask and says 'If you must speak, do it quietly. The wine has gone where it belongs, the feast is above us, and the barrels will be gone in due order when the stream is ready for them.'";
+        }
         return "The butler says 'If you must speak, be brief. Wine, keys, and quiet order all have their proper places here.'";
       }
       if (matches(character.name, "gandalf") && game.currentRoom === "rivendell") {
@@ -7834,16 +8334,78 @@
         }
         return "Gandalf says 'Rivendell rewards patience. Hear what can be heard here before you grow restless for the road.'";
       }
+      if (matches(character.name, "gandalf") && game.wargEscapeActive() && game.currentRoom === "treeless_opening") {
+        return game.flags.warg_escape_in_trees
+          ? "Gandalf says 'Hold fast and do not look down more than you must. We have bought a little height, and perhaps a little time besides.'"
+          : "Gandalf says 'Up, Bilbo. The ground is lost. Take to the pines while there is still a trunk left between you and those jaws.'";
+      }
+      if (matches(character.name, "gandalf") && game.flags.thorin_fallen && game.currentRoom === "stoe_of_ravenhill") {
+        return "Gandalf says 'Go to Thorin, if you mean to. He has little strength left, but he has asked for you before the end.'";
+      }
+      if (matches(character.name, "beorn") && game.flags.thorin_fallen && game.currentRoom === "stoe_of_ravenhill") {
+        return "Beorn says 'He fought hard and fell hard. I brought him out when the crush was blackest; now let him spend his last strength in peace, if peace can still be given him.'";
+      }
+      if (matches(character.name, "gandalf") && game.battleActive() && ["ruins_of_the_town_of_dale", "front_gate", "stoe_of_ravenhill"].includes(game.currentRoom)) {
+        return "Gandalf says 'No long counsels now, Bilbo. Keep your wits, choose your ground, and do the most good you can before the field closes altogether.'";
+      }
+      if (matches(character.name, "gandalf") && game.flags.erebor_standoff_started && ["ruins_of_the_town_of_dale", "front_gate"].includes(game.currentRoom)) {
+        if (game.dainArrived()) {
+          return "Gandalf says 'Dain has come in arms, which is excellent news if you mean to fight and very poor news if you mean to end the matter with words alone.'";
+        }
+        return "Gandalf says 'The dragon is dead, and that has only left room for more human sorts of trouble. We had better tread carefully now.'";
+      }
+      if (matches(character.name, "thorin") && game.flags.thorin_fallen && game.currentRoom === "stoe_of_ravenhill") {
+        if (!game.flags.thorin_reconciled) {
+          game.flags.thorin_reconciled = true;
+          game.recordProgressAutosave(
+            "autosave_milestone_thorin_farewell",
+            "after Thorin's farewell on Ravenhill",
+            "erebor:thorin-farewell",
+          );
+          return "Thorin opens his eyes and says 'Farewell, good thief. There is more in you of good than you know: courage and wisdom, blended in measure. If more of us valued food and cheer and song above hoarded gold, it would be a merrier world.'";
+        }
+        return "Thorin says faintly 'Farewell, Master Baggins. Go in peace, and remember me kindly.'";
+      }
+      if (matches(character.name, "thorin") && game.wargEscapeActive() && game.currentRoom === "treeless_opening") {
+        return game.flags.warg_escape_in_trees
+          ? "Thorin says 'A poor perch for kings or burglars, but better bark underhand than wargs at our heels.'"
+          : "Thorin says 'Tree or fang, Master Baggins: choose quickly. There is no third road offered us tonight.'";
+      }
+      if (matches(character.name, "thorin") && IMMERSION_LAKETOWN_ROOMS.has(game.currentRoom) && !game.flags.dragondefeated) {
+        return "Thorin says 'These lake-folk have given us roof and breathing-space, and I do not forget it. Yet every hour spent here is only a pause with the Mountain still before us.'";
+      }
       if (matches(character.name, "thorin") && (game.currentRoom === "front_gate" || IMMERSION_EREBOR_OUTER_ROOMS.has(game.currentRoom))) {
+        if (game.battleActive()) {
+          return "Thorin says 'Stand fast now, Master Baggins. There will be time enough for speech when the goblins are broken or we are.'";
+        }
         return "Thorin says 'Every stone here remembers what was taken from us. Speak quickly, Master Baggins. I will not linger forever outside my father's halls.'";
       }
+      if (matches(character.name, "bard") && game.battleActive() && ["ruins_of_the_town_of_dale", "front_gate", "stoe_of_ravenhill"].includes(game.currentRoom)) {
+        return "Bard says 'Hold where you can help, and hold cleanly. Panic is half the enemy's work if we let it be.'";
+      }
+      if (matches(character.name, "master") && IMMERSION_LAKETOWN_ROOMS.has(game.currentRoom)) {
+        game.noteLaketownMasterViewHeard();
+        return "The Master smooths his robe and says 'Lake-town prospers when sober heads govern it. Excitement is a poor substitute for order, and heroics poorer still when trade must go on.'";
+      }
+      if (matches(character.name, "bard") && game.flags.erebor_standoff_started && ["ruins_of_the_town_of_dale", "front_gate"].includes(game.currentRoom)) {
+        if (game.dainArrived()) {
+          return "Bard says 'With Dain come more axes, and with more axes come fewer patient ears. The need for a just settlement has not grown smaller, only more urgent.'";
+        }
+        return "Bard says 'The fire is gone from the Mountain, but old claims have come out of the dark in its place. We must see what sort of answer Thorin means to make.'";
+      }
       if (matches(character.name, "bard") && (IMMERSION_LAKETOWN_ROOMS.has(game.currentRoom) || game.currentRoom === "front_gate" || IMMERSION_EREBOR_OUTER_ROOMS.has(game.currentRoom) || IMMERSION_EREBOR_INNER_ROOMS.has(game.currentRoom))) {
+        if (!game.flags.dragondefeated && game.flags.laketown_barrel_arrival_seen && matches(game.currentRoom, "wooden_town")) {
+          return "Bard says 'You look as though the river has tried hard to keep you. Best get warm if you can, then tell what has driven dwarves and strangers out of the wood and down to our lake.'";
+        }
         return "Bard says 'A bowman does not waste words when the air already feels like the breath before a storm. When the moment comes, the shot must be true.'";
       }
       if (matches(character.name, "elrond") && game.currentRoom === "rivendell") {
         return "Elrond folds his hands and says 'Speak without haste. In Rivendell, even quiet words may be worth the hearing.'";
       }
       if (matches(character.name, "beorn") && game.currentRoom === "beorns_house") {
+        if (game.flags.beorn_dinner_seen) {
+          return "Beorn studies you in silence for a moment and says 'Eat while the food is before you and sleep while the roof is over you. The road will still be there in the morning, and so will Mirkwood.'";
+        }
         return "Beorn studies you in silence for a moment and says 'Say what you mean, little one, and spare me needless words.'";
       }
       if (matches(character.name, "gollum")) {
@@ -7866,7 +8428,12 @@
           searching: "Smaug says 'Come out, come out, thief in the dark. I know now that I am not alone.'",
           enraged: "Smaug's answer is a furnace-breath growl: 'When I find you, I shall know your taste as well as your scent.'",
         };
-        return lines[this.currentSmaugState()] || lines.sleeping;
+        const line = lines[this.currentSmaugState()] || lines.sleeping;
+        if (game.currentRoom === "lower_halls" && !game.smaugWeakSpotKnown()) {
+          game.flags.smaug_weakspot_known = true;
+          return `${line} As Smaug shifts over the treasure, you glimpse one small bare patch beneath the jeweled mail of his left breast.`;
+        }
+        return line;
       }
       return "";
     }
@@ -7877,6 +8444,14 @@
       const configuredResponse = characterConfiguredTopicResponse(character, text);
       if (configuredResponse) return configuredResponse;
       if (matches(character.name, "wood elf")) {
+        if (game.currentRoom === "dark_dungeon" && game.flags.elvenking_prisoner_seen) {
+          if (matchesAny(text, ["king", "elvenking", "questions", "questioning"])) {
+            return "The wood elf says 'The king asked you for honest answers and offered fair hearing for them. Since you kept your counsel, you may now keep the dungeon besides.'";
+          }
+          if (matchesAny(text, ["prison", "dungeon", "cell", "captivity", "companions", "dwarves"])) {
+            return "The wood elf says 'Your friends and your secrets have brought you no further than a locked door. If you mean to keep both, learn patience.'";
+          }
+        }
         if (matchesAny(text, ["wood", "forest", "mirkwood", "trees", "road", "path", "trail"])) {
           return "The wood elf says 'Few roads stay true in this wood for those who do not belong to it.'";
         }
@@ -7886,8 +8461,13 @@
         return "The wood elf says 'If you have business, speak it quickly. This is not a place for idle questions.'";
       }
       if (matches(character.name, "butler")) {
+        if (game.currentRoom === "cellar" && game.flags.cellar_feast_scene_seen && matchesAny(text, ["wine", "feast", "drunk", "drunken", "cups", "ale"])) {
+          return "The butler blinks and says 'There is feasting in the king's house tonight, and the wine has been honored as wine should be. That is no business of yours, except not to get underfoot while honest servants finish theirs.'";
+        }
         if (matchesAny(text, ["barrel", "barrels", "wine", "cellar"])) {
-          return "The butler says 'The barrels go where they are meant to go, and not one inch nearer mischief than duty requires.'";
+          return game.currentRoom === "cellar" && game.flags.cellar_feast_scene_seen
+            ? "The butler says 'The barrels go downriver when they are emptied and marked for it. Tonight there are enough of them to keep a sober servant busy and a tired one from becoming any soberer.'"
+            : "The butler says 'The barrels go where they are meant to go, and not one inch nearer mischief than duty requires.'";
         }
         if (matchesAny(text, ["key", "keys", "red key", "door", "doors"])) {
           return "The butler says 'Keys are trusted to steady hands. Doors are happier when they are used for their intended business.'";
@@ -7904,6 +8484,65 @@
           return game.flags.mapread
             ? "Gandalf says 'The way east is plain enough in broad strokes. The difficulty, as ever, lies in walking it.'"
             : "Gandalf says 'Patience. Wisdom often travels more slowly than feet.'";
+        }
+      }
+      if (matches(character.name, "gandalf") && game.wargEscapeActive() && game.currentRoom === "treeless_opening") {
+        if (matchesAny(text, ["wargs", "wolves", "danger"])) {
+          return game.flags.warg_escape_in_trees
+            ? "Gandalf says 'So long as they must leap and snap at bark instead of flesh, we have gained something. Not enough, perhaps, but something.'"
+            : "Gandalf says 'The wargs mean to hem us in for the goblins. Height first, questions later.'";
+        }
+        if (matchesAny(text, ["eagles", "eagle", "rescue", "help"])) {
+          return "Gandalf says 'If any help is abroad in the high airs tonight, it will not come because we deserve it, but because luck still keeps odd friendships.'";
+        }
+      }
+      if (matches(character.name, "gandalf") && game.flags.thorin_fallen && game.currentRoom === "stoe_of_ravenhill") {
+        if (matchesAny(text, ["thorin", "king under the mountain", "king"])) {
+          return game.flags.thorin_reconciled
+            ? "Gandalf says 'He has had his word with you, and that was what lay nearest his heart at the end.'"
+            : "Gandalf says 'He is hurt past healing, I fear. Go to him now, Bilbo: he would not have you kept away by formality.'";
+        }
+        if (matchesAny(text, ["battle", "war", "goblins", "victory"])) {
+          return "Gandalf says 'The battle is won, but no victory worth having ever comes to hand without its reckoning.'";
+        }
+      }
+      if (matches(character.name, "gandalf") && game.flags.erebor_standoff_started && ["ruins_of_the_town_of_dale", "front_gate"].includes(game.currentRoom)) {
+        if (matchesAny(text, ["dain", "iron hills", "reinforcements", "kinsmen"])) {
+          game.beginNegotiation();
+          return game.dainArrived()
+            ? "Gandalf says 'Dain has come swiftly from the Iron Hills, and he has not marched in mail so that this matter may remain a mere exchange of courtesies. Every axe beneath the Mountain makes peace narrower and battle easier.'"
+            : "Gandalf says 'If Dain comes, he will come in arms and quickly enough. That will strengthen Thorin's hand, but not anyone's patience.'";
+        }
+        if (matchesAny(text, ["thorin", "king under the mountain"])) {
+          game.beginNegotiation();
+          if (game.dainArrived()) {
+            return game.negotiationSoftened()
+              ? "Gandalf says 'Thorin is still proud, and now he has Dain's mailed kindred beneath the Mountain to stiffen that pride. The Arkenstone still gives us a language he cannot ignore, but the time for gentle delay is passing.'"
+              : "Gandalf says 'Thorin has the Mountain under him at last, and Dain's coming gives that pride a wall of iron to lean against. Counsel will not grow easier from here.'";
+          }
+          return game.negotiationSoftened()
+            ? "Gandalf says 'Thorin is still proud enough, but pride is easier to reason with when the Arkenstone itself has entered the matter. He may yet hear more than his own grievance.'"
+            : "Gandalf says 'Thorin has the Mountain under him at last, and that makes counsel harder for him to hear just now than danger ever did.'";
+        }
+        if (matchesAny(text, ["negotiation", "parley", "terms", "bargain", "bargaining"])) {
+          game.beginNegotiation();
+          if (game.dainArrived()) {
+            return game.negotiationSoftened()
+              ? "Gandalf says 'With the Arkenstone in Bard's keeping, the talk still has a true beginning; but Dain's arrival means that beginning must be used quickly, before iron and impatience speak louder than reason.'"
+              : "Gandalf says 'At present it is more stand-off than settlement, and Dain's coming makes delay more dangerous still. Without some weight to lay against Thorin's pride, words alone may soon be crowded out by warlike counsels.'";
+          }
+          return game.negotiationSoftened()
+            ? "Gandalf says 'With the Arkenstone in Bard's keeping, the talk need not begin empty-handed. It is not peace, but it is at least a language Thorin cannot easily ignore.'"
+            : "Gandalf says 'At present it is more stand-off than settlement. Without some weight to lay against Thorin's pride, words alone may go poorly.'";
+        }
+        if (matchesAny(text, ["thorin", "king", "dwarves", "erebor", "mountain"])) {
+          return "Gandalf says 'Thorin has the Mountain under him at last, and that makes counsel harder for him to hear just now than danger ever did.'";
+        }
+        if (matchesAny(text, ["bard", "camp", "men", "dale", "lake-town", "laketown"])) {
+          return "Gandalf says 'Bard has gathered the men of the Lake and what remains of Dale's shelter below the Gate. Relief, hunger, and old debts are all camped there together.'";
+        }
+        if (matchesAny(text, ["treasure", "gold", "hoard"])) {
+          return "Gandalf says 'Gold can wake many old voices at once. We have not yet heard the last of them.'";
         }
       }
       if (IMMERSION_RIVENDELL_ROOMS.has(game.currentRoom) && !game.rivendellPreparationsComplete()) {
@@ -7944,6 +8583,20 @@
         }
       }
       if (matches(character.name, "beorn")) {
+        if (game.flags.thorin_fallen && game.currentRoom === "stoe_of_ravenhill") {
+          if (matchesAny(text, ["thorin", "king", "king under the mountain"])) {
+            return "Beorn says 'He was no light burden to bear, nor would I have had him be one. A king should come out of battle as a king, even when battle has beaten him.'";
+          }
+          if (matchesAny(text, ["battle", "war", "goblins", "wargs", "eagles"])) {
+            return "Beorn says 'The goblins were ripe for breaking, and the eagles gave them trouble from above while I gave them trouble where my hands could reach. That is enough tale for one field.'";
+          }
+        }
+        if (matchesAny(text, ["animals", "beasts", "dogs", "horses", "sheep", "servants"])) {
+          return "Beorn says 'My beasts know their work better than many men do. Treat them with courtesy, and you will find them more sensible company than most travelers.'";
+        }
+        if (matchesAny(text, ["honey", "bees", "bread", "cakes", "supper", "dinner", "hospitality", "house", "hall"])) {
+          return "Beorn says 'What is under my roof is plain, strong, and sufficient. Bread, honey, clean straw, and room by the fire are good things; there is no need to make them fancy in order to make them welcome.'";
+        }
         if (matchesAny(text, ["mirkwood", "forest", "wood"])) {
           return game.beornWarningSummary();
         }
@@ -7963,8 +8616,97 @@
           return "Beorn says 'There is food and a roof here for decent guests. Take both with thanks, and do not abuse either.'";
         }
       }
+      if (matches(character.name, "master") && IMMERSION_LAKETOWN_ROOMS.has(game.currentRoom)) {
+        game.noteLaketownMasterViewHeard();
+        if (matchesAny(text, ["bard", "bowman"])) {
+          return "The Master smiles thinly and says 'Bard is useful in rough weather and with a bow in his hand, but towns are not governed by grim warnings alone. A people must be steadied as well as stirred.'";
+        }
+        if (matchesAny(text, ["dragon", "smaug", "danger"])) {
+          return "The Master says 'Dragons are unfortunate for commerce, certainly; but panic ruins a town even faster if left unchecked. One must think of stores, boats, and order as well as alarms.'";
+        }
+        if (matchesAny(text, ["town", "lake-town", "laketown", "people", "trade", "gold", "treasure"])) {
+          return "The Master spreads his hands and says 'Lake-town lives by traffic, timber, and prudent management. If the Mountain yields profit again, wise men must see that the town benefits from it rather than merely boasting of brave speeches after the fact.'";
+        }
+        if (matchesAny(text, ["elves", "dwarves", "strangers", "company"])) {
+          return "The Master says 'Strangers bring disturbance before they bring advantage, as a rule; yet if advantage comes at last, a sensible town does not refuse to reckon with it.'";
+        }
+        return "The Master says 'Ask what bears on the welfare of Lake-town, and I shall answer if I see profit in clarity.'";
+      }
+      if (matches(character.name, "thorin") && game.flags.thorin_fallen && game.currentRoom === "stoe_of_ravenhill") {
+        if (matchesAny(text, ["bilbo", "baggins", "friendship", "friend", "forgiveness", "farewell"])) {
+          if (!game.flags.thorin_reconciled) {
+            game.flags.thorin_reconciled = true;
+            game.recordProgressAutosave(
+              "autosave_milestone_thorin_farewell",
+              "after Thorin's farewell on Ravenhill",
+              "erebor:thorin-farewell",
+            );
+          }
+          return "Thorin says 'There is more in you of good than you know, Master Baggins. Farewell.'";
+        }
+        if (matchesAny(text, ["treasure", "gold", "arkenstone", "mountain"])) {
+          return "Thorin says 'The gold seems a small matter now. I would rather part in kindness than keep every gem in Erebor and lose that.'";
+        }
+        return game.flags.thorin_reconciled
+          ? "Thorin says 'Farewell, Master Baggins. Go in peace.'"
+          : "Thorin says weakly 'Sit by me a while, if you will.'";
+      }
+      if (matches(character.name, "thorin") && game.wargEscapeActive() && game.currentRoom === "treeless_opening") {
+        if (matchesAny(text, ["wargs", "wolves", "goblins"])) {
+          return "Thorin says 'There are teeth below and goblins above. I would gladly meet either on honest ground instead of hanging between them like wind-shaken fruit.'";
+        }
+        if (matchesAny(text, ["eagles", "eagle", "help", "rescue"])) {
+          return "Thorin says 'If help comes, let it come quickly. I have no love for leaving our fate to talons and chance, but less for leaving it to wargs.'";
+        }
+      }
+      if (matches(character.name, "thorin") && IMMERSION_LAKETOWN_ROOMS.has(game.currentRoom) && !game.flags.dragondefeated) {
+        if (matchesAny(text, ["town", "lake-town", "laketown", "people", "houses"])) {
+          return "Thorin says 'It is a strange city, half ship and half marketplace, yet there is hard usefulness in it. A people who can build thus upon dark water are not to be dismissed as soft.'";
+        }
+        if (matchesAny(text, ["master", "town-master", "governor"])) {
+          return "Thorin says 'The Master hears profit rustling even in trouble. That may serve a town well enough, provided bolder men are near when profit proves dangerous company.'";
+        }
+        if (matchesAny(text, ["bard", "bowman"])) {
+          return "Thorin says 'Bard has the look of one who sees farther than most and says less than he knows. I would rather have such a man beside a dragon than a hall full of flatterers.'";
+        }
+        if (matchesAny(text, ["dragon", "smaug", "mountain", "erebor"])) {
+          return "Thorin says 'Smaug is near enough to trouble every plank in this town, and nearer still to my thought. Lake-town may shelter us for a night, but it cannot end our business.'";
+        }
+      }
       if (matches(character.name, "thorin") && (game.currentRoom === "front_gate" || IMMERSION_EREBOR_OUTER_ROOMS.has(game.currentRoom) || IMMERSION_EREBOR_INNER_ROOMS.has(game.currentRoom))) {
-        if (matchesAny(text, ["treasure", "gold", "hoard", "arkenstone"])) {
+        if (game.flags.erebor_standoff_started && matchesAny(text, ["dain", "iron hills", "reinforcements", "kinsmen"])) {
+          game.beginNegotiation();
+          return game.dainArrived()
+            ? "Thorin says 'Dain is my kinsman, and he has come because the halls of my fathers are not to be ringed by hungry claimants without answer. Let Bard remember that before he mistakes patience for weakness.'"
+            : "Thorin says 'If Dain of the Iron Hills hears that Erebor is beset before its gates are warm again, he will not leave his kin unanswered.'";
+        }
+        if (game.flags.erebor_standoff_started && matchesAny(text, ["negotiation", "parley", "terms", "bargain", "bargaining", "bard", "tribute", "aid"])) {
+          game.beginNegotiation();
+          if (game.dainArrived()) {
+            if (!game.negotiationSoftened()) game.noteNegotiationFailure();
+            return game.negotiationSoftened()
+              ? "Thorin says 'The Arkenstone may buy Bard a hearing, but Dain stands below the Mountain now, and I will not have my rights hurried into surrender because other men have chosen to gather in arms.'"
+              : "Thorin says 'With Dain come axes enough that I need not bargain out of fear. If Bard seeks terms, he will learn that my patience is not surrender.'";
+          }
+          if (game.negotiationSoftened()) {
+            game.resolveNegotiation();
+            return "Thorin says 'I will not be schooled before my own gate; yet for the Arkenstone's sake, and for the honor of my word, I will hear what Bard asks before I answer him finally.'";
+          }
+          game.noteNegotiationFailure();
+          return "Thorin says 'If Bard comes to my gate with demands, he shall hear my answer from the stone itself: what is mine is not to be haggled over in the hour of its recovery.'";
+        }
+        if (matchesAny(text, ["arkenstone", "heart of the mountain"])) {
+          if (game.flags.arkenstone_given_to_bard) {
+            return "Thorin says 'If the Arkenstone passes into other hands, then bargaining will soon follow it; and bargains made over a king's jewel are seldom gentle things.'";
+          }
+          if (game.arkenstoneIdentified()) {
+            return game.findInInventory("arkenstone") && !game.arkenstoneHiddenFromThorin()
+              ? "Thorin's gaze fixes at once. 'The Arkenstone,' he says softly. 'The Heart of the Mountain. No heir of my house could look on it lightly.'"
+              : "Thorin says 'If the Arkenstone has indeed come to light again, then the heart of the Mountain is no lost memory only.'";
+          }
+          return "Thorin says 'If the Heart of the Mountain still lies anywhere in these halls, I would know it when I saw it.'";
+        }
+        if (matchesAny(text, ["treasure", "gold", "hoard"])) {
           return "Thorin says 'The treasure is not mere glitter to us. It is the memory of a kingdom, and the proof that Erebor may yet be ours again.'";
         }
         if (matchesAny(text, ["dragon", "smaug"])) {
@@ -7974,7 +8716,47 @@
           return "Thorin says 'Erebor is not only stone and treasure. It is our house, and I would see it named ours again before I die.'";
         }
       }
+      if (matches(character.name, "bard") && game.flags.erebor_standoff_started && ["ruins_of_the_town_of_dale", "front_gate"].includes(game.currentRoom)) {
+        if (matchesAny(text, ["dain", "iron hills", "reinforcements", "kinsmen"])) {
+          game.beginNegotiation();
+          return game.dainArrived()
+            ? "Bard says 'Dain is beneath the Mountain now with mailed dwarves at his back. If justice is to be had without blood, it must be had quickly.'"
+            : "Bard says 'If Dain reaches Thorin before terms do, the Mountain will have more defenders and fewer patient ears.'";
+        }
+        if (matchesAny(text, ["negotiation", "parley", "terms", "bargain", "bargaining"])) {
+          game.beginNegotiation();
+          if (game.dainArrived()) {
+            return game.negotiationSoftened()
+              ? "Bard says 'The Arkenstone still gives us a voice in the matter, but Dain's arrival means we must use it before iron speaks louder than reason.'"
+              : "Bard says 'Dain's coming makes delay dangerous. Without some pledge or pressure greater than my word alone, Thorin will soon hear only the counsel of armed kin.'";
+          }
+          return game.negotiationSoftened()
+            ? "Bard says 'Now that the Arkenstone is in play, Thorin may at least be brought to listen. That does not make him easy, but it gives the talk a true beginning.'"
+            : "Bard says 'Without some pledge or pressure greater than my word alone, Thorin will hear only one old claim set against another. We need more than indignation to begin this talk well.'";
+        }
+        if (matchesAny(text, ["thorin", "dwarves", "erebor", "mountain"])) {
+          return "Bard says 'Thorin has won the Mountain, and now he means to hold it like a king restored. That would be simpler if no one else had paid for the dragon's death and coming.'";
+        }
+        if (matchesAny(text, ["camp", "men", "dale", "lake-town", "laketown"])) {
+          return "Bard says 'The men below the Gate are not an army by choice. They are cold, dispossessed, and waiting to learn whether justice can still be had without battle.'";
+        }
+        if (matchesAny(text, ["treasure", "gold", "hoard"])) {
+          return "Bard says 'The treasure is old and weighty with claims, but food, shelter, and rebuilding are not old questions. They are with us tonight.'";
+        }
+      }
       if (matches(character.name, "bard") && (IMMERSION_LAKETOWN_ROOMS.has(game.currentRoom) || game.currentRoom === "front_gate" || IMMERSION_EREBOR_OUTER_ROOMS.has(game.currentRoom) || IMMERSION_EREBOR_INNER_ROOMS.has(game.currentRoom))) {
+        if (!game.flags.dragondefeated && game.flags.laketown_barrel_arrival_seen && game.currentRoom === "wooden_town") {
+          if (matchesAny(text, ["town", "lake-town", "laketown", "people", "master"])) {
+            game.noteLaketownBardViewHeard();
+            if (game.flags.laketown_master_met) {
+              return "Bard says 'The Master thinks first of order, speeches, and what may be made to prosper afterward. I think of burned roofs, hungry folk, and what the Mountain has already cost the town before anyone speaks of profit from it.'";
+            }
+            return "Bard says 'Lake-town takes strangers in when there is cause, but it asks questions while it does so. A town on the water learns thrift, memory, and caution all together.'";
+          }
+          if (matchesAny(text, ["dwarves", "company", "mountain", "erebor"])) {
+            return "Bard says 'Dwarves coming secretly out of the wood and over the water are not an ordinary matter. If the Mountain is stirring again, the town will feel it soon enough.'";
+          }
+        }
         if (matchesAny(text, ["dragon", "smaug"])) {
           return "Bard says 'A dragon is not beaten by noise or bravery alone. When he comes within reach, one true opening must be enough.'";
         }
@@ -7982,11 +8764,21 @@
           return "Bard lays a hand on the black arrow and says 'A bowman lives by the shot he has not yet wasted. This one is kept for necessity, not display.'";
         }
         if (matchesAny(text, ["town", "lake-town", "laketown", "people", "master"])) {
+          game.noteLaketownBardViewHeard();
+          if (game.flags.laketown_master_met) {
+            return "Bard says 'The Master thinks first of order, speeches, and what may be made to prosper afterward. I think of burned roofs, hungry folk, and what the Mountain has already cost the town before anyone speaks of profit from it.'";
+          }
           return "Bard says 'Lake-town has endured much from the Mountain already. Whatever happens here must answer not only to old claims, but to living folk as well.'";
         }
       }
       if (matches(character.name, "dragon")) {
-        if (matchesAny(text, ["treasure", "gold", "cup", "hoard"])) return "Smaug says 'My armour is like tenfold shields, my teeth are swords, my claws are spears, and this wealth is mine by fire and fear.'";
+        if (matchesAny(text, ["treasure", "gold", "cup", "hoard"])) {
+          if (game.currentRoom === "lower_halls" && !game.smaugWeakSpotKnown()) {
+            game.flags.smaug_weakspot_known = true;
+            return "Smaug says 'My armour is like tenfold shields, my teeth are swords, my claws are spears, and this wealth is mine by fire and fear.' As the dragon rolls and gloats among the treasure, you catch sight of one small bare place in the jeweled mail of his left breast.";
+          }
+          return "Smaug says 'My armour is like tenfold shields, my teeth are swords, my claws are spears, and this wealth is mine by fire and fear.'";
+        }
         if (matchesAny(text, ["thorin", "dwarves", "company"])) return "Smaug says 'Ah, the dwarves. Greed remembers old tunnels better than wisdom does.'";
         if (matchesAny(text, ["door", "entrance", "way in", "secret"])) return "Smaug gives a low pleased rumble. 'You ask many careful questions for so small a guest. That interests me.'";
       }
@@ -8056,7 +8848,7 @@
         }
         const outcome = this.gollumWrongAnswerOutcome();
         game.print(outcome.attack, "danger");
-        game.endGame(outcome.ending, { fatal: true });
+        game.endGame(outcome.ending, { fatal: true, deathImage: "gollum_wrong_answer_to_riddle_death.png" });
         return true;
       }
       if (game.gollumState.currentRiddleIndex < riddles.length - 1) {
@@ -8214,7 +9006,10 @@
         goblin.visible = false;
         goblin.position = game.currentRoom;
       }
-      game.endGame(`The hulking goblin butchers ${victim?.name || "one of the company"} before you can tear it loose, and the cries that follow bring more goblins out of the dark. The tunnels close over the whole company.`, { fatal: true });
+      game.endGame(`The hulking goblin butchers ${victim?.name || "one of the company"} before you can tear it loose, and the cries that follow bring more goblins out of the dark. The tunnels close over the whole company.`, {
+        fatal: true,
+        deathImage: "hulking_goblin_attack_death.png",
+      });
       return true;
     }
 
@@ -8344,6 +9139,43 @@
       }
       if (game.currentRoom === "dark_dungeon") game.toggleDoorByName("red door", "Someone opens the red door.", "Someone closes the red door.");
       if (game.currentRoom === "large_dry_cave") game.toggleDoorByName("small hidden crevice", "A small hidden crevice is revealed.", "The small hidden crevice disappears.");
+      if (
+        game.flags.erebor_standoff_started
+        && game.negotiationStarted()
+        && !game.dainArrived()
+        && ["ruins_of_the_town_of_dale", "front_gate"].includes(game.currentRoom)
+      ) {
+        game.flags.dain_arrival_watch_counter = (game.flags.dain_arrival_watch_counter || 0) + 1;
+        if (game.flags.dain_arrival_watch_counter === 1) {
+          game.print("Messengers come and go between the ruins and the northern watch, and more than one voice begins to speak uneasily of dwarf-standards on the march from the Iron Hills.");
+        } else if (game.flags.dain_arrival_watch_counter >= 2) {
+          game.beginDainArrival();
+        }
+      }
+      if (
+        game.dainArrived()
+        && !game.flags.battle_started
+        && !game.flags.battle_won
+        && ["ruins_of_the_town_of_dale", "front_gate", "stoe_of_ravenhill", "little_steep_bay"].includes(game.currentRoom)
+      ) {
+        if (!game.flags.battle_wait_armed) game.flags.battle_wait_armed = true;
+        else game.beginBattleOfFiveArmies();
+      }
+      if (
+        game.flags.battle_won
+        && !game.flags.thorin_fallen
+        && game.flags.thorin_fall_wait_armed
+        && ["ruins_of_the_town_of_dale", "front_gate", "stoe_of_ravenhill", "little_steep_bay"].includes(game.currentRoom)
+      ) {
+        game.beginThorinFall();
+      }
+      if (
+        game.flags.thorin_reconciled
+        && !game.homewardJourneyStarted()
+        && game.currentRoom === "stoe_of_ravenhill"
+      ) {
+        game.beginHomewardJourney();
+      }
       if (game.currentRoom === "erebor_hidden_door" && game.rivendellPreparationsComplete() && !game.flags.secretdoorsun) {
         if (!game.flags.hidden_door_map_consulted) {
           game.print("You wait by the western wall, but without consulting the map you cannot yet be sure this is the place Elrond meant.");
@@ -8425,14 +9257,24 @@
     }
 
     killBySpiderEyes() {
-      this.game.endGame("Something small and venomous strikes from the dark. Cold fire runs through your limbs, and the forest takes you before you can cry out.", { fatal: true });
+      this.game.endGame("Something small and venomous strikes from the dark. Cold fire runs through your limbs, and the forest takes you before you can cry out.", {
+        fatal: true,
+        deathImage: "spider_stings_death.png",
+      });
     }
 
     checkSpecialSituations() {
       this.checkGollumEncounter();
       this.checkGoblinTunnelEncounter();
+      this.checkWargEscape();
+      this.checkBeornHospitality();
+      this.checkCellarFeast();
+      this.checkDwarfBarrelLoading();
+      this.checkLaketownArrival();
       this.checkKidnapping();
       this.checkTrollsClearing();
+      this.checkEreborStandoff();
+      this.checkBagEndHomecoming();
     }
 
     checkGoblinTunnelEncounter() {
@@ -8461,6 +9303,45 @@
       if (game.gollumState.pocketQuestionAsked && game.player.noticeable !== false) {
         game.print("Gollum prowls between you and the northern passage, sniffing for the ring with quick, desperate breaths.");
       }
+    }
+
+    checkWargEscape() {
+      const game = this.game;
+      if (game.flags.eagles_rescued_company) return false;
+      if (!game.gollumState?.escaped) return false;
+      if (game.flags.warg_escape_started) return false;
+      if (game.currentRoom !== "treeless_opening") return false;
+      return game.beginWargEscape();
+    }
+
+    checkBeornHospitality() {
+      const game = this.game;
+      if (game.currentRoom !== "beorns_house") return false;
+      if (game.flags.beorn_dinner_seen) return false;
+      return game.beginBeornHospitalityScene();
+    }
+
+    checkCellarFeast() {
+      const game = this.game;
+      if (game.currentRoom !== "cellar") return false;
+      if (game.flags.cellar_feast_scene_seen) return false;
+      return game.beginCellarEscapeOpportunity();
+    }
+
+    checkDwarfBarrelLoading() {
+      const game = this.game;
+      if (game.currentRoom !== "cellar") return false;
+      if (!game.flags.mirkwooddwarvesfreed) return false;
+      if (game.flags.barrel_company_prepared) return false;
+      return game.beginDwarfBarrelLoadingScene();
+    }
+
+    checkLaketownArrival() {
+      const game = this.game;
+      if (game.currentRoom !== "wooden_town") return false;
+      if (!game.flags.laketown_barrel_arrival_pending) return false;
+      if (game.flags.laketown_barrel_arrival_seen) return false;
+      return game.beginLaketownBarrelArrival();
     }
 
     checkTrollsClearing() {
@@ -8492,6 +9373,20 @@
       }
       const liveTroll = game.peopleInRoom().find((p) => ["hideous troll", "vicious troll"].includes(normalize(p.name)) && p.visible);
       if (liveTroll && !game.trollsDefeated) return;
+    }
+
+    checkEreborStandoff() {
+      const game = this.game;
+      if (!game.flags.dragondefeated || game.flags.erebor_standoff_started) return false;
+      if (!["front_gate", "ruins_of_the_town_of_dale", "stoe_of_ravenhill", "little_steep_bay"].includes(game.currentRoom)) return false;
+      return game.beginEreborStandoff();
+    }
+
+    checkBagEndHomecoming() {
+      const game = this.game;
+      if (!game.homewardJourneyStarted() || game.flags.bag_end_auction_seen) return false;
+      if (game.currentRoom !== "hobbit_hole") return false;
+      return game.noteBagEndAuction();
     }
 
     maybeAutosaveForRoom(roomId = this.game.currentRoom) {
@@ -8595,6 +9490,9 @@
       const dungeon = game.rooms.dark_dungeon;
       if (!dungeon) return;
       game.print("The wood elf's patience hardens. 'You have come far enough,' he says.");
+      game.flags.elvenking_prisoner_seen = true;
+      game.print("You are led at last before the Elvenking, who questions you coolly about your name, your companions, and what business has brought such travelers through his wood.");
+      game.print("Bilbo keeps his own counsel. At that the king's face grows no harsher, only more remote, and he orders that you be shut up in darkness until you learn either trust or weariness.");
       game.print("The wood elf captures you.");
       game.player.position = "dark_dungeon";
       game.currentRoom = "dark_dungeon";
@@ -8738,14 +9636,62 @@
     nextAutoplayCommand() {
       const game = this.game;
       const beforeDragonDefeat = !game.flags.dragondefeated;
+      const bard = Object.values(game.characters).find((character) => matches(character.name, "bard"));
+
+      if (!beforeDragonDefeat && game.flags.erebor_standoff_started && !game.flags.thorin_reconciled) {
+        if (!game.flags.negotiation_started) {
+          if (game.currentRoom !== "ruins_of_the_town_of_dale") return this.autoplayRouteCommandTo("ruins_of_the_town_of_dale");
+          return "ask bard about negotiation";
+        }
+        if (!game.flags.dain_arrived) {
+          if (!["ruins_of_the_town_of_dale", "front_gate"].includes(game.currentRoom)) return this.autoplayRouteCommandTo("ruins_of_the_town_of_dale");
+          return "wait";
+        }
+        if (!game.flags.battle_started) {
+          if (!["ruins_of_the_town_of_dale", "front_gate", "stoe_of_ravenhill", "little_steep_bay"].includes(game.currentRoom)) return this.autoplayRouteCommandTo("ruins_of_the_town_of_dale");
+          return "wait";
+        }
+      }
+
+      if (game.flags.thorin_reconciled && !game.homewardJourneyStarted()) {
+        return "wait";
+      }
+
+      if (game.flags.thorin_fallen && !game.flags.thorin_reconciled) {
+        if (game.currentRoom !== "stoe_of_ravenhill") return this.autoplayRouteCommandTo("stoe_of_ravenhill");
+        return "talk to thorin";
+      }
+
+      if (game.flags.battle_won && !game.flags.thorin_fallen && game.flags.thorin_fall_wait_armed) {
+        return "wait";
+      }
+
+      if (game.battleActive()) {
+        if (game.flags.battle_stage_1) return "follow gandalf";
+        if (game.flags.battle_stage_2) return "help bard";
+      }
+
+      if (!beforeDragonDefeat && !game.flags.erebor_standoff_started) {
+        if (game.currentRoom === "stoe_of_ravenhill") return "east";
+        if (game.currentRoom === "little_steep_bay") return "south";
+        if (game.currentRoom === "lower_halls") return "south";
+        if (game.currentRoom === "smooth_straight_passage") return "west";
+        if (game.currentRoom === "lonely_mountain") return "down";
+      }
 
       if (game.spiderEyesState?.active && game.currentRoom === game.spiderEyesState.room) {
         if ((game.spiderEyesState.waits || 0) < 2) return "wait";
         return game.spiderEyesState.safeDirections?.[0] || null;
       }
 
-      if (game.currentRoom === "lower_halls" && game.liveDragon() && game.flags.bardreadiedarrow) {
-        return this.autoplayDirectedCharacterCommand("bard", "say to bard \"shoot dragon\"");
+      if (game.currentRoom === "lower_halls" && game.liveDragon()) {
+        if (!game.smaugWeakSpotKnown()) return "ask smaug about treasure";
+        if (
+          game.flags.bardreadiedarrow
+          && (bard?.carriedBy === game.player.id || (bard?.movementMode === "follow" && bard?.position === game.currentRoom && bard.visible))
+        ) {
+          return this.autoplayRouteCommandTo("stoe_of_ravenhill");
+        }
       }
 
       if (beforeDragonDefeat && !this.autoplayHas("firestone")) {
@@ -8890,6 +9836,12 @@
         return this.autoplayRouteCommandTo("deep_dark_lake");
       }
 
+      if (beforeDragonDefeat && game.wargEscapeActive()) {
+        if (game.currentRoom !== "treeless_opening") return this.autoplayRouteCommandTo("treeless_opening");
+        if (!game.flags.warg_escape_in_trees) return "climb tree";
+        return "wait";
+      }
+
       if (beforeDragonDefeat && (game.player.strength || 1) < 6) {
         if (game.currentRoom !== "beorns_house") return this.autoplayRouteCommandTo("beorns_house");
         if (this.autoplayHas("meal")) return "eat meal";
@@ -8923,7 +9875,6 @@
         if (this.autoplayHasAccessibleBarrelForCellarEscape()) return "throw barrel through trap door";
       }
 
-      const bard = Object.values(game.characters).find((character) => matches(character.name, "bard"));
       if (!game.flags.dragondefeated) {
         const bardWithPlayer = bard?.carriedBy === game.player.id
           || (bard?.movementMode === "follow" && bard?.position === game.currentRoom && bard.visible);
@@ -8941,6 +9892,11 @@
           return this.autoplayRouteCommandTo("west_bank");
         }
         if (!game.flags.bardreadiedarrow) return this.autoplayDirectedCharacterCommand("bard", "say to bard \"get strong arrow from quiver\"");
+        if (game.currentRoom === "lower_halls" && game.liveDragon() && !game.smaugWeakSpotKnown()) return "ask smaug about treasure";
+        if (game.liveDragon() && game.smaugWeakSpotKnown()) {
+          if (game.currentRoom !== "stoe_of_ravenhill") return this.autoplayRouteCommandTo("stoe_of_ravenhill");
+          return this.autoplayDirectedCharacterCommand("bard", "say to bard \"shoot dragon\"");
+        }
       }
 
       if (game.currentRoom === "erebor_hidden_door" && !game.flags.secretdoorsun) {
@@ -8953,10 +9909,17 @@
       }
 
       if (game.currentRoom === "lower_halls" && !this.autoplayHas("treasure")) {
-        if (game.liveDragon()) return this.autoplayDirectedCharacterCommand("bard", "say to bard \"shoot dragon\"");
+        if (game.liveDragon()) {
+          if (!game.smaugWeakSpotKnown()) return "ask smaug about treasure";
+          return this.autoplayRouteCommandTo("stoe_of_ravenhill");
+        }
         const prepTreasureLoad = this.autoplayTreasurePickupPrepCommand();
         if (prepTreasureLoad) return prepTreasureLoad;
         return "take treasure";
+      }
+
+      if (game.flags.dragon_arc_complete && game.currentRoom === "hobbit_hole" && !game.flags.epilogue_complete) {
+        return "wait";
       }
 
       if (!this.autoplayHas("treasure")) return this.autoplayRouteCommandTo("lower_halls");
@@ -9101,6 +10064,8 @@
       const totalRooms = Math.max(Object.keys(game.rooms).length, 1);
       const percentage = (game.visitedRooms.size / totalRooms) * 100;
       const endMessage = message ? message.replace(/[.!?]*$/, ".") : "Your road ends here.";
+      const deathImage = options.fatal ? game.resolveFatalEndgameImage(endMessage, options) : "";
+      if (deathImage) game.showTemporaryImage(deathImage, { alt: "Death scene", dismissOnNextCommand: false });
       game.print(endMessage, "danger");
       game.print(`So ends this thread of the tale. You have mastered ${percentage.toFixed(2)}% of this adventure.`, "system");
       if (options.fatal && game.autosaveSnapshot) {
@@ -9411,6 +10376,12 @@
       }
 
       if (matchesAny(text, ["tree", "trees", "branch", "branches", "forest", "vines", "roots"])) {
+        if (game.wargEscapeActive() && game.currentRoom === "treeless_opening") {
+          if (game.flags.warg_escape_in_trees) {
+            return game.print("The pines sway alarmingly, but their upper boughs still hold the company above the snapping wolves below.");
+          }
+          return game.print("A ragged stand of pines rises at the edge of the clearing. They are not comforting trees, but just now they look very like life itself.");
+        }
         if (lower.includes("forest") || lower.includes("tree") || lower.includes("branch") || lower.includes("root")) {
           return game.print(`${subject} ${actorVerb(game.player, "study")} the trees and roots. They are part of the landscape, not an object you can use here.`);
         }
@@ -9637,6 +10608,34 @@
       if (game.items.calm_pony) game.items.calm_pony.visible = false;
     }
 
+    specialActionFatalImage(action = {}) {
+      const location = normalize(action.location || "");
+      const verb = normalize(action.verb || "");
+      const obj1 = normalize(String(action.obj1 || "").replace(/^\*/, ""));
+      const obj2 = normalize(String(action.obj2 || "").replace(/^\*/, ""));
+      const desc2 = normalize(action.desc2 || "");
+
+      if (location === "cellar" && verb === "jump" && obj2.includes("trap door")) return "bilbo_falls_from_trap_door_river_death.png";
+      if (location === "west bank" && obj2 === "river" && ["jump", "swim"].includes(verb)) return "bilbo_black_river_death.png";
+      if (location === "trolls clearing" && ["steal", "take"].includes(verb) && obj1 === "large key") return "troll_catches_bilbo_stealing_key_death.png";
+      if (location === "trolls clearing" && verb === "kill" && obj1 === "troll") return "bilbo_troll_desperate_attack_death.png";
+      if (desc2.includes("smaug grows weary of your voice")) return "smaug_incinirates_bilbo_lower_halls_death.png";
+      if (desc2.includes("gollums whisper curdles into a hiss")) return "gollum_wrong_answer_to_riddle_death.png";
+      if (desc2.includes("the warg lowers its head")) return "warg_kills_bilbo_death.png";
+      if (desc2.includes("the disgusting goblin recoils from your presence")) return "goblin_bilbo_pit_death.png";
+      if (
+        desc2.includes("the nasty goblin sneers at your words")
+        || desc2.includes("the goblin cackles at your attempt")
+        || desc2.includes("the horrible goblin bares its teeth")
+        || desc2.includes("the mean goblin sneers")
+        || desc2.includes("the vicious goblin snaps a command")
+      ) return "bilbo_goblins_around_him_death.png";
+      if (desc2.includes("the troll only grins") || desc2.includes("the vicious troll has no ear for talk")) {
+        return "troll_catches_bilbo_stealing_key_death.png";
+      }
+      return "";
+    }
+
     trySpecialAction(verb, objectText) {
       const game = this.game;
       const roomName = game.room().name;
@@ -9728,7 +10727,10 @@
         }
         if (action.destination) {
           if (actionEndsGame) {
-            game.endGame(action.desc2 || "The tale goes no farther from here.", { fatal: true });
+            game.endGame(action.desc2 || "The tale goes no farther from here.", {
+              fatal: true,
+              deathImage: this.specialActionFatalImage(action),
+            });
           } else if (game.roomByName(action.destination)) {
             const previousRoom = game.currentRoom;
             game.currentRoom = game.roomByName(action.destination).id;
@@ -11185,6 +12187,7 @@
         ? [doorText, objectText, companionNarrative, atmosphericNarrative, friendlyPeopleText].filter(Boolean).join(" ")
         : [companionNarrative, atmosphericNarrative, friendlyPeopleText].filter(Boolean).join(" ");
       this.print([roomText, detailsText].filter(Boolean).join(" "));
+      this.noteArkenstoneDiscovery();
       if (aftermathText) this.print(aftermathText, "danger");
       for (const entry of hostilePeopleEntries) this.print(entry.text, entry.kind);
       for (const person of arrivingPeople) {
@@ -11246,6 +12249,51 @@
       const normalized = normalize(raw);
       const dashed = normalized.replace(/[_\s]+/g, "-");
       return TEMPORARY_IMAGE_ALIASES[dashed] || TEMPORARY_IMAGE_ALIASES[normalized] || raw;
+    }
+
+    resolveFatalEndgameImage(message = "", options = {}) {
+      const explicit = this.resolveTemporaryImageName(options.deathImage || "");
+      if (explicit) return explicit;
+
+      const text = normalize(message);
+      if (!text) return "";
+
+      if (text.includes("gollum catches you as the ring fails")) return "gollum_ring_effect_ends_death.png";
+      if (
+        text.includes("gollum catches you in the dark")
+        || text.includes("gollum tears you down beside the black water")
+        || text.includes("gollum strangles you in the dark")
+        || text.includes("gollum drags you under the dark lake")
+        || text.includes("gollums whisper curdles into a hiss")
+      ) return "gollum_wrong_answer_to_riddle_death.png";
+      if (text.includes("something small and venomous strikes from the dark")) return "spider_stings_death.png";
+      if (text.includes("the racing river bears you under the halls and gives you back no more")) return "bilbo_falls_from_trap_door_river_death.png";
+      if (text.includes("the river takes you at once")) return "bilbo_black_river_death.png";
+      if (text.includes("the wargs rush in before the trees can be reached") || text.includes("fangs close")) return "warg_kills_bilbo_death.png";
+      if (text.includes("at last your strength deserts you in the blind dark")) return "exhausted_tunnels_death.png";
+      if (text.includes("hulking goblin butchers")) return "hulking_goblin_attack_death.png";
+      if (text.includes("you creep toward the gleaming key") || text.includes("you emerge from hiding and reach for the large key")) {
+        return "troll_catches_bilbo_stealing_key_death.png";
+      }
+      if (text.includes("you rush the monstrous troll with desperate courage")) return "bilbo_troll_desperate_attack_death.png";
+      if (text.includes("the disgusting goblin recoils from your presence") || text.includes("hurls you into a black pit") || text.includes("black pit")) {
+        return "goblin_bilbo_pit_death.png";
+      }
+      if (
+        text.includes("the nasty goblin sneers at your words")
+        || text.includes("the goblin cackles at your attempt")
+        || text.includes("the horrible goblin bares its teeth")
+        || text.includes("the mean goblin sneers")
+        || text.includes("the vicious goblin snaps a command")
+      ) return "bilbo_goblins_around_him_death.png";
+      if (
+        text.includes("smaug grows weary of your voice")
+        || text.includes("all your brave words are ashes in a breath")
+      ) return "smaug_incinirates_bilbo_lower_halls_death.png";
+      if (text.includes("the troll only grins") || text.includes("the vicious troll has no ear for talk")) {
+        return "troll_catches_bilbo_stealing_key_death.png";
+      }
+      return "";
     }
 
     showTemporaryImage(imageName, options = {}) {
@@ -11789,6 +12837,11 @@
       return connection.from === "rivendell" && connection.to === "misty_mountain";
     }
 
+    wargEscapeTravelGate(connection) {
+      if (!connection || !this.wargEscapeActive()) return false;
+      return connection.from === "treeless_opening" && ["outside_goblins_gate", "beorns_house"].includes(connection.to);
+    }
+
     narrativeTravelBlock(connection) {
       if (!connection) return false;
       return this.liveTrollExposureGate(connection)
@@ -11796,6 +12849,7 @@
         || this.rivendellRopeGate(connection)
         || this.rivendellPreparationGate(connection)
         || this.rivendellMapCarryGate(connection)
+        || this.wargEscapeTravelGate(connection)
         || this.beornMountainStormGate(connection)
         || (
         connection.from === "bilbos_garden"
@@ -11842,6 +12896,12 @@
         if (attempts === 1) return "Gandalf glances at your empty hands and says 'Not eastward yet. The map is part of the road now, not a keepsake to leave behind.'";
         return "However fair Rivendell may be, it would be sheer carelessness to leave without the curious map in Bilbo's keeping.";
       }
+      if (this.wargEscapeTravelGate(connection)) {
+        if (!this.flags.warg_escape_in_trees) {
+          return "There is no road now. Wargs are already sweeping the open ground, and the only hope lies up among the pines before they close in altogether.";
+        }
+        return "Below the pines the wolves prowl too thickly for any honest descent, and goblin cries from the heights promise worse if you try the ground too soon.";
+      }
       if (this.beornMountainStormGate(connection)) return this.beornMountainStormMessage(connection);
       if (!this.narrativeTravelBlock(connection)) return "";
       const attempts = Number(this.flags.bagendexitattempts || 0);
@@ -11875,6 +12935,10 @@
       }
       if (this.rivendellMapCarryGate(connection)) {
         this.flags.rivendellmapcarryattempts = Number(this.flags.rivendellmapcarryattempts || 0) + 1;
+        return;
+      }
+      if (this.wargEscapeTravelGate(connection)) {
+        this.flags.wargescapeblockedattempts = Number(this.flags.wargescapeblockedattempts || 0) + 1;
         return;
       }
       if (this.beornMountainStormGate(connection)) {
@@ -11969,6 +13033,8 @@
         this.killBySpiderEyes();
         return;
       }
+      if (this.resolveWargEscapeWait()) return;
+      if (this.resolveTreasureHomecoming()) return;
       const subject = actorSubject(this.player, true);
       this.print(`${subject} ${actorVerb(this.player, "wait")}.`);
       this.print("Time passes...");
@@ -12110,6 +13176,9 @@
       this.print(`Jumped to ${preset.label}.`, "system");
       this.describeRoom({ full: true });
       if (this.currentRoom === "trolls_clearing" && !this.visitedTrollsClearing && !this.trollsTransformed) {
+        this.checkSpecialSituations();
+      }
+      if (this.currentRoom === "beorns_house" && !this.flags.beorn_dinner_seen) {
         this.checkSpecialSituations();
       }
       return true;
@@ -12318,6 +13387,18 @@
         "inside_goblins_gate",
         "outside_goblins_gate",
         "treeless_opening",
+        "beorns_house",
+      ]);
+    }
+
+    debugMarkWargEscapeProgress() {
+      this.flags.warg_escape_started = true;
+      this.flags.warg_escape_in_trees = true;
+      this.flags.eagles_rescued_company = true;
+      this.flags.warg_escape_complete = true;
+      this.debugMarkVisitedPath([
+        "treeless_opening",
+        "great_river",
         "beorns_house",
       ]);
     }
@@ -12815,6 +13896,11 @@
         return this.print(`${sentenceDisplayCharacterName(character)} accepts the ${item.name}. '${profile.gift}'`);
       }
       if (matches(character.name, "gandalf")) {
+        if (matches(item.name, "arkenstone")) {
+          this.flags.gandalf_knows_arkenstone = true;
+          this.flags.arkenstone_hidden_from_thorin = true;
+          return this.print("Gandalf takes the Arkenstone gravely and says 'I will keep it for the moment, but not advertise the fact. This is the sort of treasure that turns speech into quarrel before the sentence is done.'");
+        }
         if (matches(item.name, "curious map")) {
           this.flags.gandalf_has_been_given_map = true;
           this.flags.initiative_gandalf_offer_map = true;
@@ -12838,10 +13924,20 @@
       }
       if (matches(character.name, "thorin")) {
         if (matches(item.name, "curious key")) return this.print("Thorin weighs the curious key in his hand and says 'Some doors remember the shape of old promises.'");
+        if (matches(item.name, "arkenstone")) {
+          this.flags.arkenstone_hidden_from_thorin = false;
+          return this.print("Thorin receives the Arkenstone with a strange stillness. 'The Heart of the Mountain returns at last,' he says, and for a moment every other treasure in the hall seems to matter less.");
+        }
         if (matches(item.name, "rope")) return this.print("Thorin nods and says 'Rope is rarely wasted on a dangerous road.'");
         if (matches(item.name, "sword")) return this.print("Thorin grips the sword and looks more certain of himself.");
       }
       if (matches(character.name, "bard")) {
+        if (matches(item.name, "arkenstone")) {
+          this.flags.arkenstone_given_to_bard = true;
+          this.flags.arkenstone_hidden_from_thorin = true;
+          if (this.flags.erebor_standoff_started) this.softenNegotiationWithArkenstone();
+          return this.print("Bard receives the Arkenstone without triumph. 'This may yet do what swords cannot,' he says quietly. 'If talk is still possible, this stone will weigh in it.'");
+        }
         if (matches(item.name, "bow") || matches(item.name, "arrow")) return this.print("Bard checks the weapon carefully and says 'A clean shot asks for a steady hour.'");
       }
       if (matches(character.name, "dragon")) {
@@ -13181,6 +14277,8 @@
     resolveCellarBarrelEscape() {
       this.player.insideContainer = null;
       this.flags.barrelthrown = false;
+      this.flags.barrel_company_afloat = Boolean(this.flags.barrel_company_prepared);
+      this.flags.laketown_barrel_arrival_pending = true;
       this.showTemporaryImage("elvenkings_river_barrel.png", {
         alt: "Bilbo riding a barrel down the forest river",
       });
@@ -13212,13 +14310,27 @@
         ];
       this.recordAutosave("before the barrel escape", { key: "hazard:river:cellar", force: true });
       lines.forEach((line) => this.print(line, "danger"));
-      this.endGame("The racing river bears you under the halls and gives you back no more", { fatal: true });
+      this.endGame("The racing river bears you under the halls and gives you back no more", {
+        fatal: true,
+        deathImage: "bilbo_falls_from_trap_door_river_death.png",
+      });
       return true;
     }
 
     climb(objectName) {
       const text = normalize(objectName);
       if (!text) return this.print("Climb where?");
+      if (this.wargEscapeActive() && this.currentRoom === "treeless_opening" && matchesAny(text, ["tree", "trees", "pine", "pines", "branch", "branches"])) {
+        if (this.flags.warg_escape_in_trees) {
+          return this.print("You are already as high among the pines as prudence and panic together can manage.");
+        }
+        this.flags.warg_escape_in_trees = true;
+        this.flags.warg_escape_tree_turn = this.turnCount;
+        this.companionDirector?.sync();
+        this.print("With wolves already sweeping the clearing, you scramble up among the pines as Gandalf and the dwarves do the same.");
+        this.print("Bark tears at your hands, branches whip in your face, and below the ring of yellow eyes gathers tighter round the trunks.");
+        return;
+      }
       if (matchesAny(text, ["pass", "the pass", "path", "the path", "track", "the track", "way ahead"])) {
         const preferredAdvance = this.preferredBeornMountainAdvance();
         if (preferredAdvance) return this.move(preferredAdvance.direction);
@@ -13259,6 +14371,13 @@
       if (verb === "run" && this.currentRoom === "deep_dark_lake" && this.gollumState?.awaitingPlayerRiddle) {
         this.print(this.gollumEscapeInterception("north"));
         return;
+      }
+      const battleText = normalize(objectName);
+      if (verb === "help" && matchesAny(battleText, ["bard", "men", "men of the lake", "bowmen"])) {
+        if (this.handleBattleChoice("help_bard")) return;
+      }
+      if (verb === "stand" && matchesAny(battleText, ["thorin", "with thorin", "by thorin", "beside thorin"])) {
+        if (this.handleBattleChoice("stand_with_thorin")) return;
       }
       if (verb === "jump" && this.handleCellarBarrelBoard(objectName)) return;
       if (verb === "jump" && this.currentRoom === "cellar" && /\btrap door\b/.test(normalize(objectName))) {
@@ -13317,6 +14436,9 @@
     }
 
     followCharacter(objectName = "") {
+      if (matchesAny(normalize(objectName), ["gandalf", "wizard"])) {
+        if (this.handleBattleChoice("follow_gandalf")) return;
+      }
       const target = this.resolveCharacterTarget(objectName);
       if (!target) {
         if (this.handleMirkwoodFollow(objectName)) return;
@@ -13484,6 +14606,10 @@
     }
 
     handleGo(command) {
+      if (this.battleActive() && this.isAbstractTravelCommand(command) && ["back", "go back", "walk back"].includes(normalize(command))) {
+        this.handleBattleChoice("retreat");
+        return false;
+      }
       const relativeIntent = this.relativeDirectionIntent(command);
       const relativeDirection = this.relativeDirectionCommand(command);
       if (relativeDirection) return this.handleRelativeGo(command, relativeDirection);
@@ -13805,7 +14931,10 @@
       this.player.strength = Math.max(0, (this.player.strength || 0) - outcome.damage);
       this.print(`${outcome.message} Strength: ${this.player.strength}.`, "danger");
       if (this.player.strength <= 0) {
-        this.endGame("At last your strength deserts you in the blind dark, and there the road goes out beneath your feet.", { fatal: true });
+        this.endGame("At last your strength deserts you in the blind dark, and there the road goes out beneath your feet.", {
+          fatal: true,
+          deathImage: "exhausted_tunnels_death.png",
+        });
         return true;
       }
       return false;
@@ -14010,6 +15139,7 @@
       if (matches(character.name, "thorin")) return this.thorinInitiative(character);
       if (matches(character.name, "elrond")) return this.elrondInitiative(character);
       if (matches(character.name, "beorn")) return this.beornInitiative(character);
+      if (matches(character.name, "master")) return this.masterInitiative(character);
       if (matches(character.name, "bard")) return this.bardInitiative(character);
       if (matches(character.name, "wood elf")) {
         return {
@@ -14234,6 +15364,15 @@
       return null;
     }
 
+    masterInitiative(character) {
+      if (!IMMERSION_LAKETOWN_ROOMS.has(this.currentRoom)) return null;
+      return {
+        flag: "initiative_master_laketown",
+        effect: () => this.noteLaketownMasterViewHeard(),
+        message: "The Master lifts his voice above the plankway noise and says 'A town is not saved by excitement, but by order, stores, and sensible obedience.'",
+      };
+    }
+
     characterHas(character, itemName) {
       return [...(character.inventory || []), ...(character.worn || [])].some((itemId) => matches(this.items[itemId]?.name, itemName));
     }
@@ -14253,6 +15392,440 @@
 
     playerHasQuestMap() {
       return Boolean(this.findInInventory("curious map"));
+    }
+
+    noteLaketownMasterViewHeard() {
+      this.flags.laketown_master_met = true;
+      if (this.flags.laketown_bard_view_heard) this.flags.laketown_support_split = true;
+      return true;
+    }
+
+    noteLaketownBardViewHeard() {
+      this.flags.laketown_bard_view_heard = true;
+      if (this.flags.laketown_master_met) this.flags.laketown_support_split = true;
+      return true;
+    }
+
+    beginBeornHospitalityScene() {
+      if (this.currentRoom !== "beorns_house" || this.flags.beorn_dinner_seen) return false;
+      this.flags.beorn_dinner_seen = true;
+      this.print("Before long the uncanny order of Beorn's house declares itself more plainly: great dogs pad in on their hind legs with trays, while sheep and horses move about the yard and door with the grave purpose of servants that know their business.");
+      this.print("Beorn gives no explanation worth calling one. Yet the board is soon spread with bread, honey, cream, and a prodigious supper, and for a while the whole house feels less strange than magnificently, stubbornly hospitable.");
+      return true;
+    }
+
+    beginCellarEscapeOpportunity() {
+      if (this.currentRoom !== "cellar" || this.flags.cellar_feast_scene_seen) return false;
+      this.flags.cellar_feast_scene_seen = true;
+      this.print("The king's feasting has told on the place below. From the upper halls come muffled laughter and the last wandering echoes of song, while in the cellar the air is heavy with spilled wine, wet wood, and the comfortable slackness of servants kept too long at a good table.");
+      this.print("Empty barrels stand ready by the running water, and the butler's vigilance has plainly been dulled by duty, fatigue, and a cup or two beyond strict necessity. If there is ever to be a moment for desperate barrel-work, it is near enough to this one.");
+      return true;
+    }
+
+    beginDwarfBarrelLoadingScene(options = {}) {
+      const { silent = false } = options;
+      if (this.flags.barrel_company_prepared) return false;
+      this.flags.barrel_company_prepared = true;
+      if (silent) return true;
+      this.print("The worst labor is not your own barrel at all, but the dwarves'. One by one, amid muttering, indignation, and hurried whispers, you contrive to get them stowed into the empty casks before the chance above your head closes again.");
+      this.print("No dwarf thinks much of the arrangement, but cramped discomfort weighs less than the Elvenking's cells. By the time the last lid is settled, the whole desperate escape has become a matter not of one barrel, but of a miserable little fleet.");
+      return true;
+    }
+
+    beginLaketownBarrelArrival(options = {}) {
+      const { silent = false } = options;
+      if (this.flags.laketown_barrel_arrival_seen) return false;
+      this.flags.laketown_barrel_arrival_pending = false;
+      this.flags.laketown_barrel_arrival_seen = true;
+      const companyAfloat = Boolean(this.flags.barrel_company_afloat);
+      this.flags.barrel_company_afloat = false;
+      if (silent) return true;
+      this.print("Cold hands haul you in from the lake-side landing at last, more like driftwood than travelers. The town's folk stare, laugh, pity, and question by turns, for dwarves and half-drowned strangers do not come bobbing in from the dark every evening.");
+      if (companyAfloat) {
+        this.print("Soon other barrels are being hooked in and broken open amid spluttering outrage, and the dwarves come out of them one after another stiff, bruised, furious, and indisputably alive.");
+      }
+      this.print("Bard is among the first to look on you without foolishness. He takes the measure of your condition, the Mountain beyond the water, and the rumor already racing ahead of both.");
+      return true;
+    }
+
+    arkenstoneIdentified() {
+      return Boolean(this.flags.arkenstone_identified || this.flags.arkenstone_identifed);
+    }
+
+    arkenstoneHiddenFromThorin() {
+      return Boolean(this.flags.arkenstone_hidden_from_thorin);
+    }
+
+    markArkenstoneIdentified() {
+      this.flags.arkenstone_identified = true;
+      this.flags.arkenstone_identifed = true;
+    }
+
+    arkenstoneDiscoveryCandidate() {
+      if (!(this.currentRoom === "lower_halls" || IMMERSION_EREBOR_INNER_ROOMS.has(this.currentRoom))) return null;
+      const found = this.visibleSearch("arkenstone");
+      if (!found?.item || found.item.id !== "arkenstone") return null;
+      if (found.item.location?.type === "character" && found.item.location.id === this.player.id) return null;
+      return found;
+    }
+
+    noteArkenstoneDiscovery() {
+      const found = this.arkenstoneDiscoveryCandidate();
+      if (!found || this.flags.arkenstone_seen) return false;
+      this.flags.arkenstone_seen = true;
+      this.print("Within the opened hoard, one great pale jewel catches the least light and masters it, burning with a cold fire of its own.");
+      this.print("It is plainly no common treasure-piece, but some chief wonder of the Mountain long remembered and long desired.");
+      return true;
+    }
+
+    noteArkenstoneTaken(item) {
+      if (item?.id !== "arkenstone") return false;
+      this.flags.arkenstone_seen = true;
+      this.flags.arkenstone_taken = true;
+      this.flags.arkenstone_hidden_from_thorin = true;
+      if (this.arkenstoneIdentified()) return false;
+      this.markArkenstoneIdentified();
+      this.print("The great white gem lies cold and weighty in your hand, yet it seems to gather the dim hall-light into itself.");
+      this.print("Even Bilbo can guess what no dwarf of Thorin's house could mistake: this is the Arkenstone, the Heart of the Mountain.");
+      return true;
+    }
+
+    smaugWeakSpotKnown() {
+      return Boolean(this.flags.smaug_weakspot_known);
+    }
+
+    thrushMessageSent() {
+      return Boolean(this.flags.thrush_message_sent);
+    }
+
+    bardDragonShotRoomReady() {
+      return this.currentRoom === "stoe_of_ravenhill";
+    }
+
+    noteSmaugWeakSpot() {
+      if (this.smaugWeakSpotKnown() || !this.liveDragon()) return false;
+      this.flags.smaug_weakspot_known = true;
+      this.print("As Smaug shifts over the treasure, you catch a glimpse beneath the jeweled mail of his breast: one small bare place upon the left side.");
+      this.print("It is no more than a patch, but against such a creature a patch may be enough, if the knowledge reaches the right bowman in time.");
+      return true;
+    }
+
+    deliverThrushMessage() {
+      if (!this.smaugWeakSpotKnown() || this.thrushMessageSent()) return false;
+      this.flags.thrush_message_sent = true;
+      this.print("A thrush flutters down nearby and chatters urgently, and between bird-sign and Bilbo's word the truth becomes plain: there is a bare patch in Smaug's left breast.");
+      this.print("Bard hears, nods once, and his whole attention narrows to that one chance.");
+      return true;
+    }
+
+    finalReturnStarted() {
+      return Boolean(this.flags.final_return_started);
+    }
+
+    homewardJourneyStarted() {
+      return Boolean(this.flags.homeward_journey_started);
+    }
+
+    ensureHomewardTreasureShare() {
+      if (this.findInInventory("treasure") || this.isInside("heavy_wooden_chest", "treasure")) return false;
+      const treasure = this.items.treasure;
+      if (!treasure) return false;
+      this.detachItem(treasure.id);
+      treasure.location = { type: "character", id: this.player.id };
+      if (!this.player.inventory.includes(treasure.id)) this.player.inventory.push(treasure.id);
+      this.print("Before you turn west, your share of the treasure is at last made over to you: enough to make the road home heavy, but not empty.");
+      return true;
+    }
+
+    negotiationStarted() {
+      return Boolean(this.flags.negotiation_started);
+    }
+
+    negotiationSoftened() {
+      return Boolean(this.flags.negotiation_softened_by_arkenstone);
+    }
+
+    dainArrived() {
+      return Boolean(this.flags.dain_arrived);
+    }
+
+    battleActive() {
+      return Boolean(this.flags.battle_started && !this.flags.battle_won);
+    }
+
+    beginNegotiation() {
+      this.flags.negotiation_started = true;
+      return true;
+    }
+
+    noteNegotiationFailure() {
+      this.beginNegotiation();
+      if (this.flags.negotiation_resolved || this.negotiationSoftened()) return false;
+      this.flags.negotiation_failed = true;
+      return true;
+    }
+
+    softenNegotiationWithArkenstone() {
+      this.beginNegotiation();
+      this.flags.negotiation_softened_by_arkenstone = true;
+      this.flags.negotiation_failed = false;
+      return true;
+    }
+
+    resolveNegotiation() {
+      this.beginNegotiation();
+      this.flags.negotiation_resolved = true;
+      this.flags.negotiation_failed = false;
+      return true;
+    }
+
+    beginDainArrival() {
+      if (this.dainArrived() || !this.flags.erebor_standoff_started || !this.negotiationStarted()) return false;
+      this.flags.dain_arrived = true;
+      this.flags.dwarf_reinforcements_present = true;
+      this.flags.battle_wait_armed = false;
+      this.print("A stir runs through the camp: mail-clad dwarves have come at last from the Iron Hills under Dain, and their coming is more fit for battle than for patient speech.");
+      this.print("What had been a hard negotiation beneath the Mountain now feels one step nearer open war, for Thorin is no longer shut up with only his own company behind him.");
+      this.recordProgressAutosave(
+        "autosave_milestone_dain_arrival",
+        "after Dain reaches Dale",
+        "erebor:dain-arrival",
+      );
+      return true;
+    }
+
+    battleChoiceRoom(choice = "") {
+      if (choice === "follow_gandalf") return "stoe_of_ravenhill";
+      if (choice === "stand_with_thorin") return "front_gate";
+      return "ruins_of_the_town_of_dale";
+    }
+
+    beginBattleOfFiveArmies() {
+      if (this.flags.battle_started || this.flags.battle_won || !this.dainArrived() || !this.flags.erebor_standoff_started) return false;
+      this.flags.battle_started = true;
+      this.flags.battle_stage_1 = true;
+      this.flags.battle_stage_2 = false;
+      this.flags.battle_stage_1_choice = "";
+      this.flags.battle_stage_2_choice = "";
+      this.print("Before any bargain can ripen, a black tide of goblins and wargs comes pouring out of the north. Horns answer horns, and the whole valley below Erebor turns in a moment from standoff to war.");
+      this.print("Gandalf's voice cuts through the uproar: 'Choose quickly, Bilbo. Follow me, stand with Thorin, help Bard, or retreat while retreat is still possible.'");
+      this.companionDirector?.sync();
+      this.recordProgressAutosave(
+        "autosave_milestone_five_armies_begins",
+        "after the Battle of Five Armies begins",
+        "erebor:battle-begins",
+      );
+      return true;
+    }
+
+    handleBattleChoice(choice = "") {
+      if (!this.battleActive()) return false;
+      if (choice === "retreat") {
+        this.endGame("You turn from the field while there is still a gap to do it, but in the confusion of broken stone, fleeing men, and the first rush of goblins, retreat becomes rout. The battle sweeps over you before you can win clear.", { fatal: true });
+        return true;
+      }
+      const roomId = this.battleChoiceRoom(choice);
+      if (this.flags.battle_stage_1) {
+        this.flags.battle_stage_1 = false;
+        this.flags.battle_stage_2 = true;
+        this.flags.battle_stage_1_choice = choice;
+        this.debugMovePlayer(roomId, { markRoute: true });
+        if (choice === "follow_gandalf") {
+          this.print("You race after Gandalf toward Ravenhill, where the whole field may be read in one dreadful glance.");
+          this.print("From the height the goblin onset shows its full width, and Gandalf wastes no breath on comfort: someone must steady the day before it collapses altogether.");
+        } else if (choice === "stand_with_thorin") {
+          this.print("You hurry to Thorin at the Gate, where dwarf-axes are already ringing against shield and stone.");
+          this.print("Thorin's mood is terrible and kingly together. 'Then stand fast,' he says. 'If Erebor is to be held indeed, it will be held in battle now.'");
+        } else if (choice === "help_bard") {
+          this.print("You throw yourself among Bard's men in the ruins, where arrows, stones, and shouted orders hold a ragged line.");
+          this.print("The pressure grows at once, and Bard sees that mere endurance will not serve for long. 'Hold cleanly now,' he says, 'and strike when the moment opens.'");
+        }
+        this.companionDirector?.sync();
+        return true;
+      }
+      if (!this.flags.battle_stage_2) return false;
+      this.flags.battle_stage_2 = false;
+      this.flags.battle_stage_2_choice = choice;
+      this.flags.battle_won = true;
+      this.debugMovePlayer(roomId, { markRoute: true });
+      if (choice === "follow_gandalf") {
+        this.print("You keep to Gandalf through smoke and shouting until at last the clouds break above the Mountain and help comes out of the air: eagles wheel down, and the black host begins to break.");
+      } else if (choice === "stand_with_thorin") {
+        this.print("You stand with Thorin through the worst of it as he bursts from the Gate with his kin, and the sudden fury of that charge helps crack the battle's black center before relief arrives.");
+      } else if (choice === "help_bard") {
+        this.print("You help Bard steady the battered line until the counterstroke goes in at the right moment, and from that moment the goblin host begins at last to buckle.");
+      }
+      this.flags.beorn_battle_aid_seen = true;
+      this.print("Then the eagles are among the enemy in earnest, and with them comes Beorn in a wrath beyond reason, tearing into the goblin host until its last hard courage gives way.");
+      this.print("When the tumult clears, the goblins are broken and scattered. Erebor stands, but the cost of the day is written everywhere among the stones.");
+      this.flags.thorin_fall_wait_armed = true;
+      this.companionDirector?.sync();
+      this.recordProgressAutosave(
+        "autosave_milestone_five_armies_survived",
+        "after surviving the Battle of Five Armies",
+        "erebor:battle-survived",
+      );
+      return true;
+    }
+
+    beginThorinFall() {
+      if (this.flags.thorin_fallen || !this.flags.battle_won) return false;
+      this.flags.thorin_fallen = true;
+      this.flags.beorn_bore_thorin_seen = true;
+      this.flags.thorin_fall_wait_armed = false;
+      this.debugMovePlayer("stoe_of_ravenhill", { markRoute: true });
+      this.print("When the first hard business of victory is under way, word comes quietly that Thorin has been brought to Ravenhill, sorely wounded and asking for Bilbo.");
+      this.print("You go up among the broken stones and find Gandalf beside him. The fury of battle is gone from Thorin now, and there is little strength left to him.");
+      this.print("Beorn stands nearby, still grim from battle, and it is plain from the bearing of the dwarves that he was the one who bore Thorin wounded out of the ruin of the field.");
+      this.companionDirector?.sync();
+      this.recordProgressAutosave(
+        "autosave_milestone_thorin_fallen",
+        "after finding Thorin on Ravenhill",
+        "erebor:thorin-fallen",
+      );
+      return true;
+    }
+
+    beginHomewardJourney() {
+      if (this.homewardJourneyStarted() || !this.flags.thorin_reconciled) return false;
+      this.flags.final_return_started = true;
+      this.flags.homeward_journey_started = true;
+      this.ensureHomewardTreasureShare();
+      this.debugMovePlayer("lane_beneath_hill", { markRoute: true });
+      this.print("After Thorin's farewell, the road turns west at last. Long miles pass, the seasons soften, and the Mountain falls away behind memory into tale.");
+      this.print("In time you come again beneath your own Hill, only to find home less patient than you had imagined. Word has run ahead of you in the Shire more quickly than you have.");
+      this.companionDirector?.sync();
+      this.recordProgressAutosave(
+        "autosave_milestone_homeward_journey",
+        "after returning at last to the Hill",
+        "ending:homeward-journey",
+      );
+      this.describeRoom({ full: true });
+      return true;
+    }
+
+    noteBagEndAuction() {
+      if (!this.homewardJourneyStarted() || this.flags.bag_end_auction_seen || this.currentRoom !== "hobbit_hole") return false;
+      this.flags.bag_end_auction_seen = true;
+      this.flags.epilogue_started = true;
+      this.print("The sight within stops you short: labels, bundles, and inquisitive hands have plainly been at work in Bag End, as though its master were safely dead and his goods fit for division.");
+      this.print("You have returned just in time to save your house from being lost piecemeal, though its peace and order have been badly shaken by the attempt.");
+      this.recordProgressAutosave(
+        "autosave_milestone_bag_end_auction",
+        "after finding Bag End nearly lost",
+        "ending:bag-end-auction",
+      );
+      return true;
+    }
+
+    beginEreborStandoff() {
+      if (this.flags.erebor_standoff_started || !this.flags.dragondefeated) return false;
+      if (!["front_gate", "ruins_of_the_town_of_dale", "stoe_of_ravenhill", "little_steep_bay"].includes(this.currentRoom)) return false;
+      this.flags.erebor_standoff_started = true;
+      this.flags.bard_camp_active = true;
+      this.flags.thorin_inside_erebor = true;
+
+      const thorin = this.characters.thorin;
+      if (thorin) {
+        if (thorin.carriedBy) this.releaseCarriedCharacter(thorin, { room: "erebor_great_hall" });
+        thorin.position = "erebor_great_hall";
+        thorin.carriedBy = null;
+        thorin.followingPlayer = false;
+        thorin.movementMode = "never";
+        thorin.visible = true;
+      }
+
+      const bard = this.characters.bard;
+      if (bard) {
+        if (bard.carriedBy) this.releaseCarriedCharacter(bard, { room: "ruins_of_the_town_of_dale" });
+        bard.position = "ruins_of_the_town_of_dale";
+        bard.carriedBy = null;
+        bard.followingPlayer = false;
+        bard.movementMode = "never";
+        bard.visible = true;
+      }
+
+      const gandalf = this.characters.gandalf;
+      if (gandalf) {
+        gandalf.position = "ruins_of_the_town_of_dale";
+        gandalf.carriedBy = null;
+        gandalf.followingPlayer = false;
+        gandalf.movementMode = "never";
+        gandalf.visible = true;
+      }
+
+      this.print("By the time you come again beneath the Gate, men from the Lake have gathered among the ruins of Dale and made a wary camp there.");
+      this.print("Thorin has gone within Erebor with the dwarves, while Bard and Gandalf remain without, watching the Mountain as though Smaug's fall had cleared the way for a different danger.");
+      this.companionDirector?.sync();
+      this.recordProgressAutosave(
+        "autosave_milestone_erebor_standoff",
+        "after the camps gather beneath Erebor",
+        "erebor:standoff",
+      );
+      return true;
+    }
+
+    resolveTreasureHomecoming() {
+      if (this.currentRoom !== "hobbit_hole" || !this.flags.dragon_arc_complete || !this.flags.epilogue_started || this.flags.epilogue_complete) return false;
+      this.flags.epilogue_complete = true;
+      this.print("You wait.");
+      this.print("Time passes...");
+      this.print("At length there comes a comfortable knock at Bag End, and before long Gandalf is seated by the fire with Balin beside him.");
+      this.print("Balin looks long at Bilbo and smiles, though there is grief in it too; Gandalf seems content, as if the tale has reached the quiet harbour he expected for it all along.");
+      this.print("They look from Bilbo to the chest and back again, and for a while the talk is of roads, losses, wonders, and the queer shape a well-ended tale may take.");
+      this.print("There is laughter still, and good firelight, and the comfort of things restored; yet the evening keeps a thread of sadness in it, as all true endings do when brave folk are missing from the table.");
+      this.winGame("Congratulations. You have killed Smaug and found the treasure - a real thief!");
+      return true;
+    }
+
+    wargEscapeStarted() {
+      return Boolean(this.flags.warg_escape_started);
+    }
+
+    eaglesRescuedCompany() {
+      return Boolean(this.flags.eagles_rescued_company);
+    }
+
+    wargEscapeActive() {
+      return this.wargEscapeStarted() && !this.eaglesRescuedCompany();
+    }
+
+    beginWargEscape() {
+      if (this.flags.warg_escape_started || this.flags.eagles_rescued_company) return false;
+      this.flags.warg_escape_started = true;
+      this.flags.warg_escape_in_trees = false;
+      this.flags.warg_escape_waits = 0;
+      this.recordAutosave("before the wargs close in below the trees", { key: "hazard:wargs:opening" });
+      this.companionDirector?.sync();
+      this.print("Bursting out from the goblin gate at last, you find Gandalf and the dwarves hard pressed in the open below the mountain.");
+      this.print("Wargs are already stealing in over the grass, and from the dark heights behind them goblin cries come shrill and eager. A ragged stand of pines at the clearing's edge is the only refuge within reach.");
+      return true;
+    }
+
+    resolveWargEscapeWait() {
+      if (!this.wargEscapeActive() || this.currentRoom !== "treeless_opening") return false;
+      if (!this.flags.warg_escape_in_trees) {
+        this.print("You wait in the open for one instant too long.");
+        this.endGame("The wargs rush in before the trees can be reached, and the night under the mountain ends in teeth and trampling.", {
+          fatal: true,
+          deathImage: "warg_kills_bilbo_death.png",
+        });
+        return true;
+      }
+      this.flags.warg_escape_waits = Number(this.flags.warg_escape_waits || 0) + 1;
+      this.flags.eagles_rescued_company = true;
+      this.flags.warg_escape_complete = true;
+      const previousRoom = this.currentRoom;
+      this.currentRoom = "great_river";
+      this.player.position = "great_river";
+      this.companionDirector?.sync();
+      this.print("You wait, clinging to the swaying pine while the wargs howl below and Gandalf drives them back with sudden sheets of fire.");
+      this.print("Then a great beating of wings comes out of the high dark. Eagles stoop from above the mountain, seize the company out of smoke and branches, and bear you far from the goblins' fury.");
+      this.print("By grey morning they set you down beside the Great River on the edge of Beorn's lands, shaken and weary, but alive.");
+      this.hazards?.maybeProgressAutosave(previousRoom, this.currentRoom);
+      this.maybeAutosaveForRoom(this.currentRoom);
+      this.describeRoom({ full: true });
+      return true;
     }
 
     hiddenDoorMapConsulted() {
@@ -14825,7 +16398,10 @@
           && this.isGollumPresentInLake()
         ) {
           this.print(this.encounters.gollumRingExpiryDeath(), "danger");
-          this.endGame("Gollum catches you as the ring fails.", { fatal: true });
+          this.endGame("Gollum catches you as the ring fails.", {
+            fatal: true,
+            deathImage: "gollum_ring_effect_ends_death.png",
+          });
           return;
         }
       }
@@ -14996,6 +16572,17 @@
         ],
       };
       return this.combatPick(pools[category] || pools.generic, `environment:${category}`, sequence);
+    }
+
+    fatalCombatImageForFoe(foeKind = "") {
+      const key = String(foeKind || "").trim();
+      if (key === "goblin") return "bilbo_goblins_around_him_death.png";
+      if (key === "troll") return "bilbo_troll_desperate_attack_death.png";
+      if (key === "spider") return "spider_kills_bilbo_death.png";
+      if (key === "wolf") return "warg_kills_bilbo_death.png";
+      if (key === "dragon") return "smaug_incinirates_bilbo_lower_halls_death.png";
+      if (key === "gollum") return "gollum_wrong_answer_to_riddle_death.png";
+      return "";
     }
 
     combatConditionPhrase(character) {
@@ -15198,7 +16785,7 @@
       this.aftermath?.registerCharacterDeath(fallen);
       attacker.attackFlag = 0;
       if (fallen.id === this.data.player) {
-        this.endGame(message, { fatal: true });
+        this.endGame(message, { fatal: true, deathImage: this.fatalCombatImageForFoe(this.combatFoeKind(winner)) });
         return "";
       }
       return message;

@@ -2972,6 +2972,49 @@ Future debugging advice
   to wait"; they are not the same design signal.
 
 
+Case 062 - 2026-06-21 - Arkenstone content data was still attached to the trolls cave and an obsolete necklace combo
+----------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Content review exposed two lore-breaking leftovers:
+
+- the Arkenstone was still reachable indirectly from the trolls cave because
+  `gilded_vault` was placed there and contained `arkenstone`
+- the data still allowed combining `arkenstone` with `gold necklace` to create
+  a `regal necklace`, which no longer fit the story direction
+
+Root cause
+----------
+These were old content artifacts in `assets/game-data.js`, not live logic bugs.
+The item/container placements and the combination table had drifted away from
+the intended Erebor-focused role of the Arkenstone.
+
+Resolution
+----------
+- Moved `gilded_vault` placement from `trolls_cave` to `lower_halls`
+- Kept `arkenstone` inside `gilded_vault`, so it now belongs to Erebor instead
+  of the troll-loot arc
+- Removed the obsolete `regal_necklace` item definition
+- Removed the `('arkenstone', 'gold necklace')` combination entry
+- Added regression coverage for:
+  - Arkenstone vault location
+  - failed Arkenstone + gold-necklace combination
+
+Files touched
+-------------
+- `assets/game-data.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When repurposing a late-game artifact, search both placements and
+  combinations, not only dialogue and parser references.
+- Lore-sensitive items should be validated from their container chain, not only
+  by searching the item id in isolation.
+
+
 Case 062 - 2026-06-21 - Goblin ambush autoplay must outrank long-range progression goals
 -----------------------------------------------------------------------------------------
 
@@ -3015,3 +3058,1120 @@ Future debugging advice
   recovery goals in autoplay priority order.
 - When a new progression prerequisite is added, rerun focused hazard autoplay
   tests to catch priority inversions.
+
+
+Case 063 - 2026-06-21 - Bringing the treasure home must start a final epilogue, not end instantly
+---------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+At Bag End, `put treasure in chest` ended the game immediately. That skipped
+the quieter book-shaped coda where the treasure is already home but the tale
+still needs one last settling moment.
+
+Root cause
+----------
+`checkVictory()` treated placing the treasure into the heavy wooden chest as the
+entire win condition. There was no separate post-return state, so neither
+manual play nor autoplay could express a final "homecoming first, closure
+afterward" beat.
+
+Resolution
+----------
+- Changed `checkVictory()` so putting the treasure in the chest at Bag End now
+  starts a `final_return_started` milestone instead of calling `winGame()`
+  right away
+- Added a Bag End-only `resolveTreasureHomecoming()` path on `wait`, which
+  prints the Gandalf-and-Balin epilogue and then closes the game
+- Taught autoplay to stay at Bag End and issue `wait` once the treasure is home
+  and the epilogue is pending
+- Added regression coverage for both the milestone state and the final
+  epilogue resolution
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When an ending has more than one narrative beat, represent each beat with its
+  own flag instead of collapsing everything into the first success action.
+- Autoplay endgame routing should check for pending epilogues before resuming
+  generic travel priorities.
+
+
+Case 064 - 2026-06-21 - The Arkenstone needed a real discovery beat inside Erebor
+----------------------------------------------------------------------------------
+
+Symptom
+-------
+The Arkenstone already existed as loot data in Erebor, but in play it behaved
+like an ordinary portable item. There was no distinct moment of discovery, no
+explicit identification beat, and Thorin had no dedicated reaction when Bilbo
+asked about it.
+
+Root cause
+----------
+The game had placement data for `arkenstone` inside `gilded_vault`, but no
+story-state layer around it. Room description, item-taking, and Thorin's Erebor
+dialogue all treated it as generic treasure.
+
+Resolution
+----------
+- Added Arkenstone state helpers in `game.js`:
+  - `arkenstone_seen`
+  - `arkenstone_identified` (plus compatibility write to the earlier typo
+    `arkenstone_identifed`)
+  - `arkenstone_taken`
+- `look` in the opened vault scene now triggers a one-time discovery narration
+  for the gem
+- Taking the Arkenstone now marks it seen/taken, identifies it explicitly, and
+  prints a short recognition beat
+- Thorin now gives a dedicated Arkenstone answer in Erebor once the gem has
+  been identified
+- Added regression coverage for:
+  - discovery on `look`
+  - identification on `take arkenstone`
+  - Thorin's dedicated Arkenstone response
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Important lore artifacts should not rely on item placement alone; give them a
+  discovery state and at least one recognition/reaction beat.
+- If a backlog flag name changes or ships with a typo, keep one compatibility
+  bridge rather than scattering both spellings through later logic.
+
+
+Case 065 - 2026-06-21 - The Arkenstone needed secret-sharing and handoff state, not only discovery
+---------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After adding the Erebor discovery beat, the Arkenstone still behaved too
+flatly once Bilbo had it. There was no persistent difference between:
+
+- Bilbo keeping it hidden from Thorin
+- Bilbo confiding in Gandalf
+- Bilbo handing it over to Bard
+
+That made the artifact feel important for description, but not yet for choice.
+
+Root cause
+----------
+The game tracked discovery and identification, but social transfer/reveal
+actions (`show`, `give`) had no Arkenstone-specific state. Thorin's dialogue
+also could not distinguish between a concealed stone and one openly revealed.
+
+Resolution
+----------
+- Added E03 state flags:
+  - `arkenstone_hidden_from_thorin`
+  - `arkenstone_given_to_bard`
+  - `gandalf_knows_arkenstone`
+- Taking the Arkenstone now defaults to Bilbo keeping it hidden from Thorin
+- `show arkenstone to gandalf` now marks Gandalf as knowing and reinforces the
+  secrecy beat
+- `show arkenstone to thorin` now flips the state from hidden to openly
+  revealed
+- `give arkenstone to bard` now marks the diplomatic handoff and gives Bard a
+  dedicated response
+- Thorin's Arkenstone response now changes depending on whether Bilbo is still
+  concealing the gem or has revealed it
+- Added regression coverage for the Gandalf, Thorin, and Bard branches
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- For choice-heavy artifacts, track not only possession but who knows about the
+  item and who currently controls it.
+- If a secret is meant to matter later, model "concealed" and "revealed" as
+  explicit separate states rather than inferring them from inventory alone.
+
+
+Case 066 - 2026-06-21 - Bard's dragon shot needed explicit weak-spot knowledge before it could resolve
+-------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The Erebor endgame let Bard kill Smaug as soon as he had bow and arrow ready.
+That skipped an important book-shaped dependency:
+
+- Bilbo first learning of the dragon's weak spot
+- the message being conveyed to Bard
+
+Without that separation, the dragon finale worked mechanically but lacked the
+necessary discovery beat and felt too abrupt.
+
+Root cause
+----------
+`handleBardDragonCommand()` only checked for:
+
+- Bard's bow
+- Bard's arrow
+- a still-living dragon
+
+There was no gating state for weak-spot knowledge, and autoplay had an early
+priority branch that pushed straight to `shoot dragon` as soon as the arrow was
+ready.
+
+Resolution
+----------
+- Added Smaug/Bard progression flags:
+  - `smaug_weakspot_known`
+  - `thrush_message_sent`
+- Asking Smaug about the treasure in `lower_halls` now reveals the bare patch
+  in his armored breast and marks the weak spot as known
+- Bard now refuses a blind shot until that knowledge exists
+- Once the weak spot is known, the first successful shooting attempt also
+  delivers a compact thrush-message beat before the shot resolves
+- Updated autoplay so it seeks the weak-spot information before ordering Bard's
+  final shot
+- Added regression coverage for:
+  - weak-spot discovery
+  - Bard's refusal without the information
+  - successful shot after the information
+  - autoplay's revised priority
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- For climactic scripted kills, track "weapon ready" separately from "target
+  vulnerability understood"; they are different story states.
+- If autoplay seems to skip a discovery beat, search for old high-priority
+  shortcut branches before changing the narrative logic itself.
+
+
+Case 067 - 2026-06-21 - Ravenhill had to become the only valid dragon-shot scene
+---------------------------------------------------------------------------------
+
+Symptom
+-------
+After gating Bard's shot on Smaug's weak spot, the dragon could still be slain
+immediately from Lower Halls. That flattened the book beat where Bilbo learns
+the weakness in the Mountain but Bard takes the deciding shot from Ravenhill.
+
+Root cause
+----------
+The command handler, autoplay flow, and regression tests all still treated any
+successful "shoot dragon" order as valid once the weak spot was known.
+
+Resolution
+----------
+- The dragon-shot flow now has two explicit phases:
+  - Bilbo learns the weak spot in `lower_halls`
+  - Bard can resolve the kill only in `stoe_of_ravenhill`
+- Added scene-state flags:
+  - `bard_ready_at_ravenhill`
+  - `black_arrow_committed`
+- Bard now refuses the shot from the wrong room with a Ravenhill-specific line
+- Autoplay now retreats toward Ravenhill after the weak spot is known and only
+  orders the shot once that room is reached
+- Added regression coverage for the refusal, the Ravenhill success path, and
+  the updated autoplay routing
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a narrative beat depends on both knowledge and place, gate both in one
+  helper so parser commands and autoplay cannot drift apart.
+- If the dragon sequence is moved again, update the smaug-phase "stuck"
+  helpers in parser tests so failure output still points at the right rooms.
+
+
+Case 068 - 2026-06-21 - Post-Smaug flow needed an exterior standoff phase before the old homecoming route
+----------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After Smaug's death, the game still behaved as though the story could collapse
+straight back into loot collection and the Bag End ending. There was no
+distinct phase for the new pressure gathering outside the Mountain.
+
+Root cause
+----------
+The dragon kill changed `dragondefeated`, but no later state distinguished:
+
+- Thorin reclaiming Erebor from within
+- Bard and the Lake-men gathering outside
+- the new tension at Dale and the Gate
+
+Autoplay therefore treated the post-dragon chapter as ordinary cleanup.
+
+Resolution
+----------
+- Added E04 state flags:
+  - `erebor_standoff_started`
+  - `bard_camp_active`
+  - `thorin_inside_erebor`
+- Added `beginEreborStandoff()` so the first exterior return after Smaug:
+  - starts the standoff phase
+  - moves Thorin inside Erebor
+  - gathers Bard and Gandalf in the ruins of Dale
+  - records a milestone autosave
+- Added contextual room text and dialogue for the Front Gate / Dale-camp
+  atmosphere
+- Updated autoplay so its first post-dragon exterior priority is to trigger
+  this standoff instead of flattening straight back toward the old ending flow
+- Added regression coverage for the transition, the new autoplay step, and the
+  updated descriptions
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a large plot beat is split across several backlog items, add the state
+  transition as soon as possible even if later negotiation/battle logic is not
+  written yet.
+- For chapter pivots, make autoplay perform the same transition a player would
+  see manually; otherwise old shortcut logic will keep flattening the story.
+
+
+Case 069 - 2026-06-21 - The post-Smaug standoff needed a real negotiation layer, not only atmosphere
+-----------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After adding the exterior standoff below Erebor, the scene had mood but not
+yet enough plot logic. Bard, Gandalf, and Thorin could describe the situation,
+but there was no real sense that negotiation had begun or that the Arkenstone
+could alter its course.
+
+Root cause
+----------
+E04 only established the chapter transition. It did not yet track whether:
+
+- parley had actually begun
+- Thorin had refused it
+- the Arkenstone had softened the talks
+- the immediate negotiation beat had been brought to a grudging hearing
+
+Resolution
+----------
+- Added E05 negotiation flags:
+  - `negotiation_started`
+  - `negotiation_failed`
+  - `negotiation_softened_by_arkenstone`
+  - `negotiation_resolved`
+- Added helper methods so later content can advance or inspect the negotiation
+  state cleanly
+- `ask bard about negotiation` now starts the parley beat and establishes the
+  harder baseline tone
+- `ask gandalf about thorin` now reflects whether the Arkenstone has changed
+  Gandalf's reading of the situation
+- `ask thorin about negotiation` now branches:
+  - hard refusal before Arkenstone leverage
+  - grudging willingness to hear Bard once the Arkenstone has entered the matter
+- Showing or giving the Arkenstone to Bard during the standoff now softens the
+  negotiation state instead of remaining only a flavor interaction
+- Added regression coverage for the hard Thorin branch, the softened branch,
+  and Gandalf/Bard negotiation reactions
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- For diplomacy scenes, track both mood and outcome: atmosphere alone is not
+  enough to support later branching.
+- If a lore artifact is meant to influence politics, connect it directly to the
+  negotiation state rather than leaving it as a separate isolated flag.
+
+
+Case 070 - 2026-06-21 - Dain's arrival needed to be tied to explicit waiting after the parley began
+-----------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After the negotiation layer was added below Erebor, the next escalation from
+the book was still missing: Dain's arrival from the Iron Hills. Without it, the
+standoff could remain static, and Bard, Gandalf, and Thorin had no way to react
+to the pressure that should push the tale toward open conflict.
+
+Root cause
+----------
+The standoff had state for the camps and for the negotiation itself, but no
+separate trigger for the next beat. That meant there was no compact way to:
+
+- mark the arrival of reinforcements
+- let the player feel tension building over a couple of deliberate waits
+- change dialogue tone once the balance of force shifted
+
+Resolution
+----------
+- Added E06 flags:
+  - `dain_arrived`
+  - `dwarf_reinforcements_present`
+- Added `beginDainArrival()` so later battle logic can test a single state
+  change instead of inferring it from dialogue
+- Made the arrival trigger only after negotiation has started and the player
+  explicitly waits twice in the Dale/front-gate standoff area
+- Added pre-arrival warning text on the first wait, then the actual arrival
+  beat and milestone autosave on the second
+- Extended Gandalf, Bard, and Thorin conversation branches so asking about
+  Dain or negotiation reflects whether the Iron Hills dwarves have arrived
+- Added regression coverage for:
+  - the two-wait trigger
+  - Gandalf's post-arrival reading of the danger
+  - Thorin's harder negotiation stance after Dain arrives
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- For compact chapter escalations, prefer an explicit trigger state over
+  trying to infer the beat from generic turn counts or room presence.
+- If a new political or military force enters the scene, update both the
+  trigger logic and the character dialogue in the same pass; otherwise the game
+  state will advance without the fiction sounding aware of it.
+
+
+Case 071 - 2026-06-21 - The Battle of Five Armies needed compact battle nodes, not a full combat simulator
+------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After Dain's arrival, the story still had no playable transition from tense
+standoff to open war. The book's next major beat is the Battle of Five Armies,
+but dropping a full tactical combat layer into the parser would have made the
+adventure heavier and harder to keep coherent.
+
+Root cause
+----------
+The Erebor endgame already had state for negotiation and reinforcements, but no
+small decision structure to turn those states into a playable battle beat.
+Without a compact node system, the story would either stall after Dain or need
+an overbuilt combat simulation to continue.
+
+Resolution
+----------
+- Added E07 battle flags:
+  - `battle_started`
+  - `battle_stage_1`
+  - `battle_stage_2`
+  - `battle_won`
+- Added `beginBattleOfFiveArmies()` so the battle begins as its own chapter
+  after Dain has arrived and the player waits again
+- Added `handleBattleChoice()` so the battle can be driven by a short set of
+  story actions instead of room-by-room warfare:
+  - `follow gandalf`
+  - `stand with thorin`
+  - `help bard`
+  - `retreat`
+- Used two positive choice stages plus an immediate retreat failure to keep the
+  sequence tense while remaining compact
+- Added battle-aware companion syncing and contextual room descriptions so the
+  same Dale/Erebor spaces feel different once the battle has begun
+- Added regression coverage for:
+  - the wait-based battle trigger after Dain
+  - a winning path through the compact battle
+  - Thorin's branch as a valid stage advance
+  - retreat as an early fatal failure
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- For large book events, prefer a short state machine of meaningful choices
+  over trying to simulate every tactical detail.
+- If a scene reuses existing rooms for a later chapter, update companion-sync
+  logic along with the new flags; otherwise the fiction and the character
+  placement will drift apart.
+
+
+Case 072 - 2026-06-21 - Thorin's final scene needed its own aftermath state after the battle
+----------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Once the compact Battle of Five Armies was in place, the adventure still lacked
+the emotional landing that follows it in the book. Winning the battle ended the
+military beat, but there was no distinct transition into Thorin's dying
+farewell and reconciliation with Bilbo.
+
+Root cause
+----------
+The battle logic only knew how to switch between active war and victory. It did
+not yet have a separate aftermath state to:
+
+- move the player toward Ravenhill
+- anchor Thorin and Gandalf in the right place afterward
+- expose Thorin's final dialogue only after the battle had truly been won
+
+Resolution
+----------
+- Added E08 flags:
+  - `thorin_fallen`
+  - `thorin_reconciled`
+- Added `beginThorinFall()` so the post-battle shift is explicit instead of
+  being inferred from generic victory state
+- Made the Thorin scene trigger on a deliberate `wait` after the battle is won,
+  which keeps the battle victory and the farewell as two separate emotional beats
+- Added an `erebor_aftermath` companion-sync chapter so Thorin and Gandalf stay
+  anchored on Ravenhill while Bard and the dwarves remain placed coherently
+- Made `talk to thorin` on Ravenhill deliver the reconciliation and mark it as
+  a milestone autosave
+- Added regression coverage for:
+  - reaching Thorin on Ravenhill after the battle
+  - the reconciliation scene itself
+  - the final Thorin dialogue remaining unavailable before victory
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a chapter ends in victory but not yet in emotional closure, give the
+  aftermath its own state instead of overloading the victory flag.
+- If a final dialogue scene is meant to be conditional on a prior triumph, test
+  both the positive path and the premature access path in the same pass.
+
+
+Case 073 - 2026-06-21 - The return to Bag End needed a separate homecoming chapter between Thorin and the old ending
+----------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The late game still jumped too abruptly from treasure-handling at Bag End to
+the final visit scene. Once Thorin's farewell existed, that shortcut felt even
+more abrupt: there was no real westward return, no nearly-lost house, and
+autoplay still tried to run straight from Erebor to the chest.
+
+Root cause
+----------
+The old ending logic treated `final_return_started` as if the treasure chest
+itself began the whole final chapter. That collapsed three distinct beats into
+one:
+
+- Bilbo's actual journey west
+- the Bag End auction / house-nearly-lost scene
+- the quiet final visit after the treasure is finally stored
+
+Resolution
+----------
+- Added E09 flags:
+  - `homeward_journey_started`
+  - `bag_end_auction_seen`
+  - `epilogue_started`
+- Added `beginHomewardJourney()` so a deliberate wait after Thorin's farewell
+  starts a separate return-home chapter and moves Bilbo back to the Hill with
+  travel narration
+- Added `noteBagEndAuction()` so entering `hobbit_hole` after the return
+  triggers the "house nearly lost" beat and marks the epilogue chapter as truly
+  begun
+- Split the old treasure-home logic:
+  - the westward return now starts before Bag End
+  - storing the treasure marks the quiet final stretch
+  - the existing visit-on-wait remains gated behind the treasure actually being
+    home and the Bag End chapter already begun
+- Added a small narrative treasure-share handoff on the road home so autoplay
+  and non-loot-focused playthroughs still reach the Bag End endgame coherently
+- Updated autoplay so it now walks through:
+  - negotiation
+  - Dain's arrival
+  - battle
+  - Thorin's farewell
+  - westward return
+  - Bag End
+  instead of jumping straight from Erebor to the chest
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If an ending already contains multiple emotional beats, keep their state
+  transitions separate even if the older implementation merged them for
+  convenience.
+- When late-game plot beats are inserted ahead of an old autoplay destination,
+  update autoplay ordering immediately; otherwise it will keep proving the wrong
+  version of the story.
+
+
+Case 074 - 2026-06-21 - The final Bag End visit needed a bittersweet close without changing the new endgame gates
+---------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After the new homecoming chapter was in place, the final `wait` at Bag End
+closed correctly but the last visit from Gandalf and Balin still felt too
+abrupt. It landed the mechanics, but not yet the quieter mixed joy and grief of
+the book's ending.
+
+Root cause
+----------
+`resolveTreasureHomecoming()` already owned the true final win beat, but its
+closing text was still the shorter placeholder written when the bigger task was
+simply to split the ending flow apart.
+
+Resolution
+----------
+- Kept the existing endgame gates unchanged:
+  - Bag End only
+  - treasure already home
+  - epilogue already started
+  - not already completed
+- Expanded the final visit text so Balin and Gandalf bring a warmer, more
+  bittersweet close before `winGame()`
+- Re-ran the full parser/dialogue suite to confirm the narrative-only change
+  did not disturb the late-game state machine
+
+Files touched
+-------------
+- `game.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Once late-game gating is stable, prefer polishing tone inside the final scene
+  rather than reusing earlier state flags for emotional beats.
+- Keep the true win trigger attached to the last deliberate closure action, even
+  if the prose around it grows richer.
+
+
+Case 075 - 2026-06-21 - The Gollum-to-Beorn transition needed a compact warg-and-eagles chapter instead of a silent skip
+--------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After Bilbo escaped Gollum, the game effectively jumped straight into the Beorn
+approach and hospitality material. The iconic chase by wargs and the rescue by
+eagles were missing, so the chapter break felt too abrupt and too clean.
+
+Root cause
+----------
+The existing flow already had:
+
+- goblin-tunnel escape state
+- mountain/beorn approach rooms
+- Beorn arrival/recovery logic
+
+but nothing bridged them as a distinct narrative state. Once Bilbo had the
+ring, the older Beorn approach gate simply stopped being hostile and let the
+story continue.
+
+Resolution
+----------
+- Added a compact M01 state layer in `game.js`:
+  - `warg_escape_started`
+  - `warg_escape_in_trees`
+  - `eagles_rescued_company`
+- Triggered the new scene when Bilbo reaches `treeless_opening` after escaping
+  Gollum
+- Required an explicit `climb tree` before safety; `wait` in the open is now a
+  fatal mistake
+- Resolved the scene with a single deliberate `wait` from the trees, which
+  brings the eagles and moves the company to `great_river`
+- Added travel gating so the player cannot just walk off the clearing while the
+  warg scene is active
+- Added contextual room description, Gandalf/Thorin talk lines, autoplay
+  routing, and coherent debug/jump state for Beorn and Mirkwood checkpoints
+- Added regression coverage for:
+  - scene start
+  - tree climb plus eagle rescue
+  - open-ground failure
+  - autoplay traversing the new scene
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When restoring a missing book episode between two already-stable milestones,
+  prefer a short stateful chapter over stretching the neighboring chapters to
+  cover it indirectly.
+- If autoplay crosses the same region, seed its setup with all earlier
+  prerequisites or test the inserted chapter directly; otherwise older
+  progression priorities can obscure the new regression.
+
+
+Case 076 - 2026-06-21 - Lake-town needed the Master as a distinct political voice, not only Bard's heroic one
+--------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Lake-town had Bard, atmosphere, and functional routing, but no real equivalent
+of the Master. As a result, the town spoke with almost one moral voice, and the
+political tension from the book between practical opportunism and harder civic
+duty was mostly absent.
+
+Root cause
+----------
+The content layer already had Lake-town rooms, townsfolk, and Bard-specific
+logic, but no dedicated `master` character or dialogue state to track whether
+the player had heard both sides of the town's response to the Mountain.
+
+Resolution
+----------
+- Added a new `master` character in `assets/game-data.js`
+- Placed him in `laketown_town_square`
+- Added `laketown_master_met` and `laketown_support_split` state usage in
+  `game.js`
+- Added Master-specific talk/ask responses focused on order, trade, and civic
+  self-interest
+- Updated Bard's Lake-town civic response so, after meeting the Master, Bard
+  explicitly contrasts his priorities with the Master's
+- Added a small Master initiative line so the character can establish his voice
+  even before direct questioning
+- Added regression coverage for:
+  - Master placement from the Lake-town jump
+  - distinct Master dialogue
+  - support split becoming visible once Bard is consulted afterward
+
+Files touched
+-------------
+- `game.js`
+- `assets/game-data.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a chapter needs political texture, a second viewpoint character may be
+  more effective than adding more lines to the existing hero-aligned NPC.
+- If two NPCs are meant to frame the same crisis differently, track the moment
+  the player has heard both; that state is useful later for room tone, choices,
+  and recap dialogue.
+
+
+Case 077 - 2026-06-21 - Beorn hospitality scene must trigger from debug checkpoints as well as live travel
+-----------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The new Beorn dinner/hospitality pass worked when Bilbo entered `beorns_house`
+through normal movement, but the `jump beorn` checkpoint still landed in the
+older pre-scene state.
+
+Root cause
+----------
+The new hospitality beat was wired through `checkSpecialSituations()`, but the
+debug jump flow only auto-triggered special handling for the troll clearing.
+After `jump beorn`, the room description printed without running the new Beorn
+arrival scene, leaving `beorn_dinner_seen` unset and contextual follow-up text
+inactive.
+
+Resolution
+----------
+- Added a Beorn-specific special-situation trigger to the post-jump flow
+- Kept the existing room-first presentation, then immediately ran the new
+  hospitality scene when the checkpoint lands in `beorns_house`
+- Added regression coverage for:
+  - `jump beorn` setting `beorn_dinner_seen`
+  - the hospitality narration itself
+  - the updated great-hall description after arrival
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a new narrative beat is attached to room entry, verify both live travel
+  and debug/checkpoint travel paths.
+- If a checkpoint is meant to represent an established chapter state, treat its
+  scene flags as part of the contract, not as optional flavor.
+
+
+Case 078 - 2026-06-21 - Beorn needed a compact payoff in the battle finale, not only at his house
+--------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Beorn had become much stronger as a character during his hospitality chapter,
+but after Mirkwood he effectively disappeared from the adventure's final
+movement. The battle still worked mechanically, yet the book's later payoff
+for Beorn was missing.
+
+Root cause
+----------
+The compact Battle of Five Armies sequence already had good state hooks for
+victory and aftermath, but Beorn was never tied into either the battle-win
+resolution or the Ravenhill aftermath sync.
+
+Resolution
+----------
+- Added a shared victory beat where the eagles arrive and Beorn helps break the
+  goblin host
+- Added a Ravenhill aftermath beat stating that Beorn bore Thorin from the
+  field
+- Synced Beorn into the aftermath chapter so he is physically present on
+  `stoe_of_ravenhill`
+- Added Beorn-specific Ravenhill dialogue about Thorin and the battle
+- Added regression coverage for:
+  - battle victory surfacing Beorn's intervention
+  - Thorin's Ravenhill scene placing Beorn there
+  - Beorn's Ravenhill dialogue
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a mid-book character returns in the finale, prefer a short but explicit
+  payoff beat over leaving the continuity implicit.
+- Finale chapter sync should include not only the speaker needed for the next
+  command, but also any major witness whose presence carries narrative weight.
+
+
+Case 079 - 2026-06-21 - The barrel escape needed a feast-and-wine setup, not only mechanical actions in the cellar
+---------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The barrel escape already worked as gameplay, but the cellar phase felt too
+cleanly mechanical. The player could solve it without the fiction ever making
+clear why the place had become unusually vulnerable at that exact moment.
+
+Root cause
+----------
+The cellar had puzzle affordances (`barrel`, `trap door`, river) and a butler
+voice, but no arrival beat tying the whole opportunity to the Elvenking's
+feasting, the drained wine-casks, and the servants' dulled vigilance from the
+book.
+
+Resolution
+----------
+- Added a first-arrival cellar scene that frames the escape window through the
+  feast above, spilled wine, and tired servants
+- Added a contextual cellar description once that scene has been seen
+- Branched Butler talk/ask responses in that state so he sounds like part of
+  the same moment rather than a generic cellar NPC
+- Added regression coverage for:
+  - the cellar arrival scene
+  - the contextual description
+  - the butler's feast-state dialogue
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a puzzle in the book depends on a temporary lapse in vigilance, give the
+  player a short staging scene that explains the lapse before asking for the
+  action.
+- If an NPC's dialogue belongs to a specific scene-state, branch it there
+  rather than trying to make one generic line carry all versions of the moment.
+
+
+Case 080 - 2026-06-21 - Elven captivity and Lake-town arrival needed scene-state memory, not only room transitions
+---------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Two adjacent book beats were mechanically present but narratively thin:
+
+- entering the elven dungeon felt like an abrupt capture without the king's
+  questioning or Bilbo's refusal to answer
+- reaching Lake-town after the barrel escape worked as traversal, but the
+  human reception and Bard's first practical reading of the company were barely
+  staged
+
+Root cause
+----------
+Both chapters were represented mainly as room changes:
+
+- `elvenkings_halls -> dark_dungeon`
+- `cellar -> long_lake -> wooden_town`
+
+That preserved progression but not the intermediate dramatic state that gives
+the chapter its meaning and colors nearby dialogue.
+
+Resolution
+----------
+- Added an Elvenking-questioning/prisoner scene during capture and used a flag
+  to drive darker dungeon tone plus wood-elf prison dialogue
+- Added a Lake-town barrel-arrival scene/state for `wooden_town`
+- Seeded the Lake-town jump checkpoint with the new arrival-state so the debug
+  chapter remains coherent
+- Preserved the existing Master/Bard political split by giving it precedence
+  over the newer first-arrival Bard line once the player has heard the Master
+- Added regression coverage for:
+  - capture narration
+  - wood-elf dungeon dialogue
+  - barrel arrival into Lake-town
+  - Bard's arrival-state dialogue
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a chapter's meaning lies in what happens between two rooms, represent
+  that middle beat as explicit scene state instead of hiding it inside generic
+  movement.
+- If a new first-arrival scene overlaps an older conversation branch, decide
+  priority deliberately so the new color does not erase an established payoff.
+
+
+Case 081 - 2026-06-21 - The barrel escape needed to feel like the whole company escaping, not only Bilbo moving rooms
+--------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The barrel chapter already worked for Bilbo mechanically, but the dwarves were
+still mostly implicit. The player could:
+
+- reach the cellar
+- escape via barrel
+- arrive at Lake-town
+
+without the fiction clearly staging that the rest of the company had also been
+stuffed into barrels, set afloat, and hauled out again.
+
+Root cause
+----------
+The escape logic centered on Bilbo's travel state (`cellar -> long_lake ->
+wooden_town`) but had no explicit companion-scene state connecting:
+
+- dwarf loading in the cellar
+- the sight/sound of multiple barrels afloat on the lake
+- the dwarves being broken out again at Lake-town
+
+Resolution
+----------
+- Added a cellar scene after `mirkwooddwarvesfreed` that explicitly frames the
+  labor of packing the dwarves into barrels
+- Added `barrel_company_prepared` and `barrel_company_afloat` story-state use
+  around the escape transition
+- Added a contextual `long_lake` description that makes the rest of the
+  company's barrels present in the scene
+- Expanded the Lake-town arrival beat so townsfolk break open the other barrels
+  and the dwarves emerge alive, furious, and miserable
+- Seeded `jump laketown` with the same late-escape assumptions so the debug
+  checkpoint stays faithful to the chapter
+- Added regression coverage for:
+  - explicit dwarf barrel-loading
+  - the company afloat on Long Lake
+  - the dwarves being recovered at Lake-town
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a group escape is implemented through the protagonist's movement only,
+  add explicit companion-state beats at preparation, transit, and arrival.
+- Debug checkpoints that begin after a major group set-piece should inherit the
+  set-piece's social state, not only its map position.
+
+
+Case 082 - 2026-06-21 - The Elvenking prison chapter needed visible companion topology, not only Bilbo's point of view
+----------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The elven-halls sequence had better capture and barrel logic, but the dwarves
+still felt too abstract while imprisoned. The player could understand that the
+company had been taken, yet the chapter did not clearly stage:
+
+- the dwarves being kept apart in the prison spaces before rescue
+- their regrouping in the cellar once Bilbo had freed them
+
+Root cause
+----------
+Companion placement in the `elves` chapter still relied on the generic chapter
+distribution logic. That kept the dwarves ambiently present, but not in a way
+that reflected the specific topology of this chapter's imprisonment and escape.
+
+Resolution
+----------
+- Added a dedicated `syncElves()` branch in the companion director
+- Before `mirkwooddwarvesfreed`, the ambient dwarves are now distributed across
+  `dark_dungeon` and `elven_prison_cells`, with Thorin anchored in the prison
+  cells
+- After `mirkwooddwarvesfreed`, the company is now regrouped in `cellar`
+  instead of remaining loosely ambient
+- Added contextual room description support so:
+  - `elven_prison_cells` feels inhabited by separated dwarvish prisoners
+  - `cellar` feels like the regrouped pre-escape staging ground once the
+    dwarves are together again
+- Added regression coverage for both the dispersed-prison and regrouped-cellar
+  states
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a chapter's drama depends on the party being separated and then
+  reassembled, express that separation in companion placement rather than only
+  in narration.
+- Generic ambient-party syncing is fine for travel, but custody/escape chapters
+  usually need their own topology-aware sync logic.
+
+
+Case 083 - 2026-06-21 - Lake-town needed a dedicated company sync without trampling Bard's active follower state
+----------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Lake-town already had Bard and the Master as strong local voices, but Thorin
+and the dwarves still felt too ambient and under-specified inside the town
+itself. After adding a dedicated Lake-town companion sync, one regression
+appeared: Bard's previously-correct follower behavior after vertical travel in
+the outlands was being overwritten.
+
+Root cause
+----------
+The generic chapter sync for `laketown` was too weak for company presence in
+town, so a new `syncLaketown()` was needed. But the first version of that sync
+always reset Bard to a static non-following placement whenever the chapter was
+active, even if another mechanic had just correctly set him to follow Bilbo.
+
+Resolution
+----------
+- Added a dedicated `syncLaketown()` chapter sync
+- Distributed the ambient dwarves across `wooden_town` and nearby Lake-town
+  rooms so the company feels materially present in the city
+- Anchored Thorin coherently into the Lake-town chapter instead of leaving him
+  to purely generic placement
+- Added Thorin-specific Lake-town dialogue about:
+  - the town and its people
+  - the Master
+  - Bard
+  - the nearness of Smaug and the Mountain
+- Preserved Bard's active follower/carry state by making the sync leave him
+  alone when he is already following Bilbo or being carried
+- Added regression coverage for:
+  - Thorin and the dwarves being visibly present in Lake-town
+  - Thorin's Lake-town dialogue
+  - Bard's post-climb follower state staying intact
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Chapter-level companion sync should improve ambient placement, but it must
+  not blindly override more specific moment-to-moment states like following,
+  carrying, or chapter-local escort logic.
+- When adding a regional sync, rerun tests that cover room transitions inside
+  the same chapter; those are the easiest places for silent state stomping.
+
+
+Case 084 - 2026-06-21 - Death scene artwork needed a central mapping layer instead of ad hoc per-branch image swaps
+---------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+New `*_death` images had been added for multiple fatal branches, but the game
+still fell through to ordinary room art on death because fatal endgames did not
+share one image-selection path.
+
+Root cause
+----------
+Death branches were spread across several systems:
+
+- direct `endGame()` calls in hazards and combat
+- `specialActions` with `destination: "endgame"`
+- dynamically varied combat and Gollum death text
+
+Those branches already ended the game correctly, but none of them passed
+through a common "which death image should be shown?" resolver.
+
+Resolution
+----------
+- Added a central fatal-image resolver in `game.js`
+- Let `endGame()` show a non-dismissing temporary image whenever a fatal branch
+  resolves to a known `*_death` asset
+- Passed explicit death-image hints from the clearest direct callers:
+  - Gollum wrong-answer death
+  - Gollum ring-expiry death
+  - hulking goblin ambush failure
+  - spider-eyes venom death
+  - cellar trap-door plunge
+  - blind-tunnel exhaustion death
+  - warg open-ground death
+  - combat deaths by foe family
+- Added regression coverage for the new death-scene mappings, including:
+  - west-bank river death
+  - cellar river death
+  - spider-eyes death
+  - goblin ambush death
+  - goblin combat death
+  - Gollum deaths
+  - warg death
+  - special-action mapping checks for Troll/Smaug/goblin branches
+- Bumped `ASSET_VERSION` so the updated JS/image routing refreshes cleanly in
+  the browser
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a new death illustration is added, register it in the shared fatal-image
+  resolver first; do not rely on each branch remembering to swap images on its
+  own.
+- For legacy `specialActions` that still encode fatal prose in data, keep a
+  small mapping test even if the exact branch is no longer the main live path.
