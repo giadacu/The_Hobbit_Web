@@ -1211,8 +1211,12 @@
     ],
     cellar: [
       {
+        when: ({ game }) => game.flags.barrel_company_launched,
+        text: "You are in the Elvenking's cellar, where great casks, damp stone, and the black rushing of the underground water gather under the halls. The trap door stands open above the racing water, most of the dwarves are already gone in their miserable fleet, and one last empty barrel waits for Bilbo's own desperate chance.",
+      },
+      {
         when: ({ game }) => game.flags.mirkwooddwarvesfreed && game.flags.barrel_company_prepared,
-        text: "You are in the Elvenking's cellar, where great casks, damp stone, and the black rushing of the underground water gather under the halls. The dwarves are with you again at last, crowded into a whispered, miserable conspiracy among the barrels, and every moment now feels stolen from the king's people overhead.",
+        text: "You are in the Elvenking's cellar, where great casks, damp stone, and the black rushing of the underground water gather under the halls. The dwarves are stowed away in barrels at last, grumbling in muffled whispers and thumps, while Bilbo waits among the remaining casks for the next brief lapse in the butler's attention.",
       },
       {
         when: ({ game }) => game.flags.cellar_feast_scene_seen,
@@ -5317,8 +5321,14 @@
         if (door.open) return game.print(`The ${door.name} is already open.`);
         if (matches(door.name, "secret door") && !game.flags.secretdoorsun) return game.print("The rock face shows no door yet.");
         if (door.locked) return game.print(`The ${door.name} is locked.`);
+        if (game.currentRoom === "cellar" && matches(door.name, "large trap door")) {
+          if (!game.canAttemptCellarStealthAction("open the large trap door")) return;
+        }
         door.open = true;
         game.setFlag(`${compact(door.name)}open`, true);
+        if (game.currentRoom === "cellar" && matches(door.name, "large trap door")) {
+          game.consumeCellarButlerStealthWindow();
+        }
         game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "open")} the ${door.name}.`);
         if (game.currentRoom === "cellar" && matches(door.name, "large trap door")) {
           game.print("Black water hurries below the opening, shouldering past the piles and posts under the halls with unpleasant force.");
@@ -6260,6 +6270,7 @@
       if (game.unexpectedParty?.blocksDirectInteraction(character, "order")) return;
       this.rememberConversationCharacter(character);
       this.rememberReferencedCharacter(order);
+      if (game.handleCellarCompanionOrder(character, order)) return;
       if (this.ordering.handleBardDragonCommand(character, order)) return;
       this.delegateCharacterOrder(character, order);
     }
@@ -6268,6 +6279,7 @@
       const game = this.game;
       this.rememberConversationCharacter(character);
       this.rememberReferencedCharacter(order);
+      if (game.handleCellarCompanionOrder(character, order)) return;
       const delegatedSplitter = this.delegatedSplitterFor(character);
       this.seedDelegatedSplitter(delegatedSplitter);
       for (const action of delegatedSplitter.split(order)) {
@@ -9332,8 +9344,11 @@
       const game = this.game;
       if (game.currentRoom !== "cellar") return false;
       if (!game.flags.mirkwooddwarvesfreed) return false;
-      if (game.flags.barrel_company_prepared) return false;
-      return game.beginDwarfBarrelLoadingScene();
+      if (game.flags.barrel_company_prepared || game.flags.barrel_company_launched) return false;
+      if (game.flags.barrel_company_ready_prompted) return false;
+      game.flags.barrel_company_ready_prompted = true;
+      game.print("The dwarves crowd close among the casks, plainly waiting for Bilbo's word before any of them agrees to be packed into a barrel.");
+      return true;
     }
 
     checkLaketownArrival() {
@@ -9412,6 +9427,13 @@
     maybeProgressAutosave(previousRoom = "", currentRoom = this.game.currentRoom) {
       const game = this.game;
       if (!currentRoom) return false;
+      if (currentRoom === "great_river" && previousRoom === "treeless_opening" && game.flags.eagles_rescued_company) {
+        return this.recordMilestoneAutosave(
+          "autosave_milestone_eagles_rescue",
+          "after the eagles' rescue",
+          "eagles:rescue",
+        );
+      }
       if (currentRoom === "rivendell" && previousRoom === "hidden_valley_path") {
         return this.recordMilestoneAutosave(
           "autosave_milestone_rivendell_arrival",
@@ -9688,7 +9710,7 @@
         if (!game.smaugWeakSpotKnown()) return "ask smaug about treasure";
         if (
           game.flags.bardreadiedarrow
-          && (bard?.carriedBy === game.player.id || (bard?.movementMode === "follow" && bard?.position === game.currentRoom && bard.visible))
+          && (bard?.carriedBy === game.player.id || (bard?.followingPlayer && bard?.position === game.currentRoom && bard.visible))
         ) {
           return this.autoplayRouteCommandTo("stoe_of_ravenhill");
         }
@@ -9870,16 +9892,18 @@
 
       if (game.currentRoom === "cellar") {
         const trapDoor = game.doors.porta_cellar_long_lake;
-        if (trapDoor && !trapDoor.open) return "open trap door";
-        if (game.flags.barrelthrown) return "jump onto barrel";
-        if (this.autoplayHasAccessibleBarrelForCellarEscape()) return "throw barrel through trap door";
+        if (!game.flags.barrel_company_prepared) return game.cellarButlerDistracted() ? "ask thorin to enter barrels" : "wait";
+        if (trapDoor && !trapDoor.open) return game.cellarButlerDistracted() ? "open trap door" : "wait";
+        if (!game.flags.barrel_company_launched) return game.cellarButlerDistracted() ? "ask thorin to throw barrels through trap door" : "wait";
+        if (game.flags.barrelthrown) return game.cellarButlerDistracted() ? "jump onto barrel" : "wait";
+        if (this.autoplayHasAccessibleBarrelForCellarEscape()) return game.cellarButlerDistracted() ? "throw barrel through trap door" : "wait";
       }
 
       if (!game.flags.dragondefeated) {
         const bardWithPlayer = bard?.carriedBy === game.player.id
-          || (bard?.movementMode === "follow" && bard?.position === game.currentRoom && bard.visible);
+          || (bard?.followingPlayer && bard?.position === game.currentRoom && bard.visible);
         if (!bardWithPlayer) {
-          if (bard?.position === game.currentRoom && bard.visible) return "pick up bard";
+          if (bard?.position === game.currentRoom && bard.visible) return "ask bard to follow me";
           const bardCorridor = {
             elvish_clearing: "north east",
             elvenkings_halls: "south",
@@ -14199,6 +14223,125 @@
       return this.doors.porta_cellar_long_lake || null;
     }
 
+    cellarButler() {
+      return this.characters.butler || null;
+    }
+
+    cellarButlerStealthActive() {
+      const butler = this.cellarButler();
+      return Boolean(
+        this.currentRoom === "cellar"
+        && this.flags.cellar_feast_scene_seen
+        && !this.flags.laketown_barrel_arrival_seen
+        && this.player.noticeable !== false
+        && butler?.visible
+        && butler.position === "cellar"
+      );
+    }
+
+    cellarButlerDistracted() {
+      return this.cellarButlerStealthActive() && Boolean(this.flags.cellar_butler_window_open);
+    }
+
+    setNextCellarButlerWindow(delayTurns = 1) {
+      this.flags.cellar_butler_window_open = false;
+      this.flags.cellar_butler_next_window_turn = Math.max(
+        Number(this.turnCount || 0) + Math.max(1, Number(delayTurns || 1)),
+        Number(this.flags.cellar_butler_next_window_turn || 0),
+      );
+    }
+
+    primeCellarButlerStealth() {
+      if (!this.cellarButlerStealthActive()) return false;
+      if (this.flags.cellar_butler_window_open) return false;
+      const nextTurn = Number(this.flags.cellar_butler_next_window_turn || 0);
+      if (nextTurn > Number(this.turnCount || 0)) return false;
+      this.flags.cellar_butler_window_open = true;
+      this.flags.cellar_butler_next_window_turn = 0;
+      this.print("The butler turns away toward the stair with a muttered complaint, leaving the trap door and the waiting barrels unwatched for a precious moment.");
+      return true;
+    }
+
+    expireCellarButlerStealthWindow() {
+      if (!this.flags.cellar_butler_window_open) return false;
+      this.flags.cellar_butler_window_open = false;
+      if (this.cellarButlerStealthActive()) {
+        this.flags.cellar_butler_next_window_turn = Math.max(Number(this.flags.cellar_butler_next_window_turn || 0), Number(this.turnCount || 0) + 1);
+      }
+      return true;
+    }
+
+    blockCellarButlerAction(actionText = "try that") {
+      this.print(`The butler is still facing the cellar-work too squarely for you to ${actionText} unseen. Better wait until he turns away again.`);
+      return true;
+    }
+
+    consumeCellarButlerStealthWindow() {
+      if (!this.cellarButlerStealthActive()) return false;
+      if (!this.flags.cellar_butler_window_open) return false;
+      this.flags.cellar_butler_window_open = false;
+      this.flags.cellar_butler_next_window_turn = Number(this.turnCount || 0) + 2;
+      return true;
+    }
+
+    canAttemptCellarStealthAction(actionText = "try that") {
+      if (!this.cellarButlerStealthActive()) return true;
+      if (this.cellarButlerDistracted()) return true;
+      return !this.blockCellarButlerAction(actionText);
+    }
+
+    handleCellarCompanionOrder(character, order = "") {
+      if (this.currentRoom !== "cellar" || !this.flags.cellar_feast_scene_seen) return false;
+      const text = normalize(order);
+      if (!text || !/\b(barrel|barrels)\b/.test(text)) return false;
+      if (!character || character.friendly === false) return false;
+
+      if (matchesAny(text, ["enter barrels", "enter barrel", "get in barrels", "get into barrels", "climb into barrels", "hide in barrels", "into barrels"])) {
+        if (!this.flags.mirkwooddwarvesfreed) {
+          this.print(`${sentenceDisplayCharacterName(character)} says 'Free us first, Master Baggins, and then we may discuss what indignities follow.'`);
+          return true;
+        }
+        if (this.flags.barrel_company_prepared) {
+          this.print(`${sentenceDisplayCharacterName(character)} says 'We are packed in tightly enough already.'`);
+          return true;
+        }
+        if (!this.canAttemptCellarStealthAction("set the dwarves into the barrels")) return true;
+        this.consumeCellarButlerStealthWindow();
+        this.beginDwarfBarrelLoadingScene({ leader: character });
+        return true;
+      }
+
+      if (matchesAny(text, ["throw barrels", "throw the barrels", "push barrels", "send barrels", "help with barrels", "barrels through trap door", "barrels through the trap door"])) {
+        if (!this.flags.barrel_company_prepared) {
+          this.print(`${sentenceDisplayCharacterName(character)} says 'Barrels first, Master Baggins. We cannot be thrown downriver before we are packed into them.'`);
+          return true;
+        }
+        if (this.flags.barrel_company_launched) {
+          this.print(`${sentenceDisplayCharacterName(character)} says 'The others are already gone below. Your own turn is the one still waiting.'`);
+          return true;
+        }
+        const trapDoor = this.cellarTrapDoor();
+        if (!trapDoor?.open) {
+          this.print(`${sentenceDisplayCharacterName(character)} glances toward the trap door and says 'Open the way first, or all our whispering is wasted.'`);
+          return true;
+        }
+        if (!this.canAttemptCellarStealthAction("send the dwarves' barrels down unseen")) return true;
+        this.consumeCellarButlerStealthWindow();
+        this.launchDwarfBarrelCompany(character);
+        return true;
+      }
+      return false;
+    }
+
+    launchDwarfBarrelCompany(helper = null) {
+      if (this.flags.barrel_company_launched) return false;
+      this.flags.barrel_company_launched = true;
+      const helperName = helper ? displayCharacterName(helper) : "your helper";
+      this.print(`${helperName} moves when the butler's back is turned, and together you send the dwarves' barrels one by one through the open trap door into the black rush below.`);
+      this.print("There is muffled outrage from inside more than one cask, but the river takes them all the same, and in a few heartbeats the miserable little fleet is away beneath the halls.");
+      return true;
+    }
+
     handleCellarBarrelThrow(command = "") {
       if (this.currentRoom !== "cellar") return false;
       const text = normalize(command);
@@ -14212,6 +14355,15 @@
         this.print("An empty barrel is already bobbing away below the trap door.");
         return true;
       }
+      if (!this.flags.barrel_company_prepared) {
+        this.print("First the dwarves need to be packed into barrels of their own.");
+        return true;
+      }
+      if (!this.flags.barrel_company_launched) {
+        this.print("Better get the dwarves' barrels away first, or Bilbo's own jump will come too soon.");
+        return true;
+      }
+      if (!this.canAttemptCellarStealthAction("throw your barrel through the trap door")) return true;
       const barrel = this.visibleSearch("barrel")?.item || this.findInInventory("barrel");
       if (!barrel || !matches(barrel.name, "barrel")) {
         this.print(this.heldItemMessage("barrel") || "There is no barrel ready to hand.");
@@ -14223,6 +14375,7 @@
       barrel.visible = false;
       barrel.open = false;
       this.flags.barrelthrown = true;
+      this.consumeCellarButlerStealthWindow();
       this.print("You wrestle an empty barrel to the opening and heave it through. It strikes the black water below with a hollow, violent crash, vanishes among the piles and foaming shadows for one dreadful instant, and then shoots out again, bobbing wildly as the current claims it.");
       return true;
     }
@@ -14240,6 +14393,8 @@
         this.print("The barrel you need is not under you yet. Best get an empty one through the trap door first.");
         return true;
       }
+      if (!this.canAttemptCellarStealthAction("jump after the barrel")) return true;
+      this.consumeCellarButlerStealthWindow();
       return this.resolveCellarBarrelEscape();
     }
 
@@ -14277,7 +14432,7 @@
     resolveCellarBarrelEscape() {
       this.player.insideContainer = null;
       this.flags.barrelthrown = false;
-      this.flags.barrel_company_afloat = Boolean(this.flags.barrel_company_prepared);
+      this.flags.barrel_company_afloat = Boolean(this.flags.barrel_company_launched);
       this.flags.laketown_barrel_arrival_pending = true;
       this.showTemporaryImage("elvenkings_river_barrel.png", {
         alt: "Bilbo riding a barrel down the forest river",
@@ -14965,7 +15120,9 @@
         if (character.movementMode !== "follow") continue;
         if (this.isLooseFollower(character)) continue;
         if (!character.visible || character.position !== fromRoom) continue;
-        if (this.characterCannotFollowVertical(character, direction)) continue;
+        if (this.characterCannotFollowVertical(character, direction)) {
+          if (!matches(character.name, "bard") || !character.followingPlayer) continue;
+        }
         if (this.shouldHoldBardNearDale(character, toRoom)) continue;
         if (this.shouldHoldFollowerByChapter(character, fromRoom, toRoom)) continue;
         this.moveCharacter(character, toRoom, direction, { silent: true });
@@ -15066,6 +15223,7 @@
     advanceCharacterTurn(options = {}) {
       const { forceMove = false } = options;
       this.turnCount += 1;
+      this.expireCellarButlerStealthWindow();
       this.updateRingTimers();
       this.updateLanternTimer();
       this.progressGreenDragonPony();
@@ -15087,6 +15245,7 @@
       this.advanceGollumActivity();
       this.advanceGollumPursuitEcho();
       this.advanceSmaugAwareness();
+      this.primeCellarButlerStealth();
       this.maybeAtmosphericEvent();
       this.companionDirector?.maybeComment();
     }
@@ -15417,17 +15576,27 @@
     beginCellarEscapeOpportunity() {
       if (this.currentRoom !== "cellar" || this.flags.cellar_feast_scene_seen) return false;
       this.flags.cellar_feast_scene_seen = true;
+      const butler = this.cellarButler();
+      if (butler) {
+        butler.position = "cellar";
+        butler.visible = true;
+        butler.movementMode = "never";
+      }
+      this.setNextCellarButlerWindow(1);
       this.print("The king's feasting has told on the place below. From the upper halls come muffled laughter and the last wandering echoes of song, while in the cellar the air is heavy with spilled wine, wet wood, and the comfortable slackness of servants kept too long at a good table.");
       this.print("Empty barrels stand ready by the running water, and the butler's vigilance has plainly been dulled by duty, fatigue, and a cup or two beyond strict necessity. If there is ever to be a moment for desperate barrel-work, it is near enough to this one.");
+      this.print("Every now and then the butler turns toward the stair or the casks and leaves some other corner unwatched for a heartbeat. Any barrel-work will have to be done in such stolen instants.");
       return true;
     }
 
     beginDwarfBarrelLoadingScene(options = {}) {
-      const { silent = false } = options;
+      const { silent = false, leader = null } = options;
       if (this.flags.barrel_company_prepared) return false;
       this.flags.barrel_company_prepared = true;
+      this.flags.barrel_company_ready_prompted = true;
       if (silent) return true;
-      this.print("The worst labor is not your own barrel at all, but the dwarves'. One by one, amid muttering, indignation, and hurried whispers, you contrive to get them stowed into the empty casks before the chance above your head closes again.");
+      const leadIn = leader ? `${displayCharacterName(leader)} gives the word at last, and ` : "";
+      this.print(`${leadIn}the worst labor is not your own barrel at all, but the dwarves'. One by one, amid muttering, indignation, and hurried whispers, you contrive to get them stowed into the empty casks before the chance above your head closes again.`);
       this.print("No dwarf thinks much of the arrangement, but cramped discomfort weighs less than the Elvenking's cells. By the time the last lid is settled, the whole desperate escape has become a matter not of one barrel, but of a miserable little fleet.");
       return true;
     }

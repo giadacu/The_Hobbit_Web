@@ -3137,7 +3137,8 @@ const gameCases = [
     drive(game) {
       const originalRandom = Math.random;
       const issued = [];
-      Math.random = () => 0.99;
+      const seeded = makeSeededRandom(1);
+      Math.random = () => seeded();
       try {
         for (let step = 0; step < 500 && !game.endgame; step += 1) {
           const command = game.nextAutoplayCommand();
@@ -4753,12 +4754,14 @@ const gameCases = [
     drive(game) {
       game.execute("climb tree");
       game.execute("wait");
+      game.print(`Eagles rescue autosave: ${game.autosaveMeta?.label || "none"}`);
       game.print(`Eagles rescued: ${game.flags.eagles_rescued_company ? "yes" : "no"}`);
       game.print(`Room after rescue: ${game.currentRoom}`);
     },
     expectedIncluded: [
       "With wolves already sweeping the clearing, you scramble up among the pines as Gandalf and the dwarves do the same.",
       "Eagles stoop from above the mountain, seize the company out of smoke and branches, and bear you far from the goblins' fury.",
+      "Eagles rescue autosave: after the eagles' rescue",
       "Eagles rescued: yes",
       "Room after rescue: great_river",
     ],
@@ -5334,7 +5337,7 @@ const gameCases = [
       "Lake-town barrel arrival seen: yes",
       "Ambient dwarves in town: 12",
       "Strength after Beorn: 6",
-      "Autoplay next in Lake-town: pick up bard",
+      "Autoplay next in Lake-town: ask bard to follow me",
     ],
   },
   {
@@ -5415,14 +5418,26 @@ const gameCases = [
     name: "cellar barrel throw and jump reaches long lake",
     setup(game) {
       movePlayerTo(game, "cellar");
+      game.checkSpecialSituations();
+      game.flags.mirkwooddwarvesfreed = true;
     },
     drive(game) {
+      game.execute("wait");
+      game.execute('say to thorin "enter barrels"');
+      game.execute("wait");
       game.execute("open trap door");
+      game.execute("wait");
+      game.execute('say to thorin "throw barrels through trap door"');
+      game.execute("wait");
       game.execute("throw barrel through the large trap door");
+      game.execute("wait");
       game.execute("jump onto barrel");
       game.print(`Cellar barrel room: ${game.currentRoom}`);
     },
     expectedIncluded: [
+      "The butler turns away toward the stair with a muttered complaint, leaving the trap door and the waiting barrels unwatched for a precious moment.",
+      "the worst labor is not your own barrel at all, but the dwarves'.",
+      "together you send the dwarves' barrels one by one through the open trap door",
       "You wrestle an empty barrel to the opening and heave it through.",
       "You seize your moment, spring through the open trap door, and come down half upon the barrel and half into the freezing black rush beneath the halls.",
       "At last the racing black water widens, the low roof of branches breaks apart above you, and Long Lake opens ahead in cold daylight like a deliverance almost too sudden to trust.",
@@ -5433,10 +5448,19 @@ const gameCases = [
     name: "cellar barrel jump shows river artwork until the next command",
     setup(game) {
       movePlayerTo(game, "cellar");
+      game.checkSpecialSituations();
+      game.flags.mirkwooddwarvesfreed = true;
     },
     drive(game) {
+      game.execute("wait");
+      game.execute('say to thorin "enter barrels"');
+      game.execute("wait");
       game.execute("open trap door");
+      game.execute("wait");
+      game.execute('say to thorin "throw barrels through trap door"');
+      game.execute("wait");
       game.execute("throw barrel through the large trap door");
+      game.execute("wait");
       game.execute("jump onto barrel");
       game.print(`Cellar barrel temporary image: ${game.temporaryImage?.file || "none"}`);
       game.execute("look");
@@ -5506,10 +5530,16 @@ const gameCases = [
     setup(game) {
       game.execute("jump laketown");
       movePlayerTo(game, "cellar");
+      game.checkSpecialSituations();
+      game.flags.barrel_company_prepared = false;
+      game.flags.barrel_company_launched = false;
+      game.flags.barrelthrown = false;
+      game.flags.laketown_barrel_arrival_seen = false;
+      game.flags.laketown_barrel_arrival_pending = false;
     },
     drive(game) {
       const commands = [];
-      for (let step = 0; step < 3; step += 1) {
+      for (let step = 0; step < 10; step += 1) {
         const command = game.nextAutoplayCommand();
         if (!command) throw new Error(`Expected autoplay command in cellar at step ${step}.`);
         commands.push(command);
@@ -5519,25 +5549,46 @@ const gameCases = [
       game.print(`Cellar autoplay room: ${game.currentRoom}`);
     },
     expectedIncluded: [
-      "Cellar autoplay path: open trap door -> throw barrel through trap door -> jump onto barrel",
+      'Cellar autoplay path: wait -> ask thorin to enter barrels -> wait -> open trap door -> wait -> ask thorin to throw barrels through trap door -> wait -> throw barrel through trap door -> wait -> jump onto barrel',
       "Cellar autoplay room: long_lake",
     ],
   },
   {
-    name: "cellar scene now makes the dwarf barrel-loading explicit once they are freed",
+    name: "cellar now waits for bilbos order before stowing dwarves into barrels",
     setup(game) {
       movePlayerTo(game, "cellar");
-      game.flags.cellar_feast_scene_seen = true;
+      game.checkSpecialSituations();
       game.flags.mirkwooddwarvesfreed = true;
     },
     drive(game) {
       game.checkSpecialSituations();
+      game.execute("wait");
+      game.execute('say to thorin "enter barrels"');
       game.print(`Barrel company prepared: ${game.flags.barrel_company_prepared ? "yes" : "no"}`);
     },
     expectedIncluded: [
-      "The worst labor is not your own barrel at all, but the dwarves'.",
+      "The dwarves crowd close among the casks, plainly waiting for Bilbo's word before any of them agrees to be packed into a barrel.",
+      "Thorin gives the word at last, and the worst labor is not your own barrel at all, but the dwarves'.",
       "the whole desperate escape has become a matter not of one barrel, but of a miserable little fleet",
       "Barrel company prepared: yes",
+    ],
+  },
+  {
+    name: "cellar barrel-work must wait for the butlers brief lapses",
+    setup(game) {
+      movePlayerTo(game, "cellar");
+      game.checkSpecialSituations();
+      game.flags.mirkwooddwarvesfreed = true;
+    },
+    drive(game) {
+      game.execute("open trap door");
+      game.execute("open trap door");
+      game.print(`Trap door open after window: ${game.doors.porta_cellar_long_lake?.open ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "The butler is still facing the cellar-work too squarely for you to open the large trap door unseen.",
+      "The butler turns away toward the stair with a muttered complaint, leaving the trap door and the waiting barrels unwatched for a precious moment.",
+      "Trap door open after window: yes",
     ],
   },
   {
@@ -5547,10 +5598,14 @@ const gameCases = [
       game.flags.cellar_feast_scene_seen = true;
       game.flags.mirkwooddwarvesfreed = true;
       game.flags.barrel_company_prepared = true;
+      game.flags.barrel_company_launched = true;
       game.doors.porta_cellar_long_lake.open = true;
+      game.flags.cellar_butler_window_open = true;
+      game.debugSetCharacterRoom("butler", "cellar", { visible: true, movementMode: "never" });
     },
     drive(game) {
       game.execute("throw barrel through the large trap door");
+      game.flags.cellar_butler_window_open = true;
       game.execute("jump onto barrel");
       game.print(`Barrel company afloat: ${game.flags.barrel_company_afloat ? "yes" : "no"}`);
       game.print(`Long Lake company desc: ${game.contextualRoomDescription(game.rooms.long_lake)}`);
@@ -5568,10 +5623,14 @@ const gameCases = [
       game.flags.cellar_feast_scene_seen = true;
       game.flags.mirkwooddwarvesfreed = true;
       game.flags.barrel_company_prepared = true;
+      game.flags.barrel_company_launched = true;
       game.doors.porta_cellar_long_lake.open = true;
+      game.flags.cellar_butler_window_open = true;
+      game.debugSetCharacterRoom("butler", "cellar", { visible: true, movementMode: "never" });
     },
     drive(game) {
       game.execute("throw barrel through the large trap door");
+      game.flags.cellar_butler_window_open = true;
       game.execute("jump onto barrel");
       game.execute("east");
       game.print(`Lake-town arrival seen: ${game.flags.laketown_barrel_arrival_seen ? "yes" : "no"}`);
@@ -5597,6 +5656,8 @@ const gameCases = [
       game.flags.dragondefeated = true;
       game.doors.porta_cellar_long_lake.open = true;
       game.flags.barrelthrown = false;
+      game.flags.barrel_company_prepared = true;
+      game.flags.barrel_company_launched = true;
       const barrel = game.findKnownItem("barrel");
       if (barrel) {
         game.detachItem(barrel.id);
@@ -5755,7 +5816,7 @@ const gameCases = [
       "Bard here: yes",
       "Secret door revealed: no",
       "Strength after Beorn: 6",
-      "Autoplay next at Front Gate: pick up bard",
+      "Autoplay next at Front Gate: ask bard to follow me",
     ],
   },
   {
@@ -5778,6 +5839,25 @@ const gameCases = [
       "Dragon alive: yes",
       "Strength after Beorn: 6",
       "Autoplay next with Smaug: ask smaug about treasure",
+    ],
+  },
+  {
+    name: "bard stays put until bilbo asks him to follow",
+    drive(game) {
+      game.execute("jump laketown");
+      game.execute("south east");
+      game.print(`Player room after leaving Bard: ${game.currentRoom}`);
+      game.print(`Bard followed unasked: ${game.characters.bard.position === game.currentRoom ? "yes" : "no"}`);
+      game.execute("north west");
+      game.execute("ask bard to follow me");
+      game.execute("south east");
+      game.print(`Bard followed after request: ${game.characters.bard.position === game.currentRoom ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Player room after leaving Bard: laketown_docks",
+      "Bard followed unasked: no",
+      "Bard follows you as closely as possible.",
+      "Bard followed after request: yes",
     ],
   },
   {
@@ -7626,7 +7706,7 @@ const gameCases = [
     expectedIncluded: [
       "Cellar dwarves regrouped: 12",
       "Thorin regroup room: cellar",
-      "Regrouped cellar desc: You are in the Elvenking's cellar, where great casks, damp stone, and the black rushing of the underground water gather under the halls. The dwarves are with you again at last",
+      "Regrouped cellar desc: You are in the Elvenking's cellar, where great casks, damp stone, and the black rushing of the underground water gather under the halls. The dwarves are stowed away in barrels at last",
     ],
   },
   {

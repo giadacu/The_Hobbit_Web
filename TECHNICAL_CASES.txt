@@ -4175,3 +4175,159 @@ Future debugging advice
   own.
 - For legacy `specialActions` that still encode fatal prose in data, keep a
   small mapping test even if the exact branch is no longer the main live path.
+
+
+Case 085 - 2026-06-21 - Warg escape reached the eagle rescue, but no milestone safe moment was recorded there
+--------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Autoplay and direct play could survive the warg scene, be carried off by the
+eagles, and arrive at `great_river`, but no new safe moment appeared for the
+rescue itself. This made it look as though the new eagle-rescue implementation
+had not been fully integrated into the save flow.
+
+Root cause
+----------
+`resolveWargEscapeWait()` correctly moved the player from `treeless_opening`
+to `great_river` and then called the normal autosave hooks:
+
+- `maybeProgressAutosave(previousRoom, currentRoom)`
+- `maybeAutosaveForRoom(currentRoom)`
+
+However:
+
+- `maybeProgressAutosave()` had no branch for `treeless_opening -> great_river`
+  after `eagles_rescued_company`
+- `maybeAutosaveForRoom()` does not treat `great_river` as a hazard room
+
+So the rescue scene had gameplay/state support, but no milestone autosave of
+its own.
+
+Resolution
+----------
+- Added a milestone autosave for arriving at `great_river` from the warg scene
+  once `eagles_rescued_company` is true
+- Labeled it `after the eagles' rescue`
+- Extended the existing parser regression for the rescue path to assert that
+  the autosave is actually recorded
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a chapter transition teleports or jumps the party into a new region,
+  verify both narrative state and milestone autosaves; save coverage is easy to
+  miss when no ordinary room-hazard autosave applies.
+- If autoplay seems to "skip" a new scene, check whether the scene is present
+  but missing its save marker or lab route coverage.
+
+
+Case 086 - 2026-06-21 - Barrel escape needed explicit stealth beats instead of one compressed shortcut
+------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The cellar/barrel scene jumped too quickly from "barrels are here" to Bilbo's
+own drop through the trap door. It did not enforce the intended dramatic order:
+
+- first get the dwarves into barrels
+- then send their barrels down with help
+- then throw Bilbo's barrel
+- then jump after it
+
+There was also no real stealth pressure from the butler, so the scene lacked
+the sense of stolen timing the fiction wanted.
+
+Root cause
+----------
+The older implementation modeled only one immediate player barrel action:
+
+- open trap door
+- throw a barrel
+- jump onto it
+
+Meanwhile `beginDwarfBarrelLoadingScene()` auto-fired as soon as the freed
+dwarves and the cellar state coincided, collapsing Bilbo's order to the dwarves
+into passive setup instead of an explicit player-directed step.
+
+Resolution
+----------
+- Added a real cellar stealth cadence tied to the butler:
+  - the butler is present in the cellar feast scene
+  - brief distraction windows open after turn progression
+  - risky barrel actions are blocked unless taken in those windows
+- Split the barrel escape into explicit phases:
+  - dwarves ordered into barrels
+  - dwarves' barrels launched through the trap door with a companion's help
+  - Bilbo's own barrel thrown
+  - Bilbo jumps after it
+- Routed delegated companion orders through cellar-specific handling so both
+  `ask thorin to ...` and quoted delegated orders can trigger the scene logic
+- Updated autoplay to wait for distraction windows and follow the new sequence
+- Replaced and expanded regression coverage for:
+  - cellar stealth gating
+  - explicit dwarf barrel loading
+  - updated autoplay barrel path
+  - long-lake and Lake-town follow-through with the new launch state
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- For set-piece escapes, test both the fiction order and the state machine; a
+  shortcut that "still reaches the destination" can quietly flatten the scene.
+- When a stealth window is driven by turn timing, add autoplay coverage as well
+  as direct command coverage, otherwise the planner can get stuck in harmless
+  waits without obvious parser failures.
+
+Case 087 - 2026-06-21 - Bard needed explicit consent before joining Bilbo's route
+---------------------------------------------------------------------------------
+
+Symptom
+-------
+Autoplay in Lake-town, at the Front Gate, and in the Smaug setup still treated
+Bard as a companion to be physically carried or as if he were already "with"
+Bilbo. That blurred two separate behaviors:
+
+- Bard being present in the same room
+- Bard actively following because Bilbo asked him to
+
+The result was old prompts like `pick up bard`, and the planner could skip the
+intended social beat where Bilbo first asks Bard to come along.
+
+Root cause
+----------
+The autoplay checks treated Bard as "with the player" whenever his movement
+mode was `follow` in the current room, instead of requiring the stronger
+`followingPlayer` state that is set by an explicit `ask/tell ... follow me`
+order.
+
+Resolution
+----------
+- Changed the Bard-specific autoplay checks to require `followingPlayer`
+  instead of only `movementMode === "follow"`
+- Replaced the old `pick up bard` autoplay action with
+  `ask bard to follow me`
+- Added a regression test proving Bard stays behind until asked, and then
+  follows correctly once ordered
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Keep "can follow" state (`movementMode`) separate from "is currently
+  following" state (`followingPlayer`) in planner logic, especially for named
+  story companions whose consent matters in the scene.
