@@ -4331,3 +4331,304 @@ Future debugging advice
 - Keep "can follow" state (`movementMode`) separate from "is currently
   following" state (`followingPlayer`) in planner logic, especially for named
   story companions whose consent matters in the scene.
+
+Case 088 - 2026-06-21 - Music stayed on one loop and ignored changing scene context
+------------------------------------------------------------------------------------
+
+Symptom
+-------
+Using `music on` always felt repetitive because the same track kept looping for
+the whole play session, even after moving into very different places such as
+Rivendell, Mirkwood, or Erebor.
+
+Root cause
+----------
+The original music system had two structural limits:
+
+- the audio element was hard-set to `loop = true`
+- track choice happened only inside `startMusic()`, using a fixed hash of the
+  room name against one of three broad mood buckets (`relaxed`, `adventure`,
+  `suspence`)
+
+That meant:
+- turning music on picked one file and repeated it forever
+- moving to a new room did not trigger any music resync
+- rooms in very different narrative contexts still shared the same coarse pool
+
+Resolution
+----------
+- Removed infinite loop playback and rotated to a fresh track on `ended`
+- Added a lightweight music director that derives a profile from:
+  - zone (`shire`, `rivendell`, `mirkwood`, `woodland_halls`, `laketown`,
+    `erebor`, etc.)
+  - mood (`calm`, `travel`, `danger`)
+  - danger overrides for hostile/special scenes
+- Added short recent-track memory so the next pick avoids immediate repeats
+- Synced music automatically from `describeRoom()`, so room changes, loads, and
+  restarts all refresh the score when music is already active
+
+Files touched
+-------------
+- `game.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- For adaptive audio, keep selection logic centralized and keyed off scene
+  state, not scattered across individual commands.
+- If music feels "stuck", check both the room-to-profile mapping and whether
+  the room description path is still the single place that drives audio sync.
+
+Case 089 - 2026-06-21 - System voice narration needed to coexist cleanly with music and room output
+----------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The game had music support but no way to have the text read aloud using the
+system voice on Mac/PC. Adding TTS risked three common problems:
+
+- stale narration continuing after the player typed a new command
+- music and narration fighting at full volume
+- browser speech support differing between environments and tests
+
+Root cause
+----------
+There was no narration layer at all, so audio output was split between:
+
+- text printed directly to the console
+- a separate HTML audio element for music
+
+Without a dedicated controller, adding speech directly inside command handlers
+would have scattered TTS state across movement, restart/load, and output code.
+
+Resolution
+----------
+- Added a lightweight narration controller in `game.js`
+- Exposed `voice on`, `voice off`, and `voice status`
+- Routed narration from `print()` so story output and dialogue are spoken, but
+  command echoes and system prompts are not
+- Cancelled in-flight narration when a new command starts, and during
+  restore/restart flows
+- Added music ducking while narration is speaking, then restored the base music
+  volume when speech ends
+- Stubbed `speechSynthesis` in `scripts/parser-tests.js` and added regression
+  coverage for:
+  - narration activation
+  - music ducking/restoration during narration
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Keep speech queueing and output filtering centralized; otherwise narration can
+  easily drift out of sync with command flow.
+- If speech seems to skip lines, inspect the handoff between `print()`,
+  utterance queue state, and browser timing around `speechSynthesis.speak()`.
+
+Case 090 - 2026-06-21 - Voice narration was unintentionally disabled during autoplay
+-------------------------------------------------------------------------------------
+
+Symptom
+-------
+`voice on` spoke correctly during normal manual play, but no narration was
+heard once `autoplay` started.
+
+Root cause
+----------
+There were two separate blockers:
+
+- `shouldSpeakOutput()` explicitly returned `false` whenever
+  `autoplayRunning` was true
+- `execute()` cancelled any active narration at the start of every non-empty
+  command, so even autoplay-driven output could not keep speaking across steps
+
+Resolution
+----------
+- Allowed spoken narration during autoplay output
+- Changed command-start cancellation so manual commands still interrupt speech,
+  but autoplay commands do not immediately kill their own narration
+- Updated autoplay pacing to account for estimated speech duration, so the next
+  autoplay step waits long enough for narration to be heard
+- Added regression coverage proving narration now fires during autoplay
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- For any future autoplay timing tweaks, test them against both visual reading
+  pace and speech pace; text timing alone is not enough once TTS is active.
+
+Case 091 - 2026-06-21 - Consecutive narrated lines could stall after the first spoken sentence
+-----------------------------------------------------------------------------------------------
+
+Symptom
+-------
+With `voice on`, some multi-line outputs were only partially narrated. The
+first spoken line played, but later lines printed immediately afterward could
+remain silent.
+
+Root cause
+----------
+Each call to `speakNarrationText()` created a new narration generation id, even
+when the previous utterance was still actively speaking and the new text was
+meant to be appended to the same queue.
+
+That caused this failure mode:
+
+- line 1 started speaking with generation A
+- lines 2 and 3 were queued with newer generations B and C
+- when line 1 ended, `finishVoiceChunk(A)` saw that the current generation was
+  now C and returned early
+- the remaining queue never resumed
+
+Resolution
+----------
+- Kept consecutive queued narration on the same generation unless there is a
+  real interrupt/cancel event
+- Preserved generation invalidation only for genuine interruption flows
+- Added regression coverage for the exact case of multiple consecutive narrated
+  lines arriving while the first line is still speaking
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- For queued TTS, treat "append to current narration" and "interrupt current
+  narration" as different state transitions. Reusing one counter for both can
+  silently strand queued lines.
+
+Case 092 - 2026-06-21 - Saved narration preference could briefly fall back to the browser's default non-English voice
+---------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After narration had been enabled previously, a fresh page load could sometimes
+start speaking with an Italian accent even though the game was supposed to use
+English voices only.
+
+Root cause
+----------
+The saved `voice on` preference was restored before the browser had necessarily
+finished exposing the available speech voices. In that transient state:
+
+- narration was already marked enabled
+- `selectedVoice` could still be `null`
+- the browser speech engine was free to choose its own default voice when
+  `SpeechSynthesisUtterance` was spoken without an explicitly selected English
+  voice
+
+Resolution
+----------
+- Required a real selected English voice before any narration can speak
+- Kept the saved narration preference active even when the English voice is not
+  available yet, so the feature can become active later when voices load
+- Updated status/help text to report the "enabled but waiting for English
+  voice" state clearly
+- Added regression coverage proving that non-English-only voice exposure blocks
+  narration instead of falling back to the browser default
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Browser speech availability is a timing problem as much as a selection
+  problem. Treat "preference enabled" and "usable selected voice available" as
+  separate conditions.
+
+Case 093 - 2026-06-21 - Voice and music should restart in an explicitly silent state
+-------------------------------------------------------------------------------------
+
+Symptom
+-------
+The desired UX changed: on a fresh relaunch or explicit game restart, both
+music and narration should begin turned off, even if the player had enabled
+them earlier in the same session or a previous one.
+
+Root cause
+----------
+Two behaviors were working against that:
+
+- narration state had been designed to persist across page reloads
+- in-game restart did not actively clear the current music/voice session state
+
+Resolution
+----------
+- Removed narration preference persistence across sessions
+- Made game restart explicitly:
+  - turn narration off
+  - stop any active speech queue
+  - pause music
+  - clear the current music track/source
+- Added regression coverage proving restart returns both media systems to off
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If optional media is meant to be opt-in per session, avoid storing it in
+  persistent preferences unless the UX explicitly calls for that.
+
+Case 094 - 2026-06-21 - Narration could still drop later text when chunk handoff or browser end events were unreliable
+---------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Even after queued narration was introduced, some Bag End lines could still be
+spoken only partially. Typical reports were:
+
+- narration stopping after the first chunk of a long paragraph
+- later scene beats such as "A second knock..." or "Another pair arrives..."
+  printing correctly but not being read aloud
+
+Root cause
+----------
+There were two timing-sensitive gaps left in the TTS flow:
+
+- buffered room/event text was queued correctly, but the handoff to the next
+  speech chunk happened immediately inside the previous utterance's end path
+- on Safari/macOS, that direct handoff can be flaky enough that the next chunk
+  or queued paragraph is silently lost if the browser does not advance cleanly
+
+Resolution
+----------
+- Added a small deferred playback handoff for queued voice chunks instead of
+  always starting the next utterance synchronously in the same end callback
+- Added a watchdog timeout per spoken chunk so narration can recover if the
+  browser fails to deliver a reliable `onend`
+- Kept interruption semantics intact, so manual commands still cancel stale
+  narration while ordinary story beats append to the current spoken queue
+- Added regression coverage for:
+  - consecutive queued narrated lines
+  - a long paragraph that must be chunked and then continue into later beats
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If narration stops mid-scene on Mac/Safari, inspect both logical queue state
+  and browser event delivery; a correct queue is not enough if chunk handoff is
+  too immediate.

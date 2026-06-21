@@ -4,6 +4,58 @@
   const MUSIC_ROOT = "assets/local-music/";
   const ASSET_VERSION = "20260621-1945";
   const ASSET_QUERY_SUFFIX = `?v=${ASSET_VERSION}`;
+  const MUSIC_LIBRARY = {
+    shire: {
+      calm: ["Almost New relaxed.mp3", "Royal Coupling relaxed.mp3", "Midnight Tale relaxed.mp3"],
+      travel: ["Midnight Tale relaxed.mp3", "Crossing the Chasm adventure.mp3", "Eternal Terminal adventure.mp3"],
+      danger: ["Night Vigil suspence.mp3", "Myst on the Moor suspence.mp3", "Ancient Rite suspence.mp3"],
+    },
+    rivendell: {
+      calm: ["Midnight Tale relaxed.mp3", "Royal Coupling relaxed.mp3", "Almost New relaxed.mp3"],
+      travel: ["Midnight Tale relaxed.mp3", "Crossing the Chasm adventure.mp3", "Eternal Terminal adventure.mp3"],
+      danger: ["Ancient Rite suspence.mp3", "Night Vigil suspence.mp3", "Myst on the Moor suspence.mp3"],
+    },
+    beorn: {
+      calm: ["Almost New relaxed.mp3", "Midnight Tale relaxed.mp3", "Royal Coupling relaxed.mp3"],
+      travel: ["Crossing the Chasm adventure.mp3", "Eternal Terminal adventure.mp3", "Strength of the Titans adventure.mp3"],
+      danger: ["Night Vigil suspence.mp3", "Myst on the Moor suspence.mp3", "The Descent suspence.mp3"],
+    },
+    wilds: {
+      calm: ["Midnight Tale relaxed.mp3", "Crossing the Chasm adventure.mp3", "Almost New relaxed.mp3"],
+      travel: ["Crossing the Chasm adventure.mp3", "Eternal Terminal adventure.mp3", "Gothamlicious adventure.mp3"],
+      danger: ["Myst on the Moor suspence.mp3", "Night Vigil suspence.mp3", "Ancient Rite suspence.mp3"],
+    },
+    mountains: {
+      calm: ["Midnight Tale relaxed.mp3", "Strength of the Titans adventure.mp3", "Eternal Terminal adventure.mp3"],
+      travel: ["Strength of the Titans adventure.mp3", "The Ice Giants adventure.mp3", "Crossing the Chasm adventure.mp3", "Eternal Terminal adventure.mp3"],
+      danger: ["The Descent suspence.mp3", "Night Vigil suspence.mp3", "Strength of the Titans adventure.mp3", "Ancient Rite suspence.mp3"],
+    },
+    mirkwood: {
+      calm: ["Myst on the Moor suspence.mp3", "Night Vigil suspence.mp3", "Ancient Rite suspence.mp3"],
+      travel: ["Myst on the Moor suspence.mp3", "Night Vigil suspence.mp3", "Ancient Rite suspence.mp3", "The Descent suspence.mp3"],
+      danger: ["The Descent suspence.mp3", "Night Vigil suspence.mp3", "Ancient Rite suspence.mp3", "Myst on the Moor suspence.mp3"],
+    },
+    woodland_halls: {
+      calm: ["Midnight Tale relaxed.mp3", "Royal Coupling relaxed.mp3", "Almost New relaxed.mp3"],
+      travel: ["Eternal Terminal adventure.mp3", "Midnight Tale relaxed.mp3", "Ancient Rite suspence.mp3"],
+      danger: ["Ancient Rite suspence.mp3", "Night Vigil suspence.mp3", "The Descent suspence.mp3"],
+    },
+    laketown: {
+      calm: ["Almost New relaxed.mp3", "Midnight Tale relaxed.mp3", "Royal Coupling relaxed.mp3"],
+      travel: ["Eternal Terminal adventure.mp3", "Crossing the Chasm adventure.mp3", "Almost New relaxed.mp3"],
+      danger: ["Night Vigil suspence.mp3", "Ancient Rite suspence.mp3", "The Descent suspence.mp3"],
+    },
+    erebor: {
+      calm: ["Midnight Tale relaxed.mp3", "Strength of the Titans adventure.mp3", "Royal Coupling relaxed.mp3"],
+      travel: ["Strength of the Titans adventure.mp3", "The Ice Giants adventure.mp3", "Gothamlicious adventure.mp3", "Eternal Terminal adventure.mp3"],
+      danger: ["The Descent suspence.mp3", "Strength of the Titans adventure.mp3", "Night Vigil suspence.mp3", "Ancient Rite suspence.mp3"],
+    },
+    default: {
+      calm: ["Almost New relaxed.mp3", "Midnight Tale relaxed.mp3", "Royal Coupling relaxed.mp3"],
+      travel: ["Crossing the Chasm adventure.mp3", "Eternal Terminal adventure.mp3", "Strength of the Titans adventure.mp3"],
+      danger: ["Ancient Rite suspence.mp3", "Myst on the Moor suspence.mp3", "Night Vigil suspence.mp3", "The Descent suspence.mp3"],
+    },
+  };
   const TEMPORARY_IMAGE_ALIASES = {
     "thrors-map": "Thrors_map.jpg",
     "thrors map": "Thrors_map.jpg",
@@ -27,6 +79,13 @@
   const MAP_EDITOR_BOX_HEIGHT = 106;
   const MAP_EDITOR_UNIT = 168;
   const MAP_EDITOR_PADDING = 120;
+  const MUSIC_BASE_VOLUME = 0.75;
+  const MUSIC_DUCKED_VOLUME = 0.26;
+  const VOICE_DEFAULT_RATE = 1;
+  const VOICE_MAX_CHUNK_LENGTH = 220;
+  const VOICE_QUEUE_BATCH_MS = 48;
+  const VOICE_QUEUE_HANDOFF_MS = 18;
+  const VOICE_CHUNK_WATCHDOG_PADDING_MS = 420;
 
   function normalizeMapBoxMetrics(boxMetrics = 96) {
     if (typeof boxMetrics === "object" && boxMetrics) {
@@ -124,7 +183,7 @@
 
   const commandsWithoutObject = new Set([
     "look", "wait", "inventory", "inv", "i", "save", "load", "quit", "verbs",
-    "mysaves", "hello", "tips", "map", "exits", "exit", "location", "music", "autoplay", "jumps",
+    "mysaves", "hello", "tips", "map", "exits", "exit", "location", "music", "voice", "speech", "narration", "autoplay", "jumps",
     "teleport", "warp",
     "help", "hint", "status", "restart", "autosave", "undo", "pause",
     "hide", "escape", "talk",
@@ -141,7 +200,7 @@
     "save", "load", "autosave", "mysaves",
     "exits", "exit",
     "tips", "hint", "help", "verbs", "commands",
-    "map", "location", "status", "music",
+    "map", "location", "status", "music", "voice", "speech", "narration",
     "pause", "undo", "restart", "jumps",
   ]);
 
@@ -4937,6 +4996,9 @@
         location: () => game.print(actorizeSecondPerson(game.player, `You are now ${roomLocationPhrase(game.room())}.`)),
         status: () => game.showStatus(),
         music: () => game.handleMusicCommand(objectText),
+        voice: () => game.handleVoiceCommand(objectText),
+        speech: () => game.handleVoiceCommand(objectText),
+        narration: () => game.handleVoiceCommand(objectText),
         autoplay: () => game.autoplay(objectText),
         teleport: () => game.handleJumpCommand(objectText),
         warp: () => game.handleJumpCommand(objectText),
@@ -7913,6 +7975,7 @@
       const game = this.game;
       game.clearArrivalNoticeTimers();
       game.stopAutoplay();
+      game.stopVoiceNarration({ keepEnabled: true });
       game.clearTemporaryImage({ render: false });
       game.items = save.items;
       game.doors = save.doors;
@@ -9637,13 +9700,19 @@
 
     autoplayDelayForText(text) {
       const game = this.game;
-      if (game.autoplayMode !== "slow") return game.autoplayDelay;
       const cleaned = String(text || "").replace(/\s+/g, " ").trim();
       if (!cleaned) return game.autoplayDelay;
       const words = cleaned.split(/\s+/).filter(Boolean).length;
       const sentencePauses = (cleaned.match(/[.!?]/g) || []).length;
       const readingDelay = 1050 + words * 248 + sentencePauses * 338;
-      return Math.max(game.autoplayDelay, Math.min(readingDelay, 16500));
+      const narrationDelay = game.voiceEnabled
+        ? game.estimatedSpeechDurationMs(cleaned)
+        : 0;
+      const pacedDelay = Math.max(readingDelay, narrationDelay);
+      if (game.autoplayMode !== "slow") {
+        return Math.max(game.autoplayDelay, Math.min(narrationDelay || game.autoplayDelay, 16500));
+      }
+      return Math.max(game.autoplayDelay, Math.min(pacedDelay, 16500));
     }
 
     autoplayShouldLightLantern() {
@@ -10161,6 +10230,15 @@
     restartGame() {
       const game = this.game;
       this.stopAutoplay();
+      game.musicEnabled = false;
+      game.currentTrack = null;
+      if (game.audio) {
+        game.audio.pause();
+        game.audio.removeAttribute("src");
+        game.audio.load?.();
+        game.setMusicDucked(false);
+      }
+      game.stopVoiceNarration({ keepEnabled: false });
       game.clearIdleAdvanceTimer();
       game.clearArrivalNoticeTimers();
       game.clearTemporaryImage({ render: false });
@@ -11121,6 +11199,23 @@
       this.musicEnabled = false;
       this.currentTrack = null;
       this.audioErrorShown = false;
+      this.musicProfileKey = "";
+      this.musicTrackHistory = [];
+      this.musicSelectionCounter = 0;
+      this.voiceEnabled = false;
+      this.voiceActive = false;
+      this.voiceQueue = [];
+      this.voiceBufferedLines = [];
+      this.voiceBufferTimer = null;
+      this.voicePlaybackTimer = null;
+      this.voiceChunkWatchdog = null;
+      this.voiceChunkToken = 0;
+      this.voiceCurrentChunkToken = 0;
+      this.voiceUtteranceId = 0;
+      this.voiceList = [];
+      this.selectedVoice = null;
+      this.voiceRate = VOICE_DEFAULT_RATE;
+      this.voiceAvailable = this.supportsNarrationVoice();
       this.pendingClarification = null;
       this.forcedChoice = null;
       this.clarifiedReferences = {};
@@ -11151,9 +11246,10 @@
       this.temporaryImage = null;
       this.temporaryImageDismissOnNextCommand = false;
       this.audio = musicPlayer;
-      this.audio.loop = true;
+      this.audio.loop = false;
       this.audio.preload = "auto";
-      this.audio.volume = 0.75;
+      this.audio.volume = MUSIC_BASE_VOLUME;
+      this.refreshNarrationVoices();
       this.unexpectedParty = new UnexpectedPartyController(this);
       this.companionDirector = new CompanionDirector(this);
       this.storage.initialize();
@@ -11218,6 +11314,10 @@
       this.spiderEyesState = null;
       this.gollumState = this.createGollumState();
       this.turnCount = 0;
+      this.musicProfileKey = "";
+      this.musicTrackHistory = [];
+      this.musicSelectionCounter = 0;
+      this.stopVoiceNarration({ keepEnabled: true });
       this.addZXFinaleState();
       this.unexpectedParty?.reset();
       this.companionDirector?.sync();
@@ -11409,6 +11509,19 @@
           this.print(`Music file could not be loaded: ${this.audio.currentSrc || this.audio.src || this.currentTrack || "unknown track"}.`, "system");
         }
       });
+      this.audio.addEventListener("ended", () => {
+        if (!this.musicEnabled) return;
+        this.advanceMusicTrack();
+      });
+      if (this.voiceAvailable) {
+        const speech = window.speechSynthesis;
+        const refreshVoices = () => this.refreshNarrationVoices();
+        if (typeof speech?.addEventListener === "function") {
+          speech.addEventListener("voiceschanged", refreshVoices);
+        } else if (speech && "onvoiceschanged" in speech) {
+          speech.onvoiceschanged = refreshVoices;
+        }
+      }
       const bindLayoutButton = (button, mode) => {
         if (!button) return;
         button.addEventListener("click", () => this.setLayoutMode(mode));
@@ -11609,6 +11722,7 @@
 
     execute(rawCommand) {
       this.clearIdleAdvanceTimer();
+      if (normalize(rawCommand) && !this.autoplayRunning) this.stopVoiceNarration({ keepEnabled: true });
       try {
         const lower = rawCommand.toLowerCase();
         if (this.temporaryImageDismissOnNextCommand && normalize(lower)) {
@@ -12159,6 +12273,7 @@
       const room = this.room();
       if (!room) return;
       if (this.currentRoom === "trolls_clearing" && this.trollsTransformed) this.ensureTrollKeyRecovered();
+      if (this.musicEnabled) this.syncMusicForRoom();
       const wasVisited = this.visitedRooms.has(this.currentRoom);
       this.visitedRooms.add(this.currentRoom);
       this.revealLanternDiscoveries({ silent: true });
@@ -12451,8 +12566,10 @@
         }
         const line = document.createElement("p");
         line.className = `line ${kind}`.trim();
-        line.textContent = part.trim();
+        const spokenText = part.trim();
+        line.textContent = spokenText;
         output.append(line);
+        this.maybeSpeakOutput(spokenText, kind);
       }
       this.outputPinnedToBottom = shouldFollowOutput;
       this.scheduleOutputScroll(shouldFollowOutput);
@@ -13586,6 +13703,39 @@
       this.print('Use "music on" or "music off".');
     }
 
+    handleVoiceCommand(object) {
+      const option = normalize(object || "");
+      if (["off", "stop", "mute"].includes(option)) {
+        this.voiceEnabled = false;
+        this.stopVoiceNarration({ keepEnabled: false });
+        this.print("Narration voice off.", "system");
+        return;
+      }
+      if (["status", "info"].includes(option)) {
+        return this.print(this.voiceStatusText(), "system");
+      }
+      if (option && !["on", "start", ""].includes(option)) {
+        this.print('Use "voice on", "voice off", or "voice status".', "system");
+        return;
+      }
+      if (!this.supportsNarrationVoice()) {
+        this.voiceAvailable = false;
+        this.voiceEnabled = false;
+        this.print("This browser does not expose a system narration voice here.", "system");
+        return;
+      }
+      this.voiceAvailable = true;
+      this.refreshNarrationVoices();
+      if (!this.selectedVoice) {
+        this.voiceEnabled = true;
+        this.print("No English system voice is available in this browser yet. Narration will stay pending until an English voice appears.", "system");
+        return;
+      }
+      this.voiceEnabled = true;
+      this.print(this.voiceStatusText("Narration voice on."), "system");
+      this.speakNarrationText("Narration voice on.", { force: true, interrupt: true });
+    }
+
     toggleMusic() {
       if (this.musicEnabled && !this.audio.paused) {
         this.audio.pause();
@@ -13661,19 +13811,123 @@
     }
 
     startMusic() {
-      const track = this.trackForRoom();
-      if (!track) return this.print("No music track is available.");
+      this.syncMusicForRoom({ announce: true });
+    }
+
+    trackForRoom() {
+      return this.musicTrackForProfile(this.musicProfileForRoom(), { allowCurrent: true });
+    }
+
+    musicProfileForRoom(room = this.room()) {
+      const roomId = room?.id || this.currentRoom || "";
+      const sound = normalize(room?.sound || "relaxed");
+      const hasVisibleHostiles = this.visiblePeopleInRoom()
+        .some((person) => person.id !== this.player?.id && person.visible && person.friendly === false);
+      let mood = "calm";
+      if (hasVisibleHostiles || this.roomHasDangerMusic(roomId)) {
+        mood = "danger";
+      } else if (sound === "adventure") {
+        mood = "travel";
+      } else if (sound === "suspence" || sound === "suspense") {
+        mood = "danger";
+      }
+      const zone = this.musicZoneForRoom(roomId, sound);
+      const tracks = this.musicTracksForProfile(zone, mood);
+      return {
+        key: `${zone}:${mood}`,
+        zone,
+        mood,
+        tracks,
+      };
+    }
+
+    musicZoneForRoom(roomId = "", sound = "") {
+      const id = String(roomId || "");
+      if (
+        id.startsWith("bag_end_")
+        || id.includes("green_dragon")
+        || ["lane_beneath_hill", "party_field", "bywater_bridge"].includes(id)
+      ) return "shire";
+      if (id.startsWith("rivendell_") || id === "hidden_valley_path") return "rivendell";
+      if (id.startsWith("beorn_")) return "beorn";
+      if (id.startsWith("mirkwood_")) return "mirkwood";
+      if (id.startsWith("elven_") || id.startsWith("elvenking") || id === "dark_dungeon") return "woodland_halls";
+      if (id.startsWith("laketown_") || id.startsWith("lake_town_") || id === "wooden_town") return "laketown";
+      if (id.startsWith("erebor_") || id.includes("smaug") || id.includes("treasure")) return "erebor";
+      if (
+        id.includes("goblin")
+        || id.includes("mountain")
+        || id === "narrow_ledge"
+        || id === "storm_shelter"
+        || id === "deep_dark_lake"
+      ) return "mountains";
+      if (id.includes("troll") || id === "dreary") return "wilds";
+      if (sound === "adventure") return "wilds";
+      if (sound === "suspence" || sound === "suspense") return "mirkwood";
+      return "default";
+    }
+
+    roomHasDangerMusic(roomId = "") {
+      const id = String(roomId || "");
+      return [
+        "trolls_clearing",
+        "deep_dark_lake",
+        "elven_prison_cells",
+        "elven_guard_post",
+        "elven_underground_river",
+        "erebor_treasure_approach",
+      ].includes(id)
+        || id.includes("gollum")
+        || id.includes("spider")
+        || id.includes("goblin")
+        || id.includes("dungeon")
+        || id.includes("smaug");
+    }
+
+    musicTracksForProfile(zone = "default", mood = "calm") {
+      const zoneTracks = MUSIC_LIBRARY[zone] || MUSIC_LIBRARY.default;
+      return zoneTracks[mood] || MUSIC_LIBRARY.default[mood] || MUSIC_LIBRARY.default.calm;
+    }
+
+    musicTrackForProfile(profile, options = {}) {
+      const tracks = [...new Set(profile?.tracks || [])];
+      if (!tracks.length) return "";
+      const currentTrack = options.allowCurrent ? "" : this.currentTrack;
+      const recentLimit = Math.min(2, Math.max(0, tracks.length - 1));
+      const recentTracks = new Set(this.musicTrackHistory.slice(-recentLimit));
+      let candidates = tracks.filter((track) => track !== currentTrack && !recentTracks.has(track));
+      if (!candidates.length) candidates = tracks.filter((track) => track !== currentTrack);
+      if (!candidates.length) candidates = tracks.slice();
+      const seed = hashString(`${this.storySeed}:${profile.key}:${this.currentRoom}:${this.turnCount}:${this.musicSelectionCounter}:${this.currentTrack || ""}`);
+      this.musicSelectionCounter += 1;
+      return candidates[Math.abs(seed) % candidates.length];
+    }
+
+    noteMusicHistory(track = "") {
+      if (!track) return;
+      this.musicTrackHistory.push(track);
+      if (this.musicTrackHistory.length > 6) this.musicTrackHistory = this.musicTrackHistory.slice(-6);
+    }
+
+    playMusicTrack(track, options = {}) {
+      if (!track) {
+        if (options.announce) this.print("No music track is available.");
+        return;
+      }
       const src = new URL(assetUrl(MUSIC_ROOT, track), window.location.href).href;
       if (this.currentTrack !== track || this.audio.src !== src) {
         this.currentTrack = track;
         this.audioErrorShown = false;
         this.audio.src = src;
         this.audio.load();
+      } else if (this.audio.ended) {
+        this.audio.currentTime = 0;
       }
       this.audio.play()
         .then(() => {
           this.musicEnabled = true;
-          this.print(`Music playing: ${track}.`);
+          this.noteMusicHistory(track);
+          if (options.announce) this.print(`Music playing: ${track}.`);
         })
         .catch(() => {
           this.musicEnabled = false;
@@ -13681,16 +13935,251 @@
         });
     }
 
-    trackForRoom() {
-      const sound = this.room().sound;
-      const tracks = {
-        relaxed: ["Almost New relaxed.mp3", "Midnight Tale relaxed.mp3", "Royal Coupling relaxed.mp3"],
-        adventure: ["Crossing the Chasm adventure.mp3", "Eternal Terminal adventure.mp3", "Gothamlicious adventure.mp3", "Strength of the Titans adventure.mp3", "The Ice Giants adventure.mp3"],
-        suspence: ["Ancient Rite suspence.mp3", "Myst on the Moor suspence.mp3", "Night Vigil suspence.mp3", "The Descent suspence.mp3"],
+    syncMusicForRoom(options = {}) {
+      const { announce = false, forceNext = false } = options;
+      const profile = this.musicProfileForRoom();
+      const hasTrack = Boolean(this.currentTrack && this.audio.src);
+      const contextChanged = this.musicProfileKey !== profile.key;
+      const shouldPickTrack = forceNext || contextChanged || !hasTrack || this.audio.ended;
+      this.musicProfileKey = profile.key;
+      const track = shouldPickTrack
+        ? this.musicTrackForProfile(profile)
+        : this.currentTrack;
+      this.playMusicTrack(track, { announce });
+    }
+
+    advanceMusicTrack() {
+      this.syncMusicForRoom({ forceNext: true });
+    }
+
+    supportsNarrationVoice() {
+      return typeof window !== "undefined"
+        && Boolean(window.speechSynthesis)
+        && typeof window.SpeechSynthesisUtterance === "function";
+    }
+
+    refreshNarrationVoices() {
+      if (!this.supportsNarrationVoice()) {
+        this.voiceAvailable = false;
+        this.voiceList = [];
+        this.selectedVoice = null;
+        return [];
+      }
+      const voices = window.speechSynthesis.getVoices?.() || [];
+      this.voiceAvailable = voices.length > 0 || this.voiceAvailable;
+      this.voiceList = voices;
+      this.selectedVoice = this.pickNarrationVoice(voices);
+      return voices;
+    }
+
+    pickNarrationVoice(voices = []) {
+      if (!voices.length) return null;
+      const preferred = [
+        /^en-GB$/i,
+        /^en-US$/i,
+        /^en/i,
+      ];
+      for (const pattern of preferred) {
+        const match = voices.find((voice) => pattern.test(String(voice.lang || "")));
+        if (match) return match;
+      }
+      return null;
+    }
+
+    voiceStatusText(prefix = "") {
+      const voice = this.selectedVoice || this.pickNarrationVoice(this.voiceList);
+      if (!this.supportsNarrationVoice()) return [prefix, "System narration is not available in this browser."].filter(Boolean).join(" ");
+      if (!voice) {
+        return [prefix, this.voiceEnabled
+          ? "Narration is enabled, but no English system voice is available yet."
+          : "No English system voice is currently available for narration."].filter(Boolean).join(" ");
+      }
+      return [prefix, `Using ${voice.name || "system voice"} (${voice.lang || "default locale"}). Music will duck while narration is speaking.`].filter(Boolean).join(" ");
+    }
+
+    shouldSpeakOutput(kind = "") {
+      if (!this.voiceEnabled || !this.voiceAvailable || !this.selectedVoice || this.endgame && this.pendingEndgameChoice && this.autoplayRunning) return false;
+      return !["command", "system"].includes(kind);
+    }
+
+    estimatedSpeechDurationMs(text = "") {
+      const chunks = this.splitSpeechChunks(text);
+      if (!chunks.length) return 0;
+      let total = 0;
+      for (const chunk of chunks) {
+        const cleaned = String(chunk || "").trim();
+        if (!cleaned) continue;
+        const words = cleaned.split(/\s+/).filter(Boolean).length;
+        const sentencePauses = (cleaned.match(/[.!?]/g) || []).length;
+        const commaPauses = (cleaned.match(/[,;:]/g) || []).length;
+        total += 520 + words * 255 + sentencePauses * 360 + commaPauses * 120;
+      }
+      return Math.max(900, Math.min(total, 22000));
+    }
+
+    splitSpeechChunks(text = "") {
+      const trimmed = String(text || "").replace(/\s+/g, " ").trim();
+      if (!trimmed) return [];
+      if (trimmed.length <= VOICE_MAX_CHUNK_LENGTH) return [trimmed];
+      const pieces = trimmed.split(/(?<=[,;:.!?])\s+/).filter(Boolean);
+      const chunks = [];
+      let current = "";
+      for (const piece of pieces) {
+        const next = current ? `${current} ${piece}` : piece;
+        if (next.length <= VOICE_MAX_CHUNK_LENGTH) {
+          current = next;
+          continue;
+        }
+        if (current) chunks.push(current);
+        if (piece.length <= VOICE_MAX_CHUNK_LENGTH) {
+          current = piece;
+          continue;
+        }
+        const words = piece.split(/\s+/);
+        current = "";
+        for (const word of words) {
+          const candidate = current ? `${current} ${word}` : word;
+          if (candidate.length <= VOICE_MAX_CHUNK_LENGTH) {
+            current = candidate;
+          } else {
+            if (current) chunks.push(current);
+            current = word;
+          }
+        }
+      }
+      if (current) chunks.push(current);
+      return chunks;
+    }
+
+    maybeSpeakOutput(text = "", kind = "") {
+      if (!this.shouldSpeakOutput(kind)) return;
+      this.queueNarrationOutput(text);
+    }
+
+    queueNarrationOutput(text = "") {
+      const trimmed = String(text || "").trim();
+      if (!trimmed) return;
+      this.voiceBufferedLines.push(trimmed);
+      if (this.voiceBufferTimer) return;
+      this.voiceBufferTimer = setTimeout(() => {
+        this.voiceBufferTimer = null;
+        this.flushNarrationBuffer();
+      }, VOICE_QUEUE_BATCH_MS);
+    }
+
+    flushNarrationBuffer() {
+      if (!this.voiceBufferedLines.length) return;
+      const text = this.voiceBufferedLines.join(" ");
+      this.voiceBufferedLines = [];
+      this.speakNarrationText(text);
+    }
+
+    scheduleVoicePlayback(delay = 0) {
+      if (this.voicePlaybackTimer || this.voiceActive || !this.voiceQueue.length) return;
+      if (delay <= 0) {
+        this.playNextVoiceChunk();
+        return;
+      }
+      this.voicePlaybackTimer = setTimeout(() => {
+        this.voicePlaybackTimer = null;
+        this.playNextVoiceChunk();
+      }, Math.max(0, delay));
+    }
+
+    clearVoiceChunkWatchdog() {
+      clearTimeout(this.voiceChunkWatchdog);
+      this.voiceChunkWatchdog = null;
+    }
+
+    armVoiceChunkWatchdog(entry, chunkToken) {
+      this.clearVoiceChunkWatchdog();
+      const delay = this.estimatedSpeechDurationMs(entry?.text || "") + VOICE_CHUNK_WATCHDOG_PADDING_MS;
+      this.voiceChunkWatchdog = setTimeout(() => {
+        this.finishVoiceChunk(entry?.generation, chunkToken);
+      }, delay);
+    }
+
+    speakNarrationText(text = "", options = {}) {
+      if (!this.voiceEnabled || !this.supportsNarrationVoice()) return false;
+      this.refreshNarrationVoices();
+      const voice = this.selectedVoice;
+      if (!voice) return false;
+      const chunks = this.splitSpeechChunks(text);
+      if (!chunks.length) return false;
+      if (options.interrupt) this.stopVoiceNarration({ keepEnabled: true });
+      if (!this.voiceUtteranceId) this.voiceUtteranceId = 1;
+      if (options.interrupt) this.voiceUtteranceId += 1;
+      const generation = this.voiceUtteranceId;
+      for (const chunk of chunks) {
+        this.voiceQueue.push({ text: chunk, voice, generation, force: Boolean(options.force) });
+      }
+      this.scheduleVoicePlayback();
+      return true;
+    }
+
+    playNextVoiceChunk() {
+      if (!this.voiceEnabled || !this.selectedVoice || this.voiceActive || !this.voiceQueue.length || !this.supportsNarrationVoice()) return;
+      const entry = this.voiceQueue.shift();
+      if (!entry?.text) return;
+      const chunkToken = ++this.voiceChunkToken;
+      this.voiceCurrentChunkToken = chunkToken;
+      const utterance = new window.SpeechSynthesisUtterance(entry.text);
+      if (entry.voice) {
+        utterance.voice = entry.voice;
+        utterance.lang = entry.voice.lang || utterance.lang;
+      }
+      utterance.rate = this.voiceRate;
+      utterance.onstart = () => {
+        this.setMusicDucked(true);
       };
-      const list = tracks[sound] || tracks.relaxed;
-      const index = Math.abs(hashString(this.room().name)) % list.length;
-      return list[index];
+      utterance.onend = () => this.finishVoiceChunk(entry.generation, chunkToken);
+      utterance.onerror = () => this.finishVoiceChunk(entry.generation, chunkToken);
+      this.voiceActive = true;
+      this.armVoiceChunkWatchdog(entry, chunkToken);
+      try {
+        window.speechSynthesis.speak(utterance);
+      } catch {
+        this.finishVoiceChunk(entry.generation, chunkToken);
+      }
+    }
+
+    finishVoiceChunk(generation, chunkToken = 0) {
+      if (chunkToken && chunkToken !== this.voiceCurrentChunkToken) return;
+      if (generation !== this.voiceUtteranceId) return;
+      this.clearVoiceChunkWatchdog();
+      this.voiceCurrentChunkToken = 0;
+      this.voiceActive = false;
+      if (!this.voiceQueue.length) {
+        this.setMusicDucked(false);
+        return;
+      }
+      this.scheduleVoicePlayback(VOICE_QUEUE_HANDOFF_MS);
+    }
+
+    stopVoiceNarration(options = {}) {
+      const { keepEnabled = true } = options;
+      clearTimeout(this.voiceBufferTimer);
+      this.voiceBufferTimer = null;
+      clearTimeout(this.voicePlaybackTimer);
+      this.voicePlaybackTimer = null;
+      this.clearVoiceChunkWatchdog();
+      this.voiceBufferedLines = [];
+      this.voiceQueue = [];
+      this.voiceCurrentChunkToken = 0;
+      this.voiceUtteranceId += 1;
+      this.voiceActive = false;
+      if (!keepEnabled) this.voiceEnabled = false;
+      this.setMusicDucked(false);
+      if (this.supportsNarrationVoice()) {
+        try {
+          window.speechSynthesis.cancel();
+        } catch {}
+      }
+    }
+
+    setMusicDucked(ducked) {
+      if (!this.audio) return;
+      this.audio.volume = ducked ? MUSIC_DUCKED_VOLUME : MUSIC_BASE_VOLUME;
     }
 
     wear(objectName) {

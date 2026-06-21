@@ -240,6 +240,42 @@ function bootGame() {
     key(index) { return [...storage.keys()][index] || null; },
     get length() { return storage.size; },
   };
+  const speechVoices = [
+    { name: "Test English", lang: "en-GB", default: true, voiceURI: "test-en-gb" },
+    { name: "Test Italian", lang: "it-IT", default: false, voiceURI: "test-it-it" },
+  ];
+  global.SpeechSynthesisUtterance = function SpeechSynthesisUtterance(text = "") {
+    this.text = String(text);
+    this.voice = null;
+    this.lang = "";
+    this.rate = 1;
+    this.onstart = null;
+    this.onend = null;
+    this.onerror = null;
+  };
+  global.window.SpeechSynthesisUtterance = global.SpeechSynthesisUtterance;
+  global.window.speechSynthesis = {
+    _listeners: new Map(),
+    _spoken: [],
+    _voices: speechVoices,
+    speak(utterance) {
+      this._spoken.push({
+        text: utterance?.text || "",
+        voice: utterance?.voice?.name || "",
+        lang: utterance?.lang || "",
+        rate: utterance?.rate || 1,
+      });
+      utterance?.onstart?.();
+      utterance?.onend?.();
+    },
+    cancel() {},
+    getVoices() { return this._voices.slice(); },
+    addEventListener(type, listener) {
+      const list = this._listeners.get(type) || [];
+      list.push(listener);
+      this._listeners.set(type, list);
+    },
+  };
   global.requestAnimationFrame = (fn) => setTimeout(() => fn(Date.now()), 0);
   global.cancelAnimationFrame = clearTimeout;
 
@@ -8291,6 +8327,202 @@ const gameCases = [
     },
     inputs: ["talk smaug"],
     expectedIncluded: ["Smaug says 'A courteous little voice in my halls? Come nearer, and let us see what sort of thief has learned manners.'"],
+  },
+  {
+    name: "voice on enables system narration for story output",
+    setup(game) {
+      game.restartGame();
+      window.speechSynthesis._spoken.length = 0;
+    },
+    drive(game) {
+      game.execute("voice on");
+      window.speechSynthesis._spoken.length = 0;
+      game.execute("look");
+      game.flushNarrationBuffer();
+      game.print(`Narration speech used: ${window.speechSynthesis._spoken.length > 0 ? "yes" : "no"}`, "system");
+    },
+    expectedIncluded: ["Narration speech used: yes"],
+  },
+  {
+    name: "voice narration ducks music while speaking and restores it afterward",
+    setup(game) {
+      game.restartGame();
+      game.voiceEnabled = true;
+      game.audio.volume = 0.75;
+    },
+    drive(game) {
+      const originalSpeak = window.speechSynthesis.speak;
+      let activeUtterance = null;
+      window.speechSynthesis.speak = (utterance) => {
+        activeUtterance = utterance;
+        utterance?.onstart?.();
+      };
+      try {
+        game.speakNarrationText("A test line for narration ducking.", { force: true, interrupt: true });
+        game.print(`Music ducked: ${game.audio.volume < 0.75 ? "yes" : "no"}`, "system");
+        activeUtterance?.onend?.();
+        game.print(`Music restored: ${game.audio.volume === 0.75 ? "yes" : "no"}`, "system");
+      } finally {
+        window.speechSynthesis.speak = originalSpeak;
+      }
+    },
+    expectedIncluded: ["Music ducked: yes", "Music restored: yes"],
+  },
+  {
+    name: "voice narration also speaks during autoplay",
+    setup(game) {
+      game.restartGame();
+      game.voiceEnabled = true;
+      game.autoplayRunning = true;
+      window.speechSynthesis._spoken.length = 0;
+    },
+    drive(game) {
+      game.execute("look");
+      game.flushNarrationBuffer();
+      game.print(`Autoplay narration speech used: ${window.speechSynthesis._spoken.length > 0 ? "yes" : "no"}`, "system");
+      game.autoplayRunning = false;
+    },
+    expectedIncluded: ["Autoplay narration speech used: yes"],
+  },
+  {
+    name: "voice narration keeps consecutive lines queued while first line is still speaking",
+    setup(game) {
+      game.restartGame();
+      game.voiceEnabled = true;
+      window.speechSynthesis._spoken.length = 0;
+    },
+    drive(game) {
+      const originalSpeak = window.speechSynthesis.speak;
+      const originalSchedulePlayback = game.scheduleVoicePlayback;
+      const pending = [];
+      game.scheduleVoicePlayback = (delay = 0) => {
+        if (game.voiceActive || !game.voiceQueue.length) return;
+        if (delay > 0) game.voicePlaybackTimer = null;
+        game.playNextVoiceChunk();
+      };
+      window.speechSynthesis.speak = (utterance) => {
+        window.speechSynthesis._spoken.push({
+          text: utterance?.text || "",
+          voice: utterance?.voice?.name || "",
+          lang: utterance?.lang || "",
+          rate: utterance?.rate || 1,
+        });
+        pending.push(utterance);
+        utterance?.onstart?.();
+      };
+      try {
+        game.speakNarrationText("Gandalf listens intently, expecting your words.", { force: true, interrupt: true });
+        game.speakNarrationText("A second knock comes at the round green door, gentler than the first yet somehow more assured.");
+        game.speakNarrationText("From the kitchen comes the warm homely sound of cutlery, cupboard doors, and something sizzling in butter.");
+        pending.shift()?.onend?.();
+        pending.shift()?.onend?.();
+        pending.shift()?.onend?.();
+        game.print(`Queued narration lines spoken: ${window.speechSynthesis._spoken.length}`, "system");
+      } finally {
+        game.scheduleVoicePlayback = originalSchedulePlayback;
+        window.speechSynthesis.speak = originalSpeak;
+      }
+    },
+    expectedIncluded: ["Queued narration lines spoken: 3"],
+  },
+  {
+    name: "voice narration continues across chunked paragraph and later queued beats",
+    setup(game) {
+      game.restartGame();
+      game.voiceEnabled = true;
+      window.speechSynthesis._spoken.length = 0;
+    },
+    drive(game) {
+      const originalSpeak = window.speechSynthesis.speak;
+      const originalSchedulePlayback = game.scheduleVoicePlayback;
+      const pending = [];
+      game.scheduleVoicePlayback = (delay = 0) => {
+        if (game.voiceActive || !game.voiceQueue.length) return;
+        if (delay > 0) game.voicePlaybackTimer = null;
+        game.playNextVoiceChunk();
+      };
+      window.speechSynthesis.speak = (utterance) => {
+        window.speechSynthesis._spoken.push({
+          text: utterance?.text || "",
+          voice: utterance?.voice?.name || "",
+          lang: utterance?.lang || "",
+          rate: utterance?.rate || 1,
+        });
+        pending.push(utterance);
+        utterance?.onstart?.();
+      };
+      try {
+        game.speakNarrationText("This snug parlour is arranged for conversation rather than grandeur: deep chairs, a hearth laid ready, and several low tables already burdened with plates, cups, and evidence of hobbit forethought. Balin has claimed a chair and half the available table-space.", { force: true, interrupt: true });
+        game.speakNarrationText("Another pair arrives together: Fili and Kili stand at the round green door almost shoulder to shoulder.");
+        game.speakNarrationText("From the kitchen comes the warm homely sound of cutlery, cupboard doors, and something sizzling in butter.");
+        while (pending.length) pending.shift()?.onend?.();
+        game.print(`Chunked narration spoken: ${window.speechSynthesis._spoken.length >= 3 ? "yes" : "no"}`, "system");
+      } finally {
+        game.scheduleVoicePlayback = originalSchedulePlayback;
+        window.speechSynthesis.speak = originalSpeak;
+      }
+    },
+    expectedIncluded: ["Chunked narration spoken: yes"],
+  },
+  {
+    name: "voice on stays pending instead of falling back when only non-english voices exist",
+    setup(game) {
+      game.restartGame();
+      window.speechSynthesis._spoken.length = 0;
+      window.speechSynthesis._voices = [
+        { name: "Solo Italiano", lang: "it-IT", default: true, voiceURI: "solo-it" },
+      ];
+      game.refreshNarrationVoices();
+    },
+    drive(game) {
+      game.execute("voice on");
+      game.print(`English voice pending: ${game.voiceEnabled && !game.selectedVoice ? "yes" : "no"}`, "system");
+      window.speechSynthesis._voices = [
+        { name: "Test English", lang: "en-GB", default: true, voiceURI: "test-en-gb" },
+        { name: "Test Italian", lang: "it-IT", default: false, voiceURI: "test-it-it" },
+      ];
+      game.refreshNarrationVoices();
+    },
+    expectedIncluded: ["English voice pending: yes"],
+  },
+  {
+    name: "voice does not fall back to browser default when only italian voice is exposed",
+    setup(game) {
+      game.restartGame();
+      game.voiceEnabled = true;
+      window.speechSynthesis._spoken.length = 0;
+      window.speechSynthesis._voices = [
+        { name: "Solo Italiano", lang: "it-IT", default: true, voiceURI: "solo-it" },
+      ];
+      game.refreshNarrationVoices();
+    },
+    drive(game) {
+      game.execute("look");
+      game.flushNarrationBuffer();
+      game.print(`Narration blocked without english voice: ${window.speechSynthesis._spoken.length === 0 ? "yes" : "no"}`, "system");
+      window.speechSynthesis._voices = [
+        { name: "Test English", lang: "en-GB", default: true, voiceURI: "test-en-gb" },
+        { name: "Test Italian", lang: "it-IT", default: false, voiceURI: "test-it-it" },
+      ];
+      game.refreshNarrationVoices();
+    },
+    expectedIncluded: ["Narration blocked without english voice: yes"],
+  },
+  {
+    name: "restart game resets voice and music to off",
+    setup(game) {
+      game.restartGame();
+      game.voiceEnabled = true;
+      game.musicEnabled = true;
+      game.currentTrack = "Midnight Tale relaxed.mp3";
+      game.audio.src = "assets/local-music/Midnight%20Tale%20relaxed.mp3";
+    },
+    drive(game) {
+      game.restartGame();
+      game.print(`Voice reset on restart: ${game.voiceEnabled ? "no" : "yes"}`, "system");
+      game.print(`Music reset on restart: ${game.musicEnabled || game.currentTrack || game.audio.src ? "no" : "yes"}`, "system");
+    },
+    expectedIncluded: ["Voice reset on restart: yes", "Music reset on restart: yes"],
   },
 ];
 
