@@ -1351,6 +1351,47 @@ Future debugging advice
   result is supposed to remain playable at all.
 
 
+Case 061 - 2026-06-20 - Barrel escape needed a temporary river artwork before Long Lake takes over
+---------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After adding `elvenkings_river_barrel`, the successful cellar escape still
+showed the normal `Long Lake` artwork immediately. The new image was meant to
+cover the brief stretch where Bilbo is still clinging to the barrel in the
+river just after the trap-door leap.
+
+Root cause
+----------
+The safe barrel escape uses `completeSpecialTravel("long_lake", ...)`, which
+updates the room to `long_lake` and then calls `describeRoom()`. That means the
+standard room artwork for `Long Lake` naturally wins unless the sequence sets a
+temporary image override for that command.
+
+Resolution
+----------
+- Triggered `showTemporaryImage("elvenkings_river_barrel.png")` inside
+  `resolveCellarBarrelEscape()` before the special travel completes.
+- Kept the default `dismissOnNextCommand` behavior so the river-barrel artwork
+  stays visible for the arrival beat and then yields to the normal `Long Lake`
+  image on the player's next command.
+- Added parser coverage to verify both:
+  - the temporary artwork is active immediately after `jump onto barrel`
+  - the next command restores the standard `Long Lake` image
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- When a scripted arrival should show a transitional illustration that belongs
+  neither fully to the source room nor the destination room, prefer
+  `temporaryImage` over changing the destination room's base artwork.
+
+
 Case 028 - 2026-06-20 - Seeded autoplay needed traces for alternative wins and reproducible deaths
 ---------------------------------------------------------------------------------------------------
 
@@ -2762,3 +2803,170 @@ Future debugging advice
 - Distinguish true logic conflicts from tone-only fallback problems.
 - If an NPC already has a strong initiative line, make sure `talk` and `ask`
   do not undercut it with unrelated generic fallback text.
+
+
+Case 059 - 2026-06-20 - Free-play pass exposed debug jump leakage and thin chapter dialogue for key characters
+--------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Exploratory playtesting found two classes of inconsistency.
+
+1. The ordinary action `jump ...` could leak debug-checkpoint UX into normal
+   play. For example, outside the barrel sequence:
+
+   - `jump onto barrel`
+
+   produced both a debug-style checkpoint error and a normal action result.
+
+2. Several high-importance chapter moments still used generic dialogue
+   fallbacks instead of chapter-aware replies:
+
+   - Bard at the Front Gate answered `talk` / `ask about dragon` / `ask about arrow`
+     with generic fallback text
+   - Thorin before Erebor answered `talk` / `ask about treasure` / `ask about dragon`
+     with generic fallback text
+   - Gandalf in Rivendell, after Elrond had already read the map, still fell
+     back on `ask gandalf about map`
+
+Root cause
+----------
+Two separate issues were involved.
+
+1. Command routing for `jump` first attempted the debug checkpoint handler and,
+   on failure, fell through to the physical jump handler. The checkpoint
+   handler always printed its unknown-target message before returning false.
+
+2. `specialTalkResponse()` and `specialConversationResponse()` did not yet
+   include chapter-aware coverage for Bard, Thorin, or post-reading Gandalf in
+   the specific scenes where their narrative role is strongest.
+
+Resolution
+----------
+- Added a silent-on-unknown mode to the checkpoint jump handler.
+- Ordinary `jump` commands now use the silent mode, so only the physical action
+  result appears when no checkpoint matches.
+- `teleport` / `warp` still preserve the explicit checkpoint error behavior.
+- Added contextual `talk` and `ask` responses for:
+  - Bard around Lake-town / Front Gate / Erebor
+  - Thorin at the Erebor threshold
+  - Gandalf in Rivendell both before and after the map revelation
+- Added regression tests covering:
+  - ordinary `jump onto barrel` outside the barrel scene
+  - Bard front-gate dialogue
+  - Thorin front-gate dialogue
+  - Gandalf-on-the-map dialogue after Elrond's reading
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Keep debug verbs and story verbs on separate UX paths even if they share a
+  keyword.
+- For chapter-critical NPCs, generic `listens intently` / `considers ...`
+  fallbacks should be treated as missing content, not as acceptable defaults.
+
+
+Case 060 - 2026-06-20 - Bard/Thorin carry narration felt unintentionally comic during vertical travel
+------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Free-play review exposed a tonal problem around the existing `carry` mechanic:
+
+- the parser/autoplay could ask Bilbo to `pick up bard`
+- vertical release then said Bard climbed down from Bilbo's shoulders
+- the result read more like slapstick than brief assistance over difficult ground
+
+Root cause
+----------
+The mechanic was structurally useful, but its prose treated Bard and Thorin as
+literal carried baggage. That wording had outlived the narrower traversal
+problem it was originally solving.
+
+Resolution
+----------
+- Kept the internal mechanic as `carry`, so existing traversal/autoplay logic
+  still works unchanged.
+- Added natural command normalizations:
+  - `help <character> up`
+  - `boost <character> up`
+  - `give <character> a hand`
+- Rewrote Bard/Thorin carry, drop, and vertical-release text so the action now
+  reads as steadying or helping them over rough ground rather than hoisting
+  them onto Bilbo's shoulders.
+- Added parser regression coverage for the new phrasings and the revised Bard
+  release text.
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a helper mechanic survives multiple story drafts, revisit its prose even
+  when the underlying state machine is still sound.
+- Hidden canonical actions can stay technical as long as the player-facing
+  phrasing stays grounded in the fiction.
+
+
+Case 061 - 2026-06-21 - Erebor hidden-door puzzle needed explicit map consultation and repeated waits
+------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Two story beats were too loose in play:
+
+- after Elrond's counsel, the player could leave Rivendell eastward without the
+  curious map actually being in Bilbo's keeping
+- at Erebor's hidden door, a single `wait` was enough to reveal the entrance,
+  with no explicit local confirmation from the map
+
+Root cause
+----------
+The earlier Rivendell gate only checked whether Elrond's preparation sequence
+ had completed (`mapread` / `rivendell_preparations_complete`), not whether
+ Bilbo still carried the document that the later puzzle depends on.
+
+The hidden-door timer was also wired directly to `wait` in
+`handleTimedSpecials()`, but it had no prerequisite state for "Bilbo has read
+the map here and recognized the place".
+
+Resolution
+----------
+- Added a second Rivendell departure gate: eastward travel now also requires
+  the curious map to be in Bilbo's inventory.
+- Added hidden-door-local map consultation state:
+  - `read map` at `erebor_hidden_door` now prints two narrative lines that
+    recall Elrond's reading and confirm this is the right place
+  - only `wait` commands after that local reading advance the hidden-door
+    sequence
+  - the door now appears on the second deliberate `wait`, not the first
+  - leaving the hidden-door room resets the local consultation/wait sequence
+- Treated the curious map as zero carry-weight for Bilbo so the new mandatory
+  possession rule does not force autoplay or normal play into pointless weight
+  drops later in the adventure.
+- Updated autoplay and parser regression coverage for:
+  - recovering the map before leaving Rivendell
+  - the hidden-door read + two-wait flow
+  - the revised carry-weight expectation at Beorn
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a document is both a narrative key and a physical inventory item, gate the
+  relevant transitions on possession explicitly instead of assuming story flags
+  are enough.
+- For "patient timing" puzzles, separate "time passed" from "the player chose
+  to wait"; they are not the same design signal.

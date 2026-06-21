@@ -4577,7 +4577,7 @@
         climb: () => game.climb(objectText),
         eat: () => game.eat(objectText),
         drink: () => game.drink(objectText),
-        jump: () => game.handleJumpCommand(objectText) || game.physicalAction("jump", objectText),
+        jump: () => game.handleJumpCommand(objectText, { silentOnUnknown: true }) || game.physicalAction("jump", objectText),
         sit: () => game.physicalAction("sit", objectText),
         lie: () => game.physicalAction("lie", objectText),
         stand: () => game.physicalAction("stand", objectText),
@@ -4689,7 +4689,7 @@
       character.position = game.currentRoom;
       character.followingPlayer = false;
       character.justEntered = false;
-      game.print(actorizeSecondPerson(game.player, `You pick up ${displayCharacterName(character)}.`));
+      game.print(carriedCompanionStartMessage(character) || actorizeSecondPerson(game.player, `You pick up ${displayCharacterName(character)}.`));
     }
 
     characterCannotFollowVertical(character, direction) {
@@ -4820,7 +4820,7 @@
 
     dropCharacter(character) {
       this.releaseCarriedCharacter(character, {
-        message: actorizeSecondPerson(this.game.player, `You put ${character.name} down.`),
+        message: carriedCompanionDropMessage(character) || actorizeSecondPerson(this.game.player, `You put ${character.name} down.`),
       });
     }
 
@@ -7828,6 +7828,18 @@
       if (matches(character.name, "butler")) {
         return "The butler says 'If you must speak, be brief. Wine, keys, and quiet order all have their proper places here.'";
       }
+      if (matches(character.name, "gandalf") && game.currentRoom === "rivendell") {
+        if (game.flags.mapread) {
+          return "Gandalf says 'Elrond has read what needed reading. The task now is not to admire wisdom, but to remember it when the road grows hard again.'";
+        }
+        return "Gandalf says 'Rivendell rewards patience. Hear what can be heard here before you grow restless for the road.'";
+      }
+      if (matches(character.name, "thorin") && (game.currentRoom === "front_gate" || IMMERSION_EREBOR_OUTER_ROOMS.has(game.currentRoom))) {
+        return "Thorin says 'Every stone here remembers what was taken from us. Speak quickly, Master Baggins. I will not linger forever outside my father's halls.'";
+      }
+      if (matches(character.name, "bard") && (IMMERSION_LAKETOWN_ROOMS.has(game.currentRoom) || game.currentRoom === "front_gate" || IMMERSION_EREBOR_OUTER_ROOMS.has(game.currentRoom) || IMMERSION_EREBOR_INNER_ROOMS.has(game.currentRoom))) {
+        return "Bard says 'A bowman does not waste words when the air already feels like the breath before a storm. When the moment comes, the shot must be true.'";
+      }
       if (matches(character.name, "elrond") && game.currentRoom === "rivendell") {
         return "Elrond folds his hands and says 'Speak without haste. In Rivendell, even quiet words may be worth the hearing.'";
       }
@@ -7881,6 +7893,18 @@
           return "The butler says 'Keys are trusted to steady hands. Doors are happier when they are used for their intended business.'";
         }
         return "The butler says 'I have no leisure for gossip. Ask, if you must, about something that belongs in a cellar.'";
+      }
+      if (matches(character.name, "gandalf") && game.currentRoom === "rivendell") {
+        if (matchesAny(text, ["map", "moon letters", "moon-letters", "markings", "door", "secret door"])) {
+          return game.flags.mapread
+            ? "Gandalf says 'The map has yielded what it would yield. Better now to remember Elrond's reading than to hope the parchment will grow plainer by staring at it.'"
+            : "Gandalf says 'The map has waited long enough. Elrond should be the one to read what lesser eyes would miss.'";
+        }
+        if (matchesAny(text, ["journey", "road", "departure", "depart", "leave", "leaving", "east"])) {
+          return game.flags.mapread
+            ? "Gandalf says 'The way east is plain enough in broad strokes. The difficulty, as ever, lies in walking it.'"
+            : "Gandalf says 'Patience. Wisdom often travels more slowly than feet.'";
+        }
       }
       if (IMMERSION_RIVENDELL_ROOMS.has(game.currentRoom) && !game.rivendellPreparationsComplete()) {
         if (matches(character.name, "gandalf") && matchesAny(text, ["journey", "road", "departure", "depart", "leave", "leaving", "east"])) {
@@ -7937,6 +7961,28 @@
         }
         if (matchesAny(text, ["food", "meal", "shelter", "night", "rest"])) {
           return "Beorn says 'There is food and a roof here for decent guests. Take both with thanks, and do not abuse either.'";
+        }
+      }
+      if (matches(character.name, "thorin") && (game.currentRoom === "front_gate" || IMMERSION_EREBOR_OUTER_ROOMS.has(game.currentRoom) || IMMERSION_EREBOR_INNER_ROOMS.has(game.currentRoom))) {
+        if (matchesAny(text, ["treasure", "gold", "hoard", "arkenstone"])) {
+          return "Thorin says 'The treasure is not mere glitter to us. It is the memory of a kingdom, and the proof that Erebor may yet be ours again.'";
+        }
+        if (matchesAny(text, ["dragon", "smaug"])) {
+          return "Thorin says 'Smaug is the shadow over every stone here. Yet even dragons may be brought to account in the end.'";
+        }
+        if (matchesAny(text, ["mountain", "erebor", "gate", "halls"])) {
+          return "Thorin says 'Erebor is not only stone and treasure. It is our house, and I would see it named ours again before I die.'";
+        }
+      }
+      if (matches(character.name, "bard") && (IMMERSION_LAKETOWN_ROOMS.has(game.currentRoom) || game.currentRoom === "front_gate" || IMMERSION_EREBOR_OUTER_ROOMS.has(game.currentRoom) || IMMERSION_EREBOR_INNER_ROOMS.has(game.currentRoom))) {
+        if (matchesAny(text, ["dragon", "smaug"])) {
+          return "Bard says 'A dragon is not beaten by noise or bravery alone. When he comes within reach, one true opening must be enough.'";
+        }
+        if (matchesAny(text, ["arrow", "bow", "shot"])) {
+          return "Bard lays a hand on the black arrow and says 'A bowman lives by the shot he has not yet wasted. This one is kept for necessity, not display.'";
+        }
+        if (matchesAny(text, ["town", "lake-town", "laketown", "people", "master"])) {
+          return "Bard says 'Lake-town has endured much from the Mountain already. Whatever happens here must answer not only to old claims, but to living folk as well.'";
         }
       }
       if (matches(character.name, "dragon")) {
@@ -8299,8 +8345,15 @@
       if (game.currentRoom === "dark_dungeon") game.toggleDoorByName("red door", "Someone opens the red door.", "Someone closes the red door.");
       if (game.currentRoom === "large_dry_cave") game.toggleDoorByName("small hidden crevice", "A small hidden crevice is revealed.", "The small hidden crevice disappears.");
       if (game.currentRoom === "erebor_hidden_door" && game.rivendellPreparationsComplete() && !game.flags.secretdoorsun) {
+        if (!game.flags.hidden_door_map_consulted) {
+          game.print("You wait by the western wall, but without consulting the map you cannot yet be sure this is the place Elrond meant.");
+          return;
+        }
         game.secretDoorWaitCounter += 1;
-        if (game.secretDoorWaitCounter >= 1) {
+        if (game.secretDoorWaitCounter === 1) {
+          game.print("You wait in stillness while the day thins westward, watching the stone for the change Elrond foretold.");
+        }
+        if (game.secretDoorWaitCounter >= 2) {
           game.flags.secretdoorsun = true;
           game.print("As the light slants across the western stone, a narrow line answers it. What looked like barren rock resolves at last into a secret door.");
         }
@@ -8771,6 +8824,12 @@
         if (!game.flags.rivendell_progress_quest) return this.autoplayDirectedCharacterCommand("elrond", "ask elrond about journey");
       }
 
+      if (beforeDragonDefeat && game.rivendellPreparationsComplete() && !game.playerHasQuestMap()) {
+        if (game.currentRoom !== "rivendell") return this.autoplayRouteCommandTo("rivendell");
+        const mapHolder = game.findVisibleCharacterHolding("curious map")?.character;
+        if (mapHolder) return `ask ${normalize(mapHolder.name)} for map`;
+      }
+
       if (beforeDragonDefeat && game.currentRoom === "deep_dark_lake" && !game.gollumState?.pocketQuestionAsked) {
         if (!game.gollumState?.met) return "look";
         if (game.gollumState?.awaitingAnswer) {
@@ -8882,6 +8941,15 @@
           return this.autoplayRouteCommandTo("west_bank");
         }
         if (!game.flags.bardreadiedarrow) return this.autoplayDirectedCharacterCommand("bard", "say to bard \"get strong arrow from quiver\"");
+      }
+
+      if (game.currentRoom === "erebor_hidden_door" && !game.flags.secretdoorsun) {
+        if (!game.hiddenDoorMapConsulted()) return "read map";
+        if (game.secretDoorWaitCounter < 2) return "wait";
+        const secretDoor = game.findDoor("secret door")?.door;
+        if (secretDoor?.locked) return "unlock secret door with curious key";
+        if (secretDoor && !secretDoor.open) return "open secret door";
+        return "east";
       }
 
       if (game.currentRoom === "lower_halls" && !this.autoplayHas("treasure")) {
@@ -9240,6 +9308,10 @@
       if (item.broken) {
         const subject = actorSubject(game.player, true);
         return game.print(`${subject} ${actorVerb(game.player, "try")} to read the broken ${item.name}, but its markings are torn into useless fragments.`);
+      }
+      if (matches(item.name, "curious map") && game.currentRoom === "erebor_hidden_door" && game.rivendellPreparationsComplete()) {
+        game.noteHiddenDoorMapReading();
+        return;
       }
       if (item.mended && matches(item.name, "curious map")) {
         const subject = actorSubject(game.player, true);
@@ -11712,12 +11784,18 @@
       return connection.from === "rivendell" && connection.to === "misty_mountain";
     }
 
+    rivendellMapCarryGate(connection) {
+      if (!connection || !this.rivendellPreparationsComplete() || this.playerHasQuestMap()) return false;
+      return connection.from === "rivendell" && connection.to === "misty_mountain";
+    }
+
     narrativeTravelBlock(connection) {
       if (!connection) return false;
       return this.liveTrollExposureGate(connection)
         || this.rivendellWeaponGate(connection)
         || this.rivendellRopeGate(connection)
         || this.rivendellPreparationGate(connection)
+        || this.rivendellMapCarryGate(connection)
         || this.beornMountainStormGate(connection)
         || (
         connection.from === "bilbos_garden"
@@ -11758,6 +11836,12 @@
         if (attempts === 2) return "Thorin studies the valley in silence, and no one moves to gather the company for the road.";
         return "You have the feeling that your business in Rivendell is not yet finished, though no one says so plainly.";
       }
+      if (this.rivendellMapCarryGate(connection)) {
+        const attempts = Number(this.flags.rivendellmapcarryattempts || 0);
+        if (attempts <= 0) return "The road east is open at last, yet Bilbo hesitates. The curious map ought to travel with him, not remain behind in Rivendell.";
+        if (attempts === 1) return "Gandalf glances at your empty hands and says 'Not eastward yet. The map is part of the road now, not a keepsake to leave behind.'";
+        return "However fair Rivendell may be, it would be sheer carelessness to leave without the curious map in Bilbo's keeping.";
+      }
       if (this.beornMountainStormGate(connection)) return this.beornMountainStormMessage(connection);
       if (!this.narrativeTravelBlock(connection)) return "";
       const attempts = Number(this.flags.bagendexitattempts || 0);
@@ -11787,6 +11871,10 @@
       }
       if (this.rivendellPreparationGate(connection)) {
         this.flags.rivendelldepartureattempts = Number(this.flags.rivendelldepartureattempts || 0) + 1;
+        return;
+      }
+      if (this.rivendellMapCarryGate(connection)) {
+        this.flags.rivendellmapcarryattempts = Number(this.flags.rivendellmapcarryattempts || 0) + 1;
         return;
       }
       if (this.beornMountainStormGate(connection)) {
@@ -11988,7 +12076,8 @@
       this.print(lines.join("\n"), "system");
     }
 
-    handleJumpCommand(target = "") {
+    handleJumpCommand(target = "", options = {}) {
+      const { silentOnUnknown = false } = options;
       const normalizedTarget = normalize(String(target || "").replace(/^(?:to|into)\s+/, ""));
       if (!normalizedTarget) {
         this.listJumpCheckpoints();
@@ -11998,7 +12087,7 @@
         .map((alias) => normalize(alias))
         .includes(normalizedTarget));
       if (!preset) {
-        this.print(`Unknown jump target "${target}". Type "jumps" to see the available checkpoints.`, "system");
+        if (!silentOnUnknown) this.print(`Unknown jump target "${target}". Type "jumps" to see the available checkpoints.`, "system");
         return false;
       }
       this.prepareJumpState();
@@ -12090,6 +12179,7 @@
       }
       this.currentRoom = roomId;
       this.player.position = roomId;
+      this.resetHiddenDoorSearchState(fromRoom, roomId);
       this.visitedRooms.add(roomId);
       return true;
     }
@@ -13072,6 +13162,7 @@
       }
       this.currentRoom = destination;
       this.player.position = destination;
+      this.resetHiddenDoorSearchState(previousRoom, destination);
       this.moveFollowers(previousRoom, destination, direction);
       if (this.commandIssuer) {
         this.print(`${this.player.name} goes ${direction}.`);
@@ -13090,6 +13181,9 @@
     resolveCellarBarrelEscape() {
       this.player.insideContainer = null;
       this.flags.barrelthrown = false;
+      this.showTemporaryImage("elvenkings_river_barrel.png", {
+        alt: "Bilbo riding a barrel down the forest river",
+      });
       return this.completeSpecialTravel("long_lake", "down", {
         preDescriptionLines: [
           "You seize your moment, spring through the open trap door, and come down half upon the barrel and half into the freezing black rush beneath the halls.",
@@ -13507,6 +13601,7 @@
       const previousRoom = this.currentRoom;
       this.currentRoom = roomId;
       this.player.position = roomId;
+      this.resetHiddenDoorSearchState(previousRoom, roomId);
       if (delegated) {
         this.print(`${this.player.name} goes to ${name}.`);
         return true;
@@ -13654,6 +13749,7 @@
       }
       this.currentRoom = effectiveConnection.to;
       this.player.position = effectiveConnection.to;
+      this.resetHiddenDoorSearchState(previousRoom, effectiveConnection.to);
       if (this.sceneMapVisible) {
         this.sceneMapAutoFollow = true;
         this.sceneMapManualScope = false;
@@ -13729,7 +13825,7 @@
           this.releaseCarriedCharacter(character, {
             follow: true,
             room: toRoom,
-            message: `${sentenceDisplayCharacterName(character)} climbs down from your shoulders and follows you.`,
+            message: carriedCompanionVerticalReleaseMessage(character) || `${sentenceDisplayCharacterName(character)} follows you once clear of the climb.`,
           });
         }
       }
@@ -14155,6 +14251,32 @@
       return Boolean(this.flags.rivendell_preparations_complete || this.flags.mapread);
     }
 
+    playerHasQuestMap() {
+      return Boolean(this.findInInventory("curious map"));
+    }
+
+    hiddenDoorMapConsulted() {
+      return Boolean(this.flags.hidden_door_map_consulted);
+    }
+
+    noteHiddenDoorMapReading() {
+      if (this.currentRoom !== "erebor_hidden_door") return false;
+      const firstReadingHere = !this.hiddenDoorMapConsulted();
+      this.flags.hidden_door_map_consulted = true;
+      this.flags.hidden_door_map_confirmed = true;
+      if (firstReadingHere) this.secretDoorWaitCounter = 0;
+      this.print("Elrond's words come back to you: a narrow western door, and the season and light by which it may be found.");
+      this.print("Comparing the weathered markings with the stern wall before you, you know at last that this is indeed the right place.");
+      return true;
+    }
+
+    resetHiddenDoorSearchState(previousRoom = "", currentRoom = this.currentRoom) {
+      if (previousRoom !== "erebor_hidden_door" || currentRoom === "erebor_hidden_door") return false;
+      this.flags.hidden_door_map_consulted = false;
+      this.secretDoorWaitCounter = 0;
+      return true;
+    }
+
     bilboHasRecoveredRing() {
       if (this.flags.bilbo_has_ring) return true;
       const ring = this.items.golden_ring;
@@ -14409,6 +14531,7 @@
       const previousRoom = this.currentRoom;
       this.currentRoom = destination;
       this.player.position = destination;
+      this.resetHiddenDoorSearchState(previousRoom, destination);
       this.moveFollowers(previousRoom, destination, direction);
       this.resolvePendingMirkwoodBladeRecovery();
       if (message) this.print(message, "danger");
@@ -15374,7 +15497,7 @@
     currentCarryWeight(character = this.player) {
       if (!character) return 0;
       const heldIds = [...(character.inventory || []), ...(character.worn || [])];
-      return heldIds.reduce((total, itemId) => total + (this.items[itemId]?.weight || 0), 0);
+      return heldIds.reduce((total, itemId) => total + this.itemCarryWeight(this.items[itemId], character), 0);
     }
 
     carryCapacity(character = this.player) {
@@ -15423,8 +15546,14 @@
     }
 
     carryTooMuchMessage(item) {
-      const nextWeight = this.currentCarryWeight() + (item?.weight || 0);
+      const nextWeight = this.currentCarryWeight() + this.itemCarryWeight(item);
       return `The ${item.name} would be too much to carry (${nextWeight}/${this.carryCapacity()}).`;
+    }
+
+    itemCarryWeight(item, character = this.player) {
+      if (!item) return 0;
+      if (character?.id === this.data.player && matches(item.name, "curious map")) return 0;
+      return item.weight || 0;
     }
 
     inventoryItemLabel(item) {
@@ -15649,6 +15778,9 @@
       .replace(/^talk\s+with\s+(.+)$/i, "talk to $1")
       .replace(/^speak\s+to\s+(.+?)\s+about\s+(.+)$/i, "ask $1 about $2")
       .replace(/^talk\s+to\s+(.+?)\s+about\s+(.+)$/i, "ask $1 about $2")
+      .replace(/^help\s+(.+?)\s+up$/i, "carry $1")
+      .replace(/^boost\s+(.+?)\s+up$/i, "carry $1")
+      .replace(/^give\s+(.+?)\s+a\s+hand(?:\s+up)?$/i, "carry $1")
       .replace(/^ask\s+(.+?)\s+a\s+question$/i, "talk to $1")
       .replace(/^ask\s+for\s+directions$/i, "exits")
       .replace(/^ask\s+for\s+advice$/i, "tips")
@@ -15986,6 +16118,36 @@
 
   function sentenceDisplayCharacterName(character) {
     return capitalize(displayCharacterName(character));
+  }
+
+  function carriedCompanionStartMessage(character) {
+    if (matches(character?.name, "bard")) {
+      return "You draw Bard close, ready to give him a hand over the rougher ground ahead.";
+    }
+    if (matches(character?.name, "thorin")) {
+      return "You move beside Thorin, ready to steady him over the rougher ground ahead.";
+    }
+    return "";
+  }
+
+  function carriedCompanionDropMessage(character) {
+    if (matches(character?.name, "bard")) {
+      return "You let Bard find his own footing again.";
+    }
+    if (matches(character?.name, "thorin")) {
+      return "You let Thorin find his own footing again.";
+    }
+    return "";
+  }
+
+  function carriedCompanionVerticalReleaseMessage(character) {
+    if (matches(character?.name, "bard")) {
+      return "You give Bard a firm hand up, and once he has the higher ground he follows close behind.";
+    }
+    if (matches(character?.name, "thorin")) {
+      return "You steady Thorin over the rise, and he follows at once.";
+    }
+    return "";
   }
 
   function characterPossessiveName(character) {

@@ -4390,6 +4390,27 @@ const gameCases = [
     ],
   },
   {
+    name: "rivendell departure also requires bilbo to carry the curious map",
+    drive(game) {
+      game.execute("jump rivendell");
+      game.execute("talk to elrond");
+      game.execute("ask elrond about journey");
+      game.execute("give map to elrond");
+      game.execute("east");
+      game.print(`Room after mapless departure attempt: ${game.currentRoom}`);
+      game.execute("take map from elrond");
+      game.execute("east");
+      game.print(`Room after recovered-map departure: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "You give the curious map to Elrond.",
+      "The road east is open at last, yet Bilbo hesitates. The curious map ought to travel with him, not remain behind in Rivendell.",
+      "Room after mapless departure attempt: rivendell",
+      "You take the curious map from Elrond.",
+      "Room after recovered-map departure: misty_mountain",
+    ],
+  },
+  {
     name: "jump trolls preserves offscreen dawn progression after leaving the clearing",
     drive(game) {
       game.execute("jump trolls");
@@ -4874,6 +4895,8 @@ const gameCases = [
       game.execute("look at rock face");
       game.execute("north east");
       game.print(`Western wall room: ${game.currentRoom}`);
+      game.execute("read map");
+      game.execute("wait");
       game.execute("wait");
       game.execute("unlock secret door with curious key");
       game.execute("open secret door");
@@ -4884,6 +4907,8 @@ const gameCases = [
       "Jumped to Front Gate.",
       "The enormous gate stands silent and inaccessible. No obvious way lies through.",
       "Western wall room: erebor_hidden_door",
+      "Elrond's words come back to you: a narrow western door, and the season and light by which it may be found.",
+      "Comparing the weathered markings with the stern wall before you, you know at last that this is indeed the right place.",
       "What looked like barren rock resolves at last into a secret door.",
       "You unlock the secret door with the curious key.",
       "You open the secret door.",
@@ -4891,6 +4916,29 @@ const gameCases = [
     ],
     notExpectedIncluded: [
       "Room after hidden door entry: lower_halls",
+    ],
+  },
+  {
+    name: "hidden door requires reading the map and two deliberate waits",
+    drive(game) {
+      game.execute("jump front_gate");
+      game.execute("north east");
+      game.execute("wait");
+      game.execute("unlock secret door with curious key");
+      game.execute("read map");
+      game.execute("look at wall");
+      game.execute("wait");
+      game.execute("unlock secret door with curious key");
+      game.execute("wait");
+      game.execute("unlock secret door with curious key");
+    },
+    expectedIncluded: [
+      "You wait by the western wall, but without consulting the map you cannot yet be sure this is the place Elrond meant.",
+      "I don't see that here.",
+      "Elrond's words come back to you: a narrow western door, and the season and light by which it may be found.",
+      "You wait in stillness while the day thins westward, watching the stone for the change Elrond foretold.",
+      "As the light slants across the western stone, a narrow line answers it. What looked like barren rock resolves at last into a secret door.",
+      "You unlock the secret door with the curious key.",
     ],
   },
   {
@@ -4911,7 +4959,7 @@ const gameCases = [
     },
     expectedIncluded: [
       "Jumped to Rivendell.",
-      "Weight at Beorn: 46/52",
+      "Weight at Beorn: 41/52",
       "You take the meal from the cupboard.",
       "Has meal at Beorn: yes",
     ],
@@ -5066,6 +5114,26 @@ const gameCases = [
     ],
   },
   {
+    name: "cellar barrel jump shows river artwork until the next command",
+    setup(game) {
+      movePlayerTo(game, "cellar");
+    },
+    drive(game) {
+      game.execute("open trap door");
+      game.execute("throw barrel through the large trap door");
+      game.execute("jump onto barrel");
+      game.print(`Cellar barrel temporary image: ${game.temporaryImage?.file || "none"}`);
+      game.execute("look");
+      game.print(`Cellar barrel temporary image after next command: ${game.temporaryImage?.file || "none"}`);
+      game.print(`Cellar barrel room after next command: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "Cellar barrel temporary image: elvenkings_river_barrel.png",
+      "Cellar barrel temporary image after next command: none",
+      "Cellar barrel room after next command: long_lake",
+    ],
+  },
+  {
     name: "autoplay prepares the barrel escape before leaving the cellar",
     setup(game) {
       game.execute("jump laketown");
@@ -5151,6 +5219,60 @@ const gameCases = [
     ],
   },
   {
+    name: "natural assist verbs map to bard carry without shoulder wording",
+    setup(game) {
+      game.execute("jump laketown");
+      game.currentRoom = "strong_river";
+      game.player.position = "strong_river";
+      game.characters.bard.position = "strong_river";
+      game.characters.bard.visible = true;
+      game.characters.bard.carriedBy = null;
+      game.characters.bard.followingPlayer = false;
+    },
+    drive(game) {
+      game.execute("help bard up");
+      game.print(`Help carry bard: ${game.characters.bard.carriedBy === game.player.id ? "yes" : "no"}`);
+      game.characters.bard.carriedBy = null;
+      game.characters.bard.position = game.currentRoom;
+      game.execute("give bard a hand");
+      game.print(`Hand carry bard: ${game.characters.bard.carriedBy === game.player.id ? "yes" : "no"}`);
+      game.characters.bard.carriedBy = null;
+      game.characters.bard.position = game.currentRoom;
+      game.execute("boost bard up");
+      game.print(`Boost carry bard: ${game.characters.bard.carriedBy === game.player.id ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You draw Bard close, ready to give him a hand over the rougher ground ahead.",
+      "Help carry bard: yes",
+      "Hand carry bard: yes",
+      "Boost carry bard: yes",
+    ],
+    notExpectedIncluded: [
+      "You pick up Bard.",
+    ],
+  },
+  {
+    name: "carrying thorin uses grounded assistance wording",
+    setup(game) {
+      game.execute("jump front_gate");
+      game.characters.thorin.position = "front_gate";
+      game.characters.thorin.visible = true;
+      game.characters.thorin.carriedBy = null;
+      game.characters.thorin.followingPlayer = false;
+    },
+    drive(game) {
+      game.execute("carry thorin");
+      game.print(`Thorin carried: ${game.characters.thorin.carriedBy === game.player.id ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You move beside Thorin, ready to steady him over the rougher ground ahead.",
+      "Thorin carried: yes",
+    ],
+    notExpectedIncluded: [
+      "You pick up Thorin.",
+    ],
+  },
+  {
     name: "bard released after vertical travel stays in the destination room for autoplay",
     setup(game) {
       game.execute("jump laketown");
@@ -5171,13 +5293,14 @@ const gameCases = [
       game.print(`Next autoplay after bard climb: ${game.nextAutoplayCommand() || "none"}`);
     },
     expectedIncluded: [
-      "Bard climbs down from your shoulders and follows you.",
+      "You give Bard a firm hand up, and once he has the higher ground he follows close behind.",
       "Bard climb room: bleak_barren_land",
       "Bard room after climb: bleak_barren_land",
       "Bard follow after climb: yes",
       "Next autoplay after bard climb: north",
     ],
     notExpectedIncluded: [
+      "Bard climbs down from your shoulders and follows you.",
       "Bard room after climb: strong_river",
       "Next autoplay after bard climb: down",
     ],
@@ -6332,6 +6455,89 @@ const gameCases = [
     notExpectedIncluded: [
       "The butler glares at you, unimpressed.",
       "The butler considers moon, but gives no clear answer.",
+    ],
+  },
+  {
+    name: "jump action does not leak checkpoint error text into ordinary jumps",
+    setup(game) {
+      movePlayerTo(game, "front_gate");
+    },
+    inputs: ["jump onto barrel"],
+    expectedIncluded: [
+      "You jump onto barrel, but nothing happens.",
+    ],
+    notExpectedIncluded: [
+      'Unknown jump target "onto barrel". Type "jumps" to see the available checkpoints.',
+    ],
+  },
+  {
+    name: "bard gets contextual front gate talk and ask responses",
+    setup(game) {
+      movePlayerTo(game, "front_gate");
+      game.debugSetCharacterRoom("bard", "front_gate", { visible: true, movementMode: "never" });
+    },
+    inputs: [
+      "talk to bard",
+      "ask bard about dragon",
+      "ask bard about arrow",
+      "ask bard about town",
+    ],
+    expectedIncluded: [
+      "Bard says 'A bowman does not waste words when the air already feels like the breath before a storm. When the moment comes, the shot must be true.'",
+      "Bard says 'A dragon is not beaten by noise or bravery alone. When he comes within reach, one true opening must be enough.'",
+      "Bard lays a hand on the black arrow and says 'A bowman lives by the shot he has not yet wasted. This one is kept for necessity, not display.'",
+      "Bard says 'Lake-town has endured much from the Mountain already. Whatever happens here must answer not only to old claims, but to living folk as well.'",
+    ],
+    notExpectedIncluded: [
+      "Bard listens intently, expecting your words.",
+      "Bard considers dragon, but gives no clear answer.",
+      "Bard considers arrow, but gives no clear answer.",
+      "Bard considers town, but gives no clear answer.",
+    ],
+  },
+  {
+    name: "thorin gets contextual erebor threshold talk and ask responses",
+    setup(game) {
+      movePlayerTo(game, "front_gate");
+      game.debugSetCharacterRoom("thorin", "front_gate", { visible: true, movementMode: "never" });
+    },
+    inputs: [
+      "talk to thorin",
+      "ask thorin about treasure",
+      "ask thorin about dragon",
+    ],
+    expectedIncluded: [
+      "Thorin says 'Every stone here remembers what was taken from us. Speak quickly, Master Baggins. I will not linger forever outside my father's halls.'",
+      "Thorin says 'The treasure is not mere glitter to us. It is the memory of a kingdom, and the proof that Erebor may yet be ours again.'",
+      "Thorin says 'Smaug is the shadow over every stone here. Yet even dragons may be brought to account in the end.'",
+    ],
+    notExpectedIncluded: [
+      "Thorin listens intently, expecting your words.",
+      "Thorin considers treasure, but gives no clear answer.",
+      "Thorin considers dragon, but gives no clear answer.",
+    ],
+  },
+  {
+    name: "gandalf in rivendell answers about the map after elronds reading",
+    setup(game) {
+      movePlayerTo(game, "rivendell");
+      game.debugSetCharacterRoom("gandalf", "rivendell", { visible: true, movementMode: "never" });
+      game.flags.mapread = true;
+      game.flags.rivendell_preparations_complete = true;
+    },
+    inputs: [
+      "talk to gandalf",
+      "ask gandalf about map",
+      "ask gandalf about journey",
+    ],
+    expectedIncluded: [
+      "Gandalf says 'Elrond has read what needed reading. The task now is not to admire wisdom, but to remember it when the road grows hard again.'",
+      "Gandalf says 'The map has yielded what it would yield. Better now to remember Elrond's reading than to hope the parchment will grow plainer by staring at it.'",
+      "Gandalf says 'The way east is plain enough in broad strokes. The difficulty, as ever, lies in walking it.'",
+    ],
+    notExpectedIncluded: [
+      "Gandalf listens intently, expecting your words.",
+      "Gandalf considers map, but gives no clear answer.",
     ],
   },
   {
