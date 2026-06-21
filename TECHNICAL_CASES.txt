@@ -4632,3 +4632,153 @@ Future debugging advice
 - If narration stops mid-scene on Mac/Safari, inspect both logical queue state
   and browser event delivery; a correct queue is not enough if chunk handoff is
   too immediate.
+
+Case 095 - 2026-06-21 - Bare `swim` on West Bank fell through to the generic no-water fallback
+-----------------------------------------------------------------------------------------------
+
+Symptom
+-------
+At `West bank`, typing `swim` printed the generic fallback:
+
+- `You swim, but there is no safe water to swim here.`
+
+That contradicted the room state, because the Black River is present and the
+scripted consequence should be the fatal current sequence.
+
+Root cause
+----------
+`processCommand()` correctly tries `specialActions` before generic verb
+handling, but the West Bank river death action for `swim` required an implied
+target:
+
+- verb: `swim`
+- obj2: `river`
+- location: `West bank`
+
+When the player typed bare `swim`, `trySpecialAction()` received an empty object
+string, so object matching failed and the command dropped into
+`physicalAction()`'s generic fallback response.
+
+Resolution
+----------
+- Added a narrow implicit-target bridge for physical actions that are safe to
+  infer from the room state.
+- `swim` now checks for a single matching non-portable special-action target in
+  the current room and retries the special action with that inferred target.
+- Added regression coverage proving bare `swim` on `west_bank` now triggers the
+  river death/autosave sequence instead of the generic fallback line.
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a verb is allowed without an explicit object, audit any room-specific
+  `specialActions` that rely on implied environmental targets; they can be
+  bypassed silently by generic fallback text.
+- Keep inferred-target logic tightly scoped to unambiguous verbs such as
+  `swim`, rather than broadening all physical verbs and creating accidental
+  hazard triggers.
+
+Case 096 - 2026-06-21 - `Treeless Opening` existed in logic and maps but was unreachable from `Goblin Gate Out`
+--------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The original hand-drawn `Hobbit_map.png` showed a bidirectional east-west link
+between `Goblin Gate Out` and `Treeless Opening`, but normal play could not
+reach `treeless_opening` from `outside_goblins_gate`.
+
+Observed effects
+----------------
+- The world map showed `Treeless Opening` as a distinct node.
+- The game contained complete warg/eagles logic for `treeless_opening`.
+- Parser tests for the warg escape had to place the player in
+  `treeless_opening` directly during setup.
+- Actual connection data only allowed:
+  - `outside_goblins_gate -> down -> inside_goblins_gate`
+  - `treeless_opening -> west -> outside_goblins_gate`
+
+Root cause
+----------
+The eastbound half of the bidirectional connection was simply missing from the
+ connection list.
+
+Resolution
+----------
+- Added the missing normal connection:
+  - `outside_goblins_gate -> east -> treeless_opening`
+- Added regression coverage proving:
+  - east from `outside_goblins_gate` now reaches `treeless_opening`
+  - that move can trigger the warg escape in ordinary play when the Gollum
+    escape state is already active
+
+Files touched
+-------------
+- `assets/game-data.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a room appears in both narrative logic and map layout but feels
+  unreachable, compare the hand-authored source map against the raw connection
+  list before debugging higher-level triggers.
+- If a test must place the player directly into a room that should be reached
+  naturally, treat that as a sign the traversal graph may be incomplete.
+
+Case 097 - 2026-06-21 - Smaug autoplay could die on the weak-spot question when route changes shifted dragon timing
+---------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After restoring the missing `outside_goblins_gate -> east -> treeless_opening`
+connection, full parser tests started failing in:
+
+- `autoplay wins without weight drops`
+
+Autoplay still reached `lower_halls`, but after `ask smaug about treasure` it
+could die immediately instead of retreating to Ravenhill.
+
+Root cause
+----------
+The autoplay plan for Smaug assumed the weak-spot question was always safe to
+ask immediately in `lower_halls`.
+
+That was too brittle.
+
+- Smaug awareness depends partly on turn timing and suspicion state.
+- The restored mountain/goblin traversal changed the number and shape of turns
+  leading into Erebor.
+- In one valid route, autoplay reached the weak-spot question on a turn where
+  the visible player could trigger Smaug's immediate lethal retaliation.
+
+Resolution
+----------
+- Hardened autoplay in `lower_halls`:
+  - if Smaug is alive
+  - the weak spot is still unknown
+  - Bilbo is still noticeable
+  - and Bilbo has the ring
+  then autoplay now chooses `wear ring` before attempting
+  `ask smaug about treasure`
+- Updated Smaug autoplay regression expectations to reflect the safer first
+  step.
+- Re-ran the full parser suite successfully.
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When autoplay depends on a hazardous NPC's awareness cycle, avoid assuming a
+  single command is always safe at a given room; route changes elsewhere can
+  shift turn timing enough to surface latent danger.
+- Prefer safety-prep steps such as invisibility or positioning before
+  information-gathering actions in endgame hazard scenes.

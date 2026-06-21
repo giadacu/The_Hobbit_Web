@@ -4756,6 +4756,41 @@ const gameCases = [
     ],
   },
   {
+    name: "outside goblins gate now leads east into the treeless opening",
+    setup(game) {
+      game.currentRoom = "outside_goblins_gate";
+      game.player.position = "outside_goblins_gate";
+    },
+    drive(game) {
+      game.execute("east");
+      game.print(`Room after gate exit: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "Room after gate exit: treeless_opening",
+    ],
+  },
+  {
+    name: "going east from outside goblins gate can trigger the warg escape in normal play",
+    setup(game) {
+      game.currentRoom = "outside_goblins_gate";
+      game.player.position = "outside_goblins_gate";
+      game.gollumState = game.createGollumState();
+      game.gollumState.met = true;
+      game.gollumState.pocketQuestionAsked = true;
+      game.gollumState.escaped = true;
+    },
+    drive(game) {
+      game.execute("east");
+      game.print(`Warg escape started: ${game.flags.warg_escape_started ? "yes" : "no"}`);
+      game.print(`Current room after trigger: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "Bursting out from the goblin gate at last, you find Gandalf and the dwarves hard pressed in the open below the mountain.",
+      "Warg escape started: yes",
+      "Current room after trigger: treeless_opening",
+    ],
+  },
+  {
     name: "reaching the open ground after gollum starts the warg escape scene",
     setup(game) {
       game.currentRoom = "treeless_opening";
@@ -5743,7 +5778,7 @@ const gameCases = [
       game.print(`Lower halls absent-bard autoplay command: ${command || "none"}`);
     },
     expectedIncluded: [
-      "Lower halls absent-bard autoplay command: ask smaug about treasure",
+      "Lower halls absent-bard autoplay command: wear ring",
     ],
     notExpectedIncluded: [
       "Lower halls absent-bard autoplay command: say to bard \"shoot dragon\"",
@@ -5874,7 +5909,7 @@ const gameCases = [
       "Arrow with Bard: yes",
       "Dragon alive: yes",
       "Strength after Beorn: 6",
-      "Autoplay next with Smaug: ask smaug about treasure",
+      "Autoplay next with Smaug: wear ring",
     ],
   },
   {
@@ -6022,7 +6057,7 @@ const gameCases = [
       game.print(`Autoplay before weak-spot knowledge: ${game.nextAutoplayCommand()}`);
     },
     expectedIncluded: [
-      "Autoplay before weak-spot knowledge: ask smaug about treasure",
+      "Autoplay before weak-spot knowledge: wear ring",
     ],
     notExpectedIncluded: [
       "Autoplay before weak-spot knowledge: say to bard \"shoot dragon\"",
@@ -8158,6 +8193,29 @@ const gameCases = [
       "River death choice: death",
       "River death image: bilbo_black_river_death.png",
       "Type 'load' to open your safe moments in West Bank, or 'restart' to begin the tale again.",
+    ],
+  },
+  {
+    name: "bare swim on the west bank uses the river special action instead of the standard fallback",
+    setup(game) {
+      game.currentRoom = "west_bank";
+      game.player.position = "west_bank";
+    },
+    drive(game) {
+      game.execute("swim");
+      game.print(`Bare swim autosave room: ${game.autosaveMeta?.roomId || "none"}`);
+      game.print(`Bare swim death choice: ${game.pendingEndgameChoice || "none"}`);
+      game.print(`Bare swim death image: ${game.temporaryImage?.file || "none"}`);
+    },
+    expectedIncluded: [
+      "You swim in the river.",
+      "The river takes you at once, spinning you among the rocks before any hand can save you.",
+      "Bare swim autosave room: west_bank",
+      "Bare swim death choice: death",
+      "Bare swim death image: bilbo_black_river_death.png",
+    ],
+    notExpectedIncluded: [
+      "there is no safe water to swim here",
     ],
   },
   {

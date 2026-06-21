@@ -3339,6 +3339,13 @@ window.HOBBIT_DATA = {
       "distance": 1
     },
     {
+      "from": "outside_goblins_gate",
+      "direction": "east",
+      "to": "treeless_opening",
+      "door": null,
+      "distance": 1
+    },
+    {
       "from": "treeless_opening",
       "direction": "east",
       "to": "beorns_house",

@@ -9776,6 +9776,9 @@
       }
 
       if (game.currentRoom === "lower_halls" && game.liveDragon()) {
+        if (!game.smaugWeakSpotKnown() && game.player.noticeable !== false && this.autoplayHas("golden ring")) {
+          return "wear ring";
+        }
         if (!game.smaugWeakSpotKnown()) return "ask smaug about treasure";
         if (
           game.flags.bardreadiedarrow
@@ -15039,6 +15042,10 @@
         }
       }
       const text = normalize(objectName);
+      if (!text) {
+        const impliedTarget = this.impliedPhysicalActionSpecialTarget(verb);
+        if (impliedTarget && this.trySpecialAction(verb, impliedTarget)) return;
+      }
       const command = [verb, text].filter(Boolean).join(" ");
       const response = this.standardResponse(command);
       if (response) return this.print(response);
@@ -15063,6 +15070,23 @@
         wake: `${subject} ${conjugated}${target || " up"}, already alert.`,
       }[verb] || `${subject} ${conjugated}${target}, but nothing happens.`;
       this.print(generic);
+    }
+
+    impliedPhysicalActionSpecialTarget(verb) {
+      const implicitlyTargetedVerbs = new Set(["swim"]);
+      if (!implicitlyTargetedVerbs.has(verb)) return "";
+      const candidates = this.data.specialActions.filter((action) => {
+        if (action.verb !== verb) return false;
+        if (action.location && action.location !== this.room().name) return false;
+        if (action.special_char && !matches(this.player.name, normalize(action.special_char))) return false;
+        if (action.obj1) return false;
+        const target = normalize(String(action.obj2 || "").replace(/^\*/, ""));
+        if (!target) return false;
+        const visible = this.visibleSearch(target, { includeInventory: false })?.item;
+        return Boolean(visible && !visible.portable);
+      });
+      if (candidates.length !== 1) return "";
+      return candidates[0].obj2 || "";
     }
 
     physicalActionTarget(verb, text) {
