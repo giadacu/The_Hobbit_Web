@@ -5095,6 +5095,7 @@
         run: () => game.physicalAction("run", objectText),
         wake: () => game.physicalAction("wake", objectText),
         crawl: () => game.physicalAction("crawl", objectText),
+        squeeze: () => game.physicalAction("squeeze", objectText),
         leap: () => game.physicalAction("jump", objectText),
         dive: () => game.physicalAction("dive", objectText),
         swim: () => game.physicalAction("swim", objectText),
@@ -5377,6 +5378,7 @@
       const game = this.game;
       const request = parseAllTarget(objectName);
       if (request.all) return this.openAll(request.target);
+      if (game.handleDryCaveCrackOpen(objectName)) return;
       const doorFound = game.findDoor(objectName);
       if (doorFound) {
         const { door } = doorFound;
@@ -9341,6 +9343,7 @@
     checkSpecialSituations() {
       this.checkGollumEncounter();
       this.checkGoblinTunnelEncounter();
+      this.checkDryCaveCrackEscape();
       this.checkWargEscape();
       this.checkBeornHospitality();
       this.checkCellarFeast();
@@ -9354,6 +9357,10 @@
 
     checkGoblinTunnelEncounter() {
       this.game.encounters?.triggerGoblinTunnelEncounter();
+    }
+
+    checkDryCaveCrackEscape() {
+      return this.game.beginDryCaveCrackEscape();
     }
 
     checkGollumEncounter() {
@@ -10309,6 +10316,7 @@
     look(objectName = "") {
       const game = this.game;
       const text = normalize(objectName).replace(/^(?:around\s+)?for\s+/, "").replace(/^around\s+/, "");
+      if (!text && game.handleDryCaveCrackInspection("look", "area")) return;
       if (!text || ["around", "room", "place", "area", "here", "surroundings"].includes(text)) {
         return game.describeRoom({ full: true });
       }
@@ -10393,6 +10401,7 @@
     sense(verb, objectName = "") {
       const game = this.game;
       const text = normalize(objectName);
+      if (verb === "listen" && game.handleDryCaveCrackInspection(verb, text || "area")) return;
       if (text) {
         const item = game.visibleSearch(text)?.item;
         if (item) {
@@ -10418,6 +10427,8 @@
     touch(verb, objectName = "") {
       const game = this.game;
       const text = normalize(objectName);
+      if (verb === "use" && game.handleDryCaveCrackUse(text)) return;
+      if (["feel", "touch", "press", "turn", "lift"].includes(verb) && game.handleDryCaveCrackInspection(verb, text || "area")) return;
       if (!text) return this.inspectEnvironment(verb, "area");
       const item = game.visibleSearch(text)?.item;
       if (item) {
@@ -10442,6 +10453,7 @@
       const game = this.game;
       const room = game.room();
       const text = normalize(target);
+      if (game.handleDryCaveCrackInspection(verb, text, relation)) return;
       const description = game.contextualRoomDescription(room);
       const lower = normalize(description);
       const sample = this.descriptionSentenceFor(text);
@@ -11919,6 +11931,7 @@
         if (this.needsClarification(parsed)) return false;
 
         this.commandRouter.dispatch(parsed);
+        this.noteDryCaveCrackCommand(parsed);
         for (const reference of explicitReferences) {
           this.rememberClarifiedReference(reference.target, reference.choice);
         }
@@ -12994,6 +13007,7 @@
         || this.rivendellPreparationGate(connection)
         || this.rivendellMapCarryGate(connection)
         || this.wargEscapeTravelGate(connection)
+        || this.dryCaveCrackTravelGate(connection)
         || this.beornMountainStormGate(connection)
         || (
         connection.from === "bilbos_garden"
@@ -13045,6 +13059,12 @@
           return "There is no road now. Wargs are already sweeping the open ground, and the only hope lies up among the pines before they close in altogether.";
         }
         return "Below the pines the wolves prowl too thickly for any honest descent, and goblin cries from the heights promise worse if you try the ground too soon.";
+      }
+      if (this.dryCaveCrackTravelGate(connection)) {
+        if (!this.flags.drycavecrackairnoticed) return "The passage seems to end in blank stone, yet a faint thread of colder air says the hidden crack must still be there somewhere.";
+        if (!this.flags.drycavecrackseamfound) return "You know now that air comes through the stone, but you have not yet found the seam by touch.";
+        if (!this.flags.drycavecrackloosened) return "The seam is there, but still too tight for passage. You need something hard and narrow enough to work into it.";
+        return "The hidden stone has shifted, but not yet far enough to let you through. You must force it wider.";
       }
       if (this.beornMountainStormGate(connection)) return this.beornMountainStormMessage(connection);
       if (!this.narrativeTravelBlock(connection)) return "";
@@ -13250,7 +13270,7 @@
         examine: 1, wait: 1, attack: 1, give: 1, eat: 1, break: 1,
         drink: 1, inventory: 1, save: 1, load: 1, go: 1, climb: 1, throw: 1,
         jump: 1, sit: 1, stand: 1, sleep: 1, rest: 1, run: 1, wake: 1,
-        crawl: 1, leap: 1, dive: 1, swim: 1, ride: 1, listen: 1, smell: 1,
+        crawl: 1, squeeze: 1, leap: 1, dive: 1, swim: 1, ride: 1, listen: 1, smell: 1,
         touch: 1, feel: 1, knock: 1, watch: 1, search: 1,
         push: 1, pull: 1, wear: 1, remove: 1, hello: 1, combine: 1, autoplay: 1,
         map: 1, tips: 1, music: 1, mend: 1, repair: 1, fix: 1,
@@ -14705,6 +14725,7 @@
     }
 
     pushPull(action, objectName) {
+      if (this.handleDryCaveCrackPushPull(action, objectName)) return;
       const item = this.visibleSearch(objectName)?.item;
       if (!item) return this.print(this.heldItemMessage(objectName) || actorizeSecondPerson(this.player, `You cannot find the ${objectName} to ${action}.`));
       if (item.weight >= 3 * this.player.strength) return this.print(`The ${item.name} is too heavy to be ${pastTense(action)}.`);
@@ -15019,6 +15040,7 @@
         this.print(this.gollumEscapeInterception("north"));
         return;
       }
+      if (this.handleDryCaveCrackPhysicalAction(verb, objectName)) return;
       const battleText = normalize(objectName);
       if (verb === "help" && matchesAny(battleText, ["bard", "men", "men of the lake", "bowmen"])) {
         if (this.handleBattleChoice("help_bard")) return;
@@ -15295,6 +15317,14 @@
         return false;
       }
       if (command.startsWith("through ")) {
+        if (this.dryCaveCrackEscapeActive() && this.dryCaveCrackTargetIsExit(command.slice(8))) {
+          if (!this.flags.drycavecrackopened) {
+            this.print("There is not yet room enough there to slip through.");
+            this.advanceDryCaveCrackPressure(1);
+            return false;
+          }
+          return this.resolveDryCaveCrackEscape();
+        }
         const found = this.findDoor(command.slice(8));
         if (!found) {
           this.print("There is no door by that name here.");
@@ -15490,6 +15520,7 @@
         this.registerNarrativeTravelBlock(connection);
         if (this.liveTrollExposureGate(connection)) this.suppressTrollClearingImmediateAttack();
         this.print(narrativeBlock);
+        if (this.dryCaveCrackTravelGate(connection)) this.advanceDryCaveCrackPressure(1);
         return false;
       }
       if (
@@ -15520,6 +15551,9 @@
       }
       if (connection.from === "cellar" && direction === "down") {
         return this.resolveCellarTrapDoorPlunge();
+      }
+      if (this.dryCaveCrackEscapeActive(connection.from) && connection.from === "dark_stuffy_passage_5" && connection.to === "large_dry_cave" && this.flags.drycavecrackopened) {
+        return this.resolveDryCaveCrackEscape();
       }
       const mirkwoodLoop = this.mirkwoodLoopConnection(connection);
       const effectiveConnection = mirkwoodLoop?.connection || connection;
@@ -16537,6 +16571,291 @@
       const ring = this.items.golden_ring;
       if (!ring) return false;
       return this.player.inventory.includes(ring.id) || this.player.worn.includes(ring.id);
+    }
+
+    dryCaveCrackEscapeResolved() {
+      return Boolean(this.flags.drycavecrackresolved);
+    }
+
+    dryCaveCrackEscapeActive(roomId = this.currentRoom) {
+      return roomId === "dark_stuffy_passage_5"
+        && this.bilboHasRecoveredRing()
+        && !this.dryCaveCrackEscapeResolved();
+    }
+
+    dryCaveCrackTravelGate(connection) {
+      if (!connection || !this.dryCaveCrackEscapeActive(connection.from)) return false;
+      return connection.from === "dark_stuffy_passage_5"
+        && connection.to === "large_dry_cave"
+        && !this.flags.drycavecrackopened;
+    }
+
+    dryCaveCrackPressure() {
+      return Math.max(0, Number(this.flags.drycavecrackpressure || 0));
+    }
+
+    beginDryCaveCrackEscape() {
+      if (!this.dryCaveCrackEscapeActive()) return false;
+      if (this.flags.drycavecrackintroseen) return false;
+      this.flags.drycavecrackintroseen = true;
+      this.flags.drycavecrackpressure = 0;
+      this.recordAutosave("before forcing the hidden crack beneath the dry cave", {
+        key: "hazard:goblins:dry-cave-crack",
+      });
+      this.print("The passage ends in blank stone where the crack ought to be.");
+      this.print("Yet now and again a thread of cold air steals over your face.");
+      this.print("Far behind, in the blackness of the tunnels, goblin voices mutter and scrape against the stone.");
+      return true;
+    }
+
+    dryCaveCrackMatches(text = "", terms = []) {
+      const normalized = normalize(text);
+      return Boolean(normalized) && matchesAny(normalized, terms);
+    }
+
+    dryCaveCrackTargetIsStone(text = "") {
+      return this.dryCaveCrackMatches(text, [
+        "wall", "walls", "rock", "rocks", "stone", "stones", "seam", "crack", "cracks",
+        "opening", "gap", "blank stone", "face of stone", "stone face", "passage end",
+      ]);
+    }
+
+    dryCaveCrackTargetIsAir(text = "") {
+      return this.dryCaveCrackMatches(text, [
+        "air", "draft", "draught", "wind", "cold air", "cold", "breeze", "breath",
+        "sound", "sounds", "noise", "noises", "voices", "goblins", "goblin voices",
+      ]);
+    }
+
+    dryCaveCrackTargetIsExit(text = "") {
+      return this.dryCaveCrackTargetIsStone(text)
+        || this.dryCaveCrackMatches(text, ["through crack", "through the crack", "through opening", "through gap"]);
+    }
+
+    describeDryCaveCrackSearch() {
+      if (!this.flags.drycavecrackairnoticed) {
+        this.flags.drycavecrackairnoticed = true;
+        this.print("At first stone meets your hands everywhere. Then, holding yourself very still, you catch the faint thread of colder air slipping through the rock before you.");
+        return true;
+      }
+      if (!this.flags.drycavecrackseamfound) {
+        this.flags.drycavecrackseamfound = true;
+        this.print("You pass your hands slowly over the stone and find at last a hair-thin seam, so narrow that sight alone would never have marked it.");
+        return true;
+      }
+      if (!this.flags.drycavecrackloosened) {
+        this.print("The seam is there under your fingers, but still too tight to offer passage. You will need some hard narrow thing to work into it.");
+        return true;
+      }
+      if (!this.flags.drycavecrackopened) {
+        this.print("The hidden stone has shifted a little, but not far enough yet for any living thing to squeeze through.");
+        return true;
+      }
+      this.print("A narrow opening waits there now, scarcely wider than a desperate hobbit could wish for.");
+      return true;
+    }
+
+    describeDryCaveCrackListening() {
+      if (!this.flags.drycavecrackairnoticed) {
+        this.flags.drycavecrackairnoticed = true;
+        this.print("Holding very still, you catch at last the faint thread of colder air stealing through the rock. Behind you the goblin voices rise and fall in the dark.");
+        return true;
+      }
+      if (!this.flags.drycavecrackopened) {
+        this.print("You listen hard. The goblin voices are clearer now, and somewhere among them iron clinks against stone.");
+        return true;
+      }
+      this.print("Harsh voices break and mutter close behind, and now and again you hear a hand slap uselessly at the stone.");
+      return true;
+    }
+
+    parseDryCaveCrackUse(text = "") {
+      const normalized = normalize(text);
+      const onMatch = normalized.match(/^(.+?)\s+(?:on|against|in|into|at)\s+(.+)$/);
+      if (onMatch) {
+        return { toolName: onMatch[1].trim(), targetName: onMatch[2].trim() };
+      }
+      const withMatch = normalized.match(/^(.+?)\s+with\s+(.+)$/);
+      if (withMatch) {
+        return { targetName: withMatch[1].trim(), toolName: withMatch[2].trim() };
+      }
+      return { toolName: normalized, targetName: "" };
+    }
+
+    dryCaveCrackTool(toolName = "") {
+      if (!toolName) return null;
+      return this.findCharacterItem(this.player, toolName)?.item || null;
+    }
+
+    isDryCaveCrackPryingTool(item = null) {
+      if (!item) return false;
+      const name = normalize(item.name);
+      if (item.weapon) return true;
+      if (matchesAny(name, [
+        "staff", "stick", "club", "hammer", "axe", "hatchet", "spade", "trowel",
+        "pruner", "rake", "firestone", "lantern", "torch", "pipe", "key",
+      ])) return true;
+      if (!item.portable || item.container) return false;
+      if ((item.weight || 0) < 2) return false;
+      if (matchesAny(name, ["map", "cloak", "rope", "bread", "cake", "apple", "wine", "water"])) return false;
+      return true;
+    }
+
+    handleDryCaveCrackUse(text = "") {
+      if (!this.dryCaveCrackEscapeActive()) return false;
+      const { toolName, targetName } = this.parseDryCaveCrackUse(text);
+      if (!this.dryCaveCrackTargetIsStone(targetName || "crack")) return false;
+      if (!toolName) {
+        this.print("You need something hard and narrow enough to gain purchase in the crack.");
+        return true;
+      }
+      const tool = this.dryCaveCrackTool(toolName);
+      if (!tool) {
+        this.print(this.heldItemMessage(toolName) || `You do not have the ${toolName}.`);
+        return true;
+      }
+      if (!this.isDryCaveCrackPryingTool(tool)) {
+        this.print(`The ${tool.name} is no use here. You need something hard and narrow enough to bite into the seam.`);
+        return true;
+      }
+      if (!this.flags.drycavecrackseamfound) {
+        this.print("You have not yet found where the hidden seam lies in the stone.");
+        return true;
+      }
+      if (this.flags.drycavecrackopened) {
+        this.print("The opening is already wide enough. Better waste no more time and get through.");
+        return true;
+      }
+      if (this.flags.drycavecrackloosened) {
+        this.print("The stone has already shifted. You need only force it farther now.");
+        return true;
+      }
+      this.flags.drycavecrackloosened = true;
+      this.print("You work the object carefully into the seam and strain without daring to make too much noise.");
+      this.print("For a moment nothing gives; then the hidden stone shifts with a dry grating sigh.");
+      return true;
+    }
+
+    handleDryCaveCrackPushPull(action, text = "") {
+      if (!this.dryCaveCrackEscapeActive()) return false;
+      if (!this.dryCaveCrackTargetIsStone(text)) return false;
+      if (this.flags.drycavecrackopened) {
+        this.print("The loosened stone already stands far enough aside for a desperate squeeze through.");
+        return true;
+      }
+      if (!this.flags.drycavecrackloosened) {
+        this.print("There is no purchase in the stone yet. You will need to work something into the seam first.");
+        return true;
+      }
+      this.flags.drycavecrackopened = true;
+      this.print("With shoulder and both hands you force the loosened stone aside far enough to make a narrow opening.");
+      return true;
+    }
+
+    handleDryCaveCrackOpen(text = "") {
+      if (!this.dryCaveCrackEscapeActive()) return false;
+      if (!this.dryCaveCrackTargetIsStone(text)) return false;
+      return this.handleDryCaveCrackPushPull("open", text);
+    }
+
+    handleDryCaveCrackPhysicalAction(verb, text = "") {
+      if (!this.dryCaveCrackEscapeActive()) return false;
+      const normalized = normalize(text);
+      if (verb === "stand" && matchesAny(normalized, ["still", "quiet", "silent"])) {
+        return this.describeDryCaveCrackListening();
+      }
+      if (!["squeeze", "crawl"].includes(verb)) return false;
+      if (normalized && !this.dryCaveCrackTargetIsExit(normalized) && !/\bthrough\b/.test(normalized)) return false;
+      if (!this.flags.drycavecrackopened) {
+        this.print("There is not yet room enough there to slip through.");
+        return true;
+      }
+      this.resolveDryCaveCrackEscape();
+      return true;
+    }
+
+    handleDryCaveCrackInspection(verb, text = "", relation = "") {
+      if (!this.dryCaveCrackEscapeActive()) return false;
+      if (relation === "under" || relation === "behind") return false;
+      const normalized = normalize(text);
+      if (!normalized || ["area", "room", "place", "here", "surroundings"].includes(normalized)) {
+        return this.describeDryCaveCrackSearch();
+      }
+      if (this.dryCaveCrackTargetIsAir(normalized)) return this.describeDryCaveCrackListening();
+      if (this.dryCaveCrackTargetIsStone(normalized)) return this.describeDryCaveCrackSearch();
+      return false;
+    }
+
+    dryCaveCrackCommandPressure(verb = "", objectText = "") {
+      const normalizedVerb = normalize(verb);
+      if (!normalizedVerb) return 0;
+      if ([
+        "inventory", "inv", "i", "save", "load", "autosave", "mysaves",
+        "tips", "hint", "help", "verbs", "commands", "map", "location", "status",
+        "music", "voice", "speech", "narration", "pause", "undo", "restart",
+        "jumps", "teleport", "warp", "quit",
+      ].includes(normalizedVerb)) return 0;
+      if (normalizedVerb === "wait") return 2;
+      if (["attack", "break", "smash", "throw", "fire", "light"].includes(normalizedVerb)) return 2;
+      if (normalizedVerb === "look" && !normalize(objectText)) return 1;
+      return 1;
+    }
+
+    advanceDryCaveCrackPressure(amount = 1) {
+      if (!this.dryCaveCrackEscapeActive() || this.endgame) return false;
+      const delta = Math.max(0, Number(amount) || 0);
+      if (!delta) return false;
+      const previous = this.dryCaveCrackPressure();
+      const next = previous + delta;
+      this.flags.drycavecrackpressure = next;
+      if (next >= 5) {
+        this.killByDryCaveGoblins();
+        return true;
+      }
+      const threshold = [4, 3, 2, 1].find((value) => previous < value && next >= value);
+      const line = {
+        1: "The goblin voices behind rise a little, no longer lost in the deep ways but wandering this way. There cannot be much time.",
+        2: "And now beneath the voices comes another sound: the clink of gear and the quick patter of goblin feet drawing nearer.",
+        3: "At once the tunnel behind breaks into sharp cries. They have heard something.",
+        4: "From the passage behind a red flicker jumps upon the wall. Goblin light is coming.",
+      }[threshold];
+      if (line) this.print(line, threshold >= 3 ? "danger" : "");
+      return Boolean(line);
+    }
+
+    noteDryCaveCrackCommand(parsed = null) {
+      if (!this.dryCaveCrackEscapeActive() || this.endgame) return false;
+      const verb = normalize(parsed?.verb || "");
+      const objectText = normalize(parsed?.object || "");
+      const amount = this.dryCaveCrackCommandPressure(verb, objectText);
+      if (!amount) return false;
+      return this.advanceDryCaveCrackPressure(amount);
+    }
+
+    killByDryCaveGoblins() {
+      if (this.endgame) return true;
+      this.print("Too late.");
+      this.print("A red glare leaps round the bend, and before you can win through the crack the passage fills with goblin yells.");
+      this.print("A clawing hand catches at you, then another. You are dragged back from the stone into the black tunnel while the whole place rings with cruel laughter.", "danger");
+      this.endGame("The goblins seize you in the dark before you can escape the tunnels.", {
+        fatal: true,
+        deathImage: "bilbo_goblins_around_him_death.png",
+      });
+      return true;
+    }
+
+    resolveDryCaveCrackEscape() {
+      if (!this.dryCaveCrackEscapeActive()) return false;
+      this.flags.drycavecrackresolved = true;
+      this.flags.drycavecrackpressure = 0;
+      return this.completeSpecialTravel("large_dry_cave", "up", {
+        preDescriptionLines: [
+          "You turn sideways and slip through the narrow opening just as harsh voices break out close behind you.",
+          "For one dreadful instant a goblin hand gropes at the dark gap, but you fling your weight against the loosened stone.",
+          "It grates back into place with a heavy crash, wedging fast once more. The shouting is muffled at once.",
+          "You stand gasping in the dry cave above, with cold air on your face and no room for anything larger than a desperate hobbit to follow.",
+        ],
+      });
     }
 
     beornMountainArrivalComplete() {
@@ -18585,11 +18904,11 @@
   }
 
   function autosaveMarkedText(label = "") {
-    return label ? `A safe moment is marked here: ${label}.` : "A safe moment is marked here.";
+    return "Game saved.";
   }
 
   function autosaveResumedText(label = "") {
-    return label ? `You take up the thread again: ${label}.` : "You take up the thread again.";
+    return "Game loaded.";
   }
 
   function noAutosaveText() {

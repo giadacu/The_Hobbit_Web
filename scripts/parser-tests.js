@@ -3454,7 +3454,7 @@ const gameCases = [
       game.print(`Drawer clarification count across autosave restore: ${clarificationCount}`);
     },
     expectedIncluded: [
-      "You take up the thread again: clarification memory.",
+      "Game loaded.",
       "You close the top drawer.",
       "Drawer clarification count across autosave restore: 0",
     ],
@@ -4958,7 +4958,7 @@ const gameCases = [
       "Stone trolls autosave: none",
     ],
     notExpectedIncluded: [
-      "A safe moment is marked here: before facing the trolls.",
+      "Game saved.",
     ],
   },
   {
@@ -5361,14 +5361,14 @@ const gameCases = [
     drive(game) {
       const firstStart = outputLines.length;
       game.execute("west");
-      const firstSafeLines = outputLines.slice(firstStart).filter((line) => line.includes("A safe moment is marked here"));
+      const firstSafeLines = outputLines.slice(firstStart).filter((line) => line.includes("Game saved."));
       game.print(`First spider crossing safe moments shown: ${firstSafeLines.length}`);
       game.print(`First spider crossing label: ${game.autosaveMeta?.label || "none"}`);
       const secondStart = outputLines.length;
       game.execute("wait");
       game.execute("wait");
       game.execute("west");
-      const secondSafeLines = outputLines.slice(secondStart).filter((line) => line.includes("A safe moment is marked here"));
+      const secondSafeLines = outputLines.slice(secondStart).filter((line) => line.includes("Game saved."));
       game.print(`Second spider crossing safe moments shown: ${secondSafeLines.length}`);
       game.print(`Second spider crossing label: ${game.autosaveMeta?.label || "none"}`);
     },
@@ -5477,7 +5477,7 @@ const gameCases = [
       game.print(`Cellar death image: ${game.temporaryImage?.file || "none"}`);
     },
     expectedIncluded: [
-      "A safe moment is marked here: before the barrel escape.",
+      "Game saved.",
       "The current catches you like an iron hand and sweeps you away under the halls before you can master yourself.",
       "Cellar death choice: death",
       "Cellar autosave room: cellar",
@@ -7279,7 +7279,7 @@ const gameCases = [
       const goblinStart = outputLines.length;
       game.maybeAutosaveForRoom(game.currentRoom);
       game.checkSpecialSituations();
-      const goblinSafeLines = outputLines.slice(goblinStart).filter((line) => line.includes("A safe moment is marked here"));
+      const goblinSafeLines = outputLines.slice(goblinStart).filter((line) => line.includes("Game saved."));
       game.print(`Goblin entry safe moments shown: ${goblinSafeLines.length}`);
       game.print(`Goblin entry label: ${game.autosaveMeta?.label || "none"}`);
 
@@ -7293,7 +7293,7 @@ const gameCases = [
       const gollumStart = outputLines.length;
       game.maybeAutosaveForRoom(game.currentRoom);
       game.checkSpecialSituations();
-      const gollumSafeLines = outputLines.slice(gollumStart).filter((line) => line.includes("A safe moment is marked here"));
+      const gollumSafeLines = outputLines.slice(gollumStart).filter((line) => line.includes("Game saved."));
       game.print(`Gollum entry safe moments shown: ${gollumSafeLines.length}`);
       game.print(`Gollum entry label: ${game.autosaveMeta?.label || "none"}`);
     },
@@ -7445,6 +7445,73 @@ const gameCases = [
       /(?:Close behind, Gollum's scream tears through the black passages|The dark carries Gollum's grief too well here|Somewhere in the deep ways Gollum gives a choking wail|A wet shriek races the walls behind you)/,
       "Gollum escape autosave: after escaping Gollum",
       "Ring flag after Gollum: yes",
+    ],
+  },
+  {
+    name: "dry cave crack route can be reopened under goblin pressure",
+    setup(game) {
+      game.execute("jump beorn");
+      game.currentRoom = "dark_stuffy_passage_5";
+      game.player.position = "dark_stuffy_passage_5";
+      game.characters.gollum.visible = false;
+      giveItemToCharacter(game, "majestic_sword", game.player.id);
+      Object.values(game.characters).forEach((character) => {
+        if (character.id !== game.player.id && character.friendly === false) {
+          character.visible = false;
+          character.position = "deep_dark_lake";
+          character.attackFlag = 0;
+        }
+      });
+    },
+    drive(game) {
+      game.checkSpecialSituations();
+      game.execute("listen");
+      game.execute("search wall");
+      game.execute("use sword on crack");
+      game.execute("push stone");
+      game.execute("squeeze through crack");
+      game.print(`Dry cave escape room: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "The passage ends in blank stone where the crack ought to be.",
+      "The goblin voices behind rise a little, no longer lost in the deep ways but wandering this way. There cannot be much time.",
+      "And now beneath the voices comes another sound: the clink of gear and the quick patter of goblin feet drawing nearer.",
+      "At once the tunnel behind breaks into sharp cries. They have heard something.",
+      "From the passage behind a red flicker jumps upon the wall. Goblin light is coming.",
+      "You turn sideways and slip through the narrow opening just as harsh voices break out close behind you.",
+      "Dry cave escape room: large_dry_cave",
+    ],
+  },
+  {
+    name: "dawdling beneath dry cave lets the goblins catch bilbo",
+    setup(game) {
+      game.execute("jump beorn");
+      game.currentRoom = "dark_stuffy_passage_5";
+      game.player.position = "dark_stuffy_passage_5";
+      game.characters.gollum.visible = false;
+      giveItemToCharacter(game, "majestic_sword", game.player.id);
+      Object.values(game.characters).forEach((character) => {
+        if (character.id !== game.player.id && character.friendly === false) {
+          character.visible = false;
+          character.position = "deep_dark_lake";
+          character.attackFlag = 0;
+        }
+      });
+    },
+    drive(game) {
+      game.checkSpecialSituations();
+      game.execute("listen");
+      game.execute("search wall");
+      game.execute("wait");
+      game.execute("wait");
+      game.print(`Dry cave goblin death: ${game.endgame ? "yes" : "no"}`);
+      game.print(`Dry cave death image: ${game.temporaryImage?.file || "none"}`);
+    },
+    expectedIncluded: [
+      "Too late.",
+      "The goblins seize you in the dark before you can escape the tunnels.",
+      "Dry cave goblin death: yes",
+      "Dry cave death image: bilbo_goblins_around_him_death.png",
     ],
   },
   {
@@ -8111,7 +8178,7 @@ const gameCases = [
       game.print(`Resume endgame: ${game.endgame ? "yes" : "no"}`);
     },
     expectedIncluded: [
-      "You take up the thread again: before meeting Gollum.",
+      "Game loaded.",
       "Resume room: deep_dark_lake",
       "Resume endgame: no",
     ],
@@ -8133,7 +8200,7 @@ const gameCases = [
       "Load panel: open",
     ],
     notExpectedIncluded: [
-      "You take up the thread again: before facing the trolls.",
+      "Game loaded.",
     ],
   },
   {

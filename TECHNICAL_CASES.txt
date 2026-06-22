@@ -4782,3 +4782,64 @@ Future debugging advice
   shift turn timing enough to surface latent danger.
 - Prefer safety-prep steps such as invisibility or positioning before
   information-gathering actions in endgame hazard scenes.
+
+
+Case 098 - 2026-06-22 - Post-ring return from Dry Cave needed a parser-friendly crack escape instead of a free climb
+---------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After Bilbo recovered the ring, the route back up through the passage beneath
+`Dry Cave` was still a trivial `up` move. That made the shorter Beornward
+return feel too easy and gave no narrative payoff to Bilbo's stealth and
+ingenuity under the mountain.
+
+Root cause
+----------
+The tunnel under `Dry Cave` had no post-ring state of its own.
+
+- Travel from `dark_stuffy_passage_5` to `large_dry_cave` stayed a normal
+  connection.
+- The parser had no room-specific support for "find hidden seam / pry / push /
+  squeeze through" style actions.
+- There was no pressure system in that room, so even a new hidden opening would
+  have felt static rather than urgent.
+
+Resolution
+----------
+- Added a dedicated `Dry Cave` crack-escape state that activates only after the
+  ring has been recovered.
+- On first return to `dark_stuffy_passage_5`, the game now:
+  - records a safe moment
+  - prints the blocked-stone intro
+  - tracks crack progress through four fiction states:
+    - notice the air
+    - find the seam
+    - loosen the stone with a suitable carried object
+    - force the opening wider
+- Broadened parser support so reasonable commands all advance the same scene:
+  - `listen`
+  - `search wall`
+  - `feel wall`
+  - `use <hard object> on crack`
+  - `push stone`
+  - `squeeze through crack`
+- Added goblin-pressure escalation on successive commands in that room, ending
+  in a dedicated goblin death if Bilbo delays too long.
+- Added regression tests for both:
+  - the successful crack-reopening sequence
+  - the fatal goblin-catch failure
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- For parser-heavy set pieces, model the puzzle as room state plus broad
+  command families, not as one exact verb sequence.
+- If a hazard depends on command pacing rather than map movement, advance its
+  pressure from command handling itself; relying only on turn-consuming travel
+  can miss key fiction beats like `listen` or `search`.
