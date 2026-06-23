@@ -5340,3 +5340,56 @@ Future debugging advice
 -----------------------
 - For story-critical action beats, test not only the gating logic but also the
   order of the printed fiction, especially when geography is part of the setup.
+
+
+Case 109 - 2026-06-23 - Smaug's endgame compressed Bilbo's reveal, Ravenhill sighting, and Bard's shot into one beat
+----------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The Smaug finale still skipped two expected story beats:
+
+- Bilbo explicitly telling Bard about the bare patch he discovered on Smaug
+- Smaug being visibly sighted from Ravenhill before Bilbo gives the order to
+  loose the black arrow
+
+In practice the old `shoot dragon` flow could jump straight from weak-spot
+knowledge to thrush warning, sighting, and kill inside the same command.
+
+Root cause
+----------
+The dragon endgame tracked only the weak-spot discovery and the final shot
+setup.
+
+- `smaug_weakspot_known` existed, but there was no separate state for Bilbo
+  having relayed that knowledge to Bard.
+- The Ravenhill branch in `handleBardDragonCommand()` also performed the
+  thrush warning, Smaug's appearance, and the arrow release in one success
+  path.
+- Parser regressions enforced that compressed flow, so the missing narrative
+  stages looked intentional to the code.
+
+Resolution
+----------
+- Added two explicit intermediate states:
+  - Bilbo has shared Smaug's weak spot with Bard
+  - Smaug has been sighted from Ravenhill
+- Added dedicated scene helpers so the flow now stages:
+  - Bilbo's warning to Bard after the weak spot is known
+  - the thrush confirmation and Smaug's appearance above Ravenhill
+  - the actual arrow shot only afterward
+- Updated dragon-endgame regressions so they test the staged order instead of
+  the older compressed branch.
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- For climactic scenes, track narrative milestones separately when the player
+  expects distinct beats, even if the final game-state change is only one.
+- If a command is doing discovery, confirmation, sighting, and resolution all
+  at once, split those beats before adding more text around it.

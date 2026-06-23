@@ -2212,12 +2212,16 @@ const gameCases = [
       game.characters.bard.movementMode = "follow";
       game.flags.bardreadiedarrow = true;
       game.flags.smaug_weakspot_known = true;
+      game.flags.smaug_weakspot_shared_with_bard = true;
+      game.flags.thrush_message_sent = true;
+      game.flags.smaug_sighted_from_ravenhill = true;
+      game.flags.bard_ready_at_ravenhill = true;
       game.flags.dragondefeated = false;
       game.characters.red_golden_dragon.position = "lower_halls";
       game.characters.red_golden_dragon.visible = true;
     },
     inputs: ["Bard, can you shoot the dragon?"],
-    expectedIncluded: ["Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky."],
+    expectedIncluded: ["At your word Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky."],
     notExpectedIncluded: ["I'm not sure how to do that.", "The red golden dragon attacks you."],
   },
   {
@@ -2229,12 +2233,16 @@ const gameCases = [
       game.characters.bard.movementMode = "follow";
       game.flags.bardreadiedarrow = true;
       game.flags.smaug_weakspot_known = true;
+      game.flags.smaug_weakspot_shared_with_bard = true;
+      game.flags.thrush_message_sent = true;
+      game.flags.smaug_sighted_from_ravenhill = true;
+      game.flags.bard_ready_at_ravenhill = true;
       game.flags.dragondefeated = false;
       game.characters.red_golden_dragon.position = "lower_halls";
       game.characters.red_golden_dragon.visible = true;
     },
     inputs: ["Bard, can you take the shot?"],
-    expectedIncluded: ["Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky."],
+    expectedIncluded: ["At your word Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky."],
     notExpectedIncluded: ["I'm not sure how to do that.", "I don't see that here."],
   },
   {
@@ -2246,12 +2254,16 @@ const gameCases = [
       game.characters.bard.movementMode = "follow";
       game.flags.bardreadiedarrow = true;
       game.flags.smaug_weakspot_known = true;
+      game.flags.smaug_weakspot_shared_with_bard = true;
+      game.flags.thrush_message_sent = true;
+      game.flags.smaug_sighted_from_ravenhill = true;
+      game.flags.bard_ready_at_ravenhill = true;
       game.flags.dragondefeated = false;
       game.characters.red_golden_dragon.position = "lower_halls";
       game.characters.red_golden_dragon.visible = true;
     },
     inputs: ["Bard, loose the arrow!"],
-    expectedIncluded: ["Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky."],
+    expectedIncluded: ["At your word Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky."],
     notExpectedIncluded: ["I'm not sure how to do that.", "I don't see that here."],
   },
   {
@@ -2263,12 +2275,16 @@ const gameCases = [
       game.characters.bard.movementMode = "follow";
       game.flags.bardreadiedarrow = true;
       game.flags.smaug_weakspot_known = true;
+      game.flags.smaug_weakspot_shared_with_bard = true;
+      game.flags.thrush_message_sent = true;
+      game.flags.smaug_sighted_from_ravenhill = true;
+      game.flags.bard_ready_at_ravenhill = true;
       game.flags.dragondefeated = false;
       game.characters.red_golden_dragon.position = "lower_halls";
       game.characters.red_golden_dragon.visible = true;
     },
     inputs: ["Ask Bard to fire at the dragon."],
-    expectedIncluded: ["Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky."],
+    expectedIncluded: ["At your word Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky."],
     notExpectedIncluded: ["I'm not sure how to do that."],
   },
   {
@@ -6134,6 +6150,10 @@ const gameCases = [
       game.execute("jump smaug");
       game.flags.bardreadiedarrow = true;
       game.flags.smaug_weakspot_known = true;
+      game.flags.smaug_weakspot_shared_with_bard = true;
+      game.flags.thrush_message_sent = true;
+      game.flags.smaug_sighted_from_ravenhill = true;
+      game.flags.bard_ready_at_ravenhill = true;
       game.currentRoom = "stoe_of_ravenhill";
       game.player.position = "stoe_of_ravenhill";
       game.characters.bard.carriedBy = game.player.id;
@@ -6175,6 +6195,21 @@ const gameCases = [
     ],
   },
   {
+    name: "leaving the lower halls lets Bilbo tell Bard the weak spot",
+    drive(game) {
+      game.execute("jump smaug");
+      game.flags.bardreadiedarrow = true;
+      game.execute("ask smaug about treasure");
+      game.execute("west");
+      game.print(`Weak spot shared with Bard: ${game.flags.smaug_weakspot_shared_with_bard ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You tell Bard what you saw in the treasure-halls: beneath the jeweled mail of Smaug's left breast there is one small bare patch.",
+      "Bard's face hardens as he hears you out. 'The left breast, then,' he says quietly. 'If he gives me that mark in the open, I will not waste the black arrow.'",
+      "Weak spot shared with Bard: yes",
+    ],
+  },
+  {
     name: "bard refuses the dragon shot before the weak spot is known",
     drive(game) {
       game.execute("jump smaug");
@@ -6190,11 +6225,12 @@ const gameCases = [
     ],
   },
   {
-    name: "bard shoots once the weak spot is known and the thrush message is sent",
+    name: "bard still directs Bilbo to Ravenhill after the weak spot is shared",
     drive(game) {
       game.execute("jump smaug");
       game.flags.bardreadiedarrow = true;
       game.flags.smaug_weakspot_known = true;
+      game.flags.smaug_weakspot_shared_with_bard = true;
       game.flags.thrush_message_sent = false;
       game.execute('say to bard "shoot dragon"');
       game.print(`Bard ready at Ravenhill: ${game.flags.bard_ready_at_ravenhill ? "yes" : "no"}`);
@@ -6211,12 +6247,50 @@ const gameCases = [
     ],
   },
   {
-    name: "bard shoots from Ravenhill once the weak spot is known",
+    name: "arriving on Ravenhill stages the sighting before the shot",
     drive(game) {
       game.execute("jump smaug");
       game.flags.bardreadiedarrow = true;
       game.flags.smaug_weakspot_known = true;
+      game.flags.smaug_weakspot_shared_with_bard = true;
       game.flags.thrush_message_sent = false;
+      game.currentRoom = "lonely_mountain";
+      game.player.position = "lonely_mountain";
+      game.characters.bard.carriedBy = game.player.id;
+      game.characters.bard.position = "lonely_mountain";
+      game.characters.bard.followingPlayer = false;
+      game.characters.bard.movementMode = "follow";
+      game.execute("south");
+      game.execute("west");
+      game.print(`Thrush message sent: ${game.flags.thrush_message_sent ? "yes" : "no"}`);
+      game.print(`Bard ready at Ravenhill: ${game.flags.bard_ready_at_ravenhill ? "yes" : "no"}`);
+      game.print(`Smaug sighted from Ravenhill: ${game.flags.smaug_sighted_from_ravenhill ? "yes" : "no"}`);
+      game.print(`Black arrow committed: ${game.flags.black_arrow_committed ? "yes" : "no"}`);
+      game.print(`Dragon alive after sighting: ${game.liveDragon() ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Bard steps onto the old stone of Ravenhill and measures the sky above the Mountain. 'Here,' he says softly. 'From this height he must break clear before he stoops on the Lake. If ever there was a place for the last shot, it is this one.'",
+      "A thrush flutters down upon the stones and chatters urgently, confirming Bilbo's warning as though all the old friendship of bird and Dale were gathered into that one small witness.",
+      "Bard hears, nods once, and his whole attention narrows to the bare patch beneath Smaug's left breast.",
+      "Then a dark shape lifts beyond the Mountain's shoulder, and for one clear instant Smaug shows black against the sky as he turns toward the Lake.",
+      "Bard raises the bow and waits like stone, holding the black arrow ready for your word.",
+      "Thrush message sent: yes",
+      "Bard ready at Ravenhill: yes",
+      "Smaug sighted from Ravenhill: yes",
+      "Black arrow committed: no",
+      "Dragon alive after sighting: yes",
+    ],
+  },
+  {
+    name: "bard shoots from Ravenhill only after the sighting is staged",
+    drive(game) {
+      game.execute("jump smaug");
+      game.flags.bardreadiedarrow = true;
+      game.flags.smaug_weakspot_known = true;
+      game.flags.smaug_weakspot_shared_with_bard = true;
+      game.flags.thrush_message_sent = true;
+      game.flags.smaug_sighted_from_ravenhill = true;
+      game.flags.bard_ready_at_ravenhill = true;
       game.currentRoom = "stoe_of_ravenhill";
       game.player.position = "stoe_of_ravenhill";
       game.characters.bard.carriedBy = game.player.id;
@@ -6231,11 +6305,7 @@ const gameCases = [
       game.print(`Dragon defeated after true shot: ${game.flags.dragondefeated ? "yes" : "no"}`);
     },
     expectedIncluded: [
-      "Bard steps onto the old stone of Ravenhill and measures the sky above the Mountain. 'Here,' he says softly. 'From this height he must break clear before he stoops on the Lake. If ever there was a place for the last shot, it is this one.'",
-      "A thrush flutters down nearby and chatters urgently, and between bird-sign and Bilbo's word the truth becomes plain: there is a bare patch in Smaug's left breast.",
-      "Bard hears, nods once, and his whole attention narrows to that one chance.",
-      "Then a dark shape lifts beyond the Mountain's shoulder, and for one clear instant Smaug shows black against the sky as he turns toward the Lake.",
-      "Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky.",
+      "At your word Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky.",
       "Thrush message sent: yes",
       "Bard ready at Ravenhill: yes",
       "Black arrow committed: yes",
@@ -6249,6 +6319,7 @@ const gameCases = [
       game.execute("jump smaug");
       game.flags.bardreadiedarrow = true;
       game.flags.smaug_weakspot_known = true;
+      game.flags.smaug_weakspot_shared_with_bard = true;
       game.currentRoom = "stoe_of_ravenhill";
       game.player.position = "stoe_of_ravenhill";
       game.characters.bard.carriedBy = game.player.id;
@@ -6291,6 +6362,7 @@ const gameCases = [
       game.execute("jump smaug");
       game.flags.bardreadiedarrow = true;
       game.flags.smaug_weakspot_known = true;
+      game.flags.smaug_weakspot_shared_with_bard = true;
       game.characters.bard.carriedBy = game.player.id;
       game.characters.bard.position = game.currentRoom;
       game.characters.bard.followingPlayer = false;
@@ -6325,6 +6397,10 @@ const gameCases = [
       game.execute("jump smaug");
       game.flags.bardreadiedarrow = true;
       game.flags.smaug_weakspot_known = true;
+      game.flags.smaug_weakspot_shared_with_bard = true;
+      game.flags.thrush_message_sent = true;
+      game.flags.smaug_sighted_from_ravenhill = true;
+      game.flags.bard_ready_at_ravenhill = true;
       game.currentRoom = "stoe_of_ravenhill";
       game.player.position = "stoe_of_ravenhill";
       game.characters.bard.carriedBy = game.player.id;

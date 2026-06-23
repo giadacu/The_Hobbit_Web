@@ -457,6 +457,13 @@
         game.debugGiveCharacterItem("bow", "bard");
         game.debugGiveCharacterItem("strong arrow", "bard");
         game.debugSetCharacterRoom("dragon", "lower_halls");
+        game.flags.smaug_weakspot_known = false;
+        game.flags.smaug_weakspot_shared_with_bard = false;
+        game.flags.thrush_message_sent = false;
+        game.flags.smaug_sighted_from_ravenhill = false;
+        game.flags.bard_ready_at_ravenhill = false;
+        game.flags.black_arrow_committed = false;
+        game.flags.dragondefeated = false;
       },
     },
   ];
@@ -6023,6 +6030,11 @@
         game.print("Bard steadies the bow, then lowers it again. 'Not yet,' he says. 'Against such a beast a blind shot is only waste. We need his weakness, not courage alone.'");
         return true;
       }
+      if (!game.smaugWeakSpotSharedWithBard()) {
+        if (game.shareSmaugWeakSpotWithBard()) return true;
+        game.print("Bard lowers the bow. 'You have seen the flaw,' he says. 'Tell me plainly where the mail lies thin, and then we may speak of the shot.'");
+        return true;
+      }
       if (!dragon || dragon.visible === false) {
         game.print("Bard says the dragon has already been slain.");
         return true;
@@ -6031,17 +6043,16 @@
         game.print("Bard studies the Mountain and shakes his head. 'Not from here,' he says. 'Ravenhill commands the Mountain's shoulder and the road to the Lake together. There the dragon must show himself clean against the sky, and there the black arrow may fly true.'");
         return true;
       }
-      if (!game.flags.bard_ready_at_ravenhill) {
-        game.flags.bard_ready_at_ravenhill = true;
-        game.print("Bard steps onto the old stone of Ravenhill and measures the sky above the Mountain. 'Here,' he says softly. 'From this height he must break clear before he stoops on the Lake. If ever there was a place for the last shot, it is this one.'");
+      if (!game.smaugSightedFromRavenhill()) {
+        if (game.stageRavenhillDragonSighting()) return true;
+        game.print("Bard keeps the black arrow low. 'Wait,' he says. 'He has not yet shown himself clean above Ravenhill.'");
+        return true;
       }
-      if (!game.thrushMessageSent()) game.deliverThrushMessage();
-      game.print("Then a dark shape lifts beyond the Mountain's shoulder, and for one clear instant Smaug shows black against the sky as he turns toward the Lake.");
       game.flags.black_arrow_committed = true;
       dragon.visible = false;
       dragon.attackFlag = 0;
       game.flags.dragondefeated = true;
-      game.print("Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky.");
+      game.print("At your word Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky.");
       return true;
     }
   }
@@ -9309,6 +9320,7 @@
       if (game.flags.treasuretaken && game.currentRoom === "lonely_mountain" && game.liveDragon()) {
         game.print("A shadow passes over the mountain. Smaug is searching for the thief.");
       }
+      this.checkSmaugDragonEndgameScenes();
     }
 
     triggerSpiderEyesEncounter(previousRoom, currentRoom, direction) {
@@ -9391,6 +9403,7 @@
       this.checkKidnapping();
       this.checkTrollsClearing();
       this.checkEreborStandoff();
+      this.checkSmaugDragonEndgameScenes();
       this.checkBagEndHomecoming();
     }
 
@@ -9504,6 +9517,15 @@
       if (!game.flags.dragondefeated || game.flags.erebor_standoff_started) return false;
       if (!["front_gate", "ruins_of_the_town_of_dale", "stoe_of_ravenhill", "little_steep_bay"].includes(game.currentRoom)) return false;
       return game.beginEreborStandoff();
+    }
+
+    checkSmaugDragonEndgameScenes() {
+      const game = this.game;
+      if (!game.liveDragon() || !game.smaugWeakSpotKnown()) return false;
+      let changed = false;
+      if (game.shareSmaugWeakSpotWithBard()) changed = true;
+      if (game.stageRavenhillDragonSighting()) changed = true;
+      return changed;
     }
 
     checkBagEndHomecoming() {
@@ -16424,12 +16446,27 @@
       return Boolean(this.flags.smaug_weakspot_known);
     }
 
+    smaugWeakSpotSharedWithBard() {
+      return Boolean(this.flags.smaug_weakspot_shared_with_bard);
+    }
+
     thrushMessageSent() {
       return Boolean(this.flags.thrush_message_sent);
     }
 
+    smaugSightedFromRavenhill() {
+      return Boolean(this.flags.smaug_sighted_from_ravenhill);
+    }
+
     bardDragonShotRoomReady() {
       return this.currentRoom === "stoe_of_ravenhill";
+    }
+
+    bardAvailableForDragonEndgame(roomId = this.currentRoom) {
+      const bard = this.characters.bard;
+      if (!bard || bard.visible === false) return false;
+      if (bard.carriedBy === this.player.id) return true;
+      return bard.position === roomId;
     }
 
     noteSmaugWeakSpot() {
@@ -16440,11 +16477,36 @@
       return true;
     }
 
+    shareSmaugWeakSpotWithBard() {
+      if (!this.smaugWeakSpotKnown() || this.smaugWeakSpotSharedWithBard() || !this.liveDragon()) return false;
+      if (this.player.noticeable === false) return false;
+      if (!this.bardAvailableForDragonEndgame()) return false;
+      this.flags.smaug_weakspot_shared_with_bard = true;
+      this.print("You tell Bard what you saw in the treasure-halls: beneath the jeweled mail of Smaug's left breast there is one small bare patch.");
+      this.print("Bard's face hardens as he hears you out. 'The left breast, then,' he says quietly. 'If he gives me that mark in the open, I will not waste the black arrow.'");
+      return true;
+    }
+
     deliverThrushMessage() {
-      if (!this.smaugWeakSpotKnown() || this.thrushMessageSent()) return false;
+      if (!this.smaugWeakSpotSharedWithBard() || this.thrushMessageSent()) return false;
       this.flags.thrush_message_sent = true;
-      this.print("A thrush flutters down nearby and chatters urgently, and between bird-sign and Bilbo's word the truth becomes plain: there is a bare patch in Smaug's left breast.");
-      this.print("Bard hears, nods once, and his whole attention narrows to that one chance.");
+      this.print("A thrush flutters down upon the stones and chatters urgently, confirming Bilbo's warning as though all the old friendship of bird and Dale were gathered into that one small witness.");
+      this.print("Bard hears, nods once, and his whole attention narrows to the bare patch beneath Smaug's left breast.");
+      return true;
+    }
+
+    stageRavenhillDragonSighting() {
+      if (!this.liveDragon() || !this.bardDragonShotRoomReady()) return false;
+      if (!this.smaugWeakSpotSharedWithBard() || this.smaugSightedFromRavenhill()) return false;
+      if (!this.bardAvailableForDragonEndgame()) return false;
+      if (!this.flags.bard_ready_at_ravenhill) {
+        this.flags.bard_ready_at_ravenhill = true;
+        this.print("Bard steps onto the old stone of Ravenhill and measures the sky above the Mountain. 'Here,' he says softly. 'From this height he must break clear before he stoops on the Lake. If ever there was a place for the last shot, it is this one.'");
+      }
+      if (!this.thrushMessageSent()) this.deliverThrushMessage();
+      this.flags.smaug_sighted_from_ravenhill = true;
+      this.print("Then a dark shape lifts beyond the Mountain's shoulder, and for one clear instant Smaug shows black against the sky as he turns toward the Lake.");
+      this.print("Bard raises the bow and waits like stone, holding the black arrow ready for your word.");
       return true;
     }
 
