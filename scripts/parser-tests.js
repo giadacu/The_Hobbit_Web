@@ -5267,6 +5267,22 @@ const gameCases = [
     ],
   },
   {
+    name: "little steep bay no longer bypasses the hidden door into erebor",
+    drive(game) {
+      game.currentRoom = "little_steep_bay";
+      game.player.position = "little_steep_bay";
+      game.execute("east");
+      game.print(`Bay room after blocked east: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "You see no exit in that direction.",
+      "Bay room after blocked east: little_steep_bay",
+    ],
+    notExpectedIncluded: [
+      "You find yourself in a smooth, straight passage.",
+    ],
+  },
+  {
     name: "jump rivendell still leaves room to take beorns meal",
     drive(game) {
       game.execute("jump rivendell");
@@ -5501,15 +5517,15 @@ const gameCases = [
       game.execute('say to thorin "throw barrels through trap door"');
       game.execute("wait");
       game.execute("throw barrel through the large trap door");
-      game.execute("wait");
       game.execute("jump onto barrel");
       game.print(`Cellar barrel room: ${game.currentRoom}`);
     },
     expectedIncluded: [
-      "The butler turns away toward the stair with a muttered complaint, leaving the trap door and the waiting barrels unwatched for a precious moment.",
+      "The butler turns away toward the stair with a muttered complaint, leaving the trap door and the nearest casks unwatched for a precious moment.",
       "the worst labor is not your own barrel at all, but the dwarves'.",
       "together you send the dwarves' barrels one by one through the open trap door",
       "You wrestle an empty barrel to the opening and heave it through.",
+      "If you mean to trust yourself to it, you must follow at once.",
       "You seize your moment, spring through the open trap door, and come down half upon the barrel and half into the freezing black rush beneath the halls.",
       "At last the racing black water widens, the low roof of branches breaks apart above you, and Long Lake opens ahead in cold daylight like a deliverance almost too sudden to trust.",
       "Cellar barrel room: long_lake",
@@ -5531,7 +5547,6 @@ const gameCases = [
       game.execute('say to thorin "throw barrels through trap door"');
       game.execute("wait");
       game.execute("throw barrel through the large trap door");
-      game.execute("wait");
       game.execute("jump onto barrel");
       game.print(`Cellar barrel temporary image: ${game.temporaryImage?.file || "none"}`);
       game.execute("look");
@@ -5610,7 +5625,7 @@ const gameCases = [
     },
     drive(game) {
       const commands = [];
-      for (let step = 0; step < 10; step += 1) {
+      for (let step = 0; step < 9; step += 1) {
         const command = game.nextAutoplayCommand();
         if (!command) throw new Error(`Expected autoplay command in cellar at step ${step}.`);
         commands.push(command);
@@ -5620,8 +5635,59 @@ const gameCases = [
       game.print(`Cellar autoplay room: ${game.currentRoom}`);
     },
     expectedIncluded: [
-      'Cellar autoplay path: wait -> ask thorin to enter barrels -> wait -> open trap door -> wait -> ask thorin to throw barrels through trap door -> wait -> throw barrel through trap door -> wait -> jump onto barrel',
+      'Cellar autoplay path: wait -> ask thorin to enter barrels -> wait -> open trap door -> wait -> ask thorin to throw barrels through trap door -> wait -> throw barrel through trap door -> jump onto barrel',
       "Cellar autoplay room: long_lake",
+    ],
+  },
+  {
+    name: "cellar barrel throw and jump can be chained in one command",
+    setup(game) {
+      movePlayerTo(game, "cellar");
+      game.checkSpecialSituations();
+      game.flags.mirkwooddwarvesfreed = true;
+    },
+    drive(game) {
+      game.execute("wait");
+      game.execute('say to thorin "enter barrels"');
+      game.execute("wait");
+      game.execute("open trap door");
+      game.execute("wait");
+      game.execute('say to thorin "throw barrels through trap door"');
+      game.execute("wait");
+      game.execute("throw barrel through the large trap door and jump onto barrel");
+      game.print(`Cellar chained barrel room: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "If you mean to trust yourself to it, you must follow at once.",
+      "You seize your moment, spring through the open trap door, and come down half upon the barrel and half into the freezing black rush beneath the halls.",
+      "Cellar chained barrel room: long_lake",
+    ],
+  },
+  {
+    name: "cellar butler window narration follows the barrel escape phase",
+    setup(game) {
+      movePlayerTo(game, "cellar");
+      game.flags.cellar_feast_scene_seen = true;
+      game.flags.mirkwooddwarvesfreed = true;
+      game.debugSetCharacterRoom("butler", "cellar", { visible: true, movementMode: "never" });
+    },
+    drive(game) {
+      game.primeCellarButlerStealth();
+      game.flags.cellar_butler_window_open = false;
+      game.flags.barrel_company_prepared = true;
+      game.primeCellarButlerStealth();
+      game.flags.cellar_butler_window_open = false;
+      game.flags.barrel_company_launched = true;
+      game.primeCellarButlerStealth();
+      game.flags.cellar_butler_window_open = false;
+      game.flags.barrelthrown = true;
+      game.primeCellarButlerStealth();
+    },
+    expectedIncluded: [
+      "The butler turns away toward the stair with a muttered complaint, leaving the trap door and the nearest casks unwatched for a precious moment.",
+      "The butler turns away toward the stair with a muttered complaint, leaving the trap door and the packed barrels unwatched for a precious moment.",
+      "The butler turns away toward the stair with a muttered complaint, leaving the open trap door and Bilbo's last empty barrel unwatched for a precious moment.",
+      "The butler turns away toward the stair with a muttered complaint, leaving the open trap door unwatched for one precious moment.",
     ],
   },
   {
@@ -5645,6 +5711,27 @@ const gameCases = [
     ],
   },
   {
+    name: "ask dwarves to jump in the cellar maps to the barrel-loading order",
+    setup(game) {
+      movePlayerTo(game, "cellar");
+      game.checkSpecialSituations();
+      game.flags.mirkwooddwarvesfreed = true;
+    },
+    drive(game) {
+      game.execute("wait");
+      game.execute("ask dwarves to jump");
+      game.print(`Barrel company prepared after jump order: ${game.flags.barrel_company_prepared ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "The butler turns away toward the stair with a muttered complaint, leaving the trap door and the nearest casks unwatched for a precious moment.",
+      "Thorin gives the word at last, and the worst labor is not your own barrel at all, but the dwarves'.",
+      "Barrel company prepared after jump order: yes",
+    ],
+    notExpectedIncluded: [
+      'Jump checkpoints: type "jump <name>".',
+    ],
+  },
+  {
     name: "cellar barrel-work must wait for the butlers brief lapses",
     setup(game) {
       movePlayerTo(game, "cellar");
@@ -5657,9 +5744,70 @@ const gameCases = [
       game.print(`Trap door open after window: ${game.doors.porta_cellar_long_lake?.open ? "yes" : "no"}`);
     },
     expectedIncluded: [
-      "The butler is still facing the cellar-work too squarely for you to open the large trap door unseen.",
-      "The butler turns away toward the stair with a muttered complaint, leaving the trap door and the waiting barrels unwatched for a precious moment.",
-      "Trap door open after window: yes",
+      "You begin to open the large trap door, but the butler is not turned nearly far enough for such work.",
+      "You are hustled back into the Elvenking's prison and shut up once more behind the red door.",
+      "Trap door open after window: no",
+    ],
+  },
+  {
+    name: "cellar capture keeps dwarves packed if bilbo is caught after loading them",
+    setup(game) {
+      movePlayerTo(game, "cellar");
+      game.flags.cellar_feast_scene_seen = true;
+      game.flags.mirkwooddwarvesfreed = true;
+      game.flags.barrel_company_prepared = true;
+      game.flags.cellar_butler_window_open = false;
+      game.flags.cellar_butler_next_window_turn = 2;
+      game.debugSetCharacterRoom("butler", "cellar", { visible: true, movementMode: "never" });
+    },
+    drive(game) {
+      game.execute("open trap door");
+      game.print(`Capture room after packed-barrel mistake: ${game.currentRoom}`);
+      game.print(`Packed dwarves preserved: ${game.flags.barrel_company_prepared ? "yes" : "no"}`);
+      game.print(`Launched dwarves preserved: ${game.flags.barrel_company_launched ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "a muffled dwarvish thump from one of the packed barrels betrays the whole desperate scheme.",
+      "Capture room after packed-barrel mistake: dark_dungeon",
+      "Packed dwarves preserved: yes",
+      "Launched dwarves preserved: no",
+    ],
+  },
+  {
+    name: "cellar capture after bilbos barrel was thrown restores a retry state",
+    setup(game) {
+      movePlayerTo(game, "cellar");
+      game.flags.cellar_feast_scene_seen = true;
+      game.flags.mirkwooddwarvesfreed = true;
+      game.flags.barrel_company_prepared = true;
+      game.flags.barrel_company_launched = true;
+      game.flags.barrelthrown = true;
+      game.flags.cellar_barrel_immediate_jump_turn = -1;
+      game.flags.cellar_butler_window_open = false;
+      game.flags.cellar_butler_next_window_turn = 2;
+      game.doors.porta_cellar_long_lake.open = true;
+      game.items.barrel.location = { type: "room", id: "long_lake" };
+      game.items.barrel.visible = false;
+      game.debugSetCharacterRoom("butler", "cellar", { visible: true, movementMode: "never" });
+    },
+    drive(game) {
+      game.execute("jump onto barrel");
+      const barrelLocation = game.items.barrel.location;
+      game.print(`Capture room after missed barrel jump: ${game.currentRoom}`);
+      game.print(`Dwarf fleet already away: ${game.flags.barrel_company_launched ? "yes" : "no"}`);
+      game.print(`Company afloat preserved: ${game.flags.barrel_company_afloat ? "yes" : "no"}`);
+      game.print(`Bilbo barrel thrown flag after capture: ${game.flags.barrelthrown ? "yes" : "no"}`);
+      game.print(`Bilbo barrel reset room: ${barrelLocation?.type === "room" ? barrelLocation.id : "none"}`);
+      game.print(`Trap door reset closed: ${game.doors.porta_cellar_long_lake.open ? "no" : "yes"}`);
+    },
+    expectedIncluded: [
+      "The elves come running too late for the dwarves already bobbing away beneath the halls, but not too late for Bilbo.",
+      "Capture room after missed barrel jump: dark_dungeon",
+      "Dwarf fleet already away: yes",
+      "Company afloat preserved: yes",
+      "Bilbo barrel thrown flag after capture: no",
+      "Bilbo barrel reset room: cellar",
+      "Trap door reset closed: yes",
     ],
   },
   {
@@ -6006,7 +6154,7 @@ const gameCases = [
       game.print(`Dragon defeated after true shot: ${game.flags.dragondefeated ? "yes" : "no"}`);
     },
     expectedIncluded: [
-      "Bard studies the Mountain and shakes his head. 'Not from here,' he says. 'If the black arrow is to fly true, it must be from Ravenhill, where the mark may be taken cleanly.'",
+      "Bard studies the Mountain and shakes his head. 'Not from here,' he says. 'Ravenhill commands the Mountain's shoulder and the road to the Lake together. There the dragon must show himself clean against the sky, and there the black arrow may fly true.'",
       "Bard ready at Ravenhill: no",
       "Black arrow committed: no",
       "Dragon alive after true shot: yes",
@@ -6034,7 +6182,7 @@ const gameCases = [
       game.print(`Dragon defeated after true shot: ${game.flags.dragondefeated ? "yes" : "no"}`);
     },
     expectedIncluded: [
-      "Bard steps onto the old stone of Ravenhill and measures the sky above the Mountain. 'Here,' he says softly. 'If ever there was a place for the last shot, it is this one.'",
+      "Bard steps onto the old stone of Ravenhill and measures the sky above the Mountain. 'Here,' he says softly. 'From this height he must break clear before he stoops on the Lake. If ever there was a place for the last shot, it is this one.'",
       "A thrush flutters down nearby and chatters urgently, and between bird-sign and Bilbo's word the truth becomes plain: there is a bare patch in Smaug's left breast.",
       "Bard hears, nods once, and his whole attention narrows to that one chance.",
       "Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky.",
@@ -6043,6 +6191,30 @@ const gameCases = [
       "Black arrow committed: yes",
       "Dragon alive after true shot: no",
       "Dragon defeated after true shot: yes",
+    ],
+  },
+  {
+    name: "ravenhill look and bard dialogue explain the dragon shot",
+    drive(game) {
+      game.execute("jump smaug");
+      game.flags.bardreadiedarrow = true;
+      game.flags.smaug_weakspot_known = true;
+      game.currentRoom = "stoe_of_ravenhill";
+      game.player.position = "stoe_of_ravenhill";
+      game.characters.bard.carriedBy = game.player.id;
+      game.characters.bard.position = "stoe_of_ravenhill";
+      game.characters.bard.followingPlayer = false;
+      game.characters.bard.movementMode = "follow";
+      game.execute("look");
+      game.execute("look at sky");
+      game.execute("ask bard about ravenhill");
+      game.execute("ask bard about dragon");
+    },
+    expectedIncluded: [
+      "You are on Ravenhill above the desolation, where the Mountain's western shoulder, the ruined lands below, and the line of Long Lake all lie open together.",
+      "From Ravenhill the Mountain's western shoulder, the desolation, and the long water below lie open in one sweep.",
+      "Bard says 'From Ravenhill the Mountain's shoulder and the road to the Lake lie in one line. If Smaug stoops on the town, he must first break clear here, and that is the clean mark a bowman needs.'",
+      "Bard says 'Watch the Mountain's shoulder. If Smaug comes for the Lake, he will have to clear it before he stoops, and for a few heartbeats he will be plain against the sky.'",
     ],
   },
   {
@@ -6076,7 +6248,7 @@ const gameCases = [
       game.print(`Autoplay after weak-spot knowledge: ${game.nextAutoplayCommand()}`);
     },
     expectedIncluded: [
-      "Autoplay after weak-spot knowledge: east",
+      "Autoplay after weak-spot knowledge: up",
     ],
     notExpectedIncluded: [
       "Autoplay after weak-spot knowledge: say to bard \"shoot dragon\"",
@@ -7790,6 +7962,35 @@ const gameCases = [
     ],
   },
   {
+    name: "captured cellar bilbo can still wait for the red door to open",
+    setup(game) {
+      movePlayerTo(game, "cellar");
+      game.flags.cellar_feast_scene_seen = true;
+      game.flags.mirkwooddwarvesfreed = true;
+      game.flags.cellar_butler_window_open = false;
+      game.flags.cellar_butler_next_window_turn = 2;
+      game.debugSetCharacterRoom("butler", "cellar", { visible: true, movementMode: "never" });
+    },
+    drive(game) {
+      const originalRandom = Math.random;
+      try {
+        game.execute("open trap door");
+        Math.random = () => 0.1;
+        game.execute("wait");
+      } finally {
+        Math.random = originalRandom;
+      }
+      game.print(`Captured cellar red door open: ${game.doors.porta_dark_dungeon_cellar?.open ? "yes" : "no"}`);
+      game.print(`Captured cellar room after wait: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "You are hustled back into the Elvenking's prison and shut up once more behind the red door.",
+      "Someone opens the red door.",
+      "Captured cellar red door open: yes",
+      "Captured cellar room after wait: dark_dungeon",
+    ],
+  },
+  {
     name: "elves chapter now keeps the dwarves visibly dispersed through the prison rooms before rescue",
     setup(game) {
       movePlayerTo(game, "dark_dungeon");
@@ -7917,6 +8118,21 @@ const gameCases = [
     ],
     notExpectedIncluded: [
       'Unknown jump target "onto barrel". Type "jumps" to see the available checkpoints.',
+    ],
+  },
+  {
+    name: "delegated jump does not leak checkpoint text",
+    setup(game) {
+      movePlayerTo(game, "green_dragon_inn");
+      game.debugSetCharacterRoom("thorin", "green_dragon_inn", { visible: true, movementMode: "never" });
+    },
+    inputs: ["ask thorin to jump"],
+    expectedIncluded: [
+      "Thorin jumps, but nothing happens.",
+    ],
+    notExpectedIncluded: [
+      'Jump checkpoints: type "jump <name>".',
+      'Unknown jump target',
     ],
   },
   {
@@ -8385,6 +8601,32 @@ const gameCases = [
     ],
     notExpectedIncluded: [
       "There is no autosave available.",
+    ],
+  },
+  {
+    name: "safe moment history keeps every autosave until quota pressure",
+    drive(game) {
+      for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+        const key = localStorage.key(index);
+        if (key && key.startsWith("hobbit-web-save:")) localStorage.removeItem(key);
+      }
+      game.storage.refreshLatestAutosaveState();
+      for (let index = 1; index <= 14; index += 1) {
+        game.turnCount = index;
+        game.recordAutosave(`checkpoint ${index}`, {
+          key: `test:safe-history:${index}`,
+          force: true,
+        });
+      }
+      const autosaves = game.storage.autosaveEntries();
+      game.print(`Safe moment history count: ${autosaves.length}`);
+      game.print(`Latest safe moment label: ${autosaves[0]?.label || "none"}`);
+      game.print(`Oldest safe moment label: ${autosaves[autosaves.length - 1]?.label || "none"}`);
+    },
+    expectedIncluded: [
+      "Safe moment history count: 14",
+      "Latest safe moment label: checkpoint 14",
+      "Oldest safe moment label: checkpoint 1",
     ],
   },
   {

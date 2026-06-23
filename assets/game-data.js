@@ -3829,23 +3829,9 @@ window.HOBBIT_DATA = {
       "distance": 1
     },
     {
-      "from": "smooth_straight_passage",
-      "direction": "west",
-      "to": "little_steep_bay",
-      "door": null,
-      "distance": 1
-    },
-    {
       "from": "little_steep_bay",
       "direction": "north",
       "to": "empty_place",
-      "door": null,
-      "distance": 1
-    },
-    {
-      "from": "little_steep_bay",
-      "direction": "east",
-      "to": "smooth_straight_passage",
       "door": null,
       "distance": 1
     },

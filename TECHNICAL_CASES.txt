@@ -4843,3 +4843,313 @@ Future debugging advice
 - If a hazard depends on command pacing rather than map movement, advance its
   pressure from command handling itself; relying only on turn-consuming travel
   can miss key fiction beats like `listen` or `search`.
+
+
+Case 099 - 2026-06-22 - Butler barrel finale needed an immediate jump window and phase-aware distraction text
+--------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+In the cellar escape, Bilbo could throw his own barrel through the trap door
+but then still had to burn another full `wait` before `jump onto barrel`
+became valid again. The repeated distraction line also stayed wrong once the
+scene had advanced, still referring to "waiting barrels" even after the
+dwarves were already packed, launched, or gone.
+
+Root cause
+----------
+Two scene-state mismatches were interacting.
+
+- `handleCellarBarrelThrow()` always consumed the butler's stealth window and
+  delayed the next opening by two turns, so the intended "throw it and go at
+  once" beat could not be played naturally.
+- `primeCellarButlerStealth()` printed one fixed line regardless of whether
+  the cellar still held loose casks, packed dwarf barrels, Bilbo's last barrel,
+  or only the open trap door.
+
+Resolution
+----------
+- Added a short-lived immediate-jump allowance after Bilbo throws his barrel.
+  This keeps `jump onto barrel` available:
+  - in the same chained command, for example
+    `throw barrel through the trap door and jump onto barrel`
+  - or on the immediately following command without an extra `wait`
+- Added a cue line after the throw to signal that Bilbo must follow at once.
+- Replaced the fixed butler-distraction narration with phase-aware text that
+  reflects:
+  - loose casks before the dwarf loading
+  - packed barrels after the dwarves are hidden
+  - Bilbo's last empty barrel after the others are launched
+  - only the open trap door once Bilbo's own barrel is already below
+- Updated autoplay and parser regression tests to follow the tighter finale.
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- In stealth set pieces with chained actions, do not assume every fiction beat
+  should consume the same cadence window; climactic follow-through may need a
+  same-turn or next-command allowance.
+- If a reusable narration line depends on scene progress, derive it from state
+  instead of hard-coding the earliest-phase wording.
+
+
+Case 100 - 2026-06-22 - Delegated "jump" orders leaked the debug checkpoint command in the cellar
+---------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+In the cellar barrel sequence, a natural order like `ask dwarves to jump`
+printed the debug checkpoint list instead of advancing the scene. The same
+underlying issue could also affect other delegated `jump` orders by companions.
+
+Root cause
+----------
+The parser reused the same `jump` verb handler for both:
+
+- the player-facing debug checkpoint shortcut
+- ordinary physical jump actions
+
+When a companion order was delegated through `processCommand()`, the delegated
+actor still reached the player `jump` handler first. A bare order such as
+`ask thorin to jump` therefore triggered `handleJumpCommand("")`, which lists
+checkpoints, instead of falling through to the ordinary physical-action
+response.
+
+In the cellar, `handleCellarCompanionOrder()` also only recognized explicit
+barrel phrasing like `enter barrels`, so the natural shorthand `ask dwarves to
+jump` was not being mapped onto the intended barrel-loading beat.
+
+Resolution
+----------
+- Restricted the debug-checkpoint `jump` shortcut to Bilbo's own commands.
+  Delegated companion `jump` orders now go straight to normal physical-action
+  handling.
+- Expanded the cellar companion-order parser so natural shorthand such as
+  `ask dwarves to jump` or `ask thorin to leap into barrels` is treated as the
+  existing barrel-loading order.
+- Added regression tests for:
+  - delegated `jump` orders not leaking checkpoint text
+  - `ask dwarves to jump` correctly preparing the barrel company in the cellar
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a verb has both debug and in-world meanings, gate the debug behavior to
+  player-issued commands only.
+- For scene-specific parser affordances, support the short natural wording
+  players will try first, not only the most explicit object phrase.
+
+
+Case 101 - 2026-06-22 - Butler stealth window needed real failure stakes without erasing barrel-escape progress
+---------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+In the cellar barrel sequence, failed stealth outside the butler's distraction
+window only printed a warning to wait. The scene had tension in narration, but
+no real consequence if Bilbo tried to open the trap door, load the dwarves, or
+follow his barrel at the wrong moment.
+
+Root cause
+----------
+All cellar stealth-gated actions shared `canAttemptCellarStealthAction()`, but
+the failure branch only called `blockCellarButlerAction()` to print a soft
+refusal. That meant the butler never actually reacted to catching Bilbo in the
+act, even though the fiction already established close supervision and the
+Elvenking's prison as the natural consequence.
+
+Resolution
+----------
+- Replaced the soft refusal with a real capture flow when Bilbo attempts
+  barrel-work while the butler is still watching.
+- Added phase-aware capture narration for:
+  - early meddling before the dwarves are packed
+  - discovery of the packed dwarf barrels
+  - being caught after the dwarf fleet has already been launched
+- Sent Bilbo back to `dark_dungeon`, re-locking the red door so escape can
+  continue through the existing:
+  - `red key` route
+  - periodic `wait`-for-the-door-to-open route
+- Preserved meaningful barrel-escape progress:
+  - packed dwarves stay packed
+  - launched dwarves stay launched
+  - Bilbo's own thrown barrel is reset so he can retry after capture
+  - the trap door is closed again after the capture
+- Added regression tests for:
+  - basic trap-door capture
+  - capture after the dwarves are already packed
+  - capture after Bilbo's own barrel was already thrown
+  - continued prison-door waiting behavior after a cellar capture
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- For stealth scenes, a timed opportunity window should usually have both:
+  - a success path
+  - a concrete failure state
+- When adding failure stakes mid-scene, preserve the major fiction milestones
+  already achieved instead of bluntly resetting every flag.
+- If a recoverable setback consumes or relocates a physical prop, restore both
+  the flag state and the item's actual location; resetting only one invites
+  state drift bugs.
+
+
+Case 102 - 2026-06-22 - Erebor still exposed a legacy side entrance and Ravenhill lacked enough dragon-shot telegraphing
+---------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Two related Erebor endgame problems surfaced in autoplay and manual play:
+
+- Bilbo could still reach Smaug from `little_steep_bay` by going straight into
+  `smooth_straight_passage`, bypassing the hidden-door puzzle entirely.
+- Once the weak spot was known, the game required Bard's shot from Ravenhill,
+  but the fiction did not yet explain clearly enough:
+  - why Ravenhill mattered tactically
+  - what Bard was waiting to see there
+
+Root cause
+----------
+The runtime world data still contained an older bidirectional connection
+between:
+
+- `little_steep_bay`
+- `smooth_straight_passage`
+
+That legacy edge survived alongside the newer hidden-door route, so autoplay
+was correctly using a legal but unwanted shortcut.
+
+Separately, the Ravenhill shot logic was mechanically gated, but the supporting
+fiction was thin:
+
+- the refusal line only named Ravenhill without explaining the sightline
+- Ravenhill's room description did not show why the dragon would become a clear
+  mark there
+- examination and dialogue gave too little help if the player had not read or
+  remembered the book beat
+
+Resolution
+----------
+- Removed the legacy `little_steep_bay <-> smooth_straight_passage` connection
+  from both the source data and the runtime connection normalization.
+- Added regression coverage that verifies the bay no longer opens a side route
+  into Erebor.
+- Added pre-battle contextual descriptions for:
+  - `lonely_mountain`
+  - `stoe_of_ravenhill`
+  so the game now explains that Ravenhill commands the Mountain's shoulder and
+  the line toward Long Lake.
+- Expanded Bard's dragon-shot refusal and Ravenhill setup lines so they explain
+  that Smaug must break clear there before stooping on the Lake.
+- Added Ravenhill-specific inspection and dialogue responses so players can ask
+  about:
+  - the sky
+  - the mark
+  - Ravenhill itself
+  - Smaug's approach
+- Updated Bard's initiative text to hint more directly at choosing the right
+  ground, not only the right moment.
+
+Files touched
+-------------
+- `assets/game-data.js`
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a story gate is meant to be absolute, remove obsolete world edges from
+  the graph instead of relying only on narrative discouragement.
+- If a climactic action depends on geography, make the geography legible in:
+  - room description
+  - voluntary inspection text
+  - companion dialogue
+- Autoplay is a good detector of hidden world-model inconsistencies: if it
+  keeps finding an "impossible" shortcut, the map may still permit one.
+
+
+Case 103 - 2026-06-23 - Safe moments history was capped at 12 entries instead of preserving the full local timeline
+---------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The safe moments panel listed only a rolling window of autosaves. Older safe
+moments silently disappeared after enough new milestones were recorded, even
+though players expected the local history to keep every marked save.
+
+Root cause
+----------
+The save system stored autosaves as separate records, but `pruneAutosaves()`
+always removed everything beyond `MAX_AUTOSAVE_ENTRIES`, which was hard-coded
+to `12`.
+
+Resolution
+----------
+- Removed the fixed autosave-history cap by setting the normal autosave limit
+  to infinity.
+- Kept the existing quota-recovery path intact, so if `localStorage` fills up
+  the game still deletes the oldest autosaves only as needed to fit a new one.
+- Added parser coverage that records 14 safe moments and verifies that both
+  the newest and oldest entries are still present.
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Distinguish between UX limits and storage-safety fallbacks. If players expect
+  a timeline, avoid pruning by count unless the limit is explicitly surfaced.
+- Keep quota handling separate from ordinary save retention so storage-pressure
+  fixes do not accidentally become gameplay-visible history loss.
+
+
+Case 104 - 2026-06-23 - Safari could keep serving a stale local `game.js`, hiding the updated safe-moment behavior
+--------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After changing the safe-moment retention logic, opening `load` in Safari while
+running the game from `file://` still appeared to behave as before.
+
+Root cause
+----------
+`index.html` and `autoplay-lab.html` still referenced `game.js` with older
+query-string cache busters. When launched from local files, Safari could keep
+reusing the cached script despite the on-disk `game.js` having changed.
+
+Resolution
+----------
+- Bumped the `game.js` query-string version in both HTML entry points so the
+  browser is forced to load the updated script.
+
+Files touched
+-------------
+- `index.html`
+- `autoplay-lab.html`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When the project is run directly from `file://`, bump script version strings
+  after behavior changes in cached frontend assets.
+- If a UI still looks "old" after a code fix, verify the loaded asset URL
+  first before assuming the runtime logic is wrong.

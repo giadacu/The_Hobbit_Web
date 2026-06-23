@@ -63,7 +63,9 @@
   };
   const SAVE_PREFIX = "hobbit-web-save:";
   const SAVE_AUTOSAVE_PREFIX = `${SAVE_PREFIX}autosave:`;
-  const MAX_AUTOSAVE_ENTRIES = 12;
+  // Keep the full safe-moment history unless browser storage quota forces us
+  // to compact older entries.
+  const MAX_AUTOSAVE_ENTRIES = Number.POSITIVE_INFINITY;
   const LAYOUT_PREF_KEY = "hobbit-web-layout-mode";
   const MOBILE_LAYOUT_MAX_WIDTH = 860;
   const DEFAULT_SCENE_MAP_ZOOM = 0.6;
@@ -952,6 +954,11 @@
       "A bell rings somewhere on the water, and the town answers with footsteps, hammering, and boat-hooks on timber.",
       "The smell of tar, fish, wet rope, and cookfires hangs over the walkways in a busy human cloud.",
     ],
+    laketown_outlands: [
+      "Wind moves over the broken ground from the Lake, carrying distance, cold water, and the uneasy sense that the Mountain is not yet done with this country.",
+      "Far below, small sounds of watchfires, tools, and anxious voices drift across the desolation without ever softening it.",
+      "The Mountain stands too still for comfort, while the open land below waits like a place expecting another blow.",
+    ],
     erebor: [
       "From somewhere in the old stone comes a dull settling sound, as though the Mountain remembered its own vast weight.",
       "Dust stirs over ancient carvings, and for an instant the air seems warmer, touched by the memory of dragon-fire.",
@@ -1304,6 +1311,12 @@
         text: "You are in Lake-town, where hammers, shouted orders, and relieved exhaustion travel the plankways together above the dark water. Boats still knock at their moorings, but the talk is of rebuilding, losses, and what may yet come from the Mountain.",
       },
     ],
+    lonely_mountain: [
+      {
+        when: ({ game }) => game.liveDragon() && game.flags.treasuretaken,
+        text: "You stand on the Lonely Mountain with the desolation falling away below and Long Lake lying far off under a hard sky. Smoke and fire still trouble the heights behind you, and the slopes here break the view too much for a clean bowshot; Ravenhill to the west looks the likelier place to meet a dragon in the open.",
+      },
+    ],
     front_gate: [
       {
         when: ({ game }) => game.flags.battle_won && !game.flags.thorin_fallen,
@@ -1344,6 +1357,10 @@
       },
     ],
     stoe_of_ravenhill: [
+      {
+        when: ({ game }) => game.liveDragon(),
+        text: "You are on Ravenhill above the desolation, where the Mountain's western shoulder, the ruined lands below, and the line of Long Lake all lie open together. It is plain why a bowman would choose this height: if Smaug comes abroad toward the town, he must show himself clear against the sky here before he can sweep down.",
+      },
       {
         when: ({ game }) => game.flags.thorin_fallen && game.flags.beorn_bore_thorin_seen,
         text: "You are on Ravenhill after the battle, where the wind moves gently now over broken standards, spent weapons, and the grim stillness of costly victory. Thorin lies here under guard and care, far from healed and with little time left to him, while Beorn keeps a huge and silent watch nearby like some last strength of the wild not yet wholly withdrawn from war.",
@@ -1845,6 +1862,8 @@
       || (connection.from === "rivendell" && connection.to === "trolls_clearing")
       || (connection.from === "front_gate" && connection.to === "lower_halls")
       || (connection.from === "lower_halls" && connection.to === "front_gate")
+      || (connection.from === "little_steep_bay" && connection.to === "smooth_straight_passage")
+      || (connection.from === "smooth_straight_passage" && connection.to === "little_steep_bay")
     ));
     const cellarTrapDoorConnection = data.connections.find((connection) => connection.from === "cellar" && connection.direction === "down");
     if (cellarTrapDoorConnection) cellarTrapDoorConnection.to = "strong_river";
@@ -5086,7 +5105,9 @@
         climb: () => game.climb(objectText),
         eat: () => game.eat(objectText),
         drink: () => game.drink(objectText),
-        jump: () => game.handleJumpCommand(objectText, { silentOnUnknown: true }) || game.physicalAction("jump", objectText),
+        jump: () => (game.commandIssuer
+          ? game.physicalAction("jump", objectText)
+          : game.handleJumpCommand(objectText, { silentOnUnknown: true }) || game.physicalAction("jump", objectText)),
         sit: () => game.physicalAction("sit", objectText),
         lie: () => game.physicalAction("lie", objectText),
         stand: () => game.physicalAction("stand", objectText),
@@ -5997,12 +6018,12 @@
         return true;
       }
       if (!game.bardDragonShotRoomReady()) {
-        game.print("Bard studies the Mountain and shakes his head. 'Not from here,' he says. 'If the black arrow is to fly true, it must be from Ravenhill, where the mark may be taken cleanly.'");
+        game.print("Bard studies the Mountain and shakes his head. 'Not from here,' he says. 'Ravenhill commands the Mountain's shoulder and the road to the Lake together. There the dragon must show himself clean against the sky, and there the black arrow may fly true.'");
         return true;
       }
       if (!game.flags.bard_ready_at_ravenhill) {
         game.flags.bard_ready_at_ravenhill = true;
-        game.print("Bard steps onto the old stone of Ravenhill and measures the sky above the Mountain. 'Here,' he says softly. 'If ever there was a place for the last shot, it is this one.'");
+        game.print("Bard steps onto the old stone of Ravenhill and measures the sky above the Mountain. 'Here,' he says softly. 'From this height he must break clear before he stoops on the Lake. If ever there was a place for the last shot, it is this one.'");
       }
       if (!game.thrushMessageSent()) game.deliverThrushMessage();
       game.flags.black_arrow_committed = true;
@@ -8470,7 +8491,7 @@
         }
         return "Bard says 'The fire is gone from the Mountain, but old claims have come out of the dark in its place. We must see what sort of answer Thorin means to make.'";
       }
-      if (matches(character.name, "bard") && (IMMERSION_LAKETOWN_ROOMS.has(game.currentRoom) || game.currentRoom === "front_gate" || IMMERSION_EREBOR_OUTER_ROOMS.has(game.currentRoom) || IMMERSION_EREBOR_INNER_ROOMS.has(game.currentRoom))) {
+      if (matches(character.name, "bard") && (IMMERSION_LAKETOWN_ROOMS.has(game.currentRoom) || ["front_gate", "stoe_of_ravenhill"].includes(game.currentRoom) || IMMERSION_EREBOR_OUTER_ROOMS.has(game.currentRoom) || IMMERSION_EREBOR_INNER_ROOMS.has(game.currentRoom))) {
         if (!game.flags.dragondefeated && game.flags.laketown_barrel_arrival_seen && matches(game.currentRoom, "wooden_town")) {
           return "Bard says 'You look as though the river has tried hard to keep you. Best get warm if you can, then tell what has driven dwarves and strangers out of the wood and down to our lake.'";
         }
@@ -8821,7 +8842,13 @@
           return "Bard says 'The treasure is old and weighty with claims, but food, shelter, and rebuilding are not old questions. They are with us tonight.'";
         }
       }
-      if (matches(character.name, "bard") && (IMMERSION_LAKETOWN_ROOMS.has(game.currentRoom) || game.currentRoom === "front_gate" || IMMERSION_EREBOR_OUTER_ROOMS.has(game.currentRoom) || IMMERSION_EREBOR_INNER_ROOMS.has(game.currentRoom))) {
+      if (matches(character.name, "bard") && (IMMERSION_LAKETOWN_ROOMS.has(game.currentRoom) || ["front_gate", "stoe_of_ravenhill"].includes(game.currentRoom) || IMMERSION_EREBOR_OUTER_ROOMS.has(game.currentRoom) || IMMERSION_EREBOR_INNER_ROOMS.has(game.currentRoom))) {
+        if (!game.flags.dragondefeated && matchesAny(text, ["ravenhill", "hill", "height", "high ground", "shot", "mark"])) {
+          if (game.currentRoom === "stoe_of_ravenhill") {
+            return "Bard says 'From Ravenhill the Mountain's shoulder and the road to the Lake lie in one line. If Smaug stoops on the town, he must first break clear here, and that is the clean mark a bowman needs.'";
+          }
+          return "Bard says 'Ravenhill is the place for it. From that height one may read both the Mountain and the Lakeward sky together, instead of guessing half-blind among these lower stones.'";
+        }
         if (!game.flags.dragondefeated && game.flags.laketown_barrel_arrival_seen && game.currentRoom === "wooden_town") {
           if (matchesAny(text, ["town", "lake-town", "laketown", "people", "master"])) {
             game.noteLaketownBardViewHeard();
@@ -8835,7 +8862,9 @@
           }
         }
         if (matchesAny(text, ["dragon", "smaug"])) {
-          return "Bard says 'A dragon is not beaten by noise or bravery alone. When he comes within reach, one true opening must be enough.'";
+          return game.currentRoom === "stoe_of_ravenhill" && !game.flags.dragondefeated
+            ? "Bard says 'Watch the Mountain's shoulder. If Smaug comes for the Lake, he will have to clear it before he stoops, and for a few heartbeats he will be plain against the sky.'"
+            : "Bard says 'A dragon is not beaten by noise or bravery alone. When he comes within reach, one true opening must be enough.'";
         }
         if (matchesAny(text, ["arrow", "bow", "shot"])) {
           return "Bard lays a hand on the black arrow and says 'A bowman lives by the shot he has not yet wasted. This one is kept for necessity, not display.'";
@@ -9789,7 +9818,11 @@
         if (!game.smaugWeakSpotKnown()) return "ask smaug about treasure";
         if (
           game.flags.bardreadiedarrow
-          && (bard?.carriedBy === game.player.id || (bard?.followingPlayer && bard?.position === game.currentRoom && bard.visible))
+          && (
+            bard?.carriedBy === game.player.id
+            || (bard?.followingPlayer && bard?.position === game.currentRoom && bard.visible)
+            || (bard?.position === game.currentRoom && bard?.visible)
+          )
         ) {
           return this.autoplayRouteCommandTo("stoe_of_ravenhill");
         }
@@ -9974,7 +10007,7 @@
         if (!game.flags.barrel_company_prepared) return game.cellarButlerDistracted() ? "ask thorin to enter barrels" : "wait";
         if (trapDoor && !trapDoor.open) return game.cellarButlerDistracted() ? "open trap door" : "wait";
         if (!game.flags.barrel_company_launched) return game.cellarButlerDistracted() ? "ask thorin to throw barrels through trap door" : "wait";
-        if (game.flags.barrelthrown) return game.cellarButlerDistracted() ? "jump onto barrel" : "wait";
+        if (game.flags.barrelthrown) return (game.cellarImmediateBarrelJumpAvailable() || game.cellarButlerDistracted()) ? "jump onto barrel" : "wait";
         if (this.autoplayHasAccessibleBarrelForCellarEscape()) return game.cellarButlerDistracted() ? "throw barrel through trap door" : "wait";
       }
 
@@ -10476,6 +10509,15 @@
         if (lower.includes("drop") || lower.includes("cliff")) return game.print("The footing is dangerous. One careless step would be a poor idea.");
         if (lower.includes("moss")) return game.print("The ground is soft with moss and earth.");
         return game.print(`${subject} ${actorVerb(game.player, "study")} the ${text}. It shows no hidden passage or useful object.`);
+      }
+
+      if (matchesAny(text, ["sky", "mountain", "lake", "town", "desolation", "horizon"])) {
+        if (game.currentRoom === "stoe_of_ravenhill" && game.liveDragon()) {
+          return game.print("From Ravenhill the Mountain's western shoulder, the desolation, and the long water below lie open in one sweep. If Smaug comes abroad again, he must show himself here against the sky before he can stoop on the Lake-town roofs.");
+        }
+        if (game.currentRoom === "lonely_mountain" && game.liveDragon()) {
+          return game.print("The broken shoulders of the Mountain hide too much from here. You can glimpse the lakeward sky beyond, but not with the clear, commanding line that Ravenhill offers a bowman.");
+        }
       }
 
       if (matchesAny(text, ["wall", "walls", "rock", "rocks", "stone", "stones", "ceiling", "crack", "cracks", "gate", "door", "entrance"])) {
@@ -12943,7 +12985,8 @@
       if (IMMERSION_BEORN_ROOMS.has(roomId)) return "beorn";
       if (IMMERSION_MIRKWOOD_ROOMS.has(roomId) || ["forest_road", "forest_road_2", "forest", "waterfall", "running_river"].includes(roomId)) return "mirkwood";
       if (IMMERSION_ELVEN_HALLS_ROOMS.has(roomId) || roomId === "elvish_clearing") return "elves";
-      if (IMMERSION_LAKETOWN_ROOMS.has(roomId) || ["bleak_barren_land", "ruins_of_the_town_of_dale", "stoe_of_ravenhill"].includes(roomId)) return "laketown";
+      if (IMMERSION_LAKETOWN_ROOMS.has(roomId)) return "laketown";
+      if (["bleak_barren_land", "ruins_of_the_town_of_dale", "stoe_of_ravenhill"].includes(roomId)) return "laketown_outlands";
       if (IMMERSION_EREBOR_OUTER_ROOMS.has(roomId) || IMMERSION_EREBOR_INNER_ROOMS.has(roomId) || roomId === "front_gate") return "erebor";
       return "";
     }
@@ -14771,7 +14814,7 @@
       if (nextTurn > Number(this.turnCount || 0)) return false;
       this.flags.cellar_butler_window_open = true;
       this.flags.cellar_butler_next_window_turn = 0;
-      this.print("The butler turns away toward the stair with a muttered complaint, leaving the trap door and the waiting barrels unwatched for a precious moment.");
+      this.print(this.cellarButlerWindowNarration());
       return true;
     }
 
@@ -14785,7 +14828,92 @@
     }
 
     blockCellarButlerAction(actionText = "try that") {
-      this.print(`The butler is still facing the cellar-work too squarely for you to ${actionText} unseen. Better wait until he turns away again.`);
+      this.captureCellarByButler(actionText);
+      return true;
+    }
+
+    resetBilboBarrelAfterCapture() {
+      const barrel = this.items.barrel;
+      if (!barrel) return false;
+      this.player.insideContainer = null;
+      this.detachItem(barrel.id);
+      barrel.location = { type: "room", id: "cellar" };
+      barrel.visible = true;
+      barrel.open = false;
+      barrel.locked = false;
+      return true;
+    }
+
+    cellarCaptureLeadLine(actionText = "try that") {
+      if (this.flags.barrelthrown) {
+        return `You move to ${actionText}, but the butler wheels round in time to see exactly what you are about.`;
+      }
+      if (this.flags.barrel_company_launched) {
+        return "The butler turns back at the worst possible instant and catches you lingering at the open trap door after the dwarves' flight.";
+      }
+      if (this.flags.barrel_company_prepared) {
+        return "The butler turns sharply back toward the casks, and at once a muffled dwarvish thump from one of the packed barrels betrays the whole desperate scheme.";
+      }
+      return `You begin to ${actionText}, but the butler is not turned nearly far enough for such work.`;
+    }
+
+    captureCellarByButler(actionText = "try that") {
+      const trapDoor = this.cellarTrapDoor();
+      const redDoor = this.doors.porta_dark_dungeon_cellar;
+      this.print(this.cellarCaptureLeadLine(actionText), "danger");
+      this.print("He gives a sharp cry for the guard, all wine-softness gone out of him in an instant.", "danger");
+      if (this.flags.barrel_company_launched) {
+        this.print("The elves come running too late for the dwarves already bobbing away beneath the halls, but not too late for Bilbo.");
+        this.flags.barrel_company_afloat = true;
+      } else if (this.flags.barrel_company_prepared) {
+        this.print("Before you can mend the business, guards are among the casks, and the butler orders that the suspicious barrels be watched while you are dragged away.");
+      } else {
+        this.print("Before you can so much as lay an innocent hand upon a cask, guards are on you from both sides of the cellar.");
+      }
+      this.print("You are hustled back into the Elvenking's prison and shut up once more behind the red door.");
+      this.flags.elvenking_prisoner_seen = true;
+      this.flags.cellar_butler_window_open = false;
+      this.flags.cellar_butler_next_window_turn = 0;
+      this.clearCellarImmediateBarrelJumpWindow();
+      if (this.flags.barrelthrown) this.resetBilboBarrelAfterCapture();
+      this.flags.barrelthrown = false;
+      if (trapDoor) trapDoor.open = false;
+      if (redDoor) {
+        redDoor.open = false;
+        redDoor.locked = true;
+      }
+      this.currentRoom = "dark_dungeon";
+      this.player.position = "dark_dungeon";
+      this.describeRoom();
+      return true;
+    }
+
+    cellarButlerWindowNarration() {
+      if (this.flags.barrelthrown) {
+        return "The butler turns away toward the stair with a muttered complaint, leaving the open trap door unwatched for one precious moment.";
+      }
+      if (this.flags.barrel_company_launched) {
+        return "The butler turns away toward the stair with a muttered complaint, leaving the open trap door and Bilbo's last empty barrel unwatched for a precious moment.";
+      }
+      if (this.flags.barrel_company_prepared) {
+        return "The butler turns away toward the stair with a muttered complaint, leaving the trap door and the packed barrels unwatched for a precious moment.";
+      }
+      return "The butler turns away toward the stair with a muttered complaint, leaving the trap door and the nearest casks unwatched for a precious moment.";
+    }
+
+    markCellarImmediateBarrelJumpWindow() {
+      this.flags.cellar_barrel_immediate_jump_turn = Number(this.turnCount || 0) + 1;
+      return true;
+    }
+
+    cellarImmediateBarrelJumpAvailable() {
+      if (this.currentRoom !== "cellar") return false;
+      if (!this.flags.barrelthrown) return false;
+      return Number(this.flags.cellar_barrel_immediate_jump_turn || 0) >= Number(this.turnCount || 0);
+    }
+
+    clearCellarImmediateBarrelJumpWindow() {
+      this.flags.cellar_barrel_immediate_jump_turn = 0;
       return true;
     }
 
@@ -14806,10 +14934,24 @@
     handleCellarCompanionOrder(character, order = "") {
       if (this.currentRoom !== "cellar" || !this.flags.cellar_feast_scene_seen) return false;
       const text = normalize(order);
-      if (!text || !/\b(barrel|barrels)\b/.test(text)) return false;
+      if (!text) return false;
       if (!character || character.friendly === false) return false;
 
-      if (matchesAny(text, ["enter barrels", "enter barrel", "get in barrels", "get into barrels", "climb into barrels", "hide in barrels", "into barrels"])) {
+      const isBarrelLoadingOrder = matchesAny(text, [
+        "enter barrels", "enter barrel",
+        "get in barrels", "get into barrels",
+        "climb into barrels", "hide in barrels", "into barrels",
+        "jump", "leap", "jump in", "leap in",
+        "jump into barrels", "jump into barrel", "jump in barrels",
+        "leap into barrels", "leap into barrel", "leap in barrels",
+      ]);
+      const isBarrelLaunchOrder = matchesAny(text, [
+        "throw barrels", "throw the barrels", "push barrels", "send barrels",
+        "help with barrels", "barrels through trap door", "barrels through the trap door",
+      ]);
+      if (!isBarrelLoadingOrder && !isBarrelLaunchOrder) return false;
+
+      if (isBarrelLoadingOrder) {
         if (!this.flags.mirkwooddwarvesfreed) {
           this.print(`${sentenceDisplayCharacterName(character)} says 'Free us first, Master Baggins, and then we may discuss what indignities follow.'`);
           return true;
@@ -14824,7 +14966,7 @@
         return true;
       }
 
-      if (matchesAny(text, ["throw barrels", "throw the barrels", "push barrels", "send barrels", "help with barrels", "barrels through trap door", "barrels through the trap door"])) {
+      if (isBarrelLaunchOrder) {
         if (!this.flags.barrel_company_prepared) {
           this.print(`${sentenceDisplayCharacterName(character)} says 'Barrels first, Master Baggins. We cannot be thrown downriver before we are packed into them.'`);
           return true;
@@ -14888,8 +15030,10 @@
       barrel.visible = false;
       barrel.open = false;
       this.flags.barrelthrown = true;
+      this.markCellarImmediateBarrelJumpWindow();
       this.consumeCellarButlerStealthWindow();
       this.print("You wrestle an empty barrel to the opening and heave it through. It strikes the black water below with a hollow, violent crash, vanishes among the piles and foaming shadows for one dreadful instant, and then shoots out again, bobbing wildly as the current claims it.");
+      this.print("If you mean to trust yourself to it, you must follow at once.");
       return true;
     }
 
@@ -14906,8 +15050,10 @@
         this.print("The barrel you need is not under you yet. Best get an empty one through the trap door first.");
         return true;
       }
-      if (!this.canAttemptCellarStealthAction("jump after the barrel")) return true;
-      this.consumeCellarButlerStealthWindow();
+      const immediateJump = this.cellarImmediateBarrelJumpAvailable();
+      if (!immediateJump && !this.canAttemptCellarStealthAction("jump after the barrel")) return true;
+      this.clearCellarImmediateBarrelJumpWindow();
+      if (!immediateJump) this.consumeCellarButlerStealthWindow();
       return this.resolveCellarBarrelEscape();
     }
 
@@ -14944,6 +15090,7 @@
 
     resolveCellarBarrelEscape() {
       this.player.insideContainer = null;
+      this.clearCellarImmediateBarrelJumpWindow();
       this.flags.barrelthrown = false;
       this.flags.barrel_company_afloat = Boolean(this.flags.barrel_company_launched);
       this.flags.laketown_barrel_arrival_pending = true;
@@ -14963,6 +15110,7 @@
 
     resolveCellarTrapDoorPlunge() {
       this.player.insideContainer = null;
+      this.clearCellarImmediateBarrelJumpWindow();
       const hadBarrelBelow = Boolean(this.flags.barrelthrown);
       this.flags.barrelthrown = false;
       const lines = hadBarrelBelow
@@ -15660,6 +15808,25 @@
           });
         }
       }
+      const bard = this.characters.bard;
+      if (
+        this.liveDragon()
+        && fromRoom === "lower_halls"
+        && bard
+        && !bard.carriedBy
+        && !bard.followingPlayer
+        && bard.visible
+        && bard.position === fromRoom
+      ) {
+        this.moveCharacter(bard, toRoom, direction, { silent: true });
+        bard.justEntered = false;
+        bard.followingPlayer = true;
+        bard.movementMode = "follow";
+        if (!this.flags.bard_retreating_from_smaug) {
+          this.flags.bard_retreating_from_smaug = true;
+          this.print("Bard falls back with you from the deeper halls at once, keeping close now that the dragon's road plainly leads outward.");
+        }
+      }
       if (this.player.noticeable === false) return;
       for (const character of Object.values(this.characters)) {
         if (character.id === this.player.id) continue;
@@ -16051,14 +16218,22 @@
         return {
           flag: "initiative_bard_dragon_order",
           message: this.flags.bardreadiedarrow
-            ? "Bard says 'When fire descends, a single true shot may matter more than treasure.'"
+            ? "Bard says 'When fire descends, a single true shot may matter more than treasure. We should have Ravenhill under our feet before he breaks for the Lake.'"
             : "Bard says 'Against such fire, no ordinary shaft should be trusted.'",
+        };
+      }
+      if (this.liveDragon() && this.currentRoom === "stoe_of_ravenhill") {
+        return {
+          flag: "initiative_bard_ravenhill_mark",
+          message: "Bard studies the height and says 'From here we command the Mountain's shoulder and the line of the Lake together. If Smaug comes, he must show himself cleanly.'",
         };
       }
       if (this.liveDragon() && ["front_gate", "lonely_mountain", "stoe_of_ravenhill", "little_steep_bay"].includes(this.currentRoom)) {
         return {
           flag: "initiative_bard_ready",
-          message: "Bard tests his bowstring and says 'A bowman likes to know his moment before the sky darkens.'",
+          message: this.smaugWeakSpotKnown()
+            ? "Bard tests his bowstring and says 'Now we know the mark, only the ground remains to choose rightly.'"
+            : "Bard tests his bowstring and says 'A bowman likes to know his moment before the sky darkens.'",
         };
       }
       if (!this.flags.dragondefeated && this.currentRoom === "wooden_town") {
