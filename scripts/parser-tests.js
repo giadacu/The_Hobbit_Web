@@ -6234,6 +6234,7 @@ const gameCases = [
       "Bard steps onto the old stone of Ravenhill and measures the sky above the Mountain. 'Here,' he says softly. 'From this height he must break clear before he stoops on the Lake. If ever there was a place for the last shot, it is this one.'",
       "A thrush flutters down nearby and chatters urgently, and between bird-sign and Bilbo's word the truth becomes plain: there is a bare patch in Smaug's left breast.",
       "Bard hears, nods once, and his whole attention narrows to that one chance.",
+      "Then a dark shape lifts beyond the Mountain's shoulder, and for one clear instant Smaug shows black against the sky as he turns toward the Lake.",
       "Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky.",
       "Thrush message sent: yes",
       "Bard ready at Ravenhill: yes",

@@ -5298,3 +5298,45 @@ Future debugging advice
   as lower priority than any scene with a short lethal command window.
 - When autoplay must survive hazard fiction in dark rooms, model “unsafe to
   spend a turn on visibility” explicitly instead of relying only on room type.
+
+
+Case 108 - 2026-06-23 - Ravenhill's successful dragon-shot text skipped Smaug's visible appearance beat
+--------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The successful `say to bard "shoot dragon"` sequence on Ravenhill jumped from
+the thrush warning straight to the arrow release, making it read as though Bard
+shot before Smaug had actually shown himself in the clear sky-line the scene
+kept talking about.
+
+Root cause
+----------
+The Ravenhill success branch correctly enforced the tactical setup in logic,
+but its printed output only contained:
+
+- Bard taking position
+- the thrush message
+- the shot itself
+
+The decisive visual beat of Smaug breaking clear above the Mountain was implied
+by earlier lines, but never stated in the actual firing sequence.
+
+Resolution
+----------
+- Inserted a short narrative line before the shot showing Smaug rising beyond
+  the Mountain's shoulder and standing clear against the sky as he turns toward
+  the Lake.
+- Extended the Ravenhill parser regression to require that appearance beat
+  before the existing shot line.
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- For story-critical action beats, test not only the gating logic but also the
+  order of the printed fiction, especially when geography is part of the setup.

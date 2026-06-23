@@ -6036,6 +6036,7 @@
         game.print("Bard steps onto the old stone of Ravenhill and measures the sky above the Mountain. 'Here,' he says softly. 'From this height he must break clear before he stoops on the Lake. If ever there was a place for the last shot, it is this one.'");
       }
       if (!game.thrushMessageSent()) game.deliverThrushMessage();
+      game.print("Then a dark shape lifts beyond the Mountain's shoulder, and for one clear instant Smaug shows black against the sky as he turns toward the Lake.");
       game.flags.black_arrow_committed = true;
       dragon.visible = false;
       dragon.attackFlag = 0;
