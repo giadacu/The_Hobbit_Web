@@ -15613,6 +15613,13 @@
       return true;
     }
 
+    characterCanTravelConnection(character, connection) {
+      if (!this.canTravelConnection(connection)) return false;
+      if (!character) return true;
+      if (matches(character.name, "wood elf") && connection?.to === "cellar") return false;
+      return true;
+    }
+
     canSeeConnection(connection) {
       if (connection?.from === this.currentRoom && this.roomIsDark(connection.from)) return false;
       const requiredFlag = connection?.requiredFlag;
@@ -17642,7 +17649,7 @@
 
       const exits = shuffled(this.connectionsFrom(character.position));
       for (const connection of exits) {
-        if (!this.canTravelConnection(connection)) continue;
+        if (!this.characterCanTravelConnection(character, connection)) continue;
         this.moveCharacter(character, connection.to, connection.direction);
         break;
       }

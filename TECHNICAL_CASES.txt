@@ -5153,3 +5153,45 @@ Future debugging advice
   after behavior changes in cached frontend assets.
 - If a UI still looks "old" after a code fix, verify the loaded asset URL
   first before assuming the runtime logic is wrong.
+
+
+Case 105 - 2026-06-23 - Ambient wood-elf wandering could break the cellar barrel-escape scene
+-----------------------------------------------------------------------------------------------
+
+Symptom
+-------
+During the barrel-escape sequence in the Elvenking's cellar, a wandering wood
+elf could randomly enter the `cellar` and speak or watch Bilbo during the
+stealth window, even though the scene fiction treats the cellar as the butler's
+feast-slackened work area rather than a patrolled wood-elf route.
+
+Root cause
+----------
+Ambient NPC movement used the normal room graph and `canTravelConnection()`
+without character-specific restrictions. Since the world graph includes
+`elvenkings_halls -> cellar`, the wood elf's random movement could legally pick
+that exit and wander into the barrel scene.
+
+Resolution
+----------
+- Added `characterCanTravelConnection(character, connection)` so ambient NPC
+  movement can respect character-specific route restrictions.
+- Blocked `wood elf` ambient movement into `cellar` while leaving the room graph
+  itself unchanged for the player and the butler scene logic.
+- Added parser coverage to assert that:
+  - the wood elf is not allowed to choose the cellar connection
+  - repeated forced ambient turns do not bring the wood elf into the cellar
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a scene depends on a location feeling socially controlled by one NPC,
+  ambient wandering should respect that fiction even when the raw room graph
+  permits broader travel.
+- Prefer character-specific movement filters over deleting map connections when
+  only NPC traffic, not player travel, is the real problem.

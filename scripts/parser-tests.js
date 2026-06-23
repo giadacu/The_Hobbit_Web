@@ -7944,6 +7944,38 @@ const gameCases = [
     ],
   },
   {
+    name: "wood elf ambient wandering does not enter the cellar",
+    setup(game) {
+      movePlayerTo(game, "cellar");
+      game.flags.cellar_feast_scene_seen = true;
+      game.debugSetCharacterRoom("wood_elf", "elvenkings_halls", { visible: true, movementMode: "on_first_meet" });
+    },
+    drive(game) {
+      const allowed = game.characterCanTravelConnection(game.characters.wood_elf, {
+        from: "elvenkings_halls",
+        direction: "south",
+        to: "cellar",
+      });
+      game.print(`Wood elf can enter cellar: ${allowed ? "yes" : "no"}`);
+      game.moveCharacter(game.characters.wood_elf, "elvenkings_halls", "north", { silent: true });
+      const originalRandom = Math.random;
+      try {
+        Math.random = () => 0;
+        for (let step = 0; step < 12; step += 1) game.advanceCharacterTurn({ forceMove: true });
+      } finally {
+        Math.random = originalRandom;
+      }
+      game.print(`Wood elf room after ambient turns: ${game.characters.wood_elf?.position || "none"}`);
+    },
+    expectedIncluded: [
+      "Wood elf can enter cellar: no",
+    ],
+    notExpectedIncluded: [
+      "Wood elf room after ambient turns: cellar",
+      "A wood elf enters.",
+    ],
+  },
+  {
     name: "wood elf in the dungeon recalls the kings questioning",
     setup(game) {
       movePlayerTo(game, "dark_dungeon");
