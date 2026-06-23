@@ -3781,13 +3781,6 @@ window.HOBBIT_DATA = {
     },
     {
       "from": "front_gate",
-      "direction": "north",
-      "to": "lower_halls",
-      "door": null,
-      "distance": 1
-    },
-    {
-      "from": "front_gate",
       "direction": "south",
       "to": "ruins_of_the_town_of_dale",
       "door": null,
@@ -3804,20 +3797,6 @@ window.HOBBIT_DATA = {
       "from": "lower_halls",
       "direction": "east",
       "to": "smooth_straight_passage",
-      "door": null,
-      "distance": 1
-    },
-    {
-      "from": "lower_halls",
-      "direction": "south",
-      "to": "front_gate",
-      "door": null,
-      "distance": 1
-    },
-    {
-      "from": "lower_halls",
-      "direction": "up",
-      "to": "lonely_mountain",
       "door": null,
       "distance": 1
     },
@@ -3867,13 +3846,6 @@ window.HOBBIT_DATA = {
       "from": "lonely_mountain",
       "direction": "west",
       "to": "little_steep_bay",
-      "door": null,
-      "distance": 1
-    },
-    {
-      "from": "lonely_mountain",
-      "direction": "down",
-      "to": "lower_halls",
       "door": null,
       "distance": 1
     },

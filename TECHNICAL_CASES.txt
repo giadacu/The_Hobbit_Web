@@ -5195,3 +5195,106 @@ Future debugging advice
   permits broader travel.
 - Prefer character-specific movement filters over deleting map connections when
   only NPC traffic, not player travel, is the real problem.
+
+
+Case 106 - 2026-06-23 - Erebor still exposed a summit-to-Smaug shortcut and advanced dragon awareness outside the chamber
+--------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Two Erebor regressions appeared in manual play:
+
+- Bilbo could still reach `lower_halls` from the exterior mountain route by
+  going through `lonely_mountain` and then `down`, bypassing the hidden-door
+  route tied to Elrond's reading of the map.
+- Smaug's suspicion lines could begin while the player was still in exterior
+  approach spaces such as `empty_place` or `lonely_mountain`, before actually
+  entering the dragon's hall.
+
+Root cause
+----------
+The earlier shortcut fix removed some obsolete Erebor edges, but two more
+legacy links remained in the world model:
+
+- `lower_halls -> lonely_mountain`
+- `lonely_mountain -> lower_halls`
+
+Separately, Smaug awareness was still keyed off the broad
+`IMMERSION_EREBOR_INNER_ROOMS` group, which also included `empty_place` and
+`lonely_mountain`. That made the dragon's state machine advance and announce
+itself in rooms that were near Erebor, but not yet Smaug's actual chamber.
+
+Resolution
+----------
+- Removed the lingering `lonely_mountain <-> lower_halls` source connections
+  from `assets/game-data.js`.
+- Extended the runtime connection cleanup in `game.js` to strip the same
+  legacy edge even if older data is loaded.
+- Added a dedicated `smaugAwarenessActiveRoom()` gate so Smaug's awareness,
+  suspicion buildup, and chamber narrative only advance in `lower_halls`
+  itself, while still preserving the post-theft exterior chase state.
+- Added parser regressions covering:
+  - blocked descent from `lonely_mountain`
+  - no Smaug-awareness advance outside `lower_halls`
+
+Files touched
+-------------
+- `assets/game-data.js`
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- For story-critical chokepoints, audit every historical edge into the target
+  room, not only the most obvious shortcut that first surfaces.
+- If a boss state machine should be room-specific, gate it with an explicit
+  helper rather than a broader chapter/region grouping that may later grow.
+
+
+Case 107 - 2026-06-23 - Autoplay could spend lethal hazard turns relighting the lantern in dark encounters
+-----------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+In some dark hazard scenes, autoplay could die because the brass lantern went
+out and the next command became `light lantern` instead of the urgent action
+the scene required. The most visible manual report was the hulking goblin
+ambush in the upper tunnels, where losing one turn can kill the trapped
+companion and end the run.
+
+Root cause
+----------
+Lantern relighting sat too high in autoplay priority.
+
+- `nextAutoplayCommand()` checked `autoplayShouldLightLantern()` before the
+  goblin-ambush emergency branch.
+- `autoplayShouldLightLantern()` also treated any dark room as an immediate
+  relight target, including active Gollum danger windows at `deep_dark_lake`.
+
+That meant a generic visibility-maintenance rule could outrank short-lived
+hazard windows where spending one command on light was actively unsafe.
+
+Resolution
+----------
+- Moved the goblin-tunnel ambush response ahead of the normal lantern relight
+  check, so the rescue sequence always wins priority there.
+- Added an explicit autoplay lantern hazard-window guard covering:
+  - the active goblin tunnel ambush
+  - unresolved Gollum danger windows at `deep_dark_lake`
+- Updated parser regressions so autoplay now:
+  - continues the Gollum riddle flow instead of relighting mid-encounter
+  - resolves the goblin ambush without the old `light lantern` detour
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Treat consumable maintenance actions like light, food, or inventory cleanup
+  as lower priority than any scene with a short lethal command window.
+- When autoplay must survive hazard fiction in dark rooms, model “unsafe to
+  spend a turn on visibility” explicitly instead of relying only on room type.

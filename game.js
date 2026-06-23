@@ -1862,6 +1862,8 @@
       || (connection.from === "rivendell" && connection.to === "trolls_clearing")
       || (connection.from === "front_gate" && connection.to === "lower_halls")
       || (connection.from === "lower_halls" && connection.to === "front_gate")
+      || (connection.from === "lower_halls" && connection.to === "lonely_mountain")
+      || (connection.from === "lonely_mountain" && connection.to === "lower_halls")
       || (connection.from === "little_steep_bay" && connection.to === "smooth_straight_passage")
       || (connection.from === "smooth_straight_passage" && connection.to === "little_steep_bay")
     ));
@@ -5568,7 +5570,9 @@
       if (!target) return game.print(game.heldItemMessage(cleanName) || "I don't see that here.");
       if (matches(target.name, "secret door") && !game.flags.secretdoorsun) return game.print("The rock face shows no door yet.");
       if (!target.locked) return game.print(`The ${target.name} is already unlocked.`);
-      const namedKey = withTarget?.itemName ? game.findInInventory(withTarget.itemName) : null;
+      const namedKey = withTarget?.itemName
+        ? (game.findInInventory(withTarget.itemName) || game.visibleSearch(withTarget.itemName)?.item)
+        : null;
       if (withTarget?.itemName && !namedKey) {
         return game.print(game.heldItemMessage(withTarget.itemName) || `You do not have the ${withTarget.itemName}.`);
       }
@@ -5585,7 +5589,9 @@
       const cleanName = withTarget?.targetName || objectName.split(" with ")[0].trim();
       const target = game.findDoor(cleanName)?.door || game.visibleSearch(cleanName)?.item;
       if (!target) return game.print(game.heldItemMessage(cleanName) || "I don't see that here.");
-      const namedKey = withTarget?.itemName ? game.findInInventory(withTarget.itemName) : null;
+      const namedKey = withTarget?.itemName
+        ? (game.findInInventory(withTarget.itemName) || game.visibleSearch(withTarget.itemName)?.item)
+        : null;
       if (withTarget?.itemName && !namedKey) {
         return game.print(game.heldItemMessage(withTarget.itemName) || `You do not have the ${withTarget.itemName}.`);
       }
@@ -5599,7 +5605,11 @@
 
     keyFor(target) {
       const game = this.game;
-      return game.player.inventory.map((id) => game.items[id]).find((item) => this.keyMatchesTarget(item, target));
+      const heldKey = game.player.inventory.map((id) => game.items[id]).find((item) => this.keyMatchesTarget(item, target));
+      if (heldKey) return heldKey;
+      return game.visibleSearchAll(target?.requiredKey || "key")
+        .map(({ item }) => item)
+        .find((item) => this.keyMatchesTarget(item, target)) || null;
     }
 
     keyMatchesTarget(item, target) {
@@ -8340,6 +8350,7 @@
     }
 
     smaugRoomNarrative() {
+      if (!this.game.smaugAwarenessActiveRoom()) return "";
       return SMAUG_STATE_DESCRIPTIONS[this.currentSmaugState()] || SMAUG_STATE_DESCRIPTIONS.sleeping;
     }
 
@@ -8383,24 +8394,22 @@
       const game = this.game;
       const dragon = Object.values(game.characters).find((character) => matches(character.name, "dragon") && character.visible !== false);
       if (!dragon) return;
-      if (!(IMMERSION_EREBOR_INNER_ROOMS.has(game.currentRoom) || IMMERSION_EREBOR_OUTER_ROOMS.has(game.currentRoom) || game.flags.treasuretaken)) {
+      if (!(game.smaugAwarenessActiveRoom() || game.flags.treasuretaken)) {
         this.setSmaugState("sleeping");
         return;
       }
       let state = "sleeping";
       if (game.flags.treasuretaken) state = "enraged";
-      else if (IMMERSION_EREBOR_INNER_ROOMS.has(game.currentRoom) && game.player.noticeable !== false) {
+      else if (game.smaugAwarenessActiveRoom() && game.player.noticeable !== false) {
         const tempo = (game.turnCount + (game.flags.smaugSuspicion || 0)) % 6;
         state = tempo <= 1 ? "curious" : tempo <= 3 ? "suspicious" : "searching";
-      } else if (IMMERSION_EREBOR_INNER_ROOMS.has(game.currentRoom)) {
+      } else if (game.smaugAwarenessActiveRoom()) {
         state = "suspicious";
-      } else if (IMMERSION_EREBOR_OUTER_ROOMS.has(game.currentRoom)) {
-        state = "curious";
       }
       if (state === "searching" && game.player.noticeable !== false && game.turnCount % 5 === 0) {
         state = "enraged";
       }
-      game.flags.smaugSuspicion = (game.flags.smaugSuspicion || 0) + (IMMERSION_EREBOR_INNER_ROOMS.has(game.currentRoom) ? 1 : 0);
+      game.flags.smaugSuspicion = (game.flags.smaugSuspicion || 0) + (game.smaugAwarenessActiveRoom() ? 1 : 0);
       this.setSmaugState(state, true);
     }
 
@@ -9751,10 +9760,17 @@
       return Math.max(game.autoplayDelay, Math.min(pacedDelay, 16500));
     }
 
+    autoplayLanternHazardWindowActive() {
+      const game = this.game;
+      if (game.encounters?.isGoblinTunnelEncounterActive()) return true;
+      if (game.currentRoom === "deep_dark_lake" && !game.gollumState?.escaped) return true;
+      return false;
+    }
+
     autoplayShouldLightLantern() {
       const game = this.game;
       if (game.hasActiveLantern()) return false;
-      if (game.currentRoom === "deep_dark_lake" && game.gollumState?.pocketQuestionAsked && game.player.noticeable !== false) return false;
+      if (this.autoplayLanternHazardWindowActive()) return false;
       if (game.roomNeedsLantern(game.currentRoom)) return true;
       if (game.currentRoom === "green_dragon_inn" && !game.flags.seenpony) return true;
       return false;
@@ -9811,6 +9827,17 @@
         return game.spiderEyesState.safeDirections?.[0] || null;
       }
 
+      if (beforeDragonDefeat && game.encounters?.isGoblinTunnelEncounterActive()) {
+        const goblin = game.encounters.goblinTunnelGoblin();
+        const attackers = game.encounters.goblinTunnelAttackerIds();
+        if (!attackers.has(game.player.id)) {
+          return this.autoplayHas("majestic sword") ? `kill ${goblin.name} with sword` : `kill ${goblin.name}`;
+        }
+        const helper = game.encounters.bestGoblinTunnelHelper();
+        if (helper && !attackers.has(helper.id)) return this.autoplayDirectedCharacterCommand(helper.name, `ask ${normalize(helper.name)} to attack ${goblin.name}`);
+        return this.autoplayHas("majestic sword") ? `kill ${goblin.name} with sword` : `kill ${goblin.name}`;
+      }
+
       if (game.currentRoom === "lower_halls" && game.liveDragon()) {
         if (!game.smaugWeakSpotKnown() && game.player.noticeable !== false && this.autoplayHas("golden ring")) {
           return "wear ring";
@@ -9858,17 +9885,6 @@
       }
 
       if (beforeDragonDefeat && this.autoplayShouldLightLantern()) return "light lantern";
-
-      if (beforeDragonDefeat && game.encounters?.isGoblinTunnelEncounterActive()) {
-        const goblin = game.encounters.goblinTunnelGoblin();
-        const attackers = game.encounters.goblinTunnelAttackerIds();
-        if (!attackers.has(game.player.id)) {
-          return this.autoplayHas("majestic sword") ? `kill ${goblin.name} with sword` : `kill ${goblin.name}`;
-        }
-        const helper = game.encounters.bestGoblinTunnelHelper();
-        if (helper && !attackers.has(helper.id)) return this.autoplayDirectedCharacterCommand(helper.name, `ask ${normalize(helper.name)} to attack ${goblin.name}`);
-        return this.autoplayHas("majestic sword") ? `kill ${goblin.name} with sword` : `kill ${goblin.name}`;
-      }
 
       if (beforeDragonDefeat && !game.flags.seenpony) {
         if (!game.bagEndQuestHasBegun()) return "wait";
@@ -9939,6 +9955,12 @@
 
       const hostile = game.peopleInRoom().find((character) => character.visible && character.friendly === false && !matches(character.name, "dragon"));
       if (beforeDragonDefeat && hostile && this.autoplayHas("majestic sword")) return `kill ${hostile.name} with sword`;
+
+      if (beforeDragonDefeat && !this.autoplayHas("curious key")) {
+        const prepCuriousKeyLoad = this.autoplayRequiredPickupPrepCommand("curious key");
+        if (prepCuriousKeyLoad) return prepCuriousKeyLoad;
+        if (game.visibleSearch("curious key")?.item) return "take curious key";
+      }
 
       if (beforeDragonDefeat && game.visitedTrollsClearing && this.autoplayHas("large key") && !game.trollsTransformed && game.currentRoom !== "trolls_clearing") return "wait";
 
@@ -10044,6 +10066,10 @@
         return "east";
       }
 
+      if (!this.autoplayHas("treasure") && game.liveDragon() && !game.flags.secretdoorsun) {
+        return game.currentRoom === "erebor_hidden_door" ? "wait" : this.autoplayRouteCommandTo("erebor_hidden_door");
+      }
+
       if (game.currentRoom === "lower_halls" && !this.autoplayHas("treasure")) {
         if (game.liveDragon()) {
           if (!game.smaugWeakSpotKnown()) return "ask smaug about treasure";
@@ -10065,6 +10091,7 @@
         const chest = game.items.heavy_wooden_chest;
         if (chest.locked && !this.autoplayHas("small key")) {
           if (!game.visibleSearch("small key")) return "lift carpet";
+          if (game.keyFor(chest)) return "unlock chest";
           return "take small key";
         }
         if (chest.locked) return "unlock chest";
@@ -15441,6 +15468,10 @@
 
     liveDragonInRoom(roomId = this.currentRoom) {
       return this.peopleInRoom(roomId).some((character) => matches(character.name, "dragon") && character.visible !== false);
+    }
+
+    smaugAwarenessActiveRoom(roomId = this.currentRoom) {
+      return roomId === "lower_halls";
     }
 
     handleGo(command) {

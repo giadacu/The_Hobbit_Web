@@ -2044,6 +2044,15 @@ const gameCases = [
     expectedIncluded: ["Under the carpet there is a small key."],
   },
   {
+    name: "unlock chest can use the visible small key from under the carpet",
+    inputs: ["lift carpet", "unlock chest", "open chest"],
+    expectedIncluded: [
+      "Under the carpet there is a small key.",
+      "You unlock the heavy wooden chest with the small key.",
+      "You open the heavy wooden chest.",
+    ],
+  },
+  {
     name: "delegated movement does not describe npc destination",
     inputs: ["tell gandalf to open the door and go east"],
     expectedIncluded: ["Gandalf opens the round green door.", "Gandalf goes east."],
@@ -4275,7 +4284,7 @@ const gameCases = [
       "Erebor map hides Long Lake detail: yes",
       "Title after one back: Long Lake",
       "Long Lake subtitle: Local map",
-      "Long Lake shows Front Gate host room: no",
+      "Long Lake shows Front Gate host room: yes",
       "Long Lake hides Lower Halls detail: yes",
       "Back visible in nested local map: yes",
       "Title after second back: Elvenking's Halls",
@@ -4690,7 +4699,31 @@ const gameCases = [
       "Rivendell ready: yes",
       "Has ring: no",
       "Gollum here: yes",
-      "Autoplay next at lake: light lantern",
+      "Autoplay next at lake: look",
+    ],
+  },
+  {
+    name: "autoplay keeps the gollum riddle flow ahead of lantern relight",
+    drive(game) {
+      game.execute("jump gollum");
+      game.gollumState.met = true;
+      game.gollumState.awaitingAnswer = true;
+      game.gollumState.awaitingPlayerRiddle = false;
+      game.gollumState.pocketQuestionAsked = false;
+      game.gollumState.currentRiddleIndex = 0;
+      game.flags.lanternon = false;
+      game.flags.lanternturns = 0;
+      const command = game.nextAutoplayCommand();
+      if (command === "light lantern") {
+        throw new Error("Autoplay should not relight the lantern during the Gollum riddle flow.");
+      }
+      if (!command.startsWith("answer ")) {
+        throw new Error(`Expected autoplay to continue the Gollum riddle flow, got: ${command}`);
+      }
+      game.print(`Autoplay gollum hazard command: ${command}`);
+    },
+    expectedIncluded: [
+      "Autoplay gollum hazard command: answer ",
     ],
   },
   {
@@ -5280,6 +5313,22 @@ const gameCases = [
     ],
     notExpectedIncluded: [
       "You find yourself in a smooth, straight passage.",
+    ],
+  },
+  {
+    name: "lonely mountain no longer drops straight into smaugs hall",
+    drive(game) {
+      game.currentRoom = "lonely_mountain";
+      game.player.position = "lonely_mountain";
+      game.execute("down");
+      game.print(`Mountain room after blocked down: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "You see no exit in that direction.",
+      "Mountain room after blocked down: lonely_mountain",
+    ],
+    notExpectedIncluded: [
+      "You enter the lower halls of Erebor",
     ],
   },
   {
@@ -6248,7 +6297,7 @@ const gameCases = [
       game.print(`Autoplay after weak-spot knowledge: ${game.nextAutoplayCommand()}`);
     },
     expectedIncluded: [
-      "Autoplay after weak-spot knowledge: up",
+      "Autoplay after weak-spot knowledge: west",
     ],
     notExpectedIncluded: [
       "Autoplay after weak-spot knowledge: say to bard \"shoot dragon\"",
@@ -6302,6 +6351,29 @@ const gameCases = [
       "Jumped to Smaug.",
       "Treasure approach Smaug activity: none",
       "Lower halls Smaug activity: Smaug",
+    ],
+  },
+  {
+    name: "smaug awareness does not advance outside the lower halls",
+    drive(game) {
+      game.execute("jump front_gate");
+      game.debugSetCharacterRoom("dragon", "lower_halls");
+      game.currentRoom = "lonely_mountain";
+      game.player.position = "lonely_mountain";
+      game.flags.smaugstate = "sleeping";
+      game.flags.smaugSuspicion = 0;
+      game.advanceSmaugAwareness();
+      game.print(`Lonely Mountain Smaug state: ${game.currentSmaugState()}`);
+    },
+    expectedIncluded: [
+      "Jumped to Front Gate.",
+      "Lonely Mountain Smaug state: sleeping",
+    ],
+    notExpectedIncluded: [
+      "Smaug stirs, one vast lid lifting over a watchful eye.",
+      "Smaug's voice rolls through the hall, soft and terrible, as he begins to suspect an intruder.",
+      "Smaug rises from the treasure and begins to search the hall in deadly earnest.",
+      "Smaug's patience breaks. Rage shakes the treasure as the dragon lashes the chamber with tail and voice.",
     ],
   },
   {
@@ -7563,8 +7635,10 @@ const gameCases = [
       game.print(`Autoplay goblin ambush path: ${issued.join(" -> ")}`);
     },
     expectedIncluded: [
-      "The body of the hulking goblin lies here.",
-      "Autoplay goblin ambush path: light lantern -> kill hulking goblin with sword -> ask gandalf to attack hulking goblin",
+      "Autoplay goblin ambush path: kill hulking goblin with sword -> ask gandalf to attack hulking goblin",
+    ],
+    notExpectedIncluded: [
+      "Autoplay goblin ambush path: light lantern",
     ],
   },
   {
