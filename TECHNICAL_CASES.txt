@@ -5393,3 +5393,188 @@ Future debugging advice
   expects distinct beats, even if the final game-state change is only one.
 - If a command is doing discovery, confirmation, sighting, and resolution all
   at once, split those beats before adding more text around it.
+
+
+Case 110 - 2026-06-24 - `Treeless Opening` needed contextual visuals so the warg and eagle chapter did not read like one static room
+-------------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The warg escape and eagle rescue in `treeless_opening` worked mechanically, but
+the scene still felt visually flat.
+
+- The base `Treeless Opening` image looked like a dense forest rather than an
+  exposed open ground.
+- The rescue text jumped from wolves under the trees to `great_river` with too
+  little visual distinction between chase, rescue, and landing.
+
+Root cause
+----------
+The chapter had stateful narrative text but almost no stateful image treatment.
+
+- `treeless_opening` always relied on one room image whose composition fit the
+  "in the pines" beat better than the open-ground beat.
+- `great_river` had no dedicated arrival visual for the eagle-rescue variant.
+- The rescue text itself was compact enough that, without stronger visual cues,
+  the whole chapter could read as a single blended scene.
+
+Resolution
+----------
+- Added contextual room-image rules for:
+  - `treeless_opening` while trapped on the ground by wargs
+  - `treeless_opening` after climbing into the pines
+  - `great_river` immediately after the eagle rescue
+- Repointed the default `treeless_opening` room image toward a more open-ground
+  placeholder so the room reads closer to its name outside the rescue scene.
+- Expanded the rescue narration with an extra fire beat, a clearer airborne
+  escape beat, and a visible dawn approach to the Great River.
+- Created semantically named placeholder asset files so future final art can
+  replace them without another code change.
+
+Files touched
+-------------
+- `game.js`
+- `assets/game-data.js`
+- `assets/local-images/treeless_opening_open_ground.jpeg`
+- `assets/local-images/treeless_opening_warg_ground.jpeg`
+- `assets/local-images/treeless_opening_warg_trees.jpeg`
+- `assets/local-images/great_river_eagles_arrival.jpeg`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a short story chapter already has state flags, use them to drive image
+  changes as well as text; otherwise distinct beats can collapse visually.
+- If final art is not ready yet, introduce stable semantic filenames first so
+  later asset swaps do not require revisiting gameplay logic.
+
+
+Case 111 - 2026-06-24 - The eagle rescue needed a distinct in-flight art beat before the Great River landing image
+-------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After adding contextual art for the warg chapter, the new PNG assets included
+both an aerial eagle-rescue scene and a separate Great River arrival scene, but
+only room images were wired. That left no dedicated moment for the airborne
+escape itself.
+
+Root cause
+----------
+Room-context image rules can only show one settled room state at a time.
+
+- `great_river` could show the arrival art after rescue.
+- But the in-flight eagle beat is not really a room state; it is a transient
+  narrative moment inside the `wait` resolution that moves the party there.
+
+Resolution
+----------
+- Switched the `Treeless Opening` and `Great River` contextual image bindings to
+  the final PNG assets.
+- Repointed the default `treeless_opening` art to the PNG open-ground version.
+- At the end of `resolveWargEscapeWait()`, after printing the airborne escape
+  and landing narration, showed `aerial_rescue_eagles.png` as a temporary image.
+- Because temporary images already dismiss on the next command, the game now
+  naturally transitions from the in-flight rescue art to the contextual
+  `great_river_eagles_arrival.png` scene on the following input.
+
+Files touched
+-------------
+- `game.js`
+- `assets/game-data.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Use contextual room art for stable arrival states and temporary images for
+  one-command narrative beats that happen between rooms.
+
+
+Case 112 - 2026-06-24 - The `Treeless Opening` warg death needed its own image instead of the generic wolf death art
+---------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The `Treeless Opening` fail state already had a death image, but it reused the
+ more generic wolf/warg death art rather than the new scene-specific image the
+ repository now includes.
+
+Root cause
+----------
+The warg-opening death was still wired to `warg_kills_bilbo_death.png` in two
+ places:
+
+- the explicit `endGame()` call in `resolveWargEscapeWait()`
+- the text-to-image fallback that maps the corresponding death line to art
+
+Resolution
+----------
+- Repointed the `Treeless Opening` wait-in-the-open death to
+  `treeless_opening_warg_death.png`
+- Kept `warg_kills_bilbo_death.png` for other generic wolf/warg fatal contexts
+- Updated the parser regression to assert the new scene-specific death image
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a generic death illustration is replaced by a scene-specific one, update
+  both the direct fatal branch and any narrative-text image fallback so they do
+  not drift apart.
+
+
+Case 113 - 2026-06-24 - The trolls chapter needed image states that matched its live, suspicious, and dawn aftermath beats
+---------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The trolls sequence had strong textual staging, but visually it still felt
+underpowered.
+
+- Entering the clearing did not show a dedicated story beat for Bilbo hiding
+  while the trolls argued over a captured dwarf.
+- The live clearing and the suspicion warnings shared essentially one visual
+  state.
+- The cave still used a more generic older image instead of the new loot-focused
+  art.
+
+Root cause
+----------
+The scene already had the right state flags and narrative beats, but image
+selection had not been expanded to use them.
+
+- `checkTrollsClearing()` prints a strong intro sequence, but previously showed
+  no dedicated one-shot image for that moment.
+- `trollsclearingwarningturns` already tracked the shift from stealth to near
+  discovery, but room art did not react to it.
+- `trolls_clearing` still relied on older base/transformed image assignments.
+
+Resolution
+----------
+- Added contextual room-image rules for:
+  - live trolls in the clearing
+  - the suspicion warning phase
+  - the stone-dawn aftermath
+  - the trolls' cave loot state
+- Repointed the default room art so:
+  - `trolls_clearing` uses `trolls_clearing_live.png`
+  - `trolls_clearing` transformed art uses `trolls_clearing_stone_dawn.png`
+  - `trolls_cave` uses `trolls_cave_loot.png`
+- When the troll encounter first triggers, the game now shows
+  `trolls_clearing_entry.png` as a temporary intro image.
+
+Files touched
+-------------
+- `game.js`
+- `assets/game-data.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- For multi-beat hazard scenes, prefer one temporary entry image plus a small
+  number of contextual persistent room images keyed from existing warning or
+  aftermath flags.

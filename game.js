@@ -2,7 +2,7 @@
   const DATA = applyImmersionExpansion(window.HOBBIT_DATA);
   const IMAGE_ROOT = "assets/local-images/";
   const MUSIC_ROOT = "assets/local-music/";
-  const ASSET_VERSION = "20260621-1945";
+  const ASSET_VERSION = "20260624-1825";
   const ASSET_QUERY_SUFFIX = `?v=${ASSET_VERSION}`;
   const MUSIC_LIBRARY = {
     shire: {
@@ -1521,6 +1521,41 @@
           || game.mirkwoodLostness() >= 2
         ),
         image: "west_bank_exhausted.png",
+      },
+    ],
+    trolls_clearing: [
+      {
+        when: ({ game }) => game.trollsTransformed,
+        image: "trolls_clearing_stone_dawn.png",
+      },
+      {
+        when: ({ game }) => !game.trollsTransformed && Number(game.flags.trollsclearingwarningturns || 0) >= 1,
+        image: "trolls_clearing_suspicion.png",
+      },
+      {
+        when: ({ game }) => !game.trollsTransformed,
+        image: "trolls_clearing_live.png",
+      },
+    ],
+    trolls_cave: [
+      {
+        image: "trolls_cave_loot.png",
+      },
+    ],
+    treeless_opening: [
+      {
+        when: ({ game }) => game.wargEscapeActive() && !game.flags.warg_escape_in_trees,
+        image: "treeless_opening_warg_ground.png",
+      },
+      {
+        when: ({ game }) => game.wargEscapeActive() && game.flags.warg_escape_in_trees,
+        image: "treeless_opening_warg_trees.png",
+      },
+    ],
+    great_river: [
+      {
+        when: ({ game }) => game.eaglesRescuedCompany() && !game.beornMountainArrivalComplete(),
+        image: "great_river_eagles_arrival.png",
       },
     ],
   };
@@ -9506,6 +9541,7 @@
         game.print("Roast him!");
         game.print("He wouldn't make above a mouthful.");
         game.print("P'raps there are more like him round about.");
+        game.showTemporaryImage("trolls_clearing_entry.png", { alt: "Bilbo hiding while the trolls quarrel over a captured dwarf" });
         return;
       }
       const liveTroll = game.peopleInRoom().find((p) => ["hideous troll", "vicious troll"].includes(normalize(p.name)) && p.visible);
@@ -12516,7 +12552,8 @@
       if (text.includes("something small and venomous strikes from the dark")) return "spider_stings_death.png";
       if (text.includes("the racing river bears you under the halls and gives you back no more")) return "bilbo_falls_from_trap_door_river_death.png";
       if (text.includes("the river takes you at once")) return "bilbo_black_river_death.png";
-      if (text.includes("the wargs rush in before the trees can be reached") || text.includes("fangs close")) return "warg_kills_bilbo_death.png";
+      if (text.includes("the wargs rush in before the trees can be reached")) return "treeless_opening_warg_death.png";
+      if (text.includes("fangs close")) return "warg_kills_bilbo_death.png";
       if (text.includes("at last your strength deserts you in the blind dark")) return "exhausted_tunnels_death.png";
       if (text.includes("hulking goblin butchers")) return "hulking_goblin_attack_death.png";
       if (text.includes("you creep toward the gleaming key") || text.includes("you emerge from hiding and reach for the large key")) {
@@ -16800,7 +16837,7 @@
         this.print("You wait in the open for one instant too long.");
         this.endGame("The wargs rush in before the trees can be reached, and the night under the mountain ends in teeth and trampling.", {
           fatal: true,
-          deathImage: "warg_kills_bilbo_death.png",
+          deathImage: "treeless_opening_warg_death.png",
         });
         return true;
       }
@@ -16812,11 +16849,14 @@
       this.player.position = "great_river";
       this.companionDirector?.sync();
       this.print("You wait, clinging to the swaying pine while the wargs howl below and Gandalf drives them back with sudden sheets of fire.");
-      this.print("Then a great beating of wings comes out of the high dark. Eagles stoop from above the mountain, seize the company out of smoke and branches, and bear you far from the goblins' fury.");
+      this.print("Fire flares red among the trunks until the whole ring of pines seems to stand in a wavering crown above the wolves, and the goblin-shouting falters for one astonished moment.");
+      this.print("Then a great beating of wings comes out of the high dark. Eagles stoop from above the mountain, seize the company out of smoke and branches, and bear you away over the falling slopes while the wargs dwindle to a snarling ring below.");
+      this.print("The black ridges sink behind you. Far ahead the valley opens under a whitening sky, and the Great River begins to gleam like pale metal through the mists of morning.");
       this.print("By grey morning they set you down beside the Great River on the edge of Beorn's lands, shaken and weary, but alive.");
       this.hazards?.maybeProgressAutosave(previousRoom, this.currentRoom);
       this.maybeAutosaveForRoom(this.currentRoom);
       this.describeRoom({ full: true });
+      this.showTemporaryImage("aerial_rescue_eagles.png", { alt: "Eagles bearing the company away from the mountain" });
       return true;
     }
 

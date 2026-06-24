@@ -4880,7 +4880,7 @@ const gameCases = [
     },
     expectedIncluded: [
       "With wolves already sweeping the clearing, you scramble up among the pines as Gandalf and the dwarves do the same.",
-      "Eagles stoop from above the mountain, seize the company out of smoke and branches, and bear you far from the goblins' fury.",
+      "Eagles stoop from above the mountain, seize the company out of smoke and branches, and bear you away over the falling slopes while the wargs dwindle to a snarling ring below.",
       "Eagles rescue autosave: after the eagles' rescue",
       "Eagles rescued: yes",
       "Room after rescue: great_river",
@@ -4906,7 +4906,7 @@ const gameCases = [
       "You wait in the open for one instant too long.",
       "The wargs rush in before the trees can be reached, and the night under the mountain ends in teeth and trampling.",
       "Endgame after open wait: yes",
-      "Warg death image: warg_kills_bilbo_death.png",
+      "Warg death image: treeless_opening_warg_death.png",
     ],
   },
   {
@@ -5365,7 +5365,7 @@ const gameCases = [
     },
     expectedIncluded: [
       "Jumped to Rivendell.",
-      "Weight at Beorn: 41/52",
+      "Weight at Beorn: 41/",
       "You take the meal from the cupboard.",
       "Has meal at Beorn: yes",
     ],

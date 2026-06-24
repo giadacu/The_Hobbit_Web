@@ -20,8 +20,8 @@ window.HOBBIT_DATA = {
       "id": "trolls_clearing",
       "name": "Trolls clearing",
       "description": "You are in the trolls' clearing. Ancient trees encircle the open space, their branches forming a natural canopy overhead. The ground is covered in soft moss, interspersed with large, flat rocks. Scattered around the clearing are various makeshift shelters and a large fire pit, its embers still glowing faintly.",
-      "image": "Trolls.jpeg",
-      "transformedImage": "trolls_stone.jpeg",
+      "image": "trolls_clearing_live.png",
+      "transformedImage": "trolls_clearing_stone_dawn.png",
       "sound": "suspence"
     },
     "hidden_path": {
@@ -36,7 +36,7 @@ window.HOBBIT_DATA = {
       "id": "trolls_cave",
       "name": "Trolls Cave",
       "description": "You are in the trolls' cave. The cavern is small and dimly lit, with stalactites hanging from the ceiling like ancient teeth. The air is cool and damp, filled with the echo of dripping water. Shadows dance on the rugged walls, revealing crude drawings and remnants of past inhabitants. The ground is uneven, littered with bones and scattered treasures, whispering of the trolls' presence.",
-      "image": "trolls_cave.jpeg",
+      "image": "trolls_cave_loot.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -380,7 +380,7 @@ window.HOBBIT_DATA = {
       "id": "treeless_opening",
       "name": "Treeless opening",
       "description": "You are in a treeless opening. The vast expanse of open land stretches out beneath a sky painted with hues of twilight. The ground, a patchwork of grass and wildflowers, is soft underfoot. Distant hills frame the horizon, their silhouettes dark against the fading light. The air is crisp and carries the faint scent of blooming flora. In the quiet, the gentle whispers of the wind weave through the open space, accompanied by the distant call of a lone bird. The serene, unbroken landscape invites a sense of peace and solitude, far from the turmoil of the world beyond.",
-      "image": "treeless_opening.jpeg",
+      "image": "treeless_opening_open_ground.png",
       "transformedImage": null,
       "sound": "adventure"
     },
