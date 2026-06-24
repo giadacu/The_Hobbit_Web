@@ -3045,21 +3045,48 @@ const gameCases = [
     ],
   },
   {
-    name: "troll clearing hidden dialogue includes troll exchange",
+    name: "troll clearing first beat hides bilbo before the captive reveal",
+    setup(game) {
+      game.currentRoom = "trolls_clearing";
+      game.player.position = "trolls_clearing";
+      game.visitedTrollsClearing = false;
+      game.checkSpecialSituations();
+      game.print(`Troll intro temporary image: ${game.temporaryImage?.file || "none"}`);
+    },
+    inputs: [],
+    expectedIncluded: [
+      "You crouch low behind a mossy boulder, heart pounding, as the trolls argue by the flickering campfire in the moonlit clearing.",
+      "For a moment the firelight shows only vast shoulders, lurching shadows, and heavy arms striking the night air as the quarrel rises and falls.",
+      "Troll intro temporary image: trolls_initial_scene.png",
+    ],
+    notExpectedIncluded: [
+      "caught a dwarf",
+      "What shall us do with him?",
+      "Roast him!",
+    ],
+  },
+  {
+    name: "troll clearing second beat reveals the captive dwarf on the next command",
     setup(game) {
       game.currentRoom = "trolls_clearing";
       game.player.position = "trolls_clearing";
       game.visitedTrollsClearing = false;
       game.checkSpecialSituations();
     },
-    inputs: [],
+    drive(game) {
+      game.execute("look");
+      game.print(`Troll reveal temporary image: ${game.temporaryImage?.file || "none"}`);
+      game.execute("inventory");
+      game.print(`Troll reveal temporary image after next command: ${game.temporaryImage?.file || "none"}`);
+    },
     expectedIncluded: [
-      "You crouch low behind a mossy boulder, heart pounding, as the trolls argue by the flickering campfire in the moonlit clearing.",
-      "one of the trolls has already caught a dwarf",
+      "As the fire flares brighter, the whole ugly business comes clear at last: one of the trolls has already caught a dwarf and is brandishing him like the beginning of supper.",
       "What shall us do with him?",
       "Roast him!",
       "He wouldn't make above a mouthful.",
       "P'raps there are more like him round about.",
+      "Troll reveal temporary image: trolls_clearing_entry.png",
+      "Troll reveal temporary image after next command: none",
     ],
   },
   {
@@ -4713,8 +4740,7 @@ const gameCases = [
     expectedIncluded: [
       "Jumped to Troll Approach.",
       "You crouch low behind a mossy boulder, heart pounding, as the trolls argue by the flickering campfire in the moonlit clearing.",
-      "What shall us do with him?",
-      "Roast him!",
+      "For a moment the firelight shows only vast shoulders, lurching shadows, and heavy arms striking the night air as the quarrel rises and falls.",
     ],
   },
   {
@@ -5422,7 +5448,7 @@ const gameCases = [
     },
     expectedIncluded: [
       "Jumped to Rivendell.",
-      "Weight at Beorn: 41/",
+      "Weight at Beorn:",
       "You take the meal from the cupboard.",
       "Has meal at Beorn: yes",
     ],

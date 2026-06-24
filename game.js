@@ -9554,14 +9554,11 @@
         game.waitCounter = 0;
         game.flags.trollsclearingwarningturns = 0;
         game.flags.trollsclearingwarningturnstamp = -1;
+        game.flags.trollscaptiverevealed = false;
         game.recordAutosave("before facing the trolls", { key: "hazard:trolls:room" });
         game.print("You crouch low behind a mossy boulder, heart pounding, as the trolls argue by the flickering campfire in the moonlit clearing.");
-        game.print("Only then do you make out the cause of the quarrel: one of the trolls has already caught a dwarf and is brandishing him like the beginning of supper.");
-        game.print("What shall us do with him?");
-        game.print("Roast him!");
-        game.print("He wouldn't make above a mouthful.");
-        game.print("P'raps there are more like him round about.");
-        game.showTemporaryImage("trolls_clearing_entry.png", { alt: "Bilbo hiding while the trolls quarrel over a captured dwarf" });
+        game.print("For a moment the firelight shows only vast shoulders, lurching shadows, and heavy arms striking the night air as the quarrel rises and falls.");
+        game.showTemporaryImage("trolls_initial_scene.png", { alt: "Bilbo hiding at the edge of the trolls' clearing" });
         return;
       }
       const liveTroll = game.peopleInRoom().find((p) => ["hideous troll", "vicious troll"].includes(normalize(p.name)) && p.visible);
@@ -11982,6 +11979,7 @@
         let forceNpcMovement = false;
         let shouldAdvanceTurn = false;
         for (const [index, command] of commands.entries()) {
+          this.maybeRevealTrollCaptiveScene(command);
           if (normalize(command) === "wait") forceNpcMovement = true;
           const moved = this.processCommand(command);
           if (this.commandConsumesTurn(command)) shouldAdvanceTurn = true;
@@ -12007,6 +12005,49 @@
       const text = normalize(command);
       if (!text) return false;
       return !/^(?:ask|talk|speak|say|whisper|yell)\b/.test(text);
+    }
+
+    trollCaptiveRevealPending() {
+      return this.currentRoom === "trolls_clearing"
+        && this.visitedTrollsClearing
+        && !this.trollsTransformed
+        && !Boolean(this.flags.trollscaptiverevealed);
+    }
+
+    shouldDeferTrollCaptiveReveal(command = "") {
+      const text = normalizeNaturalCommand(String(command || "").toLowerCase());
+      if (!text) return true;
+      return [
+        "save",
+        "load",
+        "restart",
+        "commands",
+        "verbs",
+        "tips",
+        "help",
+        "map",
+        "complete map",
+        "white",
+        "black",
+      ].includes(text) || /^voice\b/.test(text);
+    }
+
+    revealTrollCaptiveScene() {
+      if (!this.trollCaptiveRevealPending()) return false;
+      this.flags.trollscaptiverevealed = true;
+      this.print("As the fire flares brighter, the whole ugly business comes clear at last: one of the trolls has already caught a dwarf and is brandishing him like the beginning of supper.");
+      this.print("What shall us do with him?");
+      this.print("Roast him!");
+      this.print("He wouldn't make above a mouthful.");
+      this.print("P'raps there are more like him round about.");
+      this.showTemporaryImage("trolls_clearing_entry.png", { alt: "Bilbo spying the trolls as they quarrel over a captured dwarf" });
+      return true;
+    }
+
+    maybeRevealTrollCaptiveScene(command = "") {
+      if (!this.trollCaptiveRevealPending()) return false;
+      if (this.shouldDeferTrollCaptiveReveal(command)) return false;
+      return this.revealTrollCaptiveScene();
     }
 
     emptyCommandReferenceContext() {

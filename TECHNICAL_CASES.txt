@@ -5617,3 +5617,49 @@ Future debugging advice
 -----------------------
 - If travel art belongs to the departure beat rather than the destination
   room, use a temporary image instead of relying on contextual room art alone.
+
+
+Case 115 - 2026-06-24 - The trolls clearing opener needed a separate pre-reveal beat
+-------------------------------------------------------------------------------------
+
+Symptom
+-------
+Entering `trolls_clearing` immediately showed the strongest visual beat of the
+scene: the trolls already quarreling over a captured dwarf. That made the
+encounter feel as if it started one moment too far in.
+
+Root cause
+----------
+The first-entry trigger in `checkTrollsClearing()` bundled everything into one
+moment:
+
+- autosave and hazard initialization
+- Bilbo's hiding-place intro text
+- the captive-dwarf reveal and troll dialogue
+- the temporary image `trolls_clearing_entry.png`
+
+So the existing "entry image" was not really an approach beat; it was already
+the reveal.
+
+Resolution
+----------
+- Split the opener into two phases.
+- First entry now gives only Bilbo's hidden approach beat and a more neutral
+  temporary image (`trolls_initial_scene.png`).
+- A new narrative flag defers the captive-dwarf reveal until the next
+  in-world command in the clearing, where the game then prints the troll
+  exchange and shows `trolls_clearing_entry.png`.
+- Kept autosave, warning-turn logic, and troll danger timing separate from the
+  new pacing flag.
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a hazard scene feels like it begins too late, prefer a separate
+  narrative-phase flag instead of overloading combat/suspicion counters that
+  already drive gameplay pressure.
