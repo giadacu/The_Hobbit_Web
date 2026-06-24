@@ -220,6 +220,13 @@ body {
   z-index: 21;
 }
 
+.lab-overlay-panel--wide {
+  left: 16px;
+  right: 16px;
+  width: auto;
+  max-width: none;
+}
+
 .lab-overlay-panel__head {
   display: flex;
   align-items: start;
@@ -297,6 +304,378 @@ body {
   font: inherit;
   font-size: 0.78rem;
   cursor: pointer;
+}
+
+.lab-spine {
+  display: grid;
+  gap: 14px;
+}
+
+.lab-spine-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.lab-spine-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1.72fr) minmax(300px, 0.78fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.lab-spine-pane {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.lab-spine__summary {
+  padding: 10px 11px;
+  border: 1px solid rgba(214, 185, 102, 0.12);
+  border-radius: 10px;
+  background: rgba(245, 238, 219, 0.05);
+}
+
+.lab-spine__summary {
+  display: grid;
+  gap: 8px;
+}
+
+.lab-spine__summary-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.lab-spine__selection {
+  padding: 8px 9px;
+  border-radius: 10px;
+  border: 1px solid rgba(214, 185, 102, 0.14);
+  background: rgba(245, 238, 219, 0.045);
+  display: grid;
+  gap: 4px;
+}
+
+.lab-spine__summary strong,
+.lab-spine-node__command,
+.lab-spine-branch__label,
+.lab-spine-terminal__label {
+  color: #f4edd8;
+}
+
+.lab-spine__meta,
+.lab-spine__selection,
+.lab-spine-branch__meta,
+.lab-spine-node__meta,
+.lab-spine-empty {
+  color: #dccca8;
+  font-size: 0.76rem;
+  line-height: 1.42;
+}
+
+.lab-spine__selection strong {
+  color: #fff2cf;
+}
+
+.lab-spine__panel {
+  padding: 9px 10px;
+  border: 1px solid rgba(214, 185, 102, 0.12);
+  border-radius: 10px;
+  background: rgba(245, 238, 219, 0.05);
+  display: grid;
+  gap: 7px;
+}
+
+.lab-spine__panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lab-spine__panel-head strong {
+  color: #f4edd8;
+}
+
+.lab-spine__panel-copy {
+  color: #dccca8;
+  font-size: 0.76rem;
+  line-height: 1.42;
+}
+
+.lab-spine-inspector {
+  display: grid;
+  gap: 10px;
+  align-items: start;
+}
+
+.lab-spine-detail-row {
+  min-width: 0;
+}
+
+.lab-spine__panel--detail {
+  min-width: 0;
+}
+
+.lab-spine__panel--detail .lab-detail__text,
+.lab-spine__panel--detail .lab-detail__log,
+.lab-spine__panel--detail .lab-detail__list {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.lab-spine__panel--detail .lab-detail__text {
+  white-space: pre-wrap;
+}
+
+.lab-spine__panel--detail .lab-detail__log {
+  max-height: 210px;
+  overflow: auto;
+}
+
+.lab-spine__panel--detail .lab-detail__list {
+  max-height: 140px;
+  overflow: auto;
+}
+
+.lab-spine__actions,
+.lab-spine-branch__actions,
+.lab-spine-terminal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lab-spine__button,
+.lab-spine-branch__button,
+.lab-spine-node__button,
+.lab-spine-terminal__button {
+  appearance: none;
+  border: 1px solid rgba(214, 185, 102, 0.28);
+  border-radius: 8px;
+  background: rgba(245, 238, 219, 0.1);
+  color: #f5eedb;
+  padding: 7px 9px;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.lab-spine-tree,
+.lab-spine-node__branches {
+  display: grid;
+}
+
+.lab-spine-tree {
+  gap: 0;
+}
+
+.lab-spine-node,
+.lab-spine-terminal {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  padding-bottom: 10px;
+}
+
+.lab-spine-node.has-branches {
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.72fr);
+  gap: 12px;
+}
+
+.lab-spine-terminal {
+  padding-bottom: 0;
+}
+
+.lab-spine-node::before,
+.lab-spine-terminal::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(214, 185, 102, 0.7), rgba(214, 185, 102, 0.16));
+}
+
+.lab-spine-node:first-child::before {
+  top: 18px;
+}
+
+.lab-spine-terminal::before {
+  bottom: 18px;
+}
+
+.lab-spine-node__main,
+.lab-spine-terminal__main {
+  position: relative;
+  min-height: 36px;
+  padding-left: 36px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lab-spine-node__main::before,
+.lab-spine-terminal__main::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 17px;
+  width: 20px;
+  height: 2px;
+  background: rgba(214, 185, 102, 0.55);
+}
+
+.lab-spine-node__button,
+.lab-spine-terminal__button {
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(73, 112, 70, 0.9), rgba(35, 66, 39, 0.95));
+  border-color: rgba(168, 216, 157, 0.26);
+  box-shadow: 0 0 0 3px rgba(12, 23, 13, 0.55);
+}
+
+.lab-spine-terminal__button {
+  background: linear-gradient(180deg, rgba(121, 144, 67, 0.95), rgba(65, 82, 32, 0.98));
+}
+
+.lab-spine-node__button.is-selected,
+.lab-spine-terminal__button.is-selected {
+  box-shadow: 0 0 0 3px rgba(12, 23, 13, 0.55), 0 0 0 1px rgba(214, 185, 102, 0.7);
+}
+
+.lab-spine-node__command,
+.lab-spine-terminal__label {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lab-spine-node__command:hover,
+.lab-spine-terminal__label:hover,
+.lab-spine-branch__label:hover {
+  color: #fff6df;
+}
+
+.lab-spine-node__index,
+.lab-spine-terminal__meta {
+  color: #d6b966;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lab-spine-node__branches {
+  gap: 8px;
+  padding-top: 1px;
+}
+
+.lab-spine-branch {
+  position: relative;
+  display: grid;
+  gap: 5px;
+  padding-left: 26px;
+}
+
+.lab-spine-branch::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 14px;
+  width: 18px;
+  height: 2px;
+  background: rgba(209, 104, 93, 0.62);
+}
+
+.lab-spine-branch::after {
+  content: "";
+  position: absolute;
+  left: 16px;
+  top: 11px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(209, 104, 93, 0.9);
+  box-shadow: 0 0 0 2px rgba(51, 16, 12, 0.55);
+}
+
+.lab-spine-branch__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lab-spine-branch__label {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.83rem;
+  cursor: pointer;
+}
+
+.lab-spine-branch__meta {
+  padding-left: 2px;
+}
+
+.lab-spine-branch__button {
+  justify-self: start;
+  padding: 5px 8px;
+  font-size: 0.72rem;
+  border-color: rgba(209, 104, 93, 0.28);
+  background: rgba(120, 34, 25, 0.18);
+}
+
+.lab-spine-branch.is-selected .lab-spine-branch__label {
+  color: #fff3ef;
+}
+
+.lab-spine-branch.is-selected::after {
+  box-shadow: 0 0 0 2px rgba(51, 16, 12, 0.55), 0 0 0 1px rgba(214, 185, 102, 0.72);
+}
+
+.lab-spine-terminal__main {
+  min-height: 34px;
+}
+
+.lab-spine-empty {
+  font-style: italic;
+  padding-left: 36px;
+}
+
+@media (max-width: 860px) {
+  .lab-spine-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .lab-spine-node,
+  .lab-spine-terminal {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .lab-spine-node.has-branches {
+    grid-template-columns: 1fr;
+  }
+
+  .lab-spine-node__branches {
+    padding-left: 36px;
+  }
 }
 
 .lab-audit__list {
@@ -483,6 +862,7 @@ body {
 .lab-detail__section {
   display: grid;
   gap: 6px;
+  min-width: 0;
 }
 
 .lab-detail__section strong {
@@ -490,6 +870,55 @@ body {
   font-size: 0.7rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.lab-detail__disclosure {
+  padding-bottom: 2px;
+}
+
+.lab-detail__summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.lab-detail__summary::-webkit-details-marker {
+  display: none;
+}
+
+.lab-detail__toggle {
+  width: 16px;
+  height: 16px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(214, 185, 102, 0.28);
+  border-radius: 999px;
+  color: #f5eedb;
+  font-size: 0.8rem;
+  line-height: 1;
+  background: rgba(245, 238, 219, 0.08);
+}
+
+.lab-detail__disclosure[open] .lab-detail__toggle {
+  content: "-";
+}
+
+.lab-detail__disclosure[open] .lab-detail__toggle::before {
+  content: "-";
+}
+
+.lab-detail__disclosure:not([open]) .lab-detail__toggle::before {
+  content: "+";
+}
+
+.lab-detail__disclosure .lab-detail__toggle {
+  color: transparent;
+}
+
+.lab-detail__disclosure pre {
+  margin: 6px 0 0;
 }
 
 .lab-detail__list,

@@ -5663,3 +5663,523 @@ Future debugging advice
 - When a hazard scene feels like it begins too late, prefer a separate
   narrative-phase flag instead of overloading combat/suspicion counters that
   already drive gameplay pressure.
+
+
+Case 116 - 2026-06-24 - The autoplay lab needed a separate solution-spine view instead of bending the branch tree
+------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The existing autoplay lab could show successful runs or death runs, but it did
+not show "the winning route with the fatal offshoots branching away from it".
+Using the standard branch tree for this made the output feel mixed together and
+hard to read.
+
+Root cause
+----------
+The current branch tree groups full simulated runs by command prefix. That is
+useful for browsing runs, but it does not model a canonical success path with
+explicit divergence points.
+
+Trying to force that shape into the same tree would have:
+
+- mixed two different mental models in one panel
+- made the main analysis UI harder to read
+- hidden the key data we needed: the exact step where a fatal branch leaves the
+  winning sequence
+
+Resolution
+----------
+- Added a separate `Solution spine` action and overlay in the lab.
+- The new flow first finds one canonical winning run in the current seed range,
+  preferring optimal autoplay and falling back to alternative success only if
+  needed.
+- It then replays prefixes of that winning run and probes fatal deviations from
+  each step, keeping the standard branch tree unchanged.
+- Offshoot details now record the divergence step, the winning command they
+  replace, the fatal starting command, and the steps to death.
+
+Files touched
+-------------
+- `autoplay-lab.html`
+- `autoplay-lab.css`
+- `autoplay-lab.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a new autoplay view wants to express relations between runs rather than
+  just list runs, build a separate report shape instead of overloading
+  `buildBranchTree()`.
+- Keep the canonical route chooser isolated so future support for multiple
+  winning spines can be added without rewriting the main tree renderer.
+
+
+Case 117 - 2026-06-24 - The solution spine reads better as a trunk with offshoots than as stacked cards
+-------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The first `Solution spine` overlay worked functionally, but the per-step card
+layout still looked like a list of panels rather than a single winning path
+with obvious fatal branches.
+
+Root cause
+----------
+The overlay reused a card vocabulary close to the rest of the lab UI.
+
+That kept implementation simple, but it weakened the main mental model:
+
+- one canonical success trunk
+- explicit lateral death offshoots
+
+Resolution
+----------
+- Reworked only the spine overlay rendering and CSS.
+- The winning route is now drawn as a vertical trunk with one node per command.
+- Fatal branches appear as short red offshoots to the side of the exact step
+  where they diverge.
+- Kept the main branch tree and analysis UI unchanged.
+
+Files touched
+-------------
+- `autoplay-lab.css`
+- `autoplay-lab.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a debug view is about path structure, prefer node-and-branch visuals over
+  repeated cards, even when both show the same data.
+- Keep the graph-like styling local to the dedicated overlay so the main lab
+  UI does not accumulate a second competing visual language.
+
+
+Case 118 - 2026-06-24 - Solution-spine trunk nodes looked clickable but all pointed to the same full run
+--------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+In the `Solution spine` overlay, the green trunk nodes looked interactive, but
+clicking them appeared to do nothing.
+
+Root cause
+----------
+The click wiring was technically active, but every green node opened the same
+full winning run id.
+
+That meant:
+
+- no per-step selection state
+- no visible node change when clicking different trunk steps
+- no step-specific detail panel update
+
+So the interaction felt dead even though the handler was firing.
+
+Resolution
+----------
+- Added explicit spine-step selection state separate from selected branch run.
+- Trunk nodes now carry their own `data-spine-step-index`.
+- Clicking a green node rebuilds a preview of the winning route up to that step
+  and updates the detail panel accordingly.
+- The terminal `Reached` node now also has its own explicit selection state.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- For path diagrams, do not reuse a single run id for every node if the user
+  expects node-level interaction.
+- If a control looks clickable, make sure it changes either the selected state
+  in the diagram or the detail panel in a visibly distinct way.
+
+
+Case 119 - 2026-06-24 - Spine selection feedback was happening behind the overlay instead of inside it
+-----------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Even after trunk nodes became step-specific, clicking them could still feel
+broken because the most obvious feedback appeared in the main `Branch Detail`
+panel behind the open `Solution spine` overlay.
+
+Root cause
+----------
+The selection state and detail rendering existed, but the visible confirmation
+was split across two layers:
+
+- the overlay in front
+- the main detail panel underneath it
+
+So the interaction technically worked, but the user had no immediate feedback
+inside the open overlay itself.
+
+Resolution
+----------
+- Added a small selection-summary block directly inside the `Solution spine`
+  overlay.
+- The overlay now reflects the currently selected trunk step or fatal branch
+  without relying on the hidden underlying detail panel.
+- Kept the existing detail-panel updates as a secondary view rather than the
+  only visible confirmation.
+
+Files touched
+-------------
+- `autoplay-lab.css`
+- `autoplay-lab.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When using modal or overlay debug views, keep the primary interaction
+  feedback inside the active surface.
+- If a click updates content outside the current layer, mirror at least a
+  concise summary locally so the action is unmistakable.
+
+
+Case 120 - 2026-06-24 - The solution-spine overlay needed its own detail and replay workspace
+----------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Even after adding selection feedback inside the `Solution spine` overlay, some
+important actions such as replay still appeared to happen "behind the panel"
+because the main detail and replay surfaces of the lab lived underneath the
+open overlay.
+
+Root cause
+----------
+The overlay was acting like a selector for the main lab workspace instead of a
+workspace of its own.
+
+That meant:
+
+- the trunk/branch graph was visible in front
+- but full detail and replay log still belonged to the underlying page layout
+
+So the modal view never felt self-contained.
+
+Resolution
+----------
+- Reworked `Solution spine` into a two-pane overlay workspace.
+- The left pane keeps the trunk-and-branches graph.
+- The right pane now contains:
+  - local selection detail
+  - local replay log
+- Spine replays now update an overlay-local replay state and no longer depend
+  on the main `Replay Log` panel under the modal.
+
+Files touched
+-------------
+- `autoplay-lab.css`
+- `autoplay-lab.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a tool opens as an overlay, treat it as its own surface with its own
+  inspector and playback area.
+- Avoid modal views that are only "front-end selectors" for controls hidden in
+  the base page underneath.
+
+
+Case 121 - 2026-06-24 - The solution-spine tree wasted overlay width by reserving branch columns even when empty
+---------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After moving the `Solution spine` detail and replay into the overlay, the panel
+still felt narrower than it should. Much of the useful width was left unused,
+and the spine often needed extra vertical scrolling.
+
+Root cause
+----------
+Two layout choices were working against the available space:
+
+- the summary sat only inside the left pane instead of spanning the overlay
+- every spine node reserved a second grid column for branch content, even when
+  that step had no fatal offshoots
+
+Resolution
+----------
+- Moved the summary into a full-width top band above the two-pane workspace.
+- Made spine nodes single-column by default.
+- Only nodes that actually have fatal offshoots now opt into a two-column
+  layout.
+- Slightly rebalanced the left/right pane proportions so the trunk gets more
+  horizontal room.
+
+Files touched
+-------------
+- `autoplay-lab.css`
+- `autoplay-lab.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- In graph-like debug views, avoid reserving structural columns globally if
+  only some nodes need them.
+- If an overlay still feels cramped after widening it, inspect the internal
+  grid first before increasing the modal width again.
+
+
+Case 122 - 2026-06-24 - The solution spine used space better once the tree became full-width and the inspector moved below it
+----------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Even after removing some wasted columns, the `Solution spine` overlay still did
+not feel substantially wider in practice. The tree and inspector sharing a
+single row kept compressing the trunk, and long detail content still encouraged
+vertical scrolling.
+
+Root cause
+----------
+The remaining constraint was the overall two-column composition itself.
+
+- the graph and the inspector still competed horizontally
+- the tree never really got to use the modal as a canvas
+- detail text stayed narrower than necessary, so it wrapped more than it had to
+
+Resolution
+----------
+- Kept the summary as a full-width top band.
+- Made the tree occupy its own full-width row.
+- Moved the inspector under the tree as a two-column section of its own.
+- Added local overflow handling to the longest detail lists so the overlay can
+  use horizontal room before growing vertically.
+
+Files touched
+-------------
+- `autoplay-lab.css`
+- `autoplay-lab.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a diagram is the primary object, give it a dedicated row before splitting
+  the rest of the UI into columns.
+- Reducing vertical scroll is often more about giving text wider lines than
+  about shrinking the amount of text.
+
+
+Case 123 - 2026-06-24 - The spine inspector needed two columns under the full-width tree to cut vertical scrolling
+------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After giving the `Solution spine` tree its own full-width row, the overlay
+still required too much vertical scrolling because the inspector below it was a
+single long column.
+
+Root cause
+----------
+The tree layout was improved, but the lower inspector stacked:
+
+- current selection summary
+- detailed branch/step card
+- replay log
+
+into one vertical lane, which consumed too much height.
+
+Resolution
+----------
+- Kept the tree full-width.
+- Kept the current selection as a short full-width strip.
+- Split the lower inspector into two columns:
+  - selection/detail on the left
+  - replay log on the right
+
+This preserves the wide tree while reducing the height of the lower workspace.
+
+Files touched
+-------------
+- `autoplay-lab.css`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When the main graph already has its own row, the inspector below often works
+  better as a secondary two-column area than as another stacked column.
+
+
+Case 124 - 2026-06-24 - The wide solution-spine overlay needed left/right anchoring, not a computed width
+---------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The `Solution spine` panel still left a large unused strip on the right side of
+the browser window, even after several internal layout changes.
+
+Root cause
+----------
+The remaining constraint was the modal container itself.
+
+`lab-overlay-panel--wide` was still relying on a computed width, so the panel
+could appear narrower than the available viewport even though the internal
+layout was ready to use more horizontal space.
+
+Resolution
+----------
+- Anchored the wide overlay to both sides of the window:
+  - `left: 16px`
+  - `right: 16px`
+- Switched the width handling to:
+  - `width: auto`
+  - `max-width: none`
+
+This lets the wide spine panel actually occupy the full browser width allowed
+by its outer margins.
+
+Files touched
+-------------
+- `autoplay-lab.css`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a modal is supposed to feel "full width", prefer explicit left/right
+  anchoring over a width formula.
+- Before changing inner grids again, verify whether the outer container is
+  already leaving viewport space unused.
+
+
+Case 125 - 2026-06-24 - The solution spine needed a dedicated replay column instead of stacking replay under detail
+-------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Even with a wider `Solution spine` overlay, the right side still felt cramped
+because `Selection Detail` and `Replay Log` were stacked in the same column.
+
+Root cause
+----------
+The layout still treated the entire inspector area as one vertical lane, so the
+replay block consumed height instead of using the free horizontal room.
+
+Resolution
+----------
+- Split the inspector area into two columns:
+  - center column for selection summary and detail
+  - right column for replay log
+- Kept the left column dedicated to the winning-path summary and tree.
+- Added a responsive fallback so the extra replay column collapses cleanly on
+  narrower widths.
+
+Files touched
+-------------
+- `autoplay-lab.css`
+- `autoplay-lab.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When an overlay has one graph and two textual tools, giving each tool its own
+  column is usually cleaner than stacking both under the same inspector.
+
+
+Case 126 - 2026-06-24 - The solution spine became clearer again after removing the dedicated replay column
+---------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Once the `Replay Log` got its own column, the `Solution spine` overlay became
+heavier than needed for this workflow and introduced a third lane the user no
+longer wanted to keep visible.
+
+Root cause
+----------
+The replay area had become part of the persistent composition even though the
+main purpose of the panel is to inspect the winning trunk and its fatal
+branches.
+
+Resolution
+----------
+- Removed the dedicated `Replay Log` column from the `Solution spine`.
+- Removed local replay controls from the spine overlay so no replay affordances
+  remain inside that panel.
+- Restored the workbench to a simpler two-column layout:
+  - left: trunk and branches
+  - right: selection detail
+
+Files touched
+-------------
+- `autoplay-lab.css`
+- `autoplay-lab.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If an auxiliary tool starts competing visually with the main diagram, prefer
+  removing it from the persistent layout instead of giving it more screen real
+  estate.
+
+
+Case 127 - 2026-06-24 - The spine detail needed a full-width row because long state summaries were being clipped in a side column
+-------------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+With `Selection Detail` kept in the right column, longer content such as
+inventory and final-state summaries could appear clipped or overly compressed.
+
+Root cause
+----------
+The detail card was still living in a narrow side column while it contained
+long wrapped text and `pre`-style blocks that needed more horizontal room.
+
+Resolution
+----------
+- Kept only the short current-selection summary in the right column.
+- Moved the full `Selection Detail` card into its own full-width row below the
+  workspace.
+- Hardened wrapping in the detail area with `white-space: pre-wrap` and
+  `word-break: break-word` so long state summaries wrap instead of clipping.
+
+Files touched
+-------------
+- `autoplay-lab.css`
+- `autoplay-lab.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a side inspector contains long narrative or state text, use the side
+  column only for short status summaries and move the full detail card into a
+  wide row.
+
+
+Case 128 - 2026-06-24 - The solution detail needed a collapsed final-state section to keep the panel scannable
+----------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Even after moving `Selection Detail` into a wide row, the `Final State` block
+still took a lot of vertical space and made the detail panel harder to scan.
+
+Root cause
+----------
+The full state summary was always rendered expanded, even though it is useful
+mainly on demand rather than as the first thing to read.
+
+Resolution
+----------
+- Turned `Final State` into a collapsed disclosure inside `Selection Detail`.
+- Used a minimal `+` / `-` affordance so the section stays compact by default
+  and expands only when clicked.
+- Kept the behavior local to the spine detail panel without adding extra JS
+  state management.
+
+Files touched
+-------------
+- `autoplay-lab.css`
+- `autoplay-lab.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- For long diagnostic blocks inside an inspector, prefer collapsed native
+  disclosure controls before adding custom stateful UI.

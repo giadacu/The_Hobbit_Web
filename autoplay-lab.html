@@ -66,6 +66,7 @@
           <h2>Analyze</h2>
           <div class="lab-actions">
             <button id="lab-analyze" type="button">Analyze branches</button>
+            <button id="lab-solution-spine-button" type="button">Solution spine</button>
             <button id="lab-continuous-start" type="button">Start continuous trial</button>
             <button id="lab-reset" type="button">Reset view</button>
             <button id="lab-continuous-stop" type="button" disabled>Stop continuous trial</button>
@@ -141,6 +142,17 @@
         <button id="lab-death-close" type="button" class="lab-overlay-panel__close">Close</button>
       </div>
       <div id="lab-death-catalog" class="lab-overlay-panel__body lab-death-catalog">Catalogo in caricamento.</div>
+    </aside>
+
+    <aside id="lab-spine-panel" class="lab-overlay-panel lab-overlay-panel--wide" hidden aria-hidden="true">
+      <div class="lab-overlay-panel__head">
+        <div>
+          <strong>Solution Spine</strong>
+          <div class="lab-overlay-panel__copy">Una traiettoria vincente canonica con le deviazioni che portano alla morte.</div>
+        </div>
+        <button id="lab-spine-close" type="button" class="lab-overlay-panel__close">Close</button>
+      </div>
+      <div id="lab-spine" class="lab-overlay-panel__body lab-spine">Nessuna solution spine generata.</div>
     </aside>
 
     <section class="lab-sandbox" aria-hidden="true" hidden>

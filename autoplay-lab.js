@@ -10,6 +10,7 @@
   const stepLimitInput = document.getElementById("lab-step-limit");
   const replaySpeedSelect = document.getElementById("lab-replay-speed");
   const analyzeButton = document.getElementById("lab-analyze");
+  const solutionSpineButton = document.getElementById("lab-solution-spine-button");
   const continuousStartButton = document.getElementById("lab-continuous-start");
   const continuousStopButton = document.getElementById("lab-continuous-stop");
   const auditButton = document.getElementById("lab-audit-button");
@@ -24,14 +25,17 @@
   const overlayBackdrop = document.getElementById("lab-overlay-backdrop");
   const auditPanel = document.getElementById("lab-audit-panel");
   const deathPanel = document.getElementById("lab-death-panel");
+  const spinePanel = document.getElementById("lab-spine-panel");
   const auditCloseButton = document.getElementById("lab-audit-close");
   const deathCloseButton = document.getElementById("lab-death-close");
+  const spineCloseButton = document.getElementById("lab-spine-close");
   const treeCaption = document.getElementById("lab-tree-caption");
   const treeBox = document.getElementById("lab-tree");
   const detailCaption = document.getElementById("lab-detail-caption");
   const detailBox = document.getElementById("lab-detail");
   const replayCaption = document.getElementById("lab-replay-caption");
   const replayLog = document.getElementById("lab-replay-log");
+  const spineBox = document.getElementById("lab-spine");
 
   if (!game || !output) return;
 
@@ -51,9 +55,17 @@
     report: null,
     selectedRunId: "",
     replayToken: 0,
+    spineToken: 0,
     activeOverlay: "",
     simulationHistory: null,
     activeExplorationRoute: null,
+    spineReport: null,
+    spineSelectedRunId: "",
+    spineSelectedStepIndex: -1,
+    spineSelectedPreviewRun: null,
+    spineReplayToken: 0,
+    spineReplayCaption: "Seleziona un ramo o uno step, poi avvia il replay qui dentro.",
+    spineReplayLog: "Nessun replay eseguito nella solution spine.",
     exploreMemory: loadExploreMemory(),
     continuousArchive: loadContinuousArchive(),
     continuousToken: 0,
@@ -650,6 +662,21 @@
 
   function runSignature(run) {
     return [run.presetId, run.targetId, run.strategyId, run.seed, run.outcome.code, run.commands.join("->")].join("::");
+  }
+
+  function strategyPriority(strategyId = "") {
+    if (strategyId === "optimal") return 0;
+    if (strategyId === "alternative") return 1;
+    if (strategyId === "failure") return 2;
+    if (strategyId === "exploratory") return 3;
+    return 9;
+  }
+
+  function compareCanonicalRuns(left, right) {
+    return (left.commands.length - right.commands.length)
+      || (strategyPriority(left.strategyId) - strategyPriority(right.strategyId))
+      || (left.seed - right.seed)
+      || left.commands.join("->").localeCompare(right.commands.join("->"), "it");
   }
 
   const strategyProfiles = [
@@ -2413,6 +2440,284 @@
     });
   }
 
+  async function collectRunsForSeeds({
+    presetId,
+    targetId,
+    strategyId,
+    seedStart,
+    seedCount,
+    stepLimit,
+  }) {
+    const runs = [];
+    for (let offset = 0; offset < seedCount; offset += 1) {
+      const seed = seedStart + offset;
+      runs.push(simulateRun({ presetId, targetId, strategyId, seed, stepLimit }));
+      if ((offset + 1) % 4 === 0) await wait(0);
+    }
+    runs.forEach((run) => {
+      run.id = runSignature(run);
+    });
+    return runs;
+  }
+
+  function chooseCanonicalSuccessRun(runs = []) {
+    const successRuns = runs.filter((run) => run.outcome?.tone === "success");
+    if (!successRuns.length) return null;
+    return [...successRuns].sort(compareCanonicalRuns)[0];
+  }
+
+  function failureBranchCandidates(baselineCommand = "") {
+    const commands = [];
+    const fatalDecision = fatalTriggerDecision();
+    if (fatalDecision?.command) commands.push(fatalDecision.command);
+    for (const entry of strategyCandidates("failure")) {
+      if (entry?.kind === "failure" && entry.command) commands.push(entry.command);
+    }
+    return [...new Set(commands.map((command) => String(command || "").trim()).filter((command) => command && command !== baselineCommand))];
+  }
+
+  function replayPrefix(prefixCommands = [], targetId = "", transcript = [], commands = []) {
+    for (const command of prefixCommands) {
+      if (game.endgame) return false;
+      const beforeLength = getOutputLines().length;
+      commands.push(command);
+      game.execute(command);
+      const lines = outputDelta(beforeLength);
+      transcript.push({ command, lines, decisionKind: "spine_prefix" });
+    }
+    return true;
+  }
+
+  function simulateSpineOffshootRun({
+    presetId,
+    targetId,
+    seed,
+    stepLimit,
+    spineRun,
+    divergenceStepIndex,
+    branchCommand,
+  }) {
+    const preset = presetById[presetId];
+    const target = targetById[targetId];
+    const prefixCommands = spineRun.commands.slice(0, divergenceStepIndex);
+    const totalStepLimit = Math.max(stepLimit, prefixCommands.length + 12);
+    return withSeededRandom(seed, () => {
+      const { setupOutput } = resetToPreset(preset);
+      const commands = [];
+      const transcript = [];
+
+      if (!replayPrefix(prefixCommands, targetId, transcript, commands)) return null;
+      if (game.endgame) return null;
+
+      const beforeBranchLength = getOutputLines().length;
+      commands.push(branchCommand);
+      game.execute(branchCommand);
+      transcript.push({
+        command: branchCommand,
+        lines: outputDelta(beforeBranchLength),
+        decisionKind: "fatal_branch_start",
+      });
+
+      let matched = target.matches(scenarioContext());
+      while (!matched && !game.endgame && commands.length < totalStepLimit) {
+        const decision = selectCommand("failure", target.id);
+        const nextCommand = decision?.command || "";
+        if (!nextCommand) break;
+        const beforeLength = getOutputLines().length;
+        commands.push(nextCommand);
+        game.execute(nextCommand);
+        transcript.push({
+          command: nextCommand,
+          lines: outputDelta(beforeLength),
+          decisionKind: decision?.kind || "failure_followup",
+        });
+        matched = target.matches(scenarioContext());
+      }
+
+      const outcome = matched
+        ? { code: target.id, label: target.label, tone: target.id.startsWith("death") ? "danger" : "success" }
+        : classifyFailure(commands.length, totalStepLimit);
+
+      if (outcome.tone !== "danger") return null;
+
+      const run = {
+        id: "",
+        presetId,
+        presetLabel: preset.label,
+        presetDescription: preset.description,
+        targetId,
+        targetLabel: target.label,
+        strategyId: "spine_offshoot",
+        strategyLabel: "Solution spine offshoot",
+        seed,
+        commands,
+        transcript,
+        setupOutput,
+        finalOutput: getOutputLines(),
+        room: game.currentRoom,
+        roomLabel: roomLabel(game.currentRoom),
+        endgame: Boolean(game.endgame),
+        dragonDefeated: Boolean(game.flags?.dragondefeated),
+        ringRecovered: Boolean(game.bilboHasRecoveredRing?.()),
+        strength: Number(game.player?.strength || 0),
+        outcome,
+        inventory: [...(game.player?.inventory || []), ...(game.player?.worn || [])]
+          .map((itemId) => game.items?.[itemId]?.name || itemId),
+        divergenceStepIndex,
+        divergenceStepNumber: divergenceStepIndex + 1,
+        baselineCommand: spineRun.commands[divergenceStepIndex] || "",
+        branchCommand,
+        prefixLength: prefixCommands.length,
+        stepsFromDivergence: Math.max(1, commands.length - prefixCommands.length),
+        previewTail: commands.slice(Math.max(prefixCommands.length, commands.length - 3)),
+      };
+      run.id = [
+        runSignature({
+          presetId: run.presetId,
+          targetId: run.targetId,
+          strategyId: run.strategyId,
+          seed: run.seed,
+          outcome: run.outcome,
+          commands: run.commands,
+        }),
+        `step-${run.divergenceStepNumber}`,
+        run.branchCommand,
+      ].join("::");
+      return run;
+    });
+  }
+
+  async function collectFatalBranchesFromSpine({
+    presetId,
+    targetId,
+    stepLimit,
+    spineRun,
+  }) {
+    const branches = [];
+    const seen = new Set();
+
+    for (let divergenceStepIndex = 0; divergenceStepIndex < spineRun.commands.length; divergenceStepIndex += 1) {
+      const candidates = withSeededRandom(spineRun.seed, () => {
+        resetToPreset(presetById[presetId]);
+        const prefixCommands = spineRun.commands.slice(0, divergenceStepIndex);
+        replayPrefix(prefixCommands, targetId, [], []);
+        return failureBranchCandidates(spineRun.commands[divergenceStepIndex]);
+      });
+
+      for (const branchCommand of candidates) {
+        const branch = simulateSpineOffshootRun({
+          presetId,
+          targetId,
+          seed: spineRun.seed,
+          stepLimit,
+          spineRun,
+          divergenceStepIndex,
+          branchCommand,
+        });
+        if (!branch) continue;
+        const signature = `${branch.divergenceStepIndex}::${branch.branchCommand}::${branch.outcome.code}::${branch.commands.join("->")}`;
+        if (seen.has(signature)) continue;
+        seen.add(signature);
+        branches.push(branch);
+      }
+
+      if ((divergenceStepIndex + 1) % 3 === 0) await wait(0);
+    }
+
+    return branches;
+  }
+
+  function buildSolutionSpineSteps(spineRun, branches = []) {
+    return spineRun.commands.map((command, index) => ({
+      id: `spine-step-${index + 1}`,
+      stepIndex: index,
+      stepNumber: index + 1,
+      command,
+      branches: branches
+        .filter((branch) => branch.divergenceStepIndex === index)
+        .sort((left, right) => (left.stepsFromDivergence - right.stepsFromDivergence) || left.outcome.label.localeCompare(right.outcome.label, "it")),
+    }));
+  }
+
+  async function generateSolutionSpineReport({
+    presetId,
+    targetId,
+    seedStart,
+    seedCount,
+    stepLimit,
+  }) {
+    const preset = presetById[presetId];
+    const target = targetById[targetId];
+    let canonicalRuns = [];
+    let sourceStrategyId = "optimal";
+
+    const optimalRuns = await collectRunsForSeeds({
+      presetId,
+      targetId,
+      strategyId: "optimal",
+      seedStart,
+      seedCount,
+      stepLimit,
+    });
+    canonicalRuns = optimalRuns;
+
+    let spineRun = chooseCanonicalSuccessRun(optimalRuns);
+    if (!spineRun) {
+      sourceStrategyId = "alternative";
+      const alternativeRuns = await collectRunsForSeeds({
+        presetId,
+        targetId,
+        strategyId: "alternative",
+        seedStart,
+        seedCount,
+        stepLimit,
+      });
+      canonicalRuns = alternativeRuns;
+      spineRun = chooseCanonicalSuccessRun(alternativeRuns);
+    }
+
+    if (!spineRun) {
+      return {
+        presetId,
+        presetLabel: preset.label,
+        targetId,
+        targetLabel: target.label,
+        seedStart,
+        seedCount,
+        stepLimit,
+        sourceStrategyId,
+        sourceStrategyLabel: strategyById[sourceStrategyId]?.label || sourceStrategyId,
+        spineRun: null,
+        steps: [],
+        branchRuns: [],
+        sourceRuns: canonicalRuns,
+      };
+    }
+
+    const branchRuns = await collectFatalBranchesFromSpine({
+      presetId,
+      targetId,
+      stepLimit,
+      spineRun,
+    });
+
+    return {
+      presetId,
+      presetLabel: preset.label,
+      targetId,
+      targetLabel: target.label,
+      seedStart,
+      seedCount,
+      stepLimit,
+      sourceStrategyId: spineRun.strategyId,
+      sourceStrategyLabel: spineRun.strategyLabel,
+      spineRun,
+      steps: buildSolutionSpineSteps(spineRun, branchRuns),
+      branchRuns,
+      sourceRuns: canonicalRuns,
+    };
+  }
+
   function shouldIncludeRun(run, filter = "all") {
     if (filter === "success") return run.outcome.tone === "success";
     if (filter === "death") return run.outcome.code.startsWith("death");
@@ -2557,6 +2862,12 @@
         .map((entry, index) => `<li><strong>${index + 1}. ${escapeHtml(entry.command)}</strong>\n${escapeHtml(entry.lines.join("\n") || "(no output)")}</li>`)
         .join("")
       : "<li>Nessun comando eseguito.</li>";
+    const divergenceSection = Number.isInteger(run.divergenceStepIndex)
+      ? `<div class="lab-detail__section">
+        <strong>Divergence</strong>
+        <div class="lab-detail__text">Lo spine segue la soluzione fino allo step <strong>${run.divergenceStepNumber}</strong>. Invece di <strong>${escapeHtml(run.baselineCommand || "(end)")}</strong>, qui il ramo esegue <strong>${escapeHtml(run.branchCommand || "")}</strong>.</div>
+      </div>`
+      : "";
     detailBox.innerHTML = `<div class="lab-detail__card">
       <div class="lab-detail__top">
         <strong>Seed ${run.seed}</strong>
@@ -2574,6 +2885,7 @@
         <strong>Final State</strong>
         <pre class="lab-detail__text">${escapeHtml(finalStateSummary(run))}</pre>
       </div>
+      ${divergenceSection}
       <div class="lab-detail__section">
         <strong>Commands</strong>
         <ol class="lab-detail__list">${commandItems}</ol>
@@ -2624,7 +2936,7 @@
   }
 
   function syncOverlayBackdrop() {
-    const anyOpen = state.activeOverlay === "audit" || state.activeOverlay === "death";
+    const anyOpen = state.activeOverlay === "audit" || state.activeOverlay === "death" || state.activeOverlay === "spine";
     if (overlayBackdrop) overlayBackdrop.hidden = !anyOpen;
   }
 
@@ -2632,6 +2944,7 @@
     state.activeOverlay = kind;
     setOverlayVisibility(auditPanel, kind === "audit");
     setOverlayVisibility(deathPanel, kind === "death");
+    setOverlayVisibility(spinePanel, kind === "spine");
     syncOverlayBackdrop();
   }
 
@@ -2639,6 +2952,7 @@
     state.activeOverlay = "";
     setOverlayVisibility(auditPanel, false);
     setOverlayVisibility(deathPanel, false);
+    setOverlayVisibility(spinePanel, false);
     syncOverlayBackdrop();
   }
 
@@ -2664,6 +2978,249 @@
     }).join("");
   }
 
+  function findSpineRun(runId = "") {
+    if (!runId) return null;
+    if (state.spineReport?.spineRun?.id === runId) return state.spineReport.spineRun;
+    return state.spineReport?.branchRuns?.find((run) => run.id === runId) || null;
+  }
+
+  function buildSpineStepPreview(stepIndex = 0) {
+    const report = state.spineReport;
+    const spineRun = report?.spineRun;
+    if (!report || !spineRun) return null;
+    const clampedStepIndex = Math.max(0, Math.min(Number(stepIndex) || 0, spineRun.commands.length));
+
+    if (clampedStepIndex >= spineRun.commands.length) {
+      return {
+        ...spineRun,
+        commands: [...spineRun.commands],
+        transcript: [...spineRun.transcript],
+      };
+    }
+
+    return withSeededRandom(spineRun.seed, () => {
+      resetToPreset(presetById[spineRun.presetId]);
+      const commands = [];
+      const transcript = [];
+      for (let index = 0; index <= clampedStepIndex; index += 1) {
+        const command = spineRun.commands[index];
+        if (!command || game.endgame) break;
+        const beforeLength = getOutputLines().length;
+        commands.push(command);
+        game.execute(command);
+        transcript.push({
+          command,
+          lines: outputDelta(beforeLength),
+          decisionKind: spineRun.transcript[index]?.decisionKind || "spine_preview",
+        });
+      }
+
+      return {
+        ...spineRun,
+        id: `${spineRun.id}::preview-step-${clampedStepIndex + 1}`,
+        commands,
+        transcript,
+        finalOutput: getOutputLines(),
+        room: game.currentRoom,
+        roomLabel: roomLabel(game.currentRoom),
+        endgame: Boolean(game.endgame),
+        dragonDefeated: Boolean(game.flags?.dragondefeated),
+        ringRecovered: Boolean(game.bilboHasRecoveredRing?.()),
+        strength: Number(game.player?.strength || 0),
+        outcome: {
+          code: `spine_step_${clampedStepIndex + 1}`,
+          label: `Winning path step ${clampedStepIndex + 1}`,
+          tone: "success",
+        },
+      };
+    });
+  }
+
+  function setSpineReplayState(caption = "", log = "") {
+    state.spineReplayCaption = caption || "Seleziona un ramo o uno step, poi avvia il replay qui dentro.";
+    state.spineReplayLog = log || "Nessun replay eseguito nella solution spine.";
+  }
+
+  function updateSpineReplayDom() {
+    const caption = spineBox?.querySelector?.("#lab-spine-replay-caption");
+    const log = spineBox?.querySelector?.("#lab-spine-replay-log");
+    if (caption) caption.textContent = state.spineReplayCaption;
+    if (log) log.textContent = state.spineReplayLog;
+  }
+
+  function spineDetailHtml() {
+    const run = state.spineSelectedPreviewRun;
+    if (!run) {
+      return `<div class="lab-spine__panel">
+        <div class="lab-spine__panel-head">
+          <strong>Selection Detail</strong>
+        </div>
+        <div class="lab-empty">Seleziona un nodo del tronco o un ramo rosso.</div>
+      </div>`;
+    }
+
+    const commandItems = run.commands.length
+      ? run.transcript.map((entry, index) => `<li>${index + 1}. ${escapeHtml(entry.command)} <span class="lab-inline-note">[${escapeHtml(entry.decisionKind)}]</span></li>`).join("")
+      : "<li>Il target era gia soddisfatto nel preset iniziale.</li>";
+    const outputItems = run.transcript.length
+      ? run.transcript
+        .map((entry, index) => `<li><strong>${index + 1}. ${escapeHtml(entry.command)}</strong>\n${escapeHtml(entry.lines.join("\n") || "(no output)")}</li>`)
+        .join("")
+      : "<li>Nessun comando eseguito.</li>";
+    const divergenceSection = Number.isInteger(run.divergenceStepIndex)
+      ? `<div class="lab-detail__section">
+        <strong>Divergence</strong>
+        <div class="lab-detail__text">Lo spine segue la soluzione fino allo step <strong>${run.divergenceStepNumber}</strong>. Invece di <strong>${escapeHtml(run.baselineCommand || "(end)")}</strong>, qui il ramo esegue <strong>${escapeHtml(run.branchCommand || "")}</strong>.</div>
+      </div>`
+      : "";
+
+    return `<div class="lab-spine__panel lab-spine__panel--detail">
+      <div class="lab-spine__panel-head">
+        <strong>Selection Detail</strong>
+        <span class="lab-badge lab-badge--${run.outcome.tone === "success" ? "success" : run.outcome.tone === "danger" ? "danger" : "warning"}">${escapeHtml(run.outcome.label)}</span>
+      </div>
+      <div class="lab-detail__card">
+        <div class="lab-detail__top">
+          <strong>Seed ${run.seed}</strong>
+          <div class="lab-detail__badges">
+            <span class="lab-badge lab-badge--muted">${escapeHtml(run.strategyLabel)}</span>
+            <span class="lab-badge lab-badge--muted">${run.commands.length} step${run.commands.length === 1 ? "" : "s"}</span>
+          </div>
+        </div>
+        <div class="lab-detail__section">
+          <strong>Scenario</strong>
+          <div class="lab-detail__text">${escapeHtml(run.presetDescription)}</div>
+        </div>
+        <details class="lab-detail__section lab-detail__disclosure">
+          <summary class="lab-detail__summary">
+            <span class="lab-detail__toggle" aria-hidden="true">+</span>
+            <strong>Final State</strong>
+          </summary>
+          <pre class="lab-detail__text">${escapeHtml(finalStateSummary(run))}</pre>
+        </details>
+        ${divergenceSection}
+        <div class="lab-detail__section">
+          <strong>Commands</strong>
+          <ol class="lab-detail__list">${commandItems}</ol>
+        </div>
+        <div class="lab-detail__section">
+          <strong>Command Output</strong>
+          <ol class="lab-detail__log">${outputItems}</ol>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function spineSelectionSummaryHtml() {
+    const selected = state.spineSelectedPreviewRun;
+    const report = state.spineReport;
+    if (!report?.spineRun || !selected) {
+      return '<div class="lab-spine__selection">Seleziona un nodo del tronco o un ramo rosso per vedere qui il punto corrente.</div>';
+    }
+
+    if (Number.isInteger(selected.divergenceStepIndex)) {
+      return `<div class="lab-spine__selection">
+        <div><strong>Selected death branch</strong> · ${escapeHtml(selected.outcome.label)}</div>
+        <div>Step di divergenza: <strong>${selected.divergenceStepNumber}</strong> · Invece di <strong>${escapeHtml(selected.baselineCommand || "(end)")}</strong>, il ramo esegue <strong>${escapeHtml(selected.branchCommand || "")}</strong>.</div>
+        <div>Morte dopo <strong>${selected.stepsFromDivergence}</strong> step · Stanza finale <strong>${escapeHtml(selected.roomLabel)}</strong>.</div>
+      </div>`;
+    }
+
+    const selectedStep = Number.isInteger(state.spineSelectedStepIndex) && state.spineSelectedStepIndex >= 0
+      ? state.spineSelectedStepIndex
+      : Math.max(0, (selected.commands?.length || 1) - 1);
+    const reachedTarget = selectedStep >= report.spineRun.commands.length;
+    return `<div class="lab-spine__selection">
+      <div><strong>Selected trunk step</strong> · ${reachedTarget ? escapeHtml(report.targetLabel) : `Step ${selectedStep + 1}`}</div>
+      <div>${reachedTarget ? "La traiettoria vincente e` completa." : `Comando: <strong>${escapeHtml(report.spineRun.commands[selectedStep] || "")}</strong>`}</div>
+      <div>Preview fino a <strong>${selected.commands.length}</strong> step · Stanza corrente <strong>${escapeHtml(selected.roomLabel)}</strong>.</div>
+    </div>`;
+  }
+
+  function renderSolutionSpine(report = null) {
+    if (!spineBox) return;
+    if (!report) {
+      spineBox.innerHTML = '<div class="lab-empty">Nessuna solution spine generata.</div>';
+      return;
+    }
+    if (!report.spineRun) {
+      spineBox.innerHTML = `<div class="lab-empty">Nessuna run vincente trovata per ${escapeHtml(report.presetLabel)} -> ${escapeHtml(report.targetLabel)} nell'intervallo di seed ${report.seedStart}-${report.seedStart + report.seedCount - 1}.</div>`;
+      return;
+    }
+
+    const branchedSteps = report.steps.filter((step) => step.branches.length).length;
+    const summaryHtml = `<div class="lab-spine__summary">
+      <div class="lab-spine__summary-top">
+        <div><strong>Winning path</strong> · ${escapeHtml(report.presetLabel)} -> ${escapeHtml(report.targetLabel)}</div>
+        <div class="lab-spine__meta">Seed <strong>${report.spineRun.seed}</strong> · Strategia <strong>${escapeHtml(report.sourceStrategyLabel)}</strong> · Step <strong>${report.spineRun.commands.length}</strong> · Diramazioni fatali <strong>${report.branchRuns.length}</strong> su <strong>${branchedSteps}</strong> step.</div>
+      </div>
+      <div class="lab-spine__actions">
+        <button class="lab-spine__button" type="button" data-spine-open-run-id="${escapeHtml(report.spineRun.id)}">View winning detail</button>
+      </div>
+    </div>`;
+
+    const stepsHtml = report.steps.length
+      ? report.steps.map((step) => {
+        const stepSelected = state.spineSelectedRunId === report.spineRun.id && state.spineSelectedStepIndex === step.stepIndex
+          ? " is-selected"
+          : "";
+        const branchesHtml = step.branches.length
+          ? `<div class="lab-spine-node__branches">${step.branches.map((branch) => {
+            const selected = state.spineSelectedRunId === branch.id ? " is-selected" : "";
+            return `<div class="lab-spine-branch${selected}">
+              <div class="lab-spine-branch__head">
+                <button class="lab-spine-branch__label" type="button" data-spine-open-run-id="${escapeHtml(branch.id)}">${escapeHtml(branch.outcome.label)}</button>
+                <span class="lab-badge lab-badge--danger">+${branch.stepsFromDivergence}</span>
+              </div>
+              <div class="lab-spine-branch__meta">instead of <strong>${escapeHtml(branch.baselineCommand || "(end)")}</strong>: <strong>${escapeHtml(branch.branchCommand)}</strong></div>
+            </div>`;
+          }).join("")}</div>`
+          : "";
+        const nodeClass = step.branches.length ? "lab-spine-node has-branches" : "lab-spine-node";
+
+        return `<div class="${nodeClass}">
+          <div class="lab-spine-node__main">
+            <button class="lab-spine-node__button${stepSelected}" type="button" aria-label="Open winning path detail" data-spine-step-index="${step.stepIndex}"></button>
+            <button class="lab-spine-node__command" type="button" data-spine-step-index="${step.stepIndex}">${escapeHtml(step.command)}</button>
+            <span class="lab-spine-node__index">${step.stepNumber}</span>
+          </div>
+          ${branchesHtml}
+        </div>`;
+      }).join("")
+      : '<div class="lab-spine-empty">La run vincente era gia soddisfatta al preset iniziale.</div>';
+
+    const terminalHtml = report.spineRun.commands.length
+      ? (() => {
+        const terminalSelected = state.spineSelectedRunId === report.spineRun.id
+          && state.spineSelectedStepIndex === report.spineRun.commands.length
+          ? " is-selected"
+          : "";
+        return `<div class="lab-spine-terminal">
+          <div class="lab-spine-terminal__main">
+            <button class="lab-spine-terminal__button${terminalSelected}" type="button" aria-label="Open winning path detail" data-spine-step-index="${report.spineRun.commands.length}"></button>
+            <button class="lab-spine-terminal__label" type="button" data-spine-step-index="${report.spineRun.commands.length}">${escapeHtml(report.targetLabel)}</button>
+            <span class="lab-badge lab-badge--success">Reached</span>
+          </div>
+        </div>`;
+      })()
+      : "";
+
+    spineBox.innerHTML = `<div class="lab-spine-shell">
+      <div class="lab-spine-workbench">
+        <div class="lab-spine-pane">
+          ${summaryHtml}
+          <div class="lab-spine-tree">${stepsHtml}${terminalHtml}</div>
+        </div>
+        <div class="lab-spine-inspector">
+          ${spineSelectionSummaryHtml()}
+        </div>
+      </div>
+      <div class="lab-spine-detail-row">
+        ${spineDetailHtml()}
+      </div>
+    </div>`;
+  }
+
   async function generateReport({
     presetId,
     targetId,
@@ -2676,14 +3233,13 @@
     const preset = presetById[presetId];
     const target = targetById[targetId];
     const strategy = strategyById[strategyId] || strategyById.optimal;
-    const runs = [];
-    for (let offset = 0; offset < seedCount; offset += 1) {
-      const seed = seedStart + offset;
-      runs.push(simulateRun({ presetId, targetId, strategyId: strategy.id, seed, stepLimit }));
-      if ((offset + 1) % 4 === 0) await wait(0);
-    }
-    runs.forEach((run) => {
-      run.id = runSignature(run);
+    const runs = await collectRunsForSeeds({
+      presetId,
+      targetId,
+      strategyId: strategy.id,
+      seedStart,
+      seedCount,
+      stepLimit,
     });
     const filteredRuns = runs.filter((run) => shouldIncludeRun(run, outcomeFilter));
     return {
@@ -2716,6 +3272,7 @@
     if (continuousStartButton) continuousStartButton.disabled = running;
     if (continuousStopButton) continuousStopButton.disabled = !running;
     if (analyzeButton) analyzeButton.disabled = running;
+    if (solutionSpineButton) solutionSpineButton.disabled = running;
     if (auditButton) auditButton.disabled = running;
   }
 
@@ -3132,6 +3689,42 @@
     }
   }
 
+  async function replayRunInSpine(run) {
+    if (!run) return;
+    state.spineReplayToken += 1;
+    const token = state.spineReplayToken;
+    setSpineReplayState(`Replay in corso per seed ${run.seed} dal preset ${run.presetLabel}.`, "Preparing replay...");
+    updateSpineReplayDom();
+    const speed = replaySpeedSelect.value;
+    const delayMs = speed === "slow" ? 900 : speed === "fast" ? 160 : 0;
+
+    await withSeededRandomAsync(run.seed, async () => {
+      resetToPreset(presetById[run.presetId]);
+      const lines = [];
+      const setupLines = getOutputLines();
+      if (setupLines.length) lines.push(`[setup]\n${setupLines.join("\n")}`);
+      for (const command of run.commands) {
+        if (token !== state.spineReplayToken) return;
+        const beforeLength = getOutputLines().length;
+        game.execute(command);
+        const delta = outputDelta(beforeLength);
+        lines.push(`> ${command}\n${delta.join("\n") || "(no output)"}`);
+        state.spineReplayLog = lines.join("\n\n");
+        updateSpineReplayDom();
+        if (delayMs) await wait(delayMs);
+      }
+      if (token !== state.spineReplayToken) return;
+      lines.push(`[final]\n${finalStateSummary(run)}`);
+      state.spineReplayLog = lines.join("\n\n");
+      updateSpineReplayDom();
+    });
+
+    if (token === state.spineReplayToken) {
+      state.spineReplayCaption = `Replay completato per seed ${run.seed}.`;
+      updateSpineReplayDom();
+    }
+  }
+
   async function analyze() {
     const presetId = startPresetSelect.value;
     const targetId = targetSelect.value;
@@ -3159,15 +3752,65 @@
       : `Analisi completata, ma il filtro attuale non lascia rami visibili per la strategia "${strategy.label}".`;
   }
 
+  async function analyzeSolutionSpine() {
+    const presetId = startPresetSelect.value;
+    const targetId = targetSelect.value;
+    const preset = presetById[presetId];
+    const target = targetById[targetId];
+    const { seedStart, seedCount, stepLimit } = currentAnalysisInputs();
+
+    state.spineToken += 1;
+    const token = state.spineToken;
+    state.spineReport = null;
+    state.spineSelectedRunId = "";
+    state.spineSelectedStepIndex = -1;
+    state.spineSelectedPreviewRun = null;
+    state.spineReplayToken += 1;
+    setSpineReplayState();
+    openOverlay("spine");
+    if (spineBox) spineBox.innerHTML = '<div class="lab-empty">Sto costruendo la solution spine e cercando le deviazioni fatali...</div>';
+    statusBox.textContent = `Solution spine in corso da "${preset.label}" a "${target.label}" sui seed ${seedStart}-${seedStart + seedCount - 1}...`;
+
+    const report = await generateSolutionSpineReport({
+      presetId,
+      targetId,
+      seedStart,
+      seedCount,
+      stepLimit,
+    });
+    if (token !== state.spineToken) return;
+    state.spineReport = report;
+    state.spineSelectedRunId = report.spineRun?.id || "";
+    state.spineSelectedStepIndex = report.spineRun?.commands?.length ? 0 : -1;
+    state.spineSelectedPreviewRun = report.spineRun ? (buildSpineStepPreview(0) || report.spineRun) : null;
+    setSpineReplayState();
+    renderSolutionSpine(report);
+    if (report.spineRun) {
+      statusBox.textContent = report.branchRuns.length
+        ? `Solution spine pronta: seed ${report.spineRun.seed}, ${report.branchRuns.length} diramazioni fatali trovate.`
+        : `Solution spine pronta: seed ${report.spineRun.seed}, nessuna diramazione fatale trovata con le probe correnti.`;
+    } else {
+      statusBox.textContent = `Nessuna run vincente trovata per "${preset.label}" -> "${target.label}" nell'intervallo di seed corrente.`;
+    }
+  }
+
   function resetView() {
     stopContinuousExploration("Trial continuo fermato dal reset della vista.");
     state.report = null;
+    state.spineReport = null;
     state.selectedRunId = "";
+    state.spineSelectedRunId = "";
+    state.spineSelectedStepIndex = -1;
+    state.spineSelectedPreviewRun = null;
+    state.spineReplayToken += 1;
+    setSpineReplayState();
     state.replayToken += 1;
+    state.spineToken += 1;
     state.simulationHistory = null;
     summaryBox.textContent = "Nessuna analisi eseguita.";
     auditBox.textContent = "Nessun audit eseguito.";
     closeOverlay();
+    renderSolutionSpine(null);
     treeCaption.textContent = "I rami appariranno qui dopo la simulazione.";
     treeBox.innerHTML = '<div class="lab-empty">Nessun ramo da mostrare.</div>';
     detailCaption.textContent = "Seleziona un ramo foglia per vederne comandi, output e replay.";
@@ -3203,6 +3846,39 @@
     });
   }
 
+  function handleSpineClick(event) {
+    const stepIndexRaw = event.target?.getAttribute?.("data-spine-step-index");
+    if (stepIndexRaw !== null && stepIndexRaw !== undefined) {
+      const stepIndex = Number.parseInt(stepIndexRaw, 10);
+      if (Number.isInteger(stepIndex) && state.spineReport?.spineRun) {
+        state.spineSelectedRunId = state.spineReport.spineRun.id;
+        state.spineSelectedStepIndex = stepIndex;
+        state.spineSelectedPreviewRun = buildSpineStepPreview(stepIndex) || state.spineReport.spineRun;
+        setSpineReplayState();
+        renderSolutionSpine(state.spineReport);
+      }
+      return;
+    }
+
+    const runId = event.target?.getAttribute?.("data-spine-open-run-id");
+    if (runId) {
+      const run = findSpineRun(runId);
+      if (!run) return;
+      state.spineSelectedRunId = runId;
+      state.spineSelectedStepIndex = runId === state.spineReport?.spineRun?.id
+        ? state.spineReport?.spineRun?.commands?.length || -1
+        : -1;
+      state.spineSelectedPreviewRun = run;
+      setSpineReplayState();
+      renderSolutionSpine(state.spineReport);
+      return;
+    }
+
+    const replayRunId = event.target?.getAttribute?.("data-spine-replay-run-id");
+    if (!replayRunId) return;
+    replayRunInSpine(findSpineRun(replayRunId));
+  }
+
   function handleOverlayDismiss(event) {
     if (event) event.preventDefault();
     closeOverlay();
@@ -3226,6 +3902,7 @@
   renderContinuousArchiveSummary();
   syncContinuousButtons();
   renderDeathCatalog();
+  renderSolutionSpine();
   startPresetSelect.value = "before_gollum";
   targetSelect.value = "have_ring";
   strategySelect.value = "optimal";
@@ -3234,6 +3911,11 @@
   analyzeButton.addEventListener("click", () => {
     analyze().catch((error) => {
       statusBox.textContent = `Errore durante l'analisi: ${error.message}`;
+    });
+  });
+  solutionSpineButton?.addEventListener("click", () => {
+    analyzeSolutionSpine().catch((error) => {
+      statusBox.textContent = `Errore durante la solution spine: ${error.message}`;
     });
   });
   continuousStartButton?.addEventListener("click", () => {
@@ -3257,8 +3939,10 @@
   treeBox.addEventListener("click", handleTreeClick);
   detailBox.addEventListener("click", handleTreeClick);
   deathCatalogBox?.addEventListener("click", handleDeathCatalogClick);
+  spineBox?.addEventListener("click", handleSpineClick);
   overlayBackdrop?.addEventListener("click", handleOverlayDismiss);
   auditCloseButton?.addEventListener("click", handleOverlayDismiss);
   deathCloseButton?.addEventListener("click", handleOverlayDismiss);
+  spineCloseButton?.addEventListener("click", handleOverlayDismiss);
   document.addEventListener("keydown", handleGlobalKeydown);
 })();
