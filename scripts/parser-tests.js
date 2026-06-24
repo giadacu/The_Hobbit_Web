@@ -2156,6 +2156,63 @@ const gameCases = [
     ],
   },
   {
+    name: "green dragon contextual images follow the pony sequence",
+    drive(game) {
+      game.execute("jump green_dragon");
+      game.flags.lanternon = true;
+      game.print(`Green Dragon inn base image: ${game.contextualRoomImage(game.room())}`);
+      game.flags.seenpony = true;
+      game.flags.ponypreparing = true;
+      game.print(`Green Dragon inn pony discovered image: ${game.contextualRoomImage(game.room())}`);
+
+      game.currentRoom = "green_dragon_inn_outside";
+      game.player.position = "green_dragon_inn_outside";
+      game.print(`Green Dragon yard preparing image: ${game.contextualRoomImage(game.room())}`);
+
+      game.flags.ponypreparing = false;
+      game.flags.ponyready = true;
+      game.print(`Green Dragon yard pony ready image: ${game.contextualRoomImage(game.room())}`);
+
+      game.flags.ponysequencecompleted = true;
+      game.flags.ponypassageopen = true;
+      game.print(`Green Dragon yard hedge open image: ${game.contextualRoomImage(game.room())}`);
+    },
+    expectedIncluded: [
+      "Jumped to Green Dragon Inn.",
+      "Green Dragon inn base image: Green_dragon.jpeg",
+      "Green Dragon inn pony discovered image: green_dragon_inn_pony_discovered.png",
+      "Green Dragon yard preparing image: green_dragon_out_preparing_pony.png",
+      "Green Dragon yard pony ready image: green_dragon_out_pony_ready.png",
+      "Green Dragon yard hedge open image: green_dragon_out_hedge_open.png",
+    ],
+  },
+  {
+    name: "green dragon hedge-break image persists through the pony jump",
+    drive(game) {
+      game.execute("jump green_dragon");
+      game.doors.porta_green_dragon_inn_green_dragon_inn_outside.open = true;
+      game.flags.lanternon = true;
+      game.items.low_branch.visible = true;
+      game.flags.seenpony = true;
+      game.flags.ponypreparing = false;
+      game.flags.ponyready = true;
+      game.currentRoom = "green_dragon_inn_outside";
+      game.player.position = "green_dragon_inn_outside";
+      placeCharacterWithPlayer(game, "thorin");
+      game.execute("climb onto branch");
+      game.print(`Pony jump temporary image: ${game.temporaryImage?.file || "none"}`);
+      game.print(`Pony jump room: ${game.currentRoom}`);
+      game.execute("look");
+      game.print(`Pony jump temporary image after next command: ${game.temporaryImage?.file || "none"}`);
+    },
+    expectedIncluded: [
+      "Jumped to Green Dragon Inn.",
+      "Pony jump temporary image: green_dragon_out_hedge_open.png",
+      "Pony jump room: dreary",
+      "Pony jump temporary image after next command: none",
+    ],
+  },
+  {
     name: "green dragon companions no longer stay frozen in one room",
     drive(game) {
       game.execute("jump green_dragon");

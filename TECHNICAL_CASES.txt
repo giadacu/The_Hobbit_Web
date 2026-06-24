@@ -5578,3 +5578,42 @@ Future debugging advice
 - For multi-beat hazard scenes, prefer one temporary entry image plus a small
   number of contextual persistent room images keyed from existing warning or
   aftermath flags.
+
+
+Case 114 - 2026-06-24 - The Green Dragon pony jump skipped the hedge-break image beat
+---------------------------------------------------------------------------------------
+
+Symptom
+-------
+When Bilbo climbed onto the low branch and dropped onto the pony, the game
+immediately moved to the gloomy empty land. The new hedge-break art existed,
+but the player never actually saw that scene during the transition.
+
+Root cause
+----------
+The pony jump used the generic special-action travel flow.
+
+- The action printed its jump text.
+- It opened the hedge passage.
+- It then immediately changed rooms to `dreary` and described the destination.
+
+Without a temporary transition image, the arrival room render replaced the
+hedge-break beat as soon as the move completed.
+
+Resolution
+----------
+- Added a dedicated pony hedge-break check in the special-action flow.
+- That action now shows `green_dragon_out_hedge_open.png` as a temporary image.
+- Added a regression test to verify the image appears after the jump, the room
+  still becomes `dreary`, and the temporary image clears on the next command.
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If travel art belongs to the departure beat rather than the destination
+  room, use a temporary image instead of relying on contextual room art alone.

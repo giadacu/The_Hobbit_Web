@@ -1558,6 +1558,26 @@
         image: "great_river_eagles_arrival.png",
       },
     ],
+    green_dragon_inn: [
+      {
+        when: ({ game }) => game.flags.seenpony && !game.flags.ponyready && !game.flags.ponysequencecompleted,
+        image: "green_dragon_inn_pony_discovered.png",
+      },
+    ],
+    green_dragon_inn_outside: [
+      {
+        when: ({ game }) => game.flags.ponypassageopen || game.flags.ponysequencecompleted,
+        image: "green_dragon_out_hedge_open.png",
+      },
+      {
+        when: ({ game }) => game.flags.ponyready && !game.flags.ponysequencecompleted,
+        image: "green_dragon_out_pony_ready.png",
+      },
+      {
+        when: ({ game }) => game.flags.ponypreparing && !game.flags.ponyready,
+        image: "green_dragon_out_preparing_pony.png",
+      },
+    ],
   };
 
   const CONTEXTUAL_ROOM_NARRATIVE_RULES = [
@@ -10970,6 +10990,11 @@
           game.flags.ponypassageopen = true;
           if (game.items.calm_pony) game.items.calm_pony.visible = false;
         }
+        if (this.isPonyHedgeBreakAction(action)) {
+          game.showTemporaryImage("green_dragon_out_hedge_open.png", {
+            alt: "The pony bursts through the hedge and opens the road east",
+          });
+        }
         if (action.destination) {
           if (actionEndsGame) {
             game.endGame(action.desc2 || "The tale goes no farther from here.", {
@@ -11037,6 +11062,11 @@
         && action.obj2 === "low branch"
         && action.destination === "Dreary"
         && action.flag_in1 === "seenpony";
+    }
+
+    isPonyHedgeBreakAction(action) {
+      return this.isPonySequenceAction(action)
+        && String(action.desc2 || "").includes("opening a passage to the east");
     }
 
     isPonyWindowAction(action) {
