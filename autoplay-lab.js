@@ -2854,9 +2854,6 @@
       return;
     }
     detailCaption.textContent = `Seed ${run.seed}, ${run.commands.length} step, esito ${run.outcome.label}.`;
-    const commandItems = run.commands.length
-      ? run.transcript.map((entry, index) => `<li>${index + 1}. ${escapeHtml(entry.command)} <span class="lab-inline-note">[${escapeHtml(entry.decisionKind)}]</span></li>`).join("")
-      : "<li>Il target era gia soddisfatto nel preset iniziale.</li>";
     const outputItems = run.transcript.length
       ? run.transcript
         .map((entry, index) => `<li><strong>${index + 1}. ${escapeHtml(entry.command)}</strong>\n${escapeHtml(entry.lines.join("\n") || "(no output)")}</li>`)
@@ -3059,21 +3056,11 @@
       </div>`;
     }
 
-    const commandItems = run.commands.length
-      ? run.transcript.map((entry, index) => `<li>${index + 1}. ${escapeHtml(entry.command)} <span class="lab-inline-note">[${escapeHtml(entry.decisionKind)}]</span></li>`).join("")
-      : "<li>Il target era gia soddisfatto nel preset iniziale.</li>";
     const outputItems = run.transcript.length
       ? run.transcript
         .map((entry, index) => `<li><strong>${index + 1}. ${escapeHtml(entry.command)}</strong>\n${escapeHtml(entry.lines.join("\n") || "(no output)")}</li>`)
         .join("")
       : "<li>Nessun comando eseguito.</li>";
-    const divergenceSection = Number.isInteger(run.divergenceStepIndex)
-      ? `<div class="lab-detail__section">
-        <strong>Divergence</strong>
-        <div class="lab-detail__text">Lo spine segue la soluzione fino allo step <strong>${run.divergenceStepNumber}</strong>. Invece di <strong>${escapeHtml(run.baselineCommand || "(end)")}</strong>, qui il ramo esegue <strong>${escapeHtml(run.branchCommand || "")}</strong>.</div>
-      </div>`
-      : "";
-
     return `<div class="lab-spine__panel lab-spine__panel--detail">
       <div class="lab-spine__panel-head">
         <strong>Selection Detail</strong>
@@ -3081,15 +3068,10 @@
       </div>
       <div class="lab-detail__card">
         <div class="lab-detail__top">
-          <strong>Seed ${run.seed}</strong>
           <div class="lab-detail__badges">
             <span class="lab-badge lab-badge--muted">${escapeHtml(run.strategyLabel)}</span>
             <span class="lab-badge lab-badge--muted">${run.commands.length} step${run.commands.length === 1 ? "" : "s"}</span>
           </div>
-        </div>
-        <div class="lab-detail__section">
-          <strong>Scenario</strong>
-          <div class="lab-detail__text">${escapeHtml(run.presetDescription)}</div>
         </div>
         <details class="lab-detail__section lab-detail__disclosure">
           <summary class="lab-detail__summary">
@@ -3098,11 +3080,6 @@
           </summary>
           <pre class="lab-detail__text">${escapeHtml(finalStateSummary(run))}</pre>
         </details>
-        ${divergenceSection}
-        <div class="lab-detail__section">
-          <strong>Commands</strong>
-          <ol class="lab-detail__list">${commandItems}</ol>
-        </div>
         <div class="lab-detail__section">
           <strong>Command Output</strong>
           <ol class="lab-detail__log">${outputItems}</ol>
@@ -3161,9 +3138,19 @@
 
     const stepsHtml = report.steps.length
       ? report.steps.map((step) => {
+        const branchDivergenceIndex = Number.isInteger(state.spineSelectedPreviewRun?.divergenceStepIndex)
+          ? state.spineSelectedPreviewRun.divergenceStepIndex
+          : null;
+        const isSharedPath = branchDivergenceIndex !== null && step.stepIndex < branchDivergenceIndex;
+        const isDivergencePoint = branchDivergenceIndex !== null && step.stepIndex === branchDivergenceIndex;
         const stepSelected = state.spineSelectedRunId === report.spineRun.id && state.spineSelectedStepIndex === step.stepIndex
           ? " is-selected"
           : "";
+        const pathStateClass = isDivergencePoint
+          ? " is-divergence"
+          : isSharedPath
+            ? " is-shared-path"
+            : "";
         const branchesHtml = step.branches.length
           ? `<div class="lab-spine-node__branches">${step.branches.map((branch) => {
             const selected = state.spineSelectedRunId === branch.id ? " is-selected" : "";
@@ -3178,10 +3165,10 @@
           : "";
         const nodeClass = step.branches.length ? "lab-spine-node has-branches" : "lab-spine-node";
 
-        return `<div class="${nodeClass}">
-          <div class="lab-spine-node__main">
-            <button class="lab-spine-node__button${stepSelected}" type="button" aria-label="Open winning path detail" data-spine-step-index="${step.stepIndex}"></button>
-            <button class="lab-spine-node__command" type="button" data-spine-step-index="${step.stepIndex}">${escapeHtml(step.command)}</button>
+        return `<div class="${nodeClass}${pathStateClass}">
+          <div class="lab-spine-node__main${pathStateClass}">
+            <button class="lab-spine-node__button${stepSelected}${pathStateClass}" type="button" aria-label="Open winning path detail" data-spine-step-index="${step.stepIndex}"></button>
+            <button class="lab-spine-node__command${pathStateClass}" type="button" data-spine-step-index="${step.stepIndex}">${escapeHtml(step.command)}</button>
             <span class="lab-spine-node__index">${step.stepNumber}</span>
           </div>
           ${branchesHtml}

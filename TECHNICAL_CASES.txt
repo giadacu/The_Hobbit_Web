@@ -6183,3 +6183,103 @@ Future debugging advice
 -----------------------
 - For long diagnostic blocks inside an inspector, prefer collapsed native
   disclosure controls before adding custom stateful UI.
+
+
+Case 129 - 2026-06-24 - Divergence became clearer once the shared trunk was highlighted directly in the winning-path diagram
+-----------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The `Selection Detail` panel still had to explain divergence in text, even
+though that information really belonged in the `Winning path` diagram itself.
+
+Root cause
+----------
+The shared portion of a selected death branch was not visually marked on the
+trunk, so users had to read a sentence to understand where the branch followed
+the canonical solution and where it split away.
+
+Resolution
+----------
+- Removed the textual `Divergence` block from `Selection Detail`.
+- When a death branch is selected, the trunk now highlights:
+  - the shared steps before divergence
+  - the exact divergence step with a stronger accent
+- Kept the change local to the spine renderer and CSS, without adding another
+  panel or explanatory copy.
+
+Files touched
+-------------
+- `autoplay-lab.css`
+- `autoplay-lab.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a relationship is spatial in the model, show it in the diagram first and
+  only fall back to prose if the visual alone is insufficient.
+
+
+Case 130 - 2026-06-24 - The spine detail became easier to scan after removing the redundant commands list
+---------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+`Selection Detail` still spent vertical space on a separate `Commands` section
+even though the more useful `Command Output` section already listed each
+command together with its output.
+
+Root cause
+----------
+The detail card was duplicating the command sequence in two places:
+
+- once as a bare command list
+- once inside the output transcript
+
+Resolution
+----------
+- Removed the `Commands` section from `Selection Detail`.
+- Removed the now-unused local command-list computation from the spine detail
+  renderer.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If one section is strictly a less-informative duplicate of another, prefer
+  removing it rather than trying to compress both.
+
+
+Case 131 - 2026-06-24 - Selection detail became clearer after removing static context that never changed within one spine
+------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+`Selection Detail` still showed `Seed` and `Scenario` even though those values
+often stayed constant while the user explored one solution spine.
+
+Root cause
+----------
+Those fields described the overall spine context more than the currently
+selected node or branch, so repeating them inside the detail card made the
+panel feel static and less informative.
+
+Resolution
+----------
+- Removed the `Seed` line from `Selection Detail`.
+- Removed the `Scenario` section from `Selection Detail`.
+- Kept only the parts that vary meaningfully with the selection, such as final
+  state and command output.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- In an inspector, prefer selection-specific data over repeating context that
+  already belongs to the parent panel header.

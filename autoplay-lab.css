@@ -553,6 +553,41 @@ body {
   box-shadow: 0 0 0 3px rgba(12, 23, 13, 0.55), 0 0 0 1px rgba(214, 185, 102, 0.7);
 }
 
+.lab-spine-node.is-shared-path::before,
+.lab-spine-node.is-divergence::before {
+  background: linear-gradient(180deg, rgba(137, 183, 116, 0.92), rgba(89, 134, 75, 0.38));
+}
+
+.lab-spine-node__main.is-shared-path::before,
+.lab-spine-node__main.is-divergence::before {
+  background: rgba(137, 183, 116, 0.82);
+}
+
+.lab-spine-node__button.is-shared-path {
+  background: linear-gradient(180deg, rgba(104, 148, 88, 0.96), rgba(55, 95, 49, 0.98));
+  border-color: rgba(190, 231, 170, 0.42);
+  box-shadow: 0 0 0 3px rgba(12, 23, 13, 0.55), 0 0 0 1px rgba(137, 183, 116, 0.34);
+}
+
+.lab-spine-node__command.is-shared-path {
+  color: #eef7d9;
+}
+
+.lab-spine-node.is-divergence::before,
+.lab-spine-node__main.is-divergence::before {
+  background: rgba(214, 137, 95, 0.88);
+}
+
+.lab-spine-node__button.is-divergence {
+  background: linear-gradient(180deg, rgba(176, 113, 73, 0.96), rgba(109, 62, 37, 0.98));
+  border-color: rgba(235, 182, 151, 0.48);
+  box-shadow: 0 0 0 3px rgba(39, 18, 11, 0.6), 0 0 0 1px rgba(214, 137, 95, 0.62);
+}
+
+.lab-spine-node__command.is-divergence {
+  color: #ffe3d3;
+}
+
 .lab-spine-node__command,
 .lab-spine-terminal__label {
   appearance: none;
