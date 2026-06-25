@@ -179,6 +179,7 @@
   function canonicalWinningCommand(command = "") {
     const normalized = normalize(command);
     if (!normalized || ["look", "exits", "inventory", "wait"].includes(normalized)) return "";
+    if (/^answer .+$/.test(normalized)) return "gollum answer";
     if (normalized === 'say to gollum "what have i got in my pocket"' || normalized === "say to gollum \"what have i got in my pocket\"") {
       return "gollum pocket riddle";
     }
@@ -786,6 +787,10 @@
       "dragon_defeated",
       "victory",
     ]).has(targetId);
+  }
+
+  function targetNeedsBeornArrival(targetId = "") {
+    return targetId === "beorn_fed" || targetNeedsMirkwoodTraversal(targetId);
   }
 
   function ringTargetSatisfied() {
@@ -2285,8 +2290,64 @@
     );
   }
 
+  function dryCaveCrackPryingToolName() {
+    const carriedIds = [
+      ...(game.player?.inventory || []),
+      ...(game.player?.worn || []),
+    ];
+    const carriedItems = carriedIds
+      .map((itemId) => game.items?.[itemId])
+      .filter(Boolean);
+    const tool = carriedItems.find((item) => game.isDryCaveCrackPryingTool?.(item) && item.weapon)
+      || carriedItems.find((item) => game.isDryCaveCrackPryingTool?.(item))
+      || null;
+    return tool?.name || "";
+  }
+
+  function dryCaveCrackAlternativeDecision(targetId = "") {
+    if (!targetNeedsBeornArrival(targetId)) return null;
+
+    if (game.currentRoom === "dark_stuffy_passage_13") {
+      return { command: "north west", kind: "alternative_trigger" };
+    }
+
+    if (game.currentRoom === "dark_stuffy_passage_14") {
+      return { command: "down", kind: "alternative_trigger" };
+    }
+
+    if (game.currentRoom === "dark_stuffy_passage_6") {
+      return { command: "north", kind: "alternative_trigger" };
+    }
+
+    if (game.currentRoom === "dark_stuffy_passage_5" && game.dryCaveCrackEscapeActive?.()) {
+      if (!game.flags?.drycavecrackairnoticed) return { command: "listen", kind: "alternative_trigger" };
+      if (!game.flags?.drycavecrackseamfound) return { command: "search wall", kind: "alternative_trigger" };
+      if (!game.flags?.drycavecrackloosened) {
+        const toolName = dryCaveCrackPryingToolName();
+        if (toolName) return { command: `use ${toolName} on crack`, kind: "alternative_trigger" };
+        return { command: "search wall", kind: "alternative_trigger" };
+      }
+      if (!game.flags?.drycavecrackopened) return { command: "push stone", kind: "alternative_trigger" };
+      return { command: "squeeze through crack", kind: "alternative_trigger" };
+    }
+
+    if (game.currentRoom === "large_dry_cave") {
+      return { command: "south", kind: "alternative_trigger" };
+    }
+
+    if (["narrow_place", "narrow_dangerous_path"].includes(game.currentRoom)) {
+      const advance = game.preferredBeornMountainAdvance?.();
+      if (advance?.direction) return { command: advance.direction, kind: "alternative_trigger" };
+    }
+
+    return null;
+  }
+
   function alternativeSuccessDecision(targetId = "") {
     const candidates = [];
+
+    const dryCaveAlternative = dryCaveCrackAlternativeDecision(targetId);
+    if (dryCaveAlternative) candidates.push(dryCaveAlternative);
 
     if (targetNeedsMirkwoodTraversal(targetId) && !game.flags?.mirkwoodjourneyactive) {
       if (game.currentRoom === "beorns_house") {

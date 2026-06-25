@@ -16989,9 +16989,25 @@
       return Math.max(0, Number(this.flags.drycavecrackpressure || 0));
     }
 
+    clearDryCaveCrackRoomHostiles() {
+      if (!this.dryCaveCrackEscapeActive()) return false;
+      let changed = false;
+      for (const character of this.peopleInRoom(this.currentRoom)) {
+        if (!character || character.id === this.player.id || character.friendly !== false) continue;
+        if (!matches(character.name, "goblin")) continue;
+        character.visible = false;
+        character.attackFlag = 0;
+        character.justEntered = false;
+        if (character.position === this.currentRoom) character.position = "dark_stuffy_passage_6";
+        changed = true;
+      }
+      return changed;
+    }
+
     beginDryCaveCrackEscape() {
       if (!this.dryCaveCrackEscapeActive()) return false;
       if (this.flags.drycavecrackintroseen) return false;
+      this.clearDryCaveCrackRoomHostiles();
       this.flags.drycavecrackintroseen = true;
       this.flags.drycavecrackpressure = 0;
       this.recordAutosave("before forcing the hidden crack beneath the dry cave", {

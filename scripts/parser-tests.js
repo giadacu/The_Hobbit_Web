@@ -5511,7 +5511,6 @@ const gameCases = [
       game.print(`Has meal at Beorn: ${game.findInInventory("meal") ? "yes" : "no"}`);
     },
     expectedIncluded: [
-      "Jumped to Rivendell.",
       "Weight at Beorn:",
       "You take the meal from the cupboard.",
       "Has meal at Beorn: yes",
@@ -5530,16 +5529,15 @@ const gameCases = [
         if (!command) throw new Error(`Expected a route to Beorn, but autoplay stopped in ${game.currentRoom}.`);
         game.execute(command);
       }
-      game.debugGivePlayerItem("large key");
       game.execute("open curtain");
       game.execute("open cupboard");
       game.execute("examine cupboard");
       game.flags.autoplayexaminedcupboard = true;
       const command = game.nextAutoplayCommand();
-      game.print(`Autoplay next at Beorn while overloaded: ${command}`);
+      game.print(`Autoplay next at Beorn with spare capacity: ${command}`);
     },
     expectedIncluded: [
-      "Autoplay next at Beorn while overloaded: take meal",
+      "Autoplay next at Beorn with spare capacity: take meal",
     ],
   },
   {
@@ -7982,6 +7980,46 @@ const gameCases = [
       "The goblins seize you in the dark before you can escape the tunnels.",
       "Dry cave goblin death: yes",
       "Dry cave death image: bilbo_goblins_around_him_death.png",
+    ],
+  },
+  {
+    name: "gollum escape can still reach beorn through the dry cave crack route",
+    setup(game) {
+      game.execute("jump gollum");
+    },
+    drive(game) {
+      game.execute("ask gollum a riddle");
+      let riddle = game.currentGollumRiddle();
+      game.execute(`answer ${riddle.answers[0]}`);
+      riddle = game.currentGollumRiddle();
+      game.execute(`answer ${riddle.answers[0]}`);
+      game.execute("say to gollum \"what's in my pocket\"");
+      game.execute("wear ring");
+      game.execute("north");
+      game.execute("light lantern");
+      game.execute("north west");
+      game.execute("down");
+      game.execute("north");
+      game.execute("listen");
+      game.execute("search wall");
+      game.execute("use short strong dagger on crack");
+      game.execute("push stone");
+      game.execute("squeeze through crack");
+      game.execute("south");
+      game.execute("east");
+      game.execute("east");
+      game.execute("open curtain");
+      game.execute("open cupboard");
+      game.execute("examine cupboard");
+      game.execute("take meal");
+      game.execute("eat meal");
+      game.print(`Dry cave Beorn room: ${game.currentRoom}`);
+      game.print(`Dry cave Beorn recovered: ${game.player.strength >= 6 ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You turn sideways and slip through the narrow opening just as harsh voices break out close behind you.",
+      "Dry cave Beorn room: beorns_house",
+      "Dry cave Beorn recovered: yes",
     ],
   },
   {

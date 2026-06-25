@@ -6558,3 +6558,63 @@ Future debugging advice
   that state change is intentionally part of the death outcome.
 - Apply parser strictness narrowly to safety-critical wording; otherwise small
   natural-language synonyms will regress elsewhere.
+
+
+Case 138 - 2026-06-25 - The autoplay lab lost the dry-cave return path from Gollum to Beorn
+---------------------------------------------------------------------------------------------
+
+Symptom
+-------
+In the autoplay lab, selecting `Before Gollum -> Beorn Meal Taken` no longer
+surfaced the winning branch that returns through the large dry cave and then
+reaches Beorn by the narrow path.
+
+Root cause
+----------
+Two separate regressions had collapsed that branch.
+
+1. The lab had no dedicated alternative steering for the dry-cave return:
+   - after Gollum it kept following the normal goblin-gate route unless a
+     generic autoplay step happened to discover the crack on its own
+   - the winning-path catalog also over-split runs by the literal text of each
+     correct Gollum riddle answer, so near-identical Great River runs crowded
+     out more meaningful route variants
+
+2. The underlying game route had also become unintentionally hostile:
+   - entering `dark_stuffy_passage_5` during the crack-escape scene could leave
+     a visible goblin already in the room
+   - that contradicted the scene's intended setup, where goblins are still
+     behind Bilbo, and it made the crack route unwinnable before the lab could
+     ever catalog it
+
+Resolution
+----------
+- Added explicit lab alternative steering for the dry-cave branch:
+  - `dark_stuffy_passage_13 -> north west`
+  - `dark_stuffy_passage_14 -> down`
+  - `dark_stuffy_passage_6 -> north`
+  - then the crack sequence and the return through `large_dry_cave`
+- Canonicalized generic `answer ...` commands in winning-path grouping so
+  random Gollum answer wording no longer floods the winning catalog with
+  duplicate Great River variants.
+- Restored the actual route by clearing immediate visible goblin hostiles from
+  `dark_stuffy_passage_5` when the dry-cave crack escape scene begins, matching
+  the scene text that places the goblins behind Bilbo rather than already on
+  top of him.
+- Added a regression that plays from `jump gollum` through the crack route all
+  the way to Beorn's meal.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a winning-path option disappears from the lab, verify both layers:
+  whether the lab still steers toward that route and whether the underlying
+  game branch is still genuinely winnable.
+- For path catalogs, collapse seed-randomized wording differences that do not
+  represent meaningful route choices, or real branch diversity will be hidden.
