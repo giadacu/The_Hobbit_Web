@@ -238,7 +238,6 @@ The fix aligned the game renderer with the editor logic.
    local map, so the game can map a connection to the correct parent/world
    node label.
 
-
 Case 005 - 2026-06-18 - Golden-path autoplay test hid seed-sensitive Gollum and Smaug failures
 -----------------------------------------------------------------------------------------------
 
@@ -6283,3 +6282,279 @@ Future debugging advice
 -----------------------
 - In an inspector, prefer selection-specific data over repeating context that
   already belongs to the parent panel header.
+
+
+Case 132 - 2026-06-25 - Solution spine needed multiple winning paths instead of one canonical autoplay
+------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+`autoplay-lab` built the solution spine from a single canonical winning run.
+If multiple distinct winning routes existed, the lab only exposed fatal
+branches reachable from that one path.
+
+Root cause
+----------
+`generateSolutionSpineReport()` chose one success with
+`chooseCanonicalSuccessRun()` and never kept a catalog of alternative winning
+paths. The panel had no way to switch spine source runs.
+
+Resolution
+----------
+The spine panel now discovers a small catalog of distinct winning paths before
+showing the active spine.
+
+1. Winning runs are collected from both `optimal` and `alternative`
+   strategies.
+2. Each success stores lightweight scene markers, selected final flags, and
+   visited rooms.
+3. The lab groups successes into representative winning paths and shows them in
+   the spine panel.
+4. Selecting a winning path lazily generates its own solution spine, so the
+   previous single-spine flow still works as the default when only one winner
+   exists.
+5. The catalog also refreshes automatically in the background when the lab
+   opens or when the scenario controls change.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+- `autoplay-lab.css`
+- `autoplay-lab.html`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a new winning route is not appearing, inspect the winning-path grouping
+  key before changing the spine logic itself.
+- Scene-event tracking is intentionally lightweight; when adding a major new
+  alternate solution, consider adding a new scene marker instead of relying on
+  raw command differences alone.
+
+
+Case 133 - 2026-06-25 - Multi-path spine probing could attach fatal branches to the wrong divergence state
+----------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After introducing multiple winning paths in the spine panel, some fatal
+branches appeared under later steps where they did not belong, such as
+`Death by Gollum` being shown after the path had already left `deep_dark_lake`.
+
+Root cause
+----------
+Fatal branch probing replayed the winning-path prefix before each divergence,
+but it did not verify that the replay had reconstructed the exact original
+state for that step. If the replay drifted, scene-specific fatal probes could
+still be proposed and end up attached to the wrong spine node.
+
+Resolution
+----------
+The winning run transcript now stores the pre-step room and state key for each
+command. Spine probing validates that the reconstructed divergence state still
+matches the original winning run before collecting or simulating fatal branch
+candidates.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a fatal branch looks thematically impossible for a given spine step,
+  inspect divergence-state validation before changing the fatal probes.
+- For scene-bound hazards such as Gollum, troll clearing, or cellar escape,
+  prefer validating the reconstructed state instead of relying only on the
+  branch command text.
+
+
+Case 134 - 2026-06-25 - Spine failure probes missed generic goblin combat deaths outside the hulking ambush
+-----------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+In goblin-tunnel winning paths, the spine could show the special Gollum deaths
+and the hulking-goblin ambush death, but it could miss fatal branches tied to
+ordinary hostile goblin fights such as attacking a goblin without using the
+sword.
+
+Root cause
+----------
+The failure probes treated two goblin cases differently:
+
+- the scripted hulking-goblin ambush had dedicated failure logic
+- ordinary hostile goblin fights had no comparable failure candidate in spine
+  probing
+
+As a result, the spine did not try the most relevant wrong combat variant for
+those normal fights.
+
+Resolution
+----------
+- Added a generic hostile-threat failure probe for goblin and warg style melee
+  fights when Bilbo has the sword.
+- Added a separate `Death by Goblins` outcome classification for ordinary
+  goblin-combat deaths so those branches do not fall back to `Other death`.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Keep scripted encounter probes and generic combat probes separate; they need
+  different failure moves even when both involve goblins.
+- If a combat death branch is missing from the spine, check whether the wrong
+  move exists only as a normal combat variant rather than a room hazard.
+
+
+Case 135 - 2026-06-25 - Before Trolls spine could backtrack to Bag End and miss the real no-key dawn branch
+------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+In the autoplay lab, `Before Trolls -> Rivendell Complete` could show a
+winning path that started by walking back through Bag End, and the second troll
+success path was only a near-duplicate of the key-stealing route instead of the
+valid branch where Bilbo leaves the clearing, waits three times, and lets dawn
+transform the trolls.
+
+Root cause
+----------
+Two issues overlapped.
+
+1. The `jump trolls` checkpoint landed Bilbo near the trolls, but it did not
+   include Bag End pickups such as the firestone and sturdy key that the global
+   autoplay still treats as required before Rivendell. From that checkpoint,
+   autoplay therefore backtracked west to collect them.
+
+2. The lab's alternative-success logic only proposed troll-side `wait`
+   commands after `trollkeytaken` was already true. That meant it could produce
+   a "wait after stealing the key" variant, but it never generated the real
+   alternate success where Bilbo leaves the live clearing without the key and
+   waits outside for dawn.
+
+Resolution
+----------
+- Enriched the troll debug checkpoint with the pre-troll Bag End items that the
+  autoplay still expects, so `Before Trolls` no longer backtracks to Bag End.
+- Added a troll-specific alternative branch in the autoplay lab:
+  - from a live trolls' clearing without the key, try leaving by `south west`
+  - once safely outside and still keyless, allow `wait` as the alternative
+    success move toward dawn
+- Recorded a lightweight scene marker for leaving the trolls without the key so
+  future path debugging can distinguish that branch more easily.
+
+Files touched
+-------------
+- `game.js`
+- `autoplay-lab.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Checkpoint presets used by autoplay should satisfy the autoplay's own
+  prerequisite assumptions, not only place Bilbo in the right room.
+- If two winning paths look suspiciously similar, inspect whether the lab is
+  only exploring a variant after a later flag has already collapsed the real
+  branch distinction.
+
+
+Case 136 - 2026-06-25 - `take key` in the troll clearing could steal the large key without the required careful action
+-----------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+During the live troll encounter, Bilbo could type `take key` and escape with
+the large key. The intended design was stricter: only the careful theft wording
+should succeed, while the careless version should trigger the fatal troll
+branch.
+
+Root cause
+----------
+The troll scene relied on special parser actions, but their matching was too
+permissive.
+
+- The safe troll-key actions (`carefully` / `slowly`) appear before the fatal
+  plain `take` / `steal` actions.
+- `matchesSpecialActionObjects()` still accepted an adverb-gated action when
+  the adverb was absent, as long as the object text matched.
+- `commandObjectMatches()` treats `key` as a valid match for `large key`, so
+  `take key` incorrectly matched the careful branch first.
+- The escape narration out of the clearing only checked whether Bilbo had the
+  large key in inventory, not whether the successful careful-theft state flag
+  (`trollkeytaken`) had actually been set.
+
+Resolution
+----------
+- Tightened special-action matching so actions with an explicit adverb only
+  match when that adverb is really present.
+- Hardened the troll-clearing escape narration so it only fires after the
+  proper successful theft flag is set.
+- Added parser regressions covering:
+  - `take key`
+  - movement out of the clearing while holding the key without
+    `trollkeytaken`
+  so shorthand input can no longer impersonate the successful stealth branch.
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Treat required adverbs in scene-specific actions as hard gates, not soft
+  hints, or shorthand commands can fall into the wrong narrative branch.
+- When a later movement beat depends on a successful stealth action, key it off
+  the stealth-state flag, not only the resulting inventory item.
+
+
+Case 137 - 2026-06-25 - Troll adverb hardening must not remove normal preposition flexibility or print impossible loot on fatal theft
+-------------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After tightening the troll-key parser fix:
+
+- the fatal `take key` branch still printed `You take the large key.`
+- non-critical phrasing like `climb on branch` stopped matching actions that
+  previously worked via near-equivalent wording such as `climb onto branch`
+
+Root cause
+----------
+Two follow-up issues remained.
+
+1. Special actions still ran `performSpecialActionTransfer()` even when the
+   action destination was `endgame`, so the fatal troll theft briefly granted
+   the key and printed the pickup line before death.
+
+2. The adverb matching hardening was applied too broadly. It correctly blocked
+   shorthand from impersonating `carefully take key`, but it also made benign
+   parser variations such as `on` versus `onto` fail.
+
+Resolution
+----------
+- Skip special-action item transfer for fatal `endgame` actions.
+- Restrict strict adverb matching to the truly safety-critical troll theft
+  adverbs (`carefully`, `slowly`) and keep the older flexible behavior for
+  ordinary preposition-like wording.
+- Added regression coverage for:
+  - fatal `take key` no longer printing a successful pickup
+  - `climb on branch` still following the pony route
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a special action ends the game, avoid mutating inventory first unless
+  that state change is intentionally part of the death outcome.
+- Apply parser strictness narrowly to safety-critical wording; otherwise small
+  natural-language synonyms will regress elsewhere.

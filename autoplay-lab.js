@@ -43,6 +43,9 @@
   const LAB_EXPLORE_MEMORY_KEY = "hobbit-lab-explore-memory-v2";
   const LAB_EXPLORE_MEMORY_VERSION = 3;
   const LAB_CONTINUOUS_LOG_KEY = "hobbit-lab-continuous-log-v1";
+  const WINNING_PATH_CATALOG_VERSION = 1;
+  const WINNING_PATH_MAX_COUNT = 8;
+  const WINNING_PATH_WARMUP_DELAY_MS = 260;
   const CONTINUOUS_INTER_RUN_DELAY_MS = 140;
   const CONTINUOUS_ARCHIVE_LIMITS = [
     { sessionLimit: 3, logEntries: 120, logChars: 1400, runCommands: 80 },
@@ -60,6 +63,12 @@
     simulationHistory: null,
     activeExplorationRoute: null,
     spineReport: null,
+    spineCatalog: null,
+    spineCatalogLoading: false,
+    spineLoadingRunId: "",
+    spineSelectedWinningRunId: "",
+    spineReportsByWinningRunId: {},
+    spineWarmupTimer: 0,
     spineSelectedRunId: "",
     spineSelectedStepIndex: -1,
     spineSelectedPreviewRun: null,
@@ -119,6 +128,138 @@
 
   function wait(ms = 0) {
     return new Promise((resolve) => window.setTimeout(resolve, ms));
+  }
+
+  function captureFinalFlagsSubset() {
+    const flags = game.flags || {};
+    return {
+      trollkeytaken: Boolean(flags.trollkeytaken),
+      trollsTransformed: Boolean(game.trollsTransformed),
+      mirkwooddrankstream: Boolean(flags.mirkwooddrankstream),
+      mirkwoodfolloweddeer: Boolean(flags.mirkwoodfolloweddeer),
+      mirkwoodfollowedlights: Boolean(flags.mirkwoodfollowedlights),
+      mirkwooddwarvesfreed: Boolean(flags.mirkwooddwarvesfreed),
+      barrelthrown: Boolean(flags.barrelthrown),
+      bardreadiedarrow: Boolean(flags.bardreadiedarrow),
+    };
+  }
+
+  function captureVisitedRooms() {
+    return [...(game.visitedRooms || [])];
+  }
+
+  function createSceneEventTracker() {
+    return {
+      events: [],
+      seen: new Set(),
+    };
+  }
+
+  function pushSceneEvent(tracker, event = "") {
+    const value = String(event || "").trim();
+    if (!tracker || !value || tracker.seen.has(value)) return;
+    tracker.seen.add(value);
+    tracker.events.push(value);
+  }
+
+  function inferBeornApproachFromVisitedRooms(visitedRooms = []) {
+    const rooms = Array.isArray(visitedRooms) ? visitedRooms : [];
+    const beornIndex = rooms.lastIndexOf("beorns_house");
+    if (beornIndex <= 0) return "";
+    const preceding = rooms.slice(0, beornIndex).reverse();
+    for (const roomId of preceding) {
+      if (roomId === "great_river") return "approach_great_river";
+      if (roomId === "treeless_opening") return "approach_treeless_opening";
+      if (roomId === "narrow_dangerous_path") return "approach_narrow_path";
+      if (roomId === "outside_goblins_gate") return "approach_outside_gate";
+    }
+    return "";
+  }
+
+  function canonicalWinningCommand(command = "") {
+    const normalized = normalize(command);
+    if (!normalized || ["look", "exits", "inventory", "wait"].includes(normalized)) return "";
+    if (normalized === 'say to gollum "what have i got in my pocket"' || normalized === "say to gollum \"what have i got in my pocket\"") {
+      return "gollum pocket riddle";
+    }
+    if (normalized === 'say to gollum "what\'s in my pocket"' || normalized === "say to gollum \"what's in my pocket\"") {
+      return "gollum pocket riddle";
+    }
+    if (/^say to bard "get strong arrow from quiver"$/.test(normalized)) return "bard get strong arrow";
+    if (/^say to bard "get arrow from quiver"$/.test(normalized)) return "bard get arrow";
+    if (/^say to bard "shoot dragon"$/.test(normalized)) return "dragon shoot";
+    if (/^say to bard "take shot"$/.test(normalized)) return "dragon take shot";
+    if (/^say to bard "loose arrow"$/.test(normalized)) return "dragon loose arrow";
+    if (/^ask .* to attack .*goblin$/.test(normalized)) return "goblin helper attack";
+    if (/^(kill|attack) .*goblin( with sword)?$/.test(normalized)) return "goblin bilbo attack";
+    if (normalized === "take large key") return "troll key";
+    if (normalized === "drink stream") return "mirkwood stream";
+    if (normalized === "follow deer") return "mirkwood deer";
+    if (normalized === "follow lights") return "mirkwood lights";
+    if (normalized === "help dwarves") return "mirkwood free dwarves";
+    if (normalized === "throw barrel through trap door") return "cellar throw barrel";
+    if (normalized === "jump onto barrel") return "cellar jump barrel";
+    if (normalized === "climb barrel") return "cellar climb barrel";
+    if (normalized === "take woods cloak") return "beorn take cloak";
+    if (normalized === "wear woods cloak") return "beorn wear cloak";
+    return normalized;
+  }
+
+  function recordSceneEvents({ beforeSnapshot = {}, command = "", tracker = null }) {
+    if (!tracker) return;
+    const normalized = normalize(command);
+    if (!normalized) return;
+
+    if (normalized === "take large key") pushSceneEvent(tracker, "trolls:key_taken");
+    if (normalized === "south west" && beforeSnapshot.room === "trolls_clearing" && !game.findInInventory?.("large key")) {
+      pushSceneEvent(tracker, "trolls:left_without_key");
+    }
+    if (normalized === "wait" && game.trollsTransformed) pushSceneEvent(tracker, "trolls:waited_for_dawn");
+
+    if (
+      normalized === 'say to gollum "what have i got in my pocket"'
+      || normalized === "say to gollum \"what have i got in my pocket\""
+      || normalized === 'say to gollum "what\'s in my pocket"'
+      || normalized === "say to gollum \"what's in my pocket\""
+    ) {
+      pushSceneEvent(tracker, "gollum:pocket_riddle");
+    }
+
+    if (/^ask .* to attack .*goblin$/.test(normalized)) pushSceneEvent(tracker, "goblin:helper_attack");
+    if (/^(kill|attack) .*goblin( with sword)?$/.test(normalized)) pushSceneEvent(tracker, "goblin:bilbo_attack");
+
+    if (normalized === "drink stream" && game.flags?.mirkwooddrankstream) pushSceneEvent(tracker, "mirkwood:drink_stream");
+    if (normalized === "follow deer" && game.flags?.mirkwoodfolloweddeer) pushSceneEvent(tracker, "mirkwood:follow_deer");
+    if (normalized === "follow lights" && game.flags?.mirkwoodfollowedlights) pushSceneEvent(tracker, "mirkwood:follow_lights");
+    if (normalized === "help dwarves" && game.flags?.mirkwooddwarvesfreed) pushSceneEvent(tracker, "mirkwood:free_dwarves");
+
+    if (normalized === "take woods cloak") pushSceneEvent(tracker, "beorn:take_cloak");
+    if (normalized === "wear woods cloak" && game.wearingMirkwoodCloak?.()) pushSceneEvent(tracker, "beorn:wear_cloak");
+
+    if (normalized === "throw barrel through trap door" && game.flags?.barrelthrown) pushSceneEvent(tracker, "cellar:barrel_throw");
+    if (normalized === "jump onto barrel") pushSceneEvent(tracker, "cellar:jump_barrel");
+    if (normalized === "climb barrel") pushSceneEvent(tracker, "cellar:climb_barrel");
+
+    if (normalized === 'say to bard "get strong arrow from quiver"' || normalized === "say to bard \"get strong arrow from quiver\"") {
+      pushSceneEvent(tracker, "bard:get_strong_arrow");
+    }
+    if (normalized === 'say to bard "get arrow from quiver"' || normalized === "say to bard \"get arrow from quiver\"") {
+      pushSceneEvent(tracker, "bard:get_arrow");
+    }
+    if (normalized === 'say to bard "shoot dragon"' || normalized === "say to bard \"shoot dragon\"") pushSceneEvent(tracker, "dragon:shoot");
+    if (normalized === 'say to bard "take shot"' || normalized === "say to bard \"take shot\"") pushSceneEvent(tracker, "dragon:take_shot");
+    if (normalized === 'say to bard "loose arrow"' || normalized === "say to bard \"loose arrow\"") pushSceneEvent(tracker, "dragon:loose_arrow");
+
+    if (game.currentRoom === "beorns_house") {
+      const inferred = inferBeornApproachFromVisitedRooms(captureVisitedRooms()) || (
+        beforeSnapshot.room === "great_river" ? "approach_great_river"
+          : beforeSnapshot.room === "treeless_opening" ? "approach_treeless_opening"
+            : beforeSnapshot.room === "narrow_dangerous_path" ? "approach_narrow_path"
+              : beforeSnapshot.room === "outside_goblins_gate" ? "approach_outside_gate"
+                : ""
+      );
+      if (inferred) pushSceneEvent(tracker, `beorn:${inferred}`);
+    }
   }
 
   function createExploreMemory() {
@@ -910,6 +1051,22 @@
       },
     },
     {
+      id: "death_goblin_fight",
+      label: "Death by Goblins",
+      description: "Bilbo viene sopraffatto in un combattimento contro goblin ostili.",
+      matches(context = {}) {
+        const tail = (context.tailOutput || []).join(" ");
+        return Boolean(
+          game.endgame
+          && game.pendingEndgameChoice === "death"
+          && (
+            /goblin/i.test(tail)
+            || (game.currentRoom && /goblin|passage|cavern/.test(game.currentRoom))
+          )
+        );
+      },
+    },
+    {
       id: "death_spider",
       label: "Death by Spiders",
       description: "Bilbo soccombe ai ragni o al loro veleno.",
@@ -1085,6 +1242,9 @@
     }
     if (targetById.death_goblin.matches(context)) {
       return { code: "death_goblin", label: "Death by Hulking Goblin", tone: "danger" };
+    }
+    if (targetById.death_goblin_fight.matches(context)) {
+      return { code: "death_goblin_fight", label: "Death by Goblins", tone: "danger" };
     }
     if (targetById.death_spider.matches(context)) {
       return { code: "death_spider", label: "Death by Spiders", tone: "danger" };
@@ -1634,6 +1794,15 @@
     )) || null;
   }
 
+  function visibleHostileNonSpiderThreat() {
+    return game.peopleInRoom?.().find((character) => (
+      character.visible
+      && character.friendly === false
+      && !/gollum/.test(normalize(character.name))
+      && !/spider/.test(normalize(character.name))
+    )) || null;
+  }
+
   function createHistoryTracker() {
     return {
       roomVisits: new Map(),
@@ -2097,6 +2266,25 @@
     return answers.find((answer, index) => index > 0 && String(answer || "").trim()) || "";
   }
 
+  function trollDawnWaitAvailable() {
+    return Boolean(
+      game.visitedTrollsClearing
+      && !game.trollsTransformed
+      && !game.flags?.trollkeytaken
+      && !game.findInInventory?.("large key")
+      && game.currentRoom !== "trolls_clearing"
+    );
+  }
+
+  function trollNoKeyExitAvailable() {
+    return Boolean(
+      game.currentRoom === "trolls_clearing"
+      && !game.trollsTransformed
+      && !game.flags?.trollkeytaken
+      && !game.findInInventory?.("large key")
+    );
+  }
+
   function alternativeSuccessDecision(targetId = "") {
     const candidates = [];
 
@@ -2136,12 +2324,11 @@
       }
     }
 
-    if (
-      game.visitedTrollsClearing
-      && game.flags?.trollkeytaken
-      && !game.trollsTransformed
-      && game.currentRoom !== "trolls_clearing"
-    ) {
+    if (trollNoKeyExitAvailable()) {
+      candidates.push({ command: "south west", kind: "alternative_trigger" });
+    }
+
+    if (trollDawnWaitAvailable()) {
       candidates.push({ command: "wait", kind: "alternative_trigger" });
     }
 
@@ -2271,12 +2458,11 @@
       }
     }
 
-    if (
-      game.visitedTrollsClearing
-      && game.flags?.trollkeytaken
-      && !game.trollsTransformed
-      && game.currentRoom !== "trolls_clearing"
-    ) {
+    if (trollNoKeyExitAvailable()) {
+      candidates.push({ command: "south west", kind: "alternative" });
+    }
+
+    if (trollDawnWaitAvailable()) {
       candidates.push({ command: "wait", kind: "alternative" });
     }
 
@@ -2285,6 +2471,16 @@
       candidates.push({ command: "wait", kind: "failure" });
       candidates.push({ command: "look", kind: "failure" });
       candidates.push({ command: `talk to ${normalize(spider.name)}`, kind: "failure" });
+    }
+
+    const hostileThreat = visibleHostileNonSpiderThreat();
+    if (
+      hostileThreat
+      && game.findInInventory?.("majestic sword")
+      && /goblin|wolf|warg/.test(normalize(hostileThreat.name))
+    ) {
+      candidates.push({ command: `kill ${hostileThreat.name}`, kind: "failure" });
+      candidates.push({ command: `attack ${hostileThreat.name}`, kind: "failure" });
     }
 
     if (game.currentRoom === "mirkwood_enchanted_stream" && !game.flags?.mirkwooddrankstream) {
@@ -2367,6 +2563,7 @@
       try {
         const { setupOutput } = resetToPreset(preset);
         state.simulationHistory = createHistoryTracker();
+        const sceneTracker = createSceneEventTracker();
         bumpMapCount(state.simulationHistory.roomVisits, game.currentRoom);
         const commands = [];
         const transcript = [];
@@ -2395,7 +2592,20 @@
               unlockReward,
               lines,
             });
-            transcript.push({ command, lines, decisionKind: decision?.kind || "optimal" });
+            recordSceneEvents({
+              beforeSnapshot,
+              command,
+              tracker: sceneTracker,
+            });
+            transcript.push({
+              command,
+              lines,
+              decisionKind: decision?.kind || "optimal",
+              beforeRoom: beforeSnapshot.room,
+              afterRoom: afterSnapshot.room,
+              beforeStateKey: beforeSnapshot.stateKey,
+              afterStateKey: afterSnapshot.stateKey,
+            });
             recordHistoryStep(state.simulationHistory, command, previousRoom, game.currentRoom, beforeSnapshot.stateKey);
             recordTransitionSample(state.simulationHistory, { stateKey: beforeSnapshot.stateKey, command, reward, unlockReward });
             matched = target.matches(scenarioContext());
@@ -2430,6 +2640,9 @@
           ringRecovered: Boolean(game.bilboHasRecoveredRing?.()),
           strength: Number(game.player?.strength || 0),
           outcome,
+          finalFlagsSubset: captureFinalFlagsSubset(),
+          visitedRooms: captureVisitedRooms(),
+          sceneEvents: [...sceneTracker.events],
           inventory: [...(game.player?.inventory || []), ...(game.player?.worn || [])]
             .map((itemId) => game.items?.[itemId]?.name || itemId),
         };
@@ -2488,6 +2701,26 @@
     return true;
   }
 
+  function spineDivergenceStateKey(spineRun = null, divergenceStepIndex = 0) {
+    const entry = spineRun?.transcript?.[divergenceStepIndex];
+    return String(entry?.beforeStateKey || "").trim();
+  }
+
+  function spineDivergenceRoom(spineRun = null, divergenceStepIndex = 0) {
+    const entry = spineRun?.transcript?.[divergenceStepIndex];
+    return String(entry?.beforeRoom || "").trim();
+  }
+
+  function spineDivergenceContextMatches(spineRun = null, divergenceStepIndex = 0, targetId = "") {
+    if (!spineRun) return false;
+    const expectedStateKey = spineDivergenceStateKey(spineRun, divergenceStepIndex);
+    if (expectedStateKey) {
+      return exploratoryStateKey(targetId) === expectedStateKey;
+    }
+    const expectedRoom = spineDivergenceRoom(spineRun, divergenceStepIndex);
+    return expectedRoom ? game.currentRoom === expectedRoom : true;
+  }
+
   function simulateSpineOffshootRun({
     presetId,
     targetId,
@@ -2505,13 +2738,21 @@
       const { setupOutput } = resetToPreset(preset);
       const commands = [];
       const transcript = [];
+      const sceneTracker = createSceneEventTracker();
 
       if (!replayPrefix(prefixCommands, targetId, transcript, commands)) return null;
       if (game.endgame) return null;
+      if (!spineDivergenceContextMatches(spineRun, divergenceStepIndex, targetId)) return null;
 
       const beforeBranchLength = getOutputLines().length;
+      const beforeBranchSnapshot = { room: game.currentRoom };
       commands.push(branchCommand);
       game.execute(branchCommand);
+      recordSceneEvents({
+        beforeSnapshot: beforeBranchSnapshot,
+        command: branchCommand,
+        tracker: sceneTracker,
+      });
       transcript.push({
         command: branchCommand,
         lines: outputDelta(beforeBranchLength),
@@ -2525,7 +2766,13 @@
         if (!nextCommand) break;
         const beforeLength = getOutputLines().length;
         commands.push(nextCommand);
+        const beforeSnapshot = { room: game.currentRoom };
         game.execute(nextCommand);
+        recordSceneEvents({
+          beforeSnapshot,
+          command: nextCommand,
+          tracker: sceneTracker,
+        });
         transcript.push({
           command: nextCommand,
           lines: outputDelta(beforeLength),
@@ -2561,6 +2808,9 @@
         ringRecovered: Boolean(game.bilboHasRecoveredRing?.()),
         strength: Number(game.player?.strength || 0),
         outcome,
+        finalFlagsSubset: captureFinalFlagsSubset(),
+        visitedRooms: captureVisitedRooms(),
+        sceneEvents: [...sceneTracker.events],
         inventory: [...(game.player?.inventory || []), ...(game.player?.worn || [])]
           .map((itemId) => game.items?.[itemId]?.name || itemId),
         divergenceStepIndex,
@@ -2600,7 +2850,9 @@
       const candidates = withSeededRandom(spineRun.seed, () => {
         resetToPreset(presetById[presetId]);
         const prefixCommands = spineRun.commands.slice(0, divergenceStepIndex);
-        replayPrefix(prefixCommands, targetId, [], []);
+        if (!replayPrefix(prefixCommands, targetId, [], [])) return [];
+        if (game.endgame) return [];
+        if (!spineDivergenceContextMatches(spineRun, divergenceStepIndex, targetId)) return [];
         return failureBranchCandidates(spineRun.commands[divergenceStepIndex]);
       });
 
@@ -2715,6 +2967,198 @@
       steps: buildSolutionSpineSteps(spineRun, branchRuns),
       branchRuns,
       sourceRuns: canonicalRuns,
+    };
+  }
+
+  function winningPathMarkers(run = null) {
+    if (!run) return [];
+    const markers = [];
+    const pushMarker = (value) => {
+      const marker = String(value || "").trim();
+      if (!marker || markers.includes(marker)) return;
+      markers.push(marker);
+    };
+
+    for (const event of run.sceneEvents || []) pushMarker(event);
+
+    const flags = run.finalFlagsSubset || {};
+    if (flags.trollkeytaken) pushMarker("trolls:key_taken");
+    if (flags.mirkwooddrankstream) pushMarker("mirkwood:drink_stream");
+    if (flags.mirkwoodfolloweddeer) pushMarker("mirkwood:follow_deer");
+    if (flags.mirkwoodfollowedlights) pushMarker("mirkwood:follow_lights");
+    if (flags.mirkwooddwarvesfreed) pushMarker("mirkwood:free_dwarves");
+    if (flags.barrelthrown) pushMarker("cellar:barrel_throw");
+    if (flags.bardreadiedarrow) pushMarker("bard:arrow_ready");
+
+    const beornApproach = inferBeornApproachFromVisitedRooms(run.visitedRooms || []);
+    if (beornApproach) pushMarker(`beorn:${beornApproach}`);
+
+    return markers;
+  }
+
+  function winningPathKey(run = null) {
+    if (!run) return "";
+    const markers = [...winningPathMarkers(run)].sort();
+    const compactCommands = (run.commands || [])
+      .map((command) => canonicalWinningCommand(command))
+      .filter(Boolean);
+    return [
+      `v${WINNING_PATH_CATALOG_VERSION}`,
+      run.presetId,
+      run.targetId,
+      markers.join("|"),
+      compactCommands.join("->"),
+    ].join("::");
+  }
+
+  function winningPathCoverageScore(group = null) {
+    if (!group) return 0;
+    return (group.runs?.length || 0) * 1000 - (group.representativeRun?.commands?.length || 0);
+  }
+
+  function chooseRepresentativeWinningRun(runs = []) {
+    if (!runs.length) return null;
+    return [...runs].sort(compareCanonicalRuns)[0];
+  }
+
+  function buildWinningPathLabel(group = null) {
+    const markers = group?.markers || [];
+    const parts = [];
+    if (markers.includes("trolls:waited_for_dawn")) parts.push("Dawn trolls");
+    if (markers.includes("goblin:helper_attack")) parts.push("Helper ambush");
+    else if (markers.includes("goblin:bilbo_attack")) parts.push("Bilbo ambush");
+    if (markers.includes("gollum:pocket_riddle")) parts.push("Pocket riddle");
+    if (markers.includes("beorn:approach_great_river")) parts.push("Great River");
+    else if (markers.includes("beorn:approach_treeless_opening")) parts.push("Treeless opening");
+    else if (markers.includes("beorn:approach_narrow_path")) parts.push("Narrow path");
+    if (markers.includes("mirkwood:follow_deer")) parts.push("Deer Mirkwood");
+    else if (markers.includes("mirkwood:follow_lights")) parts.push("Lights Mirkwood");
+    else if (markers.includes("mirkwood:drink_stream")) parts.push("Stream Mirkwood");
+    if (markers.includes("cellar:jump_barrel")) parts.push("Barrel jump");
+    else if (markers.includes("cellar:climb_barrel")) parts.push("Barrel climb");
+    if (markers.includes("dragon:take_shot")) parts.push("Take shot");
+    else if (markers.includes("dragon:loose_arrow")) parts.push("Loose arrow");
+    else if (markers.includes("dragon:shoot")) parts.push("Shoot dragon");
+    return parts.slice(0, 4).join(" / ") || `Winning path ${group?.representativeRun?.seed || ""}`.trim();
+  }
+
+  function groupWinningRuns(runs = []) {
+    const grouped = new Map();
+    for (const run of runs) {
+      const key = winningPathKey(run);
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          id: `winning-path-${grouped.size + 1}`,
+          key,
+          runs: [],
+          representativeRun: null,
+          markers: [],
+          label: "",
+          sampleSeeds: [],
+        });
+      }
+      grouped.get(key).runs.push(run);
+    }
+
+    const groups = [...grouped.values()].map((group) => {
+      const representativeRun = chooseRepresentativeWinningRun(group.runs);
+      const sampleSeeds = [...new Set(group.runs.map((run) => run.seed))].slice(0, 4);
+      const markers = winningPathMarkers(representativeRun);
+      return {
+        ...group,
+        representativeRun,
+        markers,
+        label: buildWinningPathLabel({ ...group, representativeRun, markers }),
+        sampleSeeds,
+      };
+    });
+
+    return groups.sort((left, right) => (
+      winningPathCoverageScore(right) - winningPathCoverageScore(left)
+      || compareCanonicalRuns(left.representativeRun, right.representativeRun)
+    ));
+  }
+
+  function selectWinningGroups(groups = [], maxCount = WINNING_PATH_MAX_COUNT) {
+    return groups.slice(0, Math.max(1, maxCount));
+  }
+
+  async function generateWinningPathCatalog({
+    presetId,
+    targetId,
+    seedStart,
+    seedCount,
+    stepLimit,
+  }) {
+    const preset = presetById[presetId];
+    const target = targetById[targetId];
+    const strategyIds = ["optimal", "alternative"];
+    const allRuns = [];
+
+    for (const strategyId of strategyIds) {
+      const runs = await collectRunsForSeeds({
+        presetId,
+        targetId,
+        strategyId,
+        seedStart,
+        seedCount,
+        stepLimit,
+      });
+      allRuns.push(...runs);
+      await wait(0);
+    }
+
+    const successRuns = allRuns.filter((run) => run.outcome?.tone === "success");
+    const allGroups = groupWinningRuns(successRuns);
+    const groups = selectWinningGroups(allGroups);
+    const winningRuns = groups.map((group) => group.representativeRun).filter(Boolean);
+
+    return {
+      version: WINNING_PATH_CATALOG_VERSION,
+      presetId,
+      presetLabel: preset.label,
+      targetId,
+      targetLabel: target.label,
+      seedStart,
+      seedCount,
+      stepLimit,
+      strategyIds,
+      generatedAt: new Date().toISOString(),
+      successRuns,
+      totalSuccessCount: successRuns.length,
+      totalGroupCount: allGroups.length,
+      groups,
+      winningRuns,
+    };
+  }
+
+  async function generateSolutionSpineReportFromRun({
+    catalog,
+    spineRun,
+  }) {
+    if (!catalog || !spineRun) return null;
+    const branchRuns = await collectFatalBranchesFromSpine({
+      presetId: spineRun.presetId,
+      targetId: spineRun.targetId,
+      stepLimit: catalog.stepLimit,
+      spineRun,
+    });
+
+    return {
+      presetId: catalog.presetId,
+      presetLabel: catalog.presetLabel,
+      targetId: catalog.targetId,
+      targetLabel: catalog.targetLabel,
+      seedStart: catalog.seedStart,
+      seedCount: catalog.seedCount,
+      stepLimit: catalog.stepLimit,
+      sourceStrategyId: spineRun.strategyId,
+      sourceStrategyLabel: spineRun.strategyLabel,
+      spineRun,
+      steps: buildSolutionSpineSteps(spineRun, branchRuns),
+      branchRuns,
+      sourceRuns: catalog.successRuns,
+      winningPathCount: catalog.winningRuns.length,
     };
   }
 
@@ -3114,14 +3558,71 @@
     </div>`;
   }
 
+  function winningCatalogPanelHtml() {
+    const catalog = state.spineCatalog;
+    const refreshButton = `<button class="lab-spine__button" type="button" data-spine-refresh="1">Refresh paths</button>`;
+
+    if (!catalog) {
+      return `<div class="lab-spine__panel">
+        <div class="lab-spine__panel-head">
+          <strong>Winning Paths</strong>
+          ${refreshButton}
+        </div>
+        <div class="lab-spine__panel-copy">${state.spineCatalogLoading ? "Scansione automatica in corso dei percorsi vincenti." : "Apri la solution spine per cercare automaticamente piu traiettorie vincenti."}</div>
+      </div>`;
+    }
+
+    const activeGroup = currentWinningGroup();
+    const cardsHtml = catalog.groups.length
+      ? catalog.groups.map((group) => {
+        const run = group.representativeRun;
+        const selectedClass = state.spineSelectedWinningRunId === run?.id ? " is-selected" : "";
+        const loadingBadge = state.spineLoadingRunId === run?.id
+          ? '<span class="lab-badge lab-badge--warning">Loading spine</span>'
+          : "";
+        const markerBadges = group.markers.slice(0, 4)
+          .map((marker) => `<span class="lab-badge lab-badge--muted">${escapeHtml(marker.replace(/^[^:]+:/, ""))}</span>`)
+          .join("");
+        return `<div class="lab-winning-card${selectedClass}">
+          <div class="lab-winning-card__top">
+            <button class="lab-winning-card__button" type="button" data-spine-winning-run-id="${escapeHtml(run?.id || "")}">${escapeHtml(group.label)}</button>
+            <span class="lab-winning-card__count">${group.runs.length} run${group.runs.length === 1 ? "" : "s"}</span>
+          </div>
+          <div class="lab-winning-card__meta">Seed ${run?.seed} · ${run?.commands?.length || 0} step · sample ${escapeHtml(group.sampleSeeds.join(", "))}</div>
+          <div class="lab-winning-card__badges">${loadingBadge}${markerBadges}</div>
+        </div>`;
+      }).join("")
+      : '<div class="lab-empty">Nessun winning path trovato per la selezione corrente.</div>';
+
+    return `<div class="lab-spine__panel">
+      <div class="lab-spine__panel-head">
+        <strong>Winning Paths</strong>
+        <div class="lab-spine__actions">${refreshButton}</div>
+      </div>
+      <div class="lab-spine__panel-copy">Trovati <strong>${catalog.winningRuns.length}</strong> winning path rappresentativi su <strong>${catalog.totalSuccessCount}</strong> successi. ${activeGroup ? `Spine attiva: <strong>${escapeHtml(activeGroup.label)}</strong>.` : ""}</div>
+      <div class="lab-winning-catalog">${cardsHtml}</div>
+    </div>`;
+  }
+
   function renderSolutionSpine(report = null) {
     if (!spineBox) return;
+    if (!state.spineCatalog && !state.spineCatalogLoading) {
+      spineBox.innerHTML = `<div class="lab-spine-shell">${winningCatalogPanelHtml()}<div class="lab-empty">Nessuna solution spine generata.</div></div>`;
+      return;
+    }
     if (!report) {
-      spineBox.innerHTML = '<div class="lab-empty">Nessuna solution spine generata.</div>';
+      const body = state.spineCatalogLoading
+        ? '<div class="lab-empty">Sto cercando i percorsi vincenti e preparando la solution spine...</div>'
+        : state.spineLoadingRunId
+          ? '<div class="lab-empty">Sto costruendo la solution spine del winning path selezionato...</div>'
+        : state.spineCatalog?.winningRuns?.length
+          ? '<div class="lab-empty">Seleziona un winning path per vederne qui la solution spine.</div>'
+          : `<div class="lab-empty">Nessuna run vincente trovata per ${escapeHtml(state.spineCatalog?.presetLabel || "")}${state.spineCatalog ? ` -> ${escapeHtml(state.spineCatalog.targetLabel)}` : ""} nell'intervallo di seed corrente.</div>`;
+      spineBox.innerHTML = `<div class="lab-spine-shell">${winningCatalogPanelHtml()}${body}</div>`;
       return;
     }
     if (!report.spineRun) {
-      spineBox.innerHTML = `<div class="lab-empty">Nessuna run vincente trovata per ${escapeHtml(report.presetLabel)} -> ${escapeHtml(report.targetLabel)} nell'intervallo di seed ${report.seedStart}-${report.seedStart + report.seedCount - 1}.</div>`;
+      spineBox.innerHTML = `<div class="lab-spine-shell">${winningCatalogPanelHtml()}<div class="lab-empty">Nessuna solution spine disponibile per il winning path selezionato.</div></div>`;
       return;
     }
 
@@ -3193,6 +3694,7 @@
       : "";
 
     spineBox.innerHTML = `<div class="lab-spine-shell">
+      ${winningCatalogPanelHtml()}
       <div class="lab-spine-workbench">
         <div class="lab-spine-pane">
           ${summaryHtml}
@@ -3252,6 +3754,150 @@
     renderSummary(state.report);
     renderTree(state.report);
     renderDetail(findRun(state.selectedRunId));
+  }
+
+  function currentWinningCatalogInputs() {
+    const { seedStart, seedCount, stepLimit } = currentAnalysisInputs();
+    return {
+      presetId: startPresetSelect.value,
+      targetId: targetSelect.value,
+      seedStart,
+      seedCount,
+      stepLimit,
+    };
+  }
+
+  function winningCatalogMatchesSelection(catalog = null) {
+    if (!catalog) return false;
+    const current = currentWinningCatalogInputs();
+    return catalog.presetId === current.presetId
+      && catalog.targetId === current.targetId
+      && catalog.seedStart === current.seedStart
+      && catalog.seedCount === current.seedCount
+      && catalog.stepLimit === current.stepLimit;
+  }
+
+  function findWinningRun(runId = "") {
+    if (!runId) return null;
+    return state.spineCatalog?.winningRuns?.find((run) => run.id === runId) || null;
+  }
+
+  function currentWinningGroup() {
+    const selectedId = state.spineSelectedWinningRunId;
+    if (!selectedId) return null;
+    return state.spineCatalog?.groups?.find((group) => group.representativeRun?.id === selectedId) || null;
+  }
+
+  async function ensureSolutionSpineForWinningRun(runId = "", token = state.spineToken) {
+    const winningRun = findWinningRun(runId);
+    if (!winningRun || token !== state.spineToken) return null;
+
+    state.spineSelectedWinningRunId = runId;
+    const cached = state.spineReportsByWinningRunId[runId];
+    if (cached) {
+      state.spineLoadingRunId = "";
+      state.spineReport = cached;
+      state.spineSelectedRunId = cached.spineRun?.id || "";
+      state.spineSelectedStepIndex = cached.spineRun?.commands?.length ? 0 : -1;
+      state.spineSelectedPreviewRun = cached.spineRun ? (buildSpineStepPreview(0) || cached.spineRun) : null;
+      setSpineReplayState();
+      renderSolutionSpine(cached);
+      return cached;
+    }
+
+    state.spineLoadingRunId = runId;
+    state.spineReport = null;
+    state.spineSelectedRunId = "";
+    state.spineSelectedStepIndex = -1;
+    state.spineSelectedPreviewRun = null;
+    setSpineReplayState("Costruisco la solution spine del winning path selezionato...", "Preparing replay...");
+    renderSolutionSpine(null);
+
+    const report = await generateSolutionSpineReportFromRun({
+      catalog: state.spineCatalog,
+      spineRun: winningRun,
+    });
+    if (token !== state.spineToken || !report) return null;
+
+    state.spineReportsByWinningRunId[runId] = report;
+    state.spineLoadingRunId = "";
+    state.spineReport = report;
+    state.spineSelectedRunId = report.spineRun?.id || "";
+    state.spineSelectedStepIndex = report.spineRun?.commands?.length ? 0 : -1;
+    state.spineSelectedPreviewRun = report.spineRun ? (buildSpineStepPreview(0) || report.spineRun) : null;
+    setSpineReplayState();
+    renderSolutionSpine(report);
+    return report;
+  }
+
+  async function refreshWinningPathCatalog({
+    silent = false,
+    openPanel = false,
+  } = {}) {
+    if (silent && !state.spineCatalogLoading && winningCatalogMatchesSelection(state.spineCatalog)) {
+      return state.spineCatalog;
+    }
+    const inputs = currentWinningCatalogInputs();
+    const preset = presetById[inputs.presetId];
+    const target = targetById[inputs.targetId];
+
+    state.spineToken += 1;
+    const token = state.spineToken;
+    state.spineCatalogLoading = true;
+    state.spineLoadingRunId = "";
+    state.spineCatalog = null;
+    state.spineReportsByWinningRunId = {};
+    state.spineReport = null;
+    state.spineSelectedWinningRunId = "";
+    state.spineSelectedRunId = "";
+    state.spineSelectedStepIndex = -1;
+    state.spineSelectedPreviewRun = null;
+    setSpineReplayState();
+    if (openPanel) openOverlay("spine");
+    renderSolutionSpine(null);
+    if (!silent) {
+      statusBox.textContent = `Cerco winning paths da "${preset.label}" a "${target.label}" sui seed ${inputs.seedStart}-${inputs.seedStart + inputs.seedCount - 1}...`;
+    }
+    try {
+      const catalog = await generateWinningPathCatalog(inputs);
+      if (token !== state.spineToken) return null;
+
+      state.spineCatalogLoading = false;
+      state.spineCatalog = catalog;
+      state.spineSelectedWinningRunId = catalog.winningRuns[0]?.id || "";
+      renderSolutionSpine(null);
+
+      if (!catalog.winningRuns.length) {
+        if (!silent) statusBox.textContent = `Nessun winning path trovato per "${preset.label}" -> "${target.label}" nell'intervallo di seed corrente.`;
+        return catalog;
+      }
+
+      const report = await ensureSolutionSpineForWinningRun(state.spineSelectedWinningRunId, token);
+      if (token !== state.spineToken) return null;
+
+      const activeGroup = currentWinningGroup();
+      if (!silent && report?.spineRun) {
+        statusBox.textContent = activeGroup
+          ? `Winning paths pronti: ${catalog.winningRuns.length} candidati distinti trovati. Spine attiva: "${activeGroup.label}".`
+          : `Winning paths pronti: ${catalog.winningRuns.length} candidati distinti trovati.`;
+      }
+      return catalog;
+    } catch (error) {
+      if (token === state.spineToken) {
+        state.spineCatalogLoading = false;
+        state.spineLoadingRunId = "";
+        renderSolutionSpine(null);
+      }
+      throw error;
+    }
+  }
+
+  function scheduleWinningPathWarmup() {
+    if (state.continuousSession?.running) return;
+    if (state.spineWarmupTimer) window.clearTimeout(state.spineWarmupTimer);
+    state.spineWarmupTimer = window.setTimeout(() => {
+      refreshWinningPathCatalog({ silent: true, openPanel: false }).catch(() => {});
+    }, WINNING_PATH_WARMUP_DELAY_MS);
   }
 
   function syncContinuousButtons() {
@@ -3744,40 +4390,17 @@
     const targetId = targetSelect.value;
     const preset = presetById[presetId];
     const target = targetById[targetId];
-    const { seedStart, seedCount, stepLimit } = currentAnalysisInputs();
-
-    state.spineToken += 1;
-    const token = state.spineToken;
-    state.spineReport = null;
-    state.spineSelectedRunId = "";
-    state.spineSelectedStepIndex = -1;
-    state.spineSelectedPreviewRun = null;
-    state.spineReplayToken += 1;
-    setSpineReplayState();
     openOverlay("spine");
-    if (spineBox) spineBox.innerHTML = '<div class="lab-empty">Sto costruendo la solution spine e cercando le deviazioni fatali...</div>';
-    statusBox.textContent = `Solution spine in corso da "${preset.label}" a "${target.label}" sui seed ${seedStart}-${seedStart + seedCount - 1}...`;
-
-    const report = await generateSolutionSpineReport({
-      presetId,
-      targetId,
-      seedStart,
-      seedCount,
-      stepLimit,
-    });
-    if (token !== state.spineToken) return;
-    state.spineReport = report;
-    state.spineSelectedRunId = report.spineRun?.id || "";
-    state.spineSelectedStepIndex = report.spineRun?.commands?.length ? 0 : -1;
-    state.spineSelectedPreviewRun = report.spineRun ? (buildSpineStepPreview(0) || report.spineRun) : null;
-    setSpineReplayState();
-    renderSolutionSpine(report);
-    if (report.spineRun) {
-      statusBox.textContent = report.branchRuns.length
-        ? `Solution spine pronta: seed ${report.spineRun.seed}, ${report.branchRuns.length} diramazioni fatali trovate.`
-        : `Solution spine pronta: seed ${report.spineRun.seed}, nessuna diramazione fatale trovata con le probe correnti.`;
-    } else {
+    if (spineBox) spineBox.innerHTML = '<div class="lab-empty">Sto cercando i winning path e preparo la prima solution spine...</div>';
+    await refreshWinningPathCatalog({ silent: false, openPanel: true });
+    if (!state.spineCatalog?.winningRuns?.length) {
       statusBox.textContent = `Nessuna run vincente trovata per "${preset.label}" -> "${target.label}" nell'intervallo di seed corrente.`;
+      return;
+    }
+    if (state.spineReport?.spineRun) {
+      statusBox.textContent = state.spineReport.branchRuns.length
+        ? `Solution spine pronta: seed ${state.spineReport.spineRun.seed}, ${state.spineReport.branchRuns.length} diramazioni fatali trovate.`
+        : `Solution spine pronta: seed ${state.spineReport.spineRun.seed}, nessuna diramazione fatale trovata con le probe correnti.`;
     }
   }
 
@@ -3785,6 +4408,11 @@
     stopContinuousExploration("Trial continuo fermato dal reset della vista.");
     state.report = null;
     state.spineReport = null;
+    state.spineCatalog = null;
+    state.spineCatalogLoading = false;
+    state.spineLoadingRunId = "";
+    state.spineSelectedWinningRunId = "";
+    state.spineReportsByWinningRunId = {};
     state.selectedRunId = "";
     state.spineSelectedRunId = "";
     state.spineSelectedStepIndex = -1;
@@ -3833,7 +4461,21 @@
     });
   }
 
-  function handleSpineClick(event) {
+  async function handleSpineClick(event) {
+    const refreshCatalog = event.target?.getAttribute?.("data-spine-refresh");
+    if (refreshCatalog) {
+      await refreshWinningPathCatalog({ silent: false, openPanel: true });
+      return;
+    }
+
+    const winningRunId = event.target?.getAttribute?.("data-spine-winning-run-id");
+    if (winningRunId) {
+      if (winningRunId !== state.spineSelectedWinningRunId || !state.spineReport) {
+        await ensureSolutionSpineForWinningRun(winningRunId, state.spineToken);
+      }
+      return;
+    }
+
     const stepIndexRaw = event.target?.getAttribute?.("data-spine-step-index");
     if (stepIndexRaw !== null && stepIndexRaw !== undefined) {
       const stepIndex = Number.parseInt(stepIndexRaw, 10);
@@ -3894,6 +4536,7 @@
   targetSelect.value = "have_ring";
   strategySelect.value = "optimal";
   renderLatestArchivedContinuousLog();
+  scheduleWinningPathWarmup();
 
   analyzeButton.addEventListener("click", () => {
     analyze().catch((error) => {
@@ -3926,10 +4569,19 @@
   treeBox.addEventListener("click", handleTreeClick);
   detailBox.addEventListener("click", handleTreeClick);
   deathCatalogBox?.addEventListener("click", handleDeathCatalogClick);
-  spineBox?.addEventListener("click", handleSpineClick);
+  spineBox?.addEventListener("click", (event) => {
+    handleSpineClick(event).catch((error) => {
+      statusBox.textContent = `Errore nella solution spine: ${error.message}`;
+    });
+  });
   overlayBackdrop?.addEventListener("click", handleOverlayDismiss);
   auditCloseButton?.addEventListener("click", handleOverlayDismiss);
   deathCloseButton?.addEventListener("click", handleOverlayDismiss);
   spineCloseButton?.addEventListener("click", handleOverlayDismiss);
+  startPresetSelect.addEventListener("change", scheduleWinningPathWarmup);
+  targetSelect.addEventListener("change", scheduleWinningPathWarmup);
+  seedStartInput.addEventListener("change", scheduleWinningPathWarmup);
+  seedCountInput.addEventListener("change", scheduleWinningPathWarmup);
+  stepLimitInput.addEventListener("change", scheduleWinningPathWarmup);
   document.addEventListener("keydown", handleGlobalKeydown);
 })();

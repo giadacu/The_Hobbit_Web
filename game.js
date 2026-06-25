@@ -276,6 +276,8 @@
         game.debugCompleteUnexpectedParty();
         game.debugMarkPonyProgress();
         game.debugGiveStandardLoadout({ map: true, key: true, pipe: true, lantern: true });
+        game.debugGivePlayerItem("firestone");
+        game.debugGivePlayerItem("sturdy key");
         game.flags.seenpony = true;
         game.flags.debugforcetrollencounter = true;
         game.debugMovePlayer("dreary", { markRoute: true });
@@ -1793,6 +1795,7 @@
         fromRoomId === "trolls_clearing"
         && toRoomId === "dreary"
         && game.player.inventory.includes("the_large_key")
+        && game.flags.trollkeytaken
         && !game.trollsTransformed
       ),
       text: "Keeping low and clutching the stolen key, you slip away from the trolls' clearing into the gloomy empty land beyond.",
@@ -10978,7 +10981,7 @@
         const actionEndsGame = String(action.destination || "").includes("endgame");
         if (action.desc1) game.print(actorActionSentence(game.player, action.desc1));
         if (action.desc2 && !actionEndsGame) game.print(action.desc2);
-        this.performSpecialActionTransfer(action);
+        if (!actionEndsGame) this.performSpecialActionTransfer(action);
         this.applySpecialActionAftereffects(action);
         if (action.flag_out) this.setFlag(action.flag_out.replace("*", ""), true);
         if (action.reveals) this.reveal(action.reveals);
@@ -11079,6 +11082,10 @@
         && matches(action.obj2 || "", "firestone");
     }
 
+    specialActionNeedsStrictAdverb(requiredAdverb = "") {
+      return ["carefully", "slowly"].includes(normalize(String(requiredAdverb || "")));
+    }
+
     matchesSpecialActionObjects(action, objectText, adverb) {
       const game = this.game;
       const text = normalizeWords(objectText);
@@ -11094,6 +11101,7 @@
       let obj2Matches = !action.obj2 || commandObjectMatches(text, action.obj2);
       if (!obj2Matches && requiredAdverb === "with") obj2Matches = this.hasInventoryMatch(action.obj2);
       if (!obj1Matches || !obj2Matches) return false;
+      if (this.specialActionNeedsStrictAdverb(requiredAdverb)) return adverbMatches;
       if (adverbMatches) return true;
       const mentionedPrimary = action.obj1 && commandObjectMatches(text, action.obj1);
       const mentionedSecondary = action.obj2 && commandObjectMatches(text, action.obj2);

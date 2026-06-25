@@ -405,6 +405,57 @@ body {
   line-height: 1.42;
 }
 
+.lab-winning-catalog {
+  display: grid;
+  gap: 8px;
+}
+
+.lab-winning-card {
+  padding: 9px 10px;
+  border: 1px solid rgba(214, 185, 102, 0.12);
+  border-radius: 10px;
+  background: rgba(245, 238, 219, 0.035);
+  display: grid;
+  gap: 6px;
+}
+
+.lab-winning-card.is-selected {
+  border-color: rgba(214, 185, 102, 0.34);
+  background: rgba(245, 238, 219, 0.08);
+}
+
+.lab-winning-card__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lab-winning-card__button {
+  appearance: none;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #f4edd8;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lab-winning-card__count,
+.lab-winning-card__meta {
+  color: #dccca8;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.lab-winning-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .lab-spine-inspector {
   display: grid;
   gap: 10px;

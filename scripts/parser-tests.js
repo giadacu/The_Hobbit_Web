@@ -3183,6 +3183,70 @@ const gameCases = [
     ],
   },
   {
+    name: "take key without carefully uses the fatal troll theft branch",
+    setup(game) {
+      game.currentRoom = "trolls_clearing";
+      game.player.position = "trolls_clearing";
+      game.visitedTrollsClearing = true;
+    },
+    drive(game) {
+      game.execute("take key");
+      game.print(`Player has large key after careless theft: ${game.player.inventory.includes("the_large_key") ? "yes" : "no"}`);
+      game.print(`Game over after careless theft: ${game.endgame ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You emerge from hiding and reach for the large key.",
+      "Player has large key after careless theft: no",
+      "Game over after careless theft: yes",
+    ],
+    notExpectedIncluded: [
+      "You take the large key.",
+      "You carefully approach the troll, eyes fixed on the gleaming key.",
+      "Keeping low and clutching the stolen key, you slip away from the trolls' clearing into the gloomy empty land beyond.",
+    ],
+  },
+  {
+    name: "troll escape narrative requires the successful theft flag",
+    setup(game) {
+      game.currentRoom = "trolls_clearing";
+      game.player.position = "trolls_clearing";
+      game.visitedTrollsClearing = true;
+      game.detachItem("the_large_key");
+      game.items.the_large_key.location = { type: "character", id: game.player.id };
+      game.player.inventory.push("the_large_key");
+      game.flags.trollkeytaken = false;
+    },
+    drive(game) {
+      game.execute("south west");
+      game.print(`Room after moving with key but no theft flag: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "Room after moving with key but no theft flag: dreary",
+    ],
+    notExpectedIncluded: [
+      "Keeping low and clutching the stolen key, you slip away from the trolls' clearing into the gloomy empty land beyond.",
+    ],
+  },
+  {
+    name: "climb on branch still matches the pony sequence",
+    setup(game) {
+      game.currentRoom = "green_dragon_inn_outside";
+      game.player.position = "green_dragon_inn_outside";
+      game.items.low_branch.visible = true;
+      game.flags.seenpony = true;
+      game.flags.ponypreparing = false;
+      game.flags.ponyready = true;
+    },
+    drive(game) {
+      game.execute("climb on branch");
+      game.print(`Room after climb on branch: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "You position yourself over the pony and jump on it.",
+      "Room after climb on branch: dreary",
+    ],
+  },
+  {
     name: "player can carry sword and rope together",
     setup(game) {
       game.player.strength = 5;
