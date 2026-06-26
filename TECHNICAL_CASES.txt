@@ -6618,3 +6618,396 @@ Future debugging advice
   game branch is still genuinely winnable.
 - For path catalogs, collapse seed-randomized wording differences that do not
   represent meaningful route choices, or real branch diversity will be hidden.
+
+
+Case 139 - 2026-06-26 - The autoplay lab endpoint menu exposed internal death targets alongside story milestones
+---------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+In the autoplay lab, the main `Endpoint` select mixed together:
+
+- story checkpoints such as Rivendell or Smaug defeated
+- internal death targets such as `Death by Gollum`
+- labels that read like low-level state checks rather than narrative endpoints
+
+That made the primary scenario chooser harder to understand, especially after
+renaming the fields to `Starting point` and `Endpoint`.
+
+Root cause
+----------
+The UI populated the main endpoint select directly from the full `targets`
+array. That array serves two roles:
+
+1. user-facing story milestones for normal analysis
+2. internal outcome targets used by failure classification and death tooling
+
+Because those roles were not separated, the select exposed internal debugging
+and death-analysis targets that were never meant to be the main route picker.
+
+Resolution
+----------
+- Added `showInEndpointMenu: false` to the death-only targets.
+- Populated the visible endpoint select from a filtered `endpointTargets`
+  collection instead of the full `targets` list.
+- Renamed the visible story endpoint labels to read more like narrative
+  milestones:
+  - `After Gollum`
+  - `Rivendell Ready`
+  - `Beorn Ready`
+  - `Out of Mirkwood`
+  - `Long Lake Reached`
+  - `Bard Ready`
+  - `Smaug Defeated`
+  - `Back Home`
+
+Files touched
+-------------
+- `autoplay-lab.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a lab control starts feeling conceptually muddy, check whether one data
+  structure is trying to serve both user-facing taxonomy and internal analysis
+  logic.
+- Keep death/outcome probes callable internally even when they should be hidden
+  from the main scenario selection UI.
+
+
+Case 140 - 2026-06-26 - A cleaner endpoint menu still felt wrong because it began at a late milestone instead of early story locations
+-------------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After hiding death targets from the autoplay lab's `Endpoint` menu, the menu
+still felt conceptually off:
+
+- it started at `After Gollum`
+- it skipped earlier story locations such as Bag End, the troll approach, and
+  Rivendell arrival
+- it still reflected milestone checks more than the chapter-like checkpoints
+  implied by `Starting point`
+
+Root cause
+----------
+The first cleanup only filtered out internal death targets. It did not change
+the underlying visible endpoint taxonomy, which still inherited the older
+"success condition" model:
+
+- `have_ring`
+- `rivendell_complete`
+- `beorn_fed`
+- `mirkwood_cleared`
+- and similar progress milestones
+
+Those checks were reliable for analysis, but they were not the same thing as
+the user's mental model of "important places in the story".
+
+Resolution
+----------
+Added a visible endpoint progression based on major story locations / chapter
+checkpoints, while keeping the older milestone targets internal for audit and
+specialized analysis:
+
+- `Bag End`
+- `Troll Approach`
+- `After Trolls`
+- `Rivendell`
+- `Deep Dark Lake`
+- `Beorn's House`
+- `Mirkwood`
+- `Lake-town`
+- `Front Gate`
+- `Smaug`
+
+The older milestone-style targets (`After Gollum`, `Rivendell Ready`,
+`Beorn Ready`, `Out of Mirkwood`, `Long Lake Reached`, `Bard Ready`) now stay
+available internally but are hidden from the main endpoint menu.
+
+Also updated the exploratory scoring helpers so the new visible location
+targets still receive sensible progress hints during non-optimal analysis.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When two controls are meant to feel parallel in the UI (`Starting point` and
+  `Endpoint`), align their taxonomy first; filtering the list is not enough if
+  the surviving entries still describe a different abstraction level.
+- For lab tools, it is often worth separating:
+  - visible chapter/location checkpoints for humans
+  - internal milestone targets for analysis heuristics and audit tooling
+
+
+Case 141 - 2026-06-26 - Solution spine winning-path labels could inherit fake troll markers from later presets
+--------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+In the autoplay lab solution spine, a route such as
+`Before Gollum -> Beorn's House` could be labeled with troll-related text like
+`Dawn trolls`, even though the winning path never revisited the troll chapter.
+
+Root cause
+----------
+The scene-event tracker recorded the marker:
+
+- `trolls:waited_for_dawn`
+
+whenever the command was `wait` and `game.trollsTransformed` was true.
+
+That was too broad for later presets such as `jump gollum`, because those
+checkpoints already inherit "trolls are transformed" as background state. A
+later unrelated `wait` command could therefore create a fake troll marker, and
+the winning-path label builder would surface it as `Dawn trolls`.
+
+Resolution
+----------
+Restricted the troll-dawn scene marker so it is only recorded when:
+
+- the command is `wait`
+- the pre-command room is exactly `trolls_clearing`
+- the trolls have actually transformed
+
+That keeps the marker tied to the real troll encounter instead of any later
+run that merely inherits the transformed-troll world state.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- For solution-spine labels, prefer markers tied to local scene context, not
+  broad world-state flags inherited by later checkpoints.
+- If a path label mentions an unrelated chapter, inspect scene-marker capture
+  before assuming the underlying route logic is wrong.
+
+
+Case 142 - 2026-06-26 - Solution spine needed durable guardrails for real death branches versus misleading scene labels
+-----------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The autoplay lab's solution spine was being used as a death-branch audit tool,
+but two different kinds of drift had started to matter:
+
+- some scene labels could imply a lethal goblin ambush even when the run only
+  involved ordinary goblin combat later in the chapter
+- future tweaks to the lab risked desynchronizing its "fatal trigger" hints
+  from what `game.js` actually kills the player for
+
+Root cause
+----------
+The lab mixed two responsibilities without enough guardrails:
+
+1. scene markers and winning-path grouping
+2. heuristics about likely fatal branch commands
+
+For goblins, generic commands such as `kill disgusting goblin with sword` were
+being folded into the same marker family used for the special hulking-goblin
+ambush. That made some solution-spine labels look like they referred to a true
+death branch when they did not.
+
+At the same time, there was no repeatable regression check asserting that the
+lab's Gollum fatal-trigger heuristic still matched the real engine behavior.
+
+Resolution
+----------
+The fix had two parts.
+
+1. Restricted goblin ambush markers and winning-path grouping so they only
+   apply when the hulking-goblin tunnel ambush is actually active.
+
+2. Added repeatable regressions in `scripts/parser-tests.js` that:
+   - confirm the real engine still treats waiting after Gollum's pocket
+     question as an immediate death branch
+   - verify the lab source still contains the expected Gollum fatal trigger
+   - verify goblin scene markers and winning-path grouping stay gated to the
+     real ambush context
+
+Files touched
+-------------
+- `autoplay-lab.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When the lab is meant to audit lethal branches, treat `game.js` as the
+  source of truth and add a regression whenever a new fatal scene is refined.
+- Keep "labeling/grouping convenience" separate from "death-branch truth":
+  generic combat verbs should not automatically inherit special-encounter
+  semantics.
+
+
+Case 143 - 2026-06-26 - Solution spine only showed fatal branches that replaced a winning step, not those triggered right after it
+-------------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+In the autoplay lab solution spine, some real fatal branches were still absent
+even after the engine and the lab agreed on the underlying death trigger.
+
+The clearest example was the Gollum pocket-question route:
+
+- the winning path reached `say to gollum "what have i got in my pocket"`
+- waiting immediately afterward was genuinely fatal in `game.js`
+- but the spine only displayed branches for earlier riddle answers, not the
+  post-step death branch after the pocket question
+
+Root cause
+----------
+`collectFatalBranchesFromSpine()` only explored branch candidates from the
+state *before* each winning command.
+
+That meant the spine could show:
+- "instead of this command, do X"
+
+but it could not show:
+- "after this command, doing X is fatal"
+
+So any death branch whose trigger lived in the post-step state was invisible
+to the user.
+
+Resolution
+----------
+Extended the solution-spine collector and renderer to support both branch
+timings:
+
+- `before`: fatal branch instead of the canonical winning step
+- `after`: fatal branch immediately after the canonical winning step
+
+The UI now labels them explicitly as `Instead of ...` or `After ...`, and the
+regression suite includes a source guardrail that checks this dual-mode branch
+support stays present.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- For audit tools built around a canonical path, always test divergence from
+  both sides of each step:
+  - pre-step alternatives
+  - post-step consequences
+- If a player reports "the death exists but the spine does not show it",
+  inspect whether the fatal trigger lives in the state after the winning
+  command rather than before it.
+
+
+Case 144 - 2026-06-26 - Solution spine replays drifted from the winning run because the lab seeded Math.random but not storySeed
+-------------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The solution spine could still miss obviously real death branches, even after
+support was added for `After ...` divergences.
+
+In the Gollum route this showed up as:
+
+- the winning path in the lab displayed one pair of correct riddle answers
+- the branch replay rebuilt a different riddle sequence
+- the spine then surfaced odd Gollum branches and still missed the fatal
+  `After "what have i got in my pocket": wait` branch
+
+Root cause
+----------
+The lab wrapped simulations in a seeded `Math.random`, but `resetToPreset()`
+still let the game create a fresh internal `storySeed` during `restartGame()`.
+
+Many story-critical choices in `game.js` are keyed off `storySeed`, including:
+
+- Gollum riddle selection
+- narrative variants
+- combat/death text choices
+
+So two lab replays could share the same RNG seed while still landing in
+different narrative states.
+
+Resolution
+----------
+Updated `resetToPreset()` so the lab explicitly applies the current run seed as
+`game.storySeed` immediately after `restartGame()` and before the preset logic
+runs.
+
+All seeded lab replays now rebuild the same story-state family as the original
+run, and the regression suite includes a guardrail checking that the reset path
+continues to preserve story-seed alignment.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- In this codebase, "same seed" means more than patching `Math.random`; any
+  replay or audit tool must also preserve `game.storySeed`.
+- If a seeded replay produces different riddles, different ambience, or
+  different death text from the source run, inspect `storySeed` before looking
+  at higher-level branch logic.
+- Also check for seed-derived substate already materialized during
+  initialization. In the Gollum chapter, `gollumState.riddleIds` had to be
+  regenerated after reseeding, not merely left in place.
+
+
+Case 145 - 2026-06-26 - Late tunnel deaths were mislabeled as Gollum because solution-spine classification trusted stale tail text
+-------------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+In the solution spine, some deaths later in the goblin tunnels were still
+labeled `Death by Gollum` even though the visible fatal scene was clearly a
+goblin combat death.
+
+Typical example:
+
+- the tail still contained a recent Gollum pursuit echo
+- the actual death line described Bilbo being killed by a disgusting goblin
+- the spine still showed `Death by Gollum`
+
+Root cause
+----------
+The lab's death classifier evaluated `death_gollum` before the goblin death
+targets and allowed it to match any fatal branch whose recent output still
+contained the word `Gollum`.
+
+That was too broad for long tunnel runs, because Gollum pursuit echoes can
+remain inside the last few output lines even when the true death cause is now a
+different encounter.
+
+Resolution
+----------
+Added `deathImage` to the scenario context and tightened the death matchers:
+
+- Gollum deaths now prefer Gollum-specific death images or explicit Gollum
+  fatal text
+- hulking-goblin deaths can match their dedicated death image
+- generic goblin deaths can match goblin-specific death images
+
+This made the label follow the actual fatal scene instead of a stale mention in
+the recent output tail.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- For any audit UI that labels causes of death, prefer structured signals such
+  as death-image ids or dedicated fatal markers over broad keyword matches in
+  recent transcript text.
+- If a late-branch death is mislabeled, inspect whether the output tail is
+  carrying narrative residue from an earlier chapter or pursuer.

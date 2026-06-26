@@ -7886,6 +7886,43 @@ const gameCases = [
     ],
   },
   {
+    name: "autoplay lab death audit guardrails stay aligned with the engine",
+    drive(game) {
+      const labSource = fs.readFileSync("autoplay-lab.js", "utf8");
+      const pocketWaitFatalPresent = /game\.gollumState\?\.pocketQuestionAsked[\s\S]{0,160}return \{ command: "wait", kind: "fatal_trigger" \}/.test(labSource);
+      const goblinSceneEventsGated = labSource.includes('if (goblinAmbushActive && /^ask .* to attack .*goblin$/.test(normalized)) pushSceneEvent(tracker, "goblin:helper_attack");')
+        && labSource.includes('if (goblinAmbushActive && /^(kill|attack) .*goblin( with sword)?$/.test(normalized)) pushSceneEvent(tracker, "goblin:bilbo_attack");');
+      const goblinCanonicalGated = labSource.includes('if (/^ask .* to attack .*goblin$/.test(normalized)) return context.goblinAmbushActive ? "goblin helper attack" : "";')
+        && labSource.includes('if (/^(kill|attack) .*goblin( with sword)?$/.test(normalized)) return context.goblinAmbushActive ? "goblin bilbo attack" : "";');
+      const spineSupportsAfterBranches = labSource.includes('{ branchTiming: "before", excludeBaseline: true },')
+        && labSource.includes('{ branchTiming: "after", excludeBaseline: false },')
+        && labSource.includes('if (run.branchTiming === "after") {')
+        && labSource.includes('return `After <strong>${baseline}</strong>: <strong>${branch}</strong>`;');
+      const labSeededStoryState = labSource.includes('function resetToPreset(preset, options = {}) {')
+        && labSource.includes('const seed = Number(options.seed) || 1;')
+        && ((labSource.match(/game\.storySeed = seed;/g) || []).length >= 2)
+        && labSource.includes('game.gollumState = game.createGollumState();');
+      const deathClassificationUsesImages = labSource.includes('deathImage: game.temporaryImage?.file || "",')
+        && labSource.includes('deathImage === "gollum_wrong_answer_to_riddle_death.png"')
+        && labSource.includes('deathImage === "hulking_goblin_attack_death.png"')
+        && labSource.includes('deathImage === "bilbo_goblins_around_him_death.png"');
+      game.print(`Lab pocket wait fatal trigger: ${pocketWaitFatalPresent ? "present" : "absent"}`);
+      game.print(`Lab goblin scene markers gated: ${goblinSceneEventsGated ? "yes" : "no"}`);
+      game.print(`Lab goblin canonical grouping gated: ${goblinCanonicalGated ? "yes" : "no"}`);
+      game.print(`Lab spine after-branch support: ${spineSupportsAfterBranches ? "yes" : "no"}`);
+      game.print(`Lab reset preserves story seed: ${labSeededStoryState ? "yes" : "no"}`);
+      game.print(`Lab death classification uses images: ${deathClassificationUsesImages ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Lab pocket wait fatal trigger: present",
+      "Lab goblin scene markers gated: yes",
+      "Lab goblin canonical grouping gated: yes",
+      "Lab spine after-branch support: yes",
+      "Lab reset preserves story seed: yes",
+      "Lab death classification uses images: yes",
+    ],
+  },
+  {
     name: "gollum riddle path grants escape with ring",
     setup(game) {
       game.currentRoom = "dark_stuffy_passage_13";
@@ -7913,6 +7950,32 @@ const gameCases = [
       /(?:Close behind, Gollum's scream tears through the black passages|The dark carries Gollum's grief too well here|Somewhere in the deep ways Gollum gives a choking wail|A wet shriek races the walls behind you)/,
       "Gollum escape autosave: after escaping Gollum",
       "Ring flag after Gollum: yes",
+    ],
+  },
+  {
+    name: "waiting after gollums pocket question is an immediate death branch",
+    setup(game) {
+      game.currentRoom = "dark_stuffy_passage_13";
+      game.player.position = "dark_stuffy_passage_13";
+    },
+    drive(game) {
+      game.execute("south");
+      game.execute("ask gollum a riddle");
+      let riddle = game.currentGollumRiddle();
+      game.execute(`answer ${riddle.answers[0]}`);
+      riddle = game.currentGollumRiddle();
+      game.execute(`answer ${riddle.answers[0]}`);
+      game.execute("say to gollum \"what's in my pocket\"");
+      game.execute("wait");
+      game.print(`Pocket wait endgame: ${game.endgame ? "yes" : "no"}`);
+      game.print(`Pocket wait room: ${game.currentRoom}`);
+      game.print(`Pocket wait death image: ${game.temporaryImage?.file || "none"}`);
+    },
+    expectedIncluded: [
+      /Gollum .*?(grapple|advantage|dark)/,
+      "Pocket wait endgame: yes",
+      "Pocket wait room: deep_dark_lake",
+      "Pocket wait death image: gollum_wrong_answer_to_riddle_death.png",
     ],
   },
   {

@@ -176,7 +176,7 @@
     return "";
   }
 
-  function canonicalWinningCommand(command = "") {
+  function canonicalWinningCommand(command = "", context = {}) {
     const normalized = normalize(command);
     if (!normalized || ["look", "exits", "inventory", "wait"].includes(normalized)) return "";
     if (/^answer .+$/.test(normalized)) return "gollum answer";
@@ -191,8 +191,8 @@
     if (/^say to bard "shoot dragon"$/.test(normalized)) return "dragon shoot";
     if (/^say to bard "take shot"$/.test(normalized)) return "dragon take shot";
     if (/^say to bard "loose arrow"$/.test(normalized)) return "dragon loose arrow";
-    if (/^ask .* to attack .*goblin$/.test(normalized)) return "goblin helper attack";
-    if (/^(kill|attack) .*goblin( with sword)?$/.test(normalized)) return "goblin bilbo attack";
+    if (/^ask .* to attack .*goblin$/.test(normalized)) return context.goblinAmbushActive ? "goblin helper attack" : "";
+    if (/^(kill|attack) .*goblin( with sword)?$/.test(normalized)) return context.goblinAmbushActive ? "goblin bilbo attack" : "";
     if (normalized === "take large key") return "troll key";
     if (normalized === "drink stream") return "mirkwood stream";
     if (normalized === "follow deer") return "mirkwood deer";
@@ -210,12 +210,15 @@
     if (!tracker) return;
     const normalized = normalize(command);
     if (!normalized) return;
+    const goblinAmbushActive = Boolean(beforeSnapshot.goblinAmbushActive);
 
     if (normalized === "take large key") pushSceneEvent(tracker, "trolls:key_taken");
     if (normalized === "south west" && beforeSnapshot.room === "trolls_clearing" && !game.findInInventory?.("large key")) {
       pushSceneEvent(tracker, "trolls:left_without_key");
     }
-    if (normalized === "wait" && game.trollsTransformed) pushSceneEvent(tracker, "trolls:waited_for_dawn");
+    if (normalized === "wait" && beforeSnapshot.room === "trolls_clearing" && game.trollsTransformed) {
+      pushSceneEvent(tracker, "trolls:waited_for_dawn");
+    }
 
     if (
       normalized === 'say to gollum "what have i got in my pocket"'
@@ -226,8 +229,8 @@
       pushSceneEvent(tracker, "gollum:pocket_riddle");
     }
 
-    if (/^ask .* to attack .*goblin$/.test(normalized)) pushSceneEvent(tracker, "goblin:helper_attack");
-    if (/^(kill|attack) .*goblin( with sword)?$/.test(normalized)) pushSceneEvent(tracker, "goblin:bilbo_attack");
+    if (goblinAmbushActive && /^ask .* to attack .*goblin$/.test(normalized)) pushSceneEvent(tracker, "goblin:helper_attack");
+    if (goblinAmbushActive && /^(kill|attack) .*goblin( with sword)?$/.test(normalized)) pushSceneEvent(tracker, "goblin:bilbo_attack");
 
     if (normalized === "drink stream" && game.flags?.mirkwooddrankstream) pushSceneEvent(tracker, "mirkwood:drink_stream");
     if (normalized === "follow deer" && game.flags?.mirkwoodfolloweddeer) pushSceneEvent(tracker, "mirkwood:follow_deer");
@@ -783,6 +786,9 @@
     return new Set([
       "mirkwood_cleared",
       "long_lake_alive",
+      "laketown_arrival",
+      "front_gate_reached",
+      "smaug_encounter",
       "bard_joined",
       "dragon_defeated",
       "victory",
@@ -790,7 +796,7 @@
   }
 
   function targetNeedsBeornArrival(targetId = "") {
-    return targetId === "beorn_fed" || targetNeedsMirkwoodTraversal(targetId);
+    return new Set(["beorn_fed", "beorn_house", "mirkwood_entry"]).has(targetId) || targetNeedsMirkwoodTraversal(targetId);
   }
 
   function ringTargetSatisfied() {
@@ -953,16 +959,98 @@
 
   const targets = [
     {
+      id: "bag_end",
+      label: "Bag End",
+      description: "Bilbo si trova ancora a casa, nel cuore di Bag End.",
+      matches() {
+        return game.currentRoom === "hobbit_hole";
+      },
+    },
+    {
+      id: "troll_approach",
+      label: "Troll Approach",
+      description: "La compagnia arriva al tratto di strada appena prima della radura dei troll.",
+      matches() {
+        return game.currentRoom === "dreary";
+      },
+    },
+    {
+      id: "after_trolls",
+      label: "After Trolls",
+      description: "Il capitolo dei troll è superato e la compagnia è di nuovo sulla strada.",
+      matches() {
+        return game.currentRoom === "trollshaws_road";
+      },
+    },
+    {
+      id: "rivendell_arrival",
+      label: "Rivendell",
+      description: "Bilbo arriva a Rivendell.",
+      matches() {
+        return game.currentRoom === "rivendell";
+      },
+    },
+    {
+      id: "deep_dark_lake",
+      label: "Deep Dark Lake",
+      description: "Bilbo raggiunge il lago sotterraneo di Gollum.",
+      matches() {
+        return game.currentRoom === "deep_dark_lake";
+      },
+    },
+    {
+      id: "beorn_house",
+      label: "Beorn's House",
+      description: "Bilbo raggiunge la casa di Beorn.",
+      matches() {
+        return game.currentRoom === "beorns_house";
+      },
+    },
+    {
+      id: "mirkwood_entry",
+      label: "Mirkwood",
+      description: "Bilbo arriva all'ingresso di Mirkwood.",
+      matches() {
+        return game.currentRoom === "mirkwood_forest_path";
+      },
+    },
+    {
+      id: "laketown_arrival",
+      label: "Lake-town",
+      description: "Bilbo raggiunge Lake-town dopo il capitolo dei barili.",
+      matches() {
+        return game.currentRoom === "wooden_town";
+      },
+    },
+    {
+      id: "front_gate_reached",
+      label: "Front Gate",
+      description: "Bilbo raggiunge il fronte della Montagna Solitaria.",
+      matches() {
+        return game.currentRoom === "front_gate";
+      },
+    },
+    {
+      id: "smaug_encounter",
+      label: "Smaug",
+      description: "Bilbo entra nel cuore di Erebor con Smaug ancora in gioco.",
+      matches() {
+        return game.currentRoom === "lower_halls";
+      },
+    },
+    {
       id: "have_ring",
-      label: "Have Ring",
-      description: "Bilbo ha recuperato l'anello.",
+      label: "After Gollum",
+      showInEndpointMenu: false,
+      description: "Bilbo esce dal capitolo di Gollum con l'anello ormai recuperato.",
       matches() {
         return ringTargetSatisfied();
       },
     },
     {
       id: "rivendell_complete",
-      label: "Rivendell Complete",
+      label: "Rivendell Ready",
+      showInEndpointMenu: false,
       description: "Le preparazioni di Rivendell sono concluse.",
       matches() {
         return Boolean(game.rivendellPreparationsComplete?.());
@@ -970,7 +1058,8 @@
     },
     {
       id: "beorn_fed",
-      label: "Beorn Meal Taken",
+      label: "Beorn Ready",
+      showInEndpointMenu: false,
       description: "Bilbo ha recuperato forza sufficiente presso Beorn.",
       matches() {
         return game.currentRoom === "beorns_house" && Number(game.player?.strength || 0) >= 6;
@@ -978,7 +1067,8 @@
     },
     {
       id: "mirkwood_cleared",
-      label: "Mirkwood Cleared",
+      label: "Out of Mirkwood",
+      showInEndpointMenu: false,
       description: "L'autoplay è uscito da Mirkwood vivo.",
       matches() {
         return Boolean(
@@ -990,7 +1080,8 @@
     },
     {
       id: "long_lake_alive",
-      label: "Long Lake Alive",
+      label: "Long Lake Reached",
+      showInEndpointMenu: false,
       description: "Bilbo arriva vivo a Long Lake dal percorso dei barili.",
       matches() {
         return game.currentRoom === "long_lake" && !game.endgame;
@@ -998,7 +1089,8 @@
     },
     {
       id: "bard_joined",
-      label: "Bard Joined",
+      label: "Bard Ready",
+      showInEndpointMenu: false,
       description: "Bard è entrato a far parte della corsa finale.",
       matches() {
         return bardWithPlayer() || Boolean(game.flags?.bardreadiedarrow);
@@ -1014,7 +1106,7 @@
     },
     {
       id: "victory",
-      label: "Victory",
+      label: "Back Home",
       description: "Bilbo riporta il tesoro a casa e chiude l'avventura.",
       matches(context = {}) {
         const allOutput = context.allOutput || [];
@@ -1024,6 +1116,7 @@
     {
       id: "death_any",
       label: "Any Death",
+      showInEndpointMenu: false,
       description: "Qualsiasi morte di Bilbo.",
       matches() {
         return Boolean(game.endgame && game.pendingEndgameChoice === "death");
@@ -1032,40 +1125,56 @@
     {
       id: "death_gollum",
       label: "Death by Gollum",
+      showInEndpointMenu: false,
       description: "Bilbo soccombe nel ramo di Gollum.",
       matches(context = {}) {
         const tail = (context.tailOutput || []).join(" ");
+        const deathImage = String(context.deathImage || "").trim();
         return Boolean(
           game.endgame
           && game.pendingEndgameChoice === "death"
-          && (game.currentRoom === "deep_dark_lake" || /gollum/i.test(tail))
+          && (
+            deathImage === "gollum_wrong_answer_to_riddle_death.png"
+            || deathImage === "gollum_ring_effect_ends_death.png"
+            || game.currentRoom === "deep_dark_lake"
+            || /gollum catches you as the ring fails|gollum catches you in the dark|gollum tears you down beside the black water|gollum strangles you in the dark|gollum drags you under the dark lake|gollums whisper curdles into a hiss/i.test(tail)
+          )
         );
       },
     },
     {
       id: "death_goblin",
       label: "Death by Hulking Goblin",
+      showInEndpointMenu: false,
       description: "Bilbo e la compagnia soccombono all'imboscata nel tunnel dei goblin.",
       matches(context = {}) {
         const tail = (context.tailOutput || []).join(" ");
+        const deathImage = String(context.deathImage || "").trim();
         return Boolean(
           game.endgame
           && game.pendingEndgameChoice === "death"
-          && /hulking goblin|tunnels close over the whole company/i.test(tail)
+          && (
+            deathImage === "hulking_goblin_attack_death.png"
+            || /hulking goblin|tunnels close over the whole company/i.test(tail)
+          )
         );
       },
     },
     {
       id: "death_goblin_fight",
       label: "Death by Goblins",
+      showInEndpointMenu: false,
       description: "Bilbo viene sopraffatto in un combattimento contro goblin ostili.",
       matches(context = {}) {
         const tail = (context.tailOutput || []).join(" ");
+        const deathImage = String(context.deathImage || "").trim();
         return Boolean(
           game.endgame
           && game.pendingEndgameChoice === "death"
           && (
-            /goblin/i.test(tail)
+            deathImage === "goblin_bilbo_pit_death.png"
+            || deathImage === "bilbo_goblins_around_him_death.png"
+            || /goblin/i.test(tail)
             || (game.currentRoom && /goblin|passage|cavern/.test(game.currentRoom))
           )
         );
@@ -1074,6 +1183,7 @@
     {
       id: "death_spider",
       label: "Death by Spiders",
+      showInEndpointMenu: false,
       description: "Bilbo soccombe ai ragni o al loro veleno.",
       matches(context = {}) {
         const tail = (context.tailOutput || []).join(" ");
@@ -1087,6 +1197,7 @@
     {
       id: "death_troll",
       label: "Death by Trolls",
+      showInEndpointMenu: false,
       description: "Bilbo soccombe nel confronto con i troll.",
       matches(context = {}) {
         const tail = (context.tailOutput || []).join(" ");
@@ -1100,6 +1211,7 @@
     {
       id: "death_river",
       label: "Death by River",
+      showInEndpointMenu: false,
       description: "Bilbo muore nelle acque nere del percorso dei barili o del fiume.",
       matches(context = {}) {
         const tail = (context.tailOutput || []).join(" ");
@@ -1113,6 +1225,7 @@
     {
       id: "death_smaug",
       label: "Death by Smaug",
+      showInEndpointMenu: false,
       description: "Bilbo muore nella fase Erebor/Smaug.",
       matches() {
         return Boolean(
@@ -1127,6 +1240,7 @@
 
   const presetById = Object.fromEntries(scenarioPresets.map((preset) => [preset.id, preset]));
   const targetById = Object.fromEntries(targets.map((target) => [target.id, target]));
+  const endpointTargets = targets.filter((target) => target.showInEndpointMenu !== false);
   const strategyById = Object.fromEntries(strategyProfiles.map((profile) => [profile.id, profile]));
   const auditRoutes = [
     { presetId: "before_trolls", targetId: "rivendell_complete" },
@@ -1223,12 +1337,19 @@
     return {
       allOutput: lines,
       tailOutput: lines.slice(-8),
+      deathImage: game.temporaryImage?.file || "",
     };
   }
 
-  function resetToPreset(preset) {
+  function resetToPreset(preset, options = {}) {
+    const seed = Number(options.seed) || 1;
     game.restartGame();
+    game.storySeed = seed;
     if (typeof preset?.apply === "function") preset.apply();
+    game.storySeed = seed;
+    if (typeof game.createGollumState === "function") {
+      game.gollumState = game.createGollumState();
+    }
     if (typeof game.checkSpecialSituations === "function") {
       game.checkSpecialSituations();
     }
@@ -1921,6 +2042,42 @@
       if (ringTargetSatisfied()) score += 220;
     }
 
+    if (targetId === "bag_end") {
+      if (game.currentRoom === "hobbit_hole") score += 220;
+    }
+
+    if (targetId === "troll_approach") {
+      if (game.currentRoom === "green_dragon_inn") score += 12;
+      if (game.flags?.seenpony) score += 28;
+      if (game.currentRoom === "dreary") score += 220;
+    }
+
+    if (targetId === "after_trolls") {
+      if (game.currentRoom === "trolls_clearing") score += 12;
+      if (game.trollsTransformed) score += 40;
+      if (game.currentRoom === "trollshaws_road") score += 220;
+    }
+
+    if (targetId === "rivendell_arrival") {
+      if (game.currentRoom === "hidden_valley_path") score += 18;
+      if (game.currentRoom === "rivendell") score += 220;
+    }
+
+    if (targetId === "deep_dark_lake") {
+      if (/goblin|cavern|passage|tunnel/.test(game.currentRoom || "")) score += 10;
+      if (game.currentRoom === "deep_dark_lake") score += 220;
+    }
+
+    if (targetId === "beorn_house") {
+      if (["great_river", "treeless_opening", "narrow_dangerous_path", "outside_goblins_gate"].includes(game.currentRoom || "")) score += 16;
+      if (game.currentRoom === "beorns_house") score += 220;
+    }
+
+    if (targetId === "mirkwood_entry") {
+      if (["beorns_house", "forest_road", "gate_to_mirkwood"].includes(game.currentRoom || "")) score += 16;
+      if (game.currentRoom === "mirkwood_forest_path") score += 220;
+    }
+
     if (targetId === "rivendell_complete") {
       if (game.currentRoom === "rivendell") score += 10;
       if (game.rivendellPreparationsComplete?.()) score += 220;
@@ -1938,6 +2095,13 @@
       if (game.flags?.mirkwoodjourneycomplete || game.currentRoom === "elvish_clearing") score += 220;
     }
 
+    if (targetId === "laketown_arrival") {
+      if (game.currentRoom === "cellar") score += 10;
+      if (game.doors?.porta_cellar_long_lake?.open) score += 12;
+      if (game.currentRoom === "long_lake") score += 26;
+      if (game.currentRoom === "wooden_town") score += 220;
+    }
+
     if (targetId === "long_lake_alive") {
       if (game.currentRoom === "cellar") score += 10;
       if (game.doors?.porta_cellar_long_lake?.open) score += 12;
@@ -1953,6 +2117,16 @@
     if (targetId === "dragon_defeated") {
       if (["front_gate", "lower_halls", "erebor_hidden_door"].includes(game.currentRoom)) score += 12;
       if (game.flags?.dragondefeated) score += 220;
+    }
+
+    if (targetId === "front_gate_reached") {
+      if (["long_lake", "wooden_town", "bleak_barren_land"].includes(game.currentRoom || "")) score += 12;
+      if (game.currentRoom === "front_gate") score += 220;
+    }
+
+    if (targetId === "smaug_encounter") {
+      if (["front_gate", "lonely_mountain", "erebor_hidden_door"].includes(game.currentRoom || "")) score += 12;
+      if (game.currentRoom === "lower_halls") score += 220;
     }
 
     if (targetId === "victory") {
@@ -2622,7 +2796,7 @@
     return withSeededRandom(seed, () => {
       state.activeExplorationRoute = { presetId, targetId };
       try {
-        const { setupOutput } = resetToPreset(preset);
+        const { setupOutput } = resetToPreset(preset, { seed });
         state.simulationHistory = createHistoryTracker();
         const sceneTracker = createSceneEventTracker();
         bumpMapCount(state.simulationHistory.roomVisits, game.currentRoom);
@@ -2637,7 +2811,10 @@
             const command = decision?.command || "";
             if (!command) break;
             const beforeLength = getOutputLines().length;
-            const beforeSnapshot = exploratoryStateSnapshot(target.id);
+            const beforeSnapshot = {
+              ...exploratoryStateSnapshot(target.id),
+              goblinAmbushActive: Boolean(game.encounters?.isGoblinTunnelEncounterActive?.()),
+            };
             commands.push(command);
             game.execute(command);
             const lines = outputDelta(beforeLength);
@@ -2666,6 +2843,7 @@
               afterRoom: afterSnapshot.room,
               beforeStateKey: beforeSnapshot.stateKey,
               afterStateKey: afterSnapshot.stateKey,
+              goblinAmbushActive: beforeSnapshot.goblinAmbushActive,
             });
             recordHistoryStep(state.simulationHistory, command, previousRoom, game.currentRoom, beforeSnapshot.stateKey);
             recordTransitionSample(state.simulationHistory, { stateKey: beforeSnapshot.stateKey, command, reward, unlockReward });
@@ -2740,14 +2918,17 @@
     return [...successRuns].sort(compareCanonicalRuns)[0];
   }
 
-  function failureBranchCandidates(baselineCommand = "") {
+  function failureBranchCandidates(baselineCommand = "", options = {}) {
+    const { excludeBaseline = true } = options;
     const commands = [];
     const fatalDecision = fatalTriggerDecision();
     if (fatalDecision?.command) commands.push(fatalDecision.command);
     for (const entry of strategyCandidates("failure")) {
       if (entry?.kind === "failure" && entry.command) commands.push(entry.command);
     }
-    return [...new Set(commands.map((command) => String(command || "").trim()).filter((command) => command && command !== baselineCommand))];
+    return [...new Set(commands.map((command) => String(command || "").trim()).filter((command) => (
+      command && (!excludeBaseline || command !== baselineCommand)
+    )))];
   }
 
   function replayPrefix(prefixCommands = [], targetId = "", transcript = [], commands = []) {
@@ -2762,24 +2943,43 @@
     return true;
   }
 
-  function spineDivergenceStateKey(spineRun = null, divergenceStepIndex = 0) {
+  function spineDivergenceStateKey(spineRun = null, divergenceStepIndex = 0, branchTiming = "before") {
     const entry = spineRun?.transcript?.[divergenceStepIndex];
+    if (branchTiming === "after") return String(entry?.afterStateKey || "").trim();
     return String(entry?.beforeStateKey || "").trim();
   }
 
-  function spineDivergenceRoom(spineRun = null, divergenceStepIndex = 0) {
+  function spineDivergenceRoom(spineRun = null, divergenceStepIndex = 0, branchTiming = "before") {
     const entry = spineRun?.transcript?.[divergenceStepIndex];
+    if (branchTiming === "after") return String(entry?.afterRoom || "").trim();
     return String(entry?.beforeRoom || "").trim();
   }
 
-  function spineDivergenceContextMatches(spineRun = null, divergenceStepIndex = 0, targetId = "") {
+  function spineDivergenceContextMatches(spineRun = null, divergenceStepIndex = 0, targetId = "", branchTiming = "before") {
     if (!spineRun) return false;
-    const expectedStateKey = spineDivergenceStateKey(spineRun, divergenceStepIndex);
+    const expectedStateKey = spineDivergenceStateKey(spineRun, divergenceStepIndex, branchTiming);
     if (expectedStateKey) {
       return exploratoryStateKey(targetId) === expectedStateKey;
     }
-    const expectedRoom = spineDivergenceRoom(spineRun, divergenceStepIndex);
+    const expectedRoom = spineDivergenceRoom(spineRun, divergenceStepIndex, branchTiming);
     return expectedRoom ? game.currentRoom === expectedRoom : true;
+  }
+
+  function spinePrefixCommandsForBranch(spineRun = null, divergenceStepIndex = 0, branchTiming = "before") {
+    if (!spineRun) return [];
+    return branchTiming === "after"
+      ? spineRun.commands.slice(0, divergenceStepIndex + 1)
+      : spineRun.commands.slice(0, divergenceStepIndex);
+  }
+
+  function spineBranchActionText(run = null) {
+    if (!run || !Number.isInteger(run.divergenceStepIndex)) return "";
+    const baseline = escapeHtml(run.baselineCommand || "(end)");
+    const branch = escapeHtml(run.branchCommand || "");
+    if (run.branchTiming === "after") {
+      return `After <strong>${baseline}</strong>: <strong>${branch}</strong>`;
+    }
+    return `Instead of <strong>${baseline}</strong>: <strong>${branch}</strong>`;
   }
 
   function simulateSpineOffshootRun({
@@ -2789,24 +2989,29 @@
     stepLimit,
     spineRun,
     divergenceStepIndex,
+    branchTiming = "before",
     branchCommand,
   }) {
     const preset = presetById[presetId];
     const target = targetById[targetId];
-    const prefixCommands = spineRun.commands.slice(0, divergenceStepIndex);
+    const prefixCommands = spinePrefixCommandsForBranch(spineRun, divergenceStepIndex, branchTiming);
     const totalStepLimit = Math.max(stepLimit, prefixCommands.length + 12);
     return withSeededRandom(seed, () => {
-      const { setupOutput } = resetToPreset(preset);
+      const { setupOutput } = resetToPreset(preset, { seed });
       const commands = [];
       const transcript = [];
       const sceneTracker = createSceneEventTracker();
 
       if (!replayPrefix(prefixCommands, targetId, transcript, commands)) return null;
       if (game.endgame) return null;
-      if (!spineDivergenceContextMatches(spineRun, divergenceStepIndex, targetId)) return null;
+      if (!spineDivergenceContextMatches(spineRun, divergenceStepIndex, targetId, branchTiming)) return null;
+      if (branchTiming === "after" && target.matches(scenarioContext())) return null;
 
       const beforeBranchLength = getOutputLines().length;
-      const beforeBranchSnapshot = { room: game.currentRoom };
+      const beforeBranchSnapshot = {
+        room: game.currentRoom,
+        goblinAmbushActive: Boolean(game.encounters?.isGoblinTunnelEncounterActive?.()),
+      };
       commands.push(branchCommand);
       game.execute(branchCommand);
       recordSceneEvents({
@@ -2827,7 +3032,10 @@
         if (!nextCommand) break;
         const beforeLength = getOutputLines().length;
         commands.push(nextCommand);
-        const beforeSnapshot = { room: game.currentRoom };
+        const beforeSnapshot = {
+          room: game.currentRoom,
+          goblinAmbushActive: Boolean(game.encounters?.isGoblinTunnelEncounterActive?.()),
+        };
         game.execute(nextCommand);
         recordSceneEvents({
           beforeSnapshot,
@@ -2877,6 +3085,7 @@
         divergenceStepIndex,
         divergenceStepNumber: divergenceStepIndex + 1,
         baselineCommand: spineRun.commands[divergenceStepIndex] || "",
+        branchTiming,
         branchCommand,
         prefixLength: prefixCommands.length,
         stepsFromDivergence: Math.max(1, commands.length - prefixCommands.length),
@@ -2892,6 +3101,7 @@
           commands: run.commands,
         }),
         `step-${run.divergenceStepNumber}`,
+        run.branchTiming,
         run.branchCommand,
       ].join("::");
       return run;
@@ -2908,30 +3118,39 @@
     const seen = new Set();
 
     for (let divergenceStepIndex = 0; divergenceStepIndex < spineRun.commands.length; divergenceStepIndex += 1) {
-      const candidates = withSeededRandom(spineRun.seed, () => {
-        resetToPreset(presetById[presetId]);
-        const prefixCommands = spineRun.commands.slice(0, divergenceStepIndex);
-        if (!replayPrefix(prefixCommands, targetId, [], [])) return [];
-        if (game.endgame) return [];
-        if (!spineDivergenceContextMatches(spineRun, divergenceStepIndex, targetId)) return [];
-        return failureBranchCandidates(spineRun.commands[divergenceStepIndex]);
-      });
+      const contexts = [
+        { branchTiming: "before", excludeBaseline: true },
+        { branchTiming: "after", excludeBaseline: false },
+      ];
 
-      for (const branchCommand of candidates) {
-        const branch = simulateSpineOffshootRun({
-          presetId,
-          targetId,
-          seed: spineRun.seed,
-          stepLimit,
-          spineRun,
-          divergenceStepIndex,
-          branchCommand,
+      for (const context of contexts) {
+        const candidates = withSeededRandom(spineRun.seed, () => {
+          resetToPreset(presetById[presetId], { seed: spineRun.seed });
+          const prefixCommands = spinePrefixCommandsForBranch(spineRun, divergenceStepIndex, context.branchTiming);
+          if (!replayPrefix(prefixCommands, targetId, [], [])) return [];
+          if (game.endgame) return [];
+          if (!spineDivergenceContextMatches(spineRun, divergenceStepIndex, targetId, context.branchTiming)) return [];
+          if (context.branchTiming === "after" && targetById[targetId]?.matches?.(scenarioContext())) return [];
+          return failureBranchCandidates(spineRun.commands[divergenceStepIndex], { excludeBaseline: context.excludeBaseline });
         });
-        if (!branch) continue;
-        const signature = `${branch.divergenceStepIndex}::${branch.branchCommand}::${branch.outcome.code}::${branch.commands.join("->")}`;
-        if (seen.has(signature)) continue;
-        seen.add(signature);
-        branches.push(branch);
+
+        for (const branchCommand of candidates) {
+          const branch = simulateSpineOffshootRun({
+            presetId,
+            targetId,
+            seed: spineRun.seed,
+            stepLimit,
+            spineRun,
+            divergenceStepIndex,
+            branchTiming: context.branchTiming,
+            branchCommand,
+          });
+          if (!branch) continue;
+          const signature = `${branch.divergenceStepIndex}::${branch.branchTiming}::${branch.branchCommand}::${branch.outcome.code}::${branch.commands.join("->")}`;
+          if (seen.has(signature)) continue;
+          seen.add(signature);
+          branches.push(branch);
+        }
       }
 
       if ((divergenceStepIndex + 1) % 3 === 0) await wait(0);
@@ -3061,7 +3280,7 @@
     if (!run) return "";
     const markers = [...winningPathMarkers(run)].sort();
     const compactCommands = (run.commands || [])
-      .map((command) => canonicalWinningCommand(command))
+      .map((command, index) => canonicalWinningCommand(command, run.transcript?.[index] || {}))
       .filter(Boolean);
     return [
       `v${WINNING_PATH_CATALOG_VERSION}`,
@@ -3304,7 +3523,7 @@
   function renderTreeLeaf(run) {
     const preview = run.commands.length
       ? run.commands.slice(Math.max(0, run.commands.length - 3)).join(" -> ")
-      : "Target già soddisfatto al punto di partenza.";
+      : "Endpoint gia` raggiunto allo starting point.";
     const selectedClass = state.selectedRunId === run.id ? " is-selected" : "";
     return `<li>
       <div class="lab-leaf${selectedClass}">
@@ -3340,8 +3559,8 @@
 
   function finalStateSummary(run) {
     return [
-      `Preset: ${run.presetLabel}`,
-      `Target: ${run.targetLabel}`,
+      `Starting point: ${run.presetLabel}`,
+      `Endpoint: ${run.targetLabel}`,
       `Strategy: ${run.strategyLabel}`,
       `Final room: ${run.roomLabel}`,
       `Strength: ${run.strength}`,
@@ -3367,7 +3586,7 @@
     const divergenceSection = Number.isInteger(run.divergenceStepIndex)
       ? `<div class="lab-detail__section">
         <strong>Divergence</strong>
-        <div class="lab-detail__text">Lo spine segue la soluzione fino allo step <strong>${run.divergenceStepNumber}</strong>. Invece di <strong>${escapeHtml(run.baselineCommand || "(end)")}</strong>, qui il ramo esegue <strong>${escapeHtml(run.branchCommand || "")}</strong>.</div>
+        <div class="lab-detail__text">Lo spine segue la soluzione fino allo step <strong>${run.divergenceStepNumber}</strong>. ${spineBranchActionText(run)}.</div>
       </div>`
       : "";
     detailBox.innerHTML = `<div class="lab-detail__card">
@@ -3411,8 +3630,8 @@
     }
     summaryBox.innerHTML = [
       `<div><strong>${report.runs.length}</strong> seed analizzati da <strong>${report.seedStart}</strong> a <strong>${report.seedStart + report.seedCount - 1}</strong>.</div>`,
-      `<div>Preset: <strong>${escapeHtml(report.presetLabel)}</strong></div>`,
-      `<div>Target: <strong>${escapeHtml(report.targetLabel)}</strong></div>`,
+      `<div>Starting point: <strong>${escapeHtml(report.presetLabel)}</strong></div>`,
+      `<div>Endpoint: <strong>${escapeHtml(report.targetLabel)}</strong></div>`,
       `<div>Strategy: <strong>${escapeHtml(report.strategyLabel)}</strong></div>`,
       `<div>Step limit: <strong>${report.stepLimit}</strong></div>`,
       `<div>${[...counts.entries()].map(([label, count]) => `${escapeHtml(label)}: <strong>${count}</strong>`).join(" · ")}</div>`,
@@ -3501,7 +3720,7 @@
     }
 
     return withSeededRandom(spineRun.seed, () => {
-      resetToPreset(presetById[spineRun.presetId]);
+      resetToPreset(presetById[spineRun.presetId], { seed: spineRun.seed });
       const commands = [];
       const transcript = [];
       for (let index = 0; index <= clampedStepIndex; index += 1) {
@@ -3603,7 +3822,7 @@
     if (Number.isInteger(selected.divergenceStepIndex)) {
       return `<div class="lab-spine__selection">
         <div><strong>Selected death branch</strong> · ${escapeHtml(selected.outcome.label)}</div>
-        <div>Step di divergenza: <strong>${selected.divergenceStepNumber}</strong> · Invece di <strong>${escapeHtml(selected.baselineCommand || "(end)")}</strong>, il ramo esegue <strong>${escapeHtml(selected.branchCommand || "")}</strong>.</div>
+        <div>Step di divergenza: <strong>${selected.divergenceStepNumber}</strong> · ${spineBranchActionText(selected)}.</div>
         <div>Morte dopo <strong>${selected.stepsFromDivergence}</strong> step · Stanza finale <strong>${escapeHtml(selected.roomLabel)}</strong>.</div>
       </div>`;
     }
@@ -3721,7 +3940,7 @@
                 <button class="lab-spine-branch__label" type="button" data-spine-open-run-id="${escapeHtml(branch.id)}">${escapeHtml(branch.outcome.label)}</button>
                 <span class="lab-badge lab-badge--danger">+${branch.stepsFromDivergence}</span>
               </div>
-              <div class="lab-spine-branch__meta">instead of <strong>${escapeHtml(branch.baselineCommand || "(end)")}</strong>: <strong>${escapeHtml(branch.branchCommand)}</strong></div>
+              <div class="lab-spine-branch__meta">${spineBranchActionText(branch)}</div>
             </div>`;
           }).join("")}</div>`
           : "";
@@ -3993,7 +4212,7 @@
       `Step live: <strong>${session.totalCommands}</strong>`,
     ].join(" · ");
     summaryBox.innerHTML = [
-      `<div>Modalita' continua sul preset <strong>${escapeHtml(session.presetLabel)}</strong> verso <strong>${escapeHtml(session.targetLabel)}</strong>.</div>`,
+      `<div>Modalita' continua dallo starting point <strong>${escapeHtml(session.presetLabel)}</strong> verso l'endpoint <strong>${escapeHtml(session.targetLabel)}</strong>.</div>`,
       `<div>Seed iniziale: <strong>${session.seedStart}</strong> · Prossimo seed: <strong>${session.nextSeed}</strong></div>`,
       `<div>${counts}</div>`,
       session.bestRun?.metrics
@@ -4020,7 +4239,7 @@
     if (currentRun) {
       const commandItems = currentRun.commands.length
         ? currentRun.transcript.map((entry, index) => `<li>${index + 1}. ${escapeHtml(entry.command)} <span class="lab-inline-note">[${escapeHtml(entry.decisionKind || "exploratory")}]</span></li>`).join("")
-        : "<li>Il preset e` gia` in stato finale utile.</li>";
+        : "<li>Lo starting point e` gia` in uno stato finale utile.</li>";
       detailBox.innerHTML = `<div class="lab-detail__card">
         <div class="lab-detail__top">
           <strong>Seed ${currentRun.seed}</strong>
@@ -4079,7 +4298,7 @@
     return withSeededRandomAsync(seed, async () => {
       state.activeExplorationRoute = { presetId: session.presetId, targetId: session.targetId };
       try {
-        resetToPreset(presetById[session.presetId]);
+        resetToPreset(presetById[session.presetId], { seed });
         state.simulationHistory = createHistoryTracker();
         bumpMapCount(state.simulationHistory.roomVisits, game.currentRoom);
         session.currentRun = startContinuousRunRecord(seed, session.targetId, state.simulationHistory);
@@ -4223,7 +4442,7 @@
     syncContinuousButtons();
     persistContinuousSession(state.continuousSession);
     renderContinuousPanels();
-    statusBox.textContent = `Trial continuo avviato da "${preset.label}" verso "${target.label}" a partire dal seed ${seedStart}.`;
+    statusBox.textContent = `Trial continuo avviato dallo starting point "${preset.label}" verso l'endpoint "${target.label}" a partire dal seed ${seedStart}.`;
 
     const token = state.continuousToken;
     try {
@@ -4355,13 +4574,13 @@
     if (!run) return;
     state.replayToken += 1;
     const token = state.replayToken;
-    replayCaption.textContent = `Replay in corso per seed ${run.seed} dal preset ${run.presetLabel}.`;
+    replayCaption.textContent = `Replay in corso per seed ${run.seed} dallo starting point ${run.presetLabel}.`;
     replayLog.textContent = "Preparing replay...";
     const speed = replaySpeedSelect.value;
     const delayMs = speed === "slow" ? 900 : speed === "fast" ? 160 : 0;
 
     await withSeededRandomAsync(run.seed, async () => {
-      resetToPreset(presetById[run.presetId]);
+      resetToPreset(presetById[run.presetId], { seed: run.seed });
       const lines = [];
       const setupLines = getOutputLines();
       if (setupLines.length) lines.push(`[setup]\n${setupLines.join("\n")}`);
@@ -4387,13 +4606,13 @@
     if (!run) return;
     state.spineReplayToken += 1;
     const token = state.spineReplayToken;
-    setSpineReplayState(`Replay in corso per seed ${run.seed} dal preset ${run.presetLabel}.`, "Preparing replay...");
+    setSpineReplayState(`Replay in corso per seed ${run.seed} dallo starting point ${run.presetLabel}.`, "Preparing replay...");
     updateSpineReplayDom();
     const speed = replaySpeedSelect.value;
     const delayMs = speed === "slow" ? 900 : speed === "fast" ? 160 : 0;
 
     await withSeededRandomAsync(run.seed, async () => {
-      resetToPreset(presetById[run.presetId]);
+      resetToPreset(presetById[run.presetId], { seed: run.seed });
       const lines = [];
       const setupLines = getOutputLines();
       if (setupLines.length) lines.push(`[setup]\n${setupLines.join("\n")}`);
@@ -4493,7 +4712,7 @@
     detailBox.innerHTML = '<div class="lab-empty">Nessun ramo selezionato.</div>';
     replayCaption.textContent = "Il replay usa il motore reale del gioco in un sandbox nascosto.";
     replayLog.textContent = "Nessun replay eseguito.";
-    statusBox.textContent = "Scegli un preset e un target, poi avvia l'analisi per costruire l'albero dei rami dell'autoplay.";
+    statusBox.textContent = "Scegli uno starting point e un endpoint, poi avvia l'analisi per costruire l'albero dei rami dell'autoplay.";
     if (!renderLatestArchivedContinuousLog()) {
       replayCaption.textContent = "Il replay usa il motore reale del gioco in un sandbox nascosto.";
       replayLog.textContent = "Nessun replay eseguito.";
@@ -4586,7 +4805,7 @@
   }
 
   populateSelect(startPresetSelect, scenarioPresets);
-  populateSelect(targetSelect, targets);
+  populateSelect(targetSelect, endpointTargets);
   populateSelect(strategySelect, strategyProfiles);
   renderMemorySummary();
   renderContinuousArchiveSummary();
@@ -4594,7 +4813,7 @@
   renderDeathCatalog();
   renderSolutionSpine();
   startPresetSelect.value = "before_gollum";
-  targetSelect.value = "have_ring";
+  targetSelect.value = "beorn_house";
   strategySelect.value = "optimal";
   renderLatestArchivedContinuousLog();
   scheduleWinningPathWarmup();
