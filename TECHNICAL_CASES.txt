@@ -7011,3 +7011,106 @@ Future debugging advice
   recent transcript text.
 - If a late-branch death is mislabeled, inspect whether the output tail is
   carrying narrative residue from an earlier chapter or pursuer.
+
+
+Case 146 - 2026-06-28 - Autoplay lab scenario dropdowns looked empty, gray, or unselectable on slower machines
+----------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+In Autoplay Scenario Lab, the `Starting point` and `Endpoint` selects could stay
+empty for a noticeable delay, then show location names in faint gray that felt
+impossible to click. The issue was easier to notice on slower computers.
+
+Root cause
+----------
+Two separate problems stacked together:
+
+1. UI styling: the sidebar selects used a light text color (`#f5eedb`) that the
+   native Windows dropdown list inherited. Open options were rendered as pale
+   gray text on a light system background, so they looked disabled even when
+   present.
+
+2. Startup scheduling: the lab populated those selects only at the very end of
+   a large synchronous bootstrap, after `game.js` and most of `autoplay-lab.js`
+   had already executed. Immediately afterward it also kicked off automatic
+   winning-path warmup simulations on the main thread, which could keep the UI
+   sluggish right when the user tried to open the menus.
+
+Resolution
+----------
+- Styled `select option` entries with dark text on a light background so the
+  open dropdown remains readable on Windows.
+- Populated scenario controls as soon as the preset/target data is available,
+  instead of waiting for the full lab bootstrap to finish.
+- Deferred non-critical sidebar rendering (`death catalog`, memory summaries,
+  solution-spine chrome) to `requestIdleCallback`.
+- Removed automatic winning-path warmup on initial page load; warmup now waits
+  for an explicit scenario change and runs only during browser idle time.
+- Yielded to the event loop after every simulated seed during catalog warmup to
+  keep dropdown interaction responsive on slower hardware.
+- Cancelled in-flight warmup/catalog work when the user focuses or clicks the
+  scenario controls.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+- `autoplay-lab.css`
+- `autoplay-lab.html`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a native `<select>` looks disabled only while open, check whether custom
+  `color` styles are being inherited by `<option>` on Windows.
+- For heavy lab tooling, treat scenario controls as priority UI: populate them
+  early and push simulations/audits to idle time or explicit user actions.
+- If dropdowns feel frozen while background analysis runs, verify whether the
+  main thread is still doing synchronous game simulations without yielding.
+
+
+Case 147 - 2026-06-28 - Solution spine on Beorn -> Lake-town missed the West Bank swim death branch
+---------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+On the winning path from Beorn toward Lake-town, the solution spine showed the
+safe boat crossing (`look across river`, `throw rope`, `pull rope`, `climb into
+boat`, `east`) but exposed no fatal branch for trying to swim across the Black
+River at `West bank`.
+
+Root cause
+----------
+The game engine already had fatal `swim` / `jump into river` special actions on
+`West bank`, but the autoplay lab's failure probes did not:
+
+- `fatalTriggerDecision()` had no West Bank case
+- `strategyCandidates("failure")` did not offer `swim` or `jump into river`
+- `collectFatalBranchesFromSpine()` only derives branches from those probes
+
+So the solution spine could never diverge into the river death even though the
+live game supports it.
+
+Resolution
+----------
+- Added a West Bank fatal trigger for `swim`.
+- Added `swim` and `jump into river` to the failure candidate set on
+  `west_bank`.
+- Tightened `death_river` classification with the river death-image ids.
+- Added a `West Bank River Crossing` death-catalog entry and audit route note
+  for `At Beorn -> Lake-town`.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+- `autoplay-lab.html`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a solution spine step looks hazard-free but the real game has a scripted
+  fatal special action, check whether the lab failure probes know about that room
+  and command pair.
+- Prefer death-image ids in lab death matchers when the engine already exposes
+  them, especially for river deaths that can come from more than one location.

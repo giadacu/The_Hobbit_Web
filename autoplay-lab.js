@@ -45,7 +45,7 @@
   const LAB_CONTINUOUS_LOG_KEY = "hobbit-lab-continuous-log-v1";
   const WINNING_PATH_CATALOG_VERSION = 1;
   const WINNING_PATH_MAX_COUNT = 8;
-  const WINNING_PATH_WARMUP_DELAY_MS = 260;
+  const WINNING_PATH_WARMUP_DELAY_MS = 900;
   const CONTINUOUS_INTER_RUN_DELAY_MS = 140;
   const CONTINUOUS_ARCHIVE_LIMITS = [
     { sessionLimit: 3, logEntries: 120, logChars: 1400, runCommands: 80 },
@@ -1215,10 +1215,15 @@
       description: "Bilbo muore nelle acque nere del percorso dei barili o del fiume.",
       matches(context = {}) {
         const tail = (context.tailOutput || []).join(" ");
+        const deathImage = String(context.deathImage || "").trim();
         return Boolean(
           game.endgame
           && game.pendingEndgameChoice === "death"
-          && /river|black water|under the halls|gives you back no more/i.test(tail)
+          && (
+            deathImage === "bilbo_black_river_death.png"
+            || deathImage === "bilbo_falls_from_trap_door_river_death.png"
+            || /river|black water|under the halls|gives you back no more/i.test(tail)
+          )
         );
       },
     },
@@ -1242,12 +1247,24 @@
   const targetById = Object.fromEntries(targets.map((target) => [target.id, target]));
   const endpointTargets = targets.filter((target) => target.showInEndpointMenu !== false);
   const strategyById = Object.fromEntries(strategyProfiles.map((profile) => [profile.id, profile]));
+
+  function bootstrapScenarioControls() {
+    populateSelect(startPresetSelect, scenarioPresets);
+    populateSelect(targetSelect, endpointTargets);
+    populateSelect(strategySelect, strategyProfiles);
+    startPresetSelect.value = "before_gollum";
+    targetSelect.value = "beorn_house";
+    strategySelect.value = "optimal";
+  }
+
+  bootstrapScenarioControls();
   const auditRoutes = [
     { presetId: "before_trolls", targetId: "rivendell_complete" },
     { presetId: "after_trolls_cave", targetId: "rivendell_complete" },
     { presetId: "rivendell_ready", targetId: "have_ring" },
     { presetId: "before_gollum", targetId: "have_ring" },
     { presetId: "at_beorn", targetId: "mirkwood_cleared" },
+    { presetId: "at_beorn", targetId: "laketown_arrival" },
     { presetId: "mirkwood_vulnerable", targetId: "mirkwood_cleared" },
     { presetId: "mirkwood_midgame", targetId: "mirkwood_cleared" },
     { presetId: "cellar_escape", targetId: "long_lake_alive" },
@@ -1258,6 +1275,7 @@
   const auditRouteNotes = {
     "after_trolls_cave:rivendell_complete": "Il preset parte dopo il rischio troll e arriva a Rivendell prima di altri trigger letali noti.",
     "at_beorn:mirkwood_cleared": "Con il loadout normale questo corridoio tende a restare vivo; i rami fatali dei ragni sono esposti dal preset Mirkwood Vulnerable.",
+    "at_beorn:laketown_arrival": "Il percorso vincente attraversa il West Bank in barca; la solution spine dovrebbe esporre il ramo mortale da swim o jump into river.",
     "laketown:bard_joined": "Questo traguardo è quasi immediato; i rami fatali di Erebor emergono dai preset Front Gate e Smaug Alive.",
   };
   const deathCatalogEntries = [
@@ -1305,6 +1323,15 @@
       outcomeCode: "death_spider",
       description: "Versione piu` severa dello scenario ragni, con Bilbo stanco e senza lame forti.",
       trigger: "Trigger fatale: stesso errore dei ragni, ma con preset pensato per esporre piu` facilmente il ramo mortale.",
+    },
+    {
+      id: "west_bank_river",
+      label: "West Bank River Crossing",
+      presetId: "at_beorn",
+      targetId: "laketown_arrival",
+      outcomeCode: "death_river",
+      description: "Raggiunge il West Bank e prova ad attraversare il fiume a nuoto invece di usare la barca.",
+      trigger: "Trigger fatale: swim o jump into river al West Bank.",
     },
     {
       id: "cellar_river",
@@ -2648,6 +2675,10 @@
       return { command: "jump trap door", kind: "fatal_trigger" };
     }
 
+    if (game.currentRoom === "west_bank") {
+      return { command: "swim", kind: "fatal_trigger" };
+    }
+
     if (game.currentRoom === "lower_halls" && game.liveDragon?.() && !game.flags?.dragondefeated) {
       if (!game.flags?.treasuretaken) return { command: "take treasure", kind: "fatal_trigger" };
       return { command: "wait", kind: "fatal_trigger" };
@@ -2732,6 +2763,11 @@
 
     if (game.currentRoom === "cellar" && !game.findInInventory?.("barrel")) {
       candidates.push({ command: "down", kind: "failure" });
+    }
+
+    if (game.currentRoom === "west_bank") {
+      candidates.push({ command: "swim", kind: "failure" });
+      candidates.push({ command: "jump into river", kind: "failure" });
     }
 
     const deduped = uniqueCandidates(candidates);
@@ -2904,7 +2940,7 @@
     for (let offset = 0; offset < seedCount; offset += 1) {
       const seed = seedStart + offset;
       runs.push(simulateRun({ presetId, targetId, strategyId, seed, stepLimit }));
-      if ((offset + 1) % 4 === 0) await wait(0);
+      await wait(0);
     }
     runs.forEach((run) => {
       run.id = runSignature(run);
@@ -4172,12 +4208,66 @@
     }
   }
 
+  function cancelBackgroundCatalogWork() {
+    if (state.spineWarmupTimer) {
+      window.clearTimeout(state.spineWarmupTimer);
+      state.spineWarmupTimer = 0;
+    }
+    if (!state.spineCatalogLoading) return;
+    state.spineToken += 1;
+    state.spineCatalogLoading = false;
+    state.spineLoadingRunId = "";
+    renderSolutionSpine();
+  }
+
   function scheduleWinningPathWarmup() {
     if (state.continuousSession?.running) return;
     if (state.spineWarmupTimer) window.clearTimeout(state.spineWarmupTimer);
     state.spineWarmupTimer = window.setTimeout(() => {
-      refreshWinningPathCatalog({ silent: true, openPanel: false }).catch(() => {});
+      state.spineWarmupTimer = 0;
+      const runWarmup = () => {
+        refreshWinningPathCatalog({ silent: true, openPanel: false }).catch(() => {});
+      };
+      if (typeof window.requestIdleCallback === "function") {
+        window.requestIdleCallback(runWarmup, { timeout: 5000 });
+      } else {
+        window.setTimeout(runWarmup, 400);
+      }
     }, WINNING_PATH_WARMUP_DELAY_MS);
+  }
+
+  function bindScenarioControlInteraction() {
+    const controls = [
+      startPresetSelect,
+      targetSelect,
+      strategySelect,
+      outcomeFilterSelect,
+      seedStartInput,
+      seedCountInput,
+      stepLimitInput,
+    ];
+    for (const control of controls) {
+      if (!control) continue;
+      control.addEventListener("pointerdown", cancelBackgroundCatalogWork, { capture: true });
+      control.addEventListener("focus", cancelBackgroundCatalogWork);
+    }
+  }
+
+  function initializeLabChrome() {
+    renderMemorySummary();
+    renderContinuousArchiveSummary();
+    syncContinuousButtons();
+    renderDeathCatalog();
+    renderSolutionSpine();
+    renderLatestArchivedContinuousLog();
+  }
+
+  function scheduleLabChromeInit() {
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(initializeLabChrome, { timeout: 1500 });
+      return;
+    }
+    window.setTimeout(initializeLabChrome, 0);
   }
 
   function syncContinuousButtons() {
@@ -4804,19 +4894,8 @@
     }
   }
 
-  populateSelect(startPresetSelect, scenarioPresets);
-  populateSelect(targetSelect, endpointTargets);
-  populateSelect(strategySelect, strategyProfiles);
-  renderMemorySummary();
-  renderContinuousArchiveSummary();
-  syncContinuousButtons();
-  renderDeathCatalog();
-  renderSolutionSpine();
-  startPresetSelect.value = "before_gollum";
-  targetSelect.value = "beorn_house";
-  strategySelect.value = "optimal";
-  renderLatestArchivedContinuousLog();
-  scheduleWinningPathWarmup();
+  bindScenarioControlInteraction();
+  scheduleLabChromeInit();
 
   analyzeButton.addEventListener("click", () => {
     analyze().catch((error) => {

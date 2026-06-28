@@ -99,6 +99,11 @@ body {
   font-size: 0.82rem;
 }
 
+.lab-field select option {
+  color: #1c1712;
+  background: #f8f2e2;
+}
+
 .lab-field input::-webkit-outer-spin-button,
 .lab-field input::-webkit-inner-spin-button {
   margin: 0;

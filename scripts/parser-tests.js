@@ -7905,13 +7905,16 @@ const gameCases = [
       const deathClassificationUsesImages = labSource.includes('deathImage: game.temporaryImage?.file || "",')
         && labSource.includes('deathImage === "gollum_wrong_answer_to_riddle_death.png"')
         && labSource.includes('deathImage === "hulking_goblin_attack_death.png"')
-        && labSource.includes('deathImage === "bilbo_goblins_around_him_death.png"');
+        && labSource.includes('deathImage === "bilbo_goblins_around_him_death.png"')
+        && labSource.includes('deathImage === "bilbo_black_river_death.png"');
+      const westBankRiverFatalPresent = /game\.currentRoom === "west_bank"[\s\S]{0,120}return \{ command: "swim", kind: "fatal_trigger" \}/.test(labSource);
       game.print(`Lab pocket wait fatal trigger: ${pocketWaitFatalPresent ? "present" : "absent"}`);
       game.print(`Lab goblin scene markers gated: ${goblinSceneEventsGated ? "yes" : "no"}`);
       game.print(`Lab goblin canonical grouping gated: ${goblinCanonicalGated ? "yes" : "no"}`);
       game.print(`Lab spine after-branch support: ${spineSupportsAfterBranches ? "yes" : "no"}`);
       game.print(`Lab reset preserves story seed: ${labSeededStoryState ? "yes" : "no"}`);
       game.print(`Lab death classification uses images: ${deathClassificationUsesImages ? "yes" : "no"}`);
+      game.print(`Lab west bank river fatal trigger: ${westBankRiverFatalPresent ? "present" : "absent"}`);
     },
     expectedIncluded: [
       "Lab pocket wait fatal trigger: present",
@@ -7920,6 +7923,7 @@ const gameCases = [
       "Lab spine after-branch support: yes",
       "Lab reset preserves story seed: yes",
       "Lab death classification uses images: yes",
+      "Lab west bank river fatal trigger: present",
     ],
   },
   {
