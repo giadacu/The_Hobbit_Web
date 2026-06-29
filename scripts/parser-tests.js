@@ -1043,6 +1043,7 @@ const originalListCases = [
   ["Tell Beorn about the goblins.", ["ask beorn about goblins"]],
   ["Ask Beorn for food.", ["ask beorn for food"]],
   ["Ask Beorn to help the dwarves.", ["ask beorn to help dwarves"]],
+  ["Free dwarves.", ["help dwarves"]],
   ["Show the map to Beorn.", ["show map to beorn"]],
   ["Thank Beorn for his hospitality.", ["thank beorn for his hospitality"]],
   ["Talk to Smaug.", ["talk to smaug"]],
@@ -5034,6 +5035,23 @@ const gameCases = [
     ],
   },
   {
+    name: "jump beorn does not replay the eagles rescue scene at great river",
+    drive(game) {
+      game.execute("jump beorn");
+      game.execute("north");
+      game.print(`Great River image after jump beorn: ${game.contextualRoomImage(game.room())}`);
+      game.print(`Great River desc after jump beorn: ${game.contextualRoomDescription(game.room())}`);
+    },
+    expectedIncluded: [
+      "Great River image after jump beorn: great_river.jpeg",
+      "Great River desc after jump beorn: You are at the Great River, broad and cold under a wide unsettled sky.",
+    ],
+    notExpectedIncluded: [
+      "after the eagles' rescue",
+      "great_river_eagles_arrival.png",
+    ],
+  },
+  {
     name: "waiting in the open during the warg escape is fatal",
     setup(game) {
       game.currentRoom = "treeless_opening";
@@ -5518,6 +5536,20 @@ const gameCases = [
     notExpectedIncluded: [
       "The meal would be too much to carry",
       "You drop the",
+    ],
+  },
+  {
+    name: "examining beorns curtain describes the revealed cupboard naturally",
+    drive(game) {
+      game.execute("jump beorn");
+      game.execute("open curtain");
+      game.execute("examine curtain");
+    },
+    expectedIncluded: [
+      "You see a heavy curtain; inside is a large cupboard set into the wall behind the curtain.",
+    ],
+    notExpectedIncluded: [
+      "inside is behind the curtain there is a wall",
     ],
   },
   {
@@ -7613,6 +7645,22 @@ const gameCases = [
     ],
   },
   {
+    name: "free dwarves acts like the cocoon rescue command in Mirkwood",
+    setup(game) {
+      movePlayerTo(game, "place_of_black_spiders");
+      game.flags.mirkwooddwarvesfreed = false;
+      game.debugGivePlayerItem("short strong dagger");
+    },
+    drive(game) {
+      game.execute("free dwarves");
+      game.print(`Mirkwood dwarves freed: ${game.flags.mirkwooddwarvesfreed ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "With the short strong dagger, you saw and slash through the clinging webs until at last the trapped dwarves can fight and stumble free.",
+      "Mirkwood dwarves freed: yes",
+    ],
+  },
+  {
     name: "beorn answers food request in his house",
     setup(game) {
       game.currentRoom = "beorns_house";
@@ -7908,6 +7956,12 @@ const gameCases = [
         && labSource.includes('deathImage === "bilbo_goblins_around_him_death.png"')
         && labSource.includes('deathImage === "bilbo_black_river_death.png"');
       const westBankRiverFatalPresent = /game\.currentRoom === "west_bank"[\s\S]{0,120}return \{ command: "swim", kind: "fatal_trigger" \}/.test(labSource);
+      const forestRoadRoutePresent = labSource.includes("function mirkwoodForestRoadRouteCandidates")
+        && labSource.includes('command: "south", kind: "alternative_trigger"')
+        && labSource.includes("forest_road: \"south east\"")
+        && labSource.includes('id: "forest_road"')
+        && labSource.includes("function classifyMirkwoodCorridor")
+        && labSource.includes("function forestRoadAllowsAutoplay");
       game.print(`Lab pocket wait fatal trigger: ${pocketWaitFatalPresent ? "present" : "absent"}`);
       game.print(`Lab goblin scene markers gated: ${goblinSceneEventsGated ? "yes" : "no"}`);
       game.print(`Lab goblin canonical grouping gated: ${goblinCanonicalGated ? "yes" : "no"}`);
@@ -7915,6 +7969,7 @@ const gameCases = [
       game.print(`Lab reset preserves story seed: ${labSeededStoryState ? "yes" : "no"}`);
       game.print(`Lab death classification uses images: ${deathClassificationUsesImages ? "yes" : "no"}`);
       game.print(`Lab west bank river fatal trigger: ${westBankRiverFatalPresent ? "present" : "absent"}`);
+      game.print(`Lab forest road Mirkwood route: ${forestRoadRoutePresent ? "present" : "absent"}`);
     },
     expectedIncluded: [
       "Lab pocket wait fatal trigger: present",
@@ -7924,6 +7979,7 @@ const gameCases = [
       "Lab reset preserves story seed: yes",
       "Lab death classification uses images: yes",
       "Lab west bank river fatal trigger: present",
+      "Lab forest road Mirkwood route: present",
     ],
   },
   {

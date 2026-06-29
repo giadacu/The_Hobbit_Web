@@ -7114,3 +7114,157 @@ Future debugging advice
   and command pair.
 - Prefer death-image ids in lab death matchers when the engine already exposes
   them, especially for river deaths that can come from more than one location.
+
+
+Case 148 - 2026-06-28 - Solution spine missed the forest-road Mirkwood winning path without the West Bank boat
+----------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+In Autoplay Scenario Lab, the Solution Spine for routes such as `At Beorn ->
+Lake-town` only surfaced the river shortcut (`gate east` -> `west_bank` -> rope
+boat) and never showed the valid interior Mirkwood path through `forest_road`
+and `mirkwood_forest_path`, which never uses the rope boat.
+
+Root cause
+----------
+The game supports two distinct Mirkwood corridors:
+
+1. River shortcut: `gate_to_mirkwood` east -> `west_bank` -> boat -> `east_bank`
+2. Forest road: `gate_to_mirkwood` south -> `forest_road` -> interior Mirkwood
+   chain -> `place_of_black_spiders`
+
+The lab's winning-path catalog only simulated `optimal` and `alternative`
+strategies. Those probes knew about stream/deer/lights detours, but not the
+gate-south forest-road choice, and winning-path labels had no marker for the
+boat-free corridor.
+
+Resolution
+----------
+- Added `mirkwoodForestRoadRouteCandidates()` with gate `south`, approach routing
+  toward the gate, and main-trail advance commands through the interior chain.
+- Added a dedicated `forest_road` simulation strategy for the winning-path
+  catalog.
+- Merged forest-road probes into alternative success, strategy candidates, and
+  exploratory hints.
+- Added scene markers and winning-path labels: `Forest road` vs `River boat`.
+- Bumped `WINNING_PATH_CATALOG_VERSION` to 2 so catalog keys distinguish the
+  new corridor.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+- `autoplay-lab.html`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a chapter has two geographic corridors to the same milestone, give the lab
+  an explicit route family and marker instead of assuming one autoplay path.
+- When only one Mirkwood variant appears in the spine, check both the strategy
+  list used by `generateWinningPathCatalog()` and whether visited-room markers
+  separate river crossings from forest-road entry.
+
+
+Case 149 - 2026-06-28 - Forest-road winning paths were still labeled River boat after a partial forest entry
+-----------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After adding forest-road support, winning-path cards could show scene badges
+such as `forest_road_entry` and `forest_path_entry`, but the group label still
+read `River boat` because the run later visited `west_bank` / `east_bank`.
+
+Root cause
+----------
+Two separate issues stacked:
+
+1. The `forest_road` strategy still deferred to `nextAutoplayCommand()` before
+   its own route probes, and autoplay naturally routes through the river
+   shortcut. Fallback to the full `alternative` strategy could also pick
+   `follow lights` / `drink stream`, which dump Bilbo back on the West Bank.
+
+2. Winning-path markers treated any `west_bank` visit as `mirkwood:river_crossing`,
+   even when the run had first entered via `gate south` -> `forest_road`.
+
+Resolution
+----------
+- Reordered `forest_road` command selection to prefer forest-route probes first.
+- Added `forestRoadAllowsAutoplay()` so autoplay is only used for safe phases
+  such as Beorn meal prep, spider rescue, and post-Mirkwood travel.
+- Suppressed lights/stream alternative probes while a committed forest-road walk
+  is still active.
+- Added `classifyMirkwoodCorridor()` so labels distinguish:
+  - true interior forest-road exits (`forest_road`)
+  - river-boat crossings (`river_crossing`)
+- Record `mirkwood:river_crossing` only when the boat is actually used.
+- Gave forest-road groups a small coverage bonus so they remain visible in the
+  winning-path picker.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+- `autoplay-lab.html`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a route family badge and its group label disagree, inspect whether the run
+  started on one corridor but exited Mirkwood through another.
+- For dedicated route strategies, never let unrestricted autoplay override the
+  route probes during the chapter the strategy is meant to explore.
+
+
+Case 150 - 2026-06-29 - Debug Beorn checkpoint should not replay the eagle-rescue arrival, and cocoon rescue should accept "free dwarves"
+-------------------------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+- In the spider chapter, `free dwarves` did not trigger the cocoon-rescue
+  action even though `help dwarves` did.
+- After `jump beorn`, moving north to `great_river` showed the eagle-rescue
+  arrival image and description even though that rescue scene had not actually
+  been played through from `treeless_opening`.
+
+Root cause
+----------
+Two separate affordance/state issues overlapped.
+
+1. Natural-command normalization knew the rescue verb as `help`, but not
+   `free`, so the intuitive phrasing never reached the existing cocoon-rescue
+   handler.
+
+2. The debug checkpoint correctly marked the company as already rescued by the
+   eagles for progression purposes, but the Great River contextual image and
+   description were keyed only off `eagles_rescued_company`. That conflated:
+   - chapter-progress state
+   - having actually seen the eagle-rescue scene
+
+Resolution
+----------
+- Added natural parser normalization so `free dwarves` and similar cocoon/web
+  phrasing map onto the existing rescue command.
+- Added a dedicated `eagles_rescue_scene_seen` flag that is set only when the
+  live treeless-opening rescue scene resolves.
+- Gated the Great River eagle-rescue image/description on that scene-seen flag
+  instead of the broader progression flag.
+- Added regressions covering:
+  - parser normalization for `free dwarves`
+  - successful in-game cocoon rescue via `free dwarves`
+  - `jump beorn -> north` using the normal Great River presentation instead of
+    replaying the eagle-rescue arrival
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a debug checkpoint needs downstream progression, separate "state already
+  true" from "scene already witnessed" if either one drives special narration.
+- For high-stakes quest verbs, add the most natural synonyms players are likely
+  to try, not only the original implementation wording.

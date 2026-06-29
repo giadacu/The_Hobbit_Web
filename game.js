@@ -1248,7 +1248,7 @@
     ],
     great_river: [
       {
-        when: ({ game }) => game.eaglesRescuedCompany() && !game.beornMountainArrivalComplete(),
+        when: ({ game }) => game.eaglesRescueSceneSeen() && !game.beornMountainArrivalComplete(),
         text: "You are at the Great River after the eagles' rescue. Dawn lies pale on the broad water, and the wild tumult of wolves, goblins, and burning pines already feels like something suffered in another night. Yet the weariness of it clings to the company, and the lands below promise shelter more than ease.",
       },
       {
@@ -1556,7 +1556,7 @@
     ],
     great_river: [
       {
-        when: ({ game }) => game.eaglesRescuedCompany() && !game.beornMountainArrivalComplete(),
+        when: ({ game }) => game.eaglesRescueSceneSeen() && !game.beornMountainArrivalComplete(),
         image: "great_river_eagles_arrival.png",
       },
     ],
@@ -16894,6 +16894,10 @@
       return Boolean(this.flags.eagles_rescued_company);
     }
 
+    eaglesRescueSceneSeen() {
+      return Boolean(this.flags.eagles_rescue_scene_seen);
+    }
+
     wargEscapeActive() {
       return this.wargEscapeStarted() && !this.eaglesRescuedCompany();
     }
@@ -16922,6 +16926,7 @@
       }
       this.flags.warg_escape_waits = Number(this.flags.warg_escape_waits || 0) + 1;
       this.flags.eagles_rescued_company = true;
+      this.flags.eagles_rescue_scene_seen = true;
       this.flags.warg_escape_complete = true;
       const previousRoom = this.currentRoom;
       this.currentRoom = "great_river";
@@ -18778,6 +18783,8 @@
       .replace(/^speak\s+to\s+(.+?)\s+about\s+(.+)$/i, "ask $1 about $2")
       .replace(/^talk\s+to\s+(.+?)\s+about\s+(.+)$/i, "ask $1 about $2")
       .replace(/^help\s+(.+?)\s+up$/i, "carry $1")
+      .replace(/^free\s+(?:the\s+)?(?:(?:webbed|trapped)\s+)?(?:dwarves|companions)(?:\s+from\s+(?:the\s+)?(?:cocoons|webs))?$/i, "help dwarves")
+      .replace(/^free\s+(?:the\s+)?(?:cocoons|webs|webbing)$/i, "help cocoons")
       .replace(/^boost\s+(.+?)\s+up$/i, "carry $1")
       .replace(/^give\s+(.+?)\s+a\s+hand(?:\s+up)?$/i, "carry $1")
       .replace(/^ask\s+(.+?)\s+a\s+question$/i, "talk to $1")

@@ -1417,7 +1417,7 @@ window.HOBBIT_DATA = {
     "cupboard": {
       "id": "cupboard",
       "name": "cupboard",
-      "description": "behind the curtain there is a wall. In the wall there is a large cupboard",
+      "description": "a large cupboard set into the wall behind the curtain",
       "container": true,
       "keyFor": null,
       "portable": false,

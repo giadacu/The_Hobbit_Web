@@ -43,7 +43,7 @@
   const LAB_EXPLORE_MEMORY_KEY = "hobbit-lab-explore-memory-v2";
   const LAB_EXPLORE_MEMORY_VERSION = 3;
   const LAB_CONTINUOUS_LOG_KEY = "hobbit-lab-continuous-log-v1";
-  const WINNING_PATH_CATALOG_VERSION = 1;
+  const WINNING_PATH_CATALOG_VERSION = 3;
   const WINNING_PATH_MAX_COUNT = 8;
   const WINNING_PATH_WARMUP_DELAY_MS = 900;
   const CONTINUOUS_INTER_RUN_DELAY_MS = 140;
@@ -203,6 +203,12 @@
     if (normalized === "climb barrel") return "cellar climb barrel";
     if (normalized === "take woods cloak") return "beorn take cloak";
     if (normalized === "wear woods cloak") return "beorn wear cloak";
+    if (normalized === "south" && (context.beforeRoom === "gate_to_mirkwood" || context.room === "gate_to_mirkwood")) {
+      return "mirkwood forest road";
+    }
+    if (normalized === "south east" && (context.beforeRoom === "forest_road" || context.room === "forest_road")) {
+      return "mirkwood forest path";
+    }
     return normalized;
   }
 
@@ -236,6 +242,8 @@
     if (normalized === "follow deer" && game.flags?.mirkwoodfolloweddeer) pushSceneEvent(tracker, "mirkwood:follow_deer");
     if (normalized === "follow lights" && game.flags?.mirkwoodfollowedlights) pushSceneEvent(tracker, "mirkwood:follow_lights");
     if (normalized === "help dwarves" && game.flags?.mirkwooddwarvesfreed) pushSceneEvent(tracker, "mirkwood:free_dwarves");
+    if (normalized === "south" && beforeSnapshot.room === "gate_to_mirkwood") pushSceneEvent(tracker, "mirkwood:forest_road_entry");
+    if (normalized === "south east" && beforeSnapshot.room === "forest_road") pushSceneEvent(tracker, "mirkwood:forest_path_entry");
 
     if (normalized === "take woods cloak") pushSceneEvent(tracker, "beorn:take_cloak");
     if (normalized === "wear woods cloak" && game.wearingMirkwoodCloak?.()) pushSceneEvent(tracker, "beorn:wear_cloak");
@@ -243,6 +251,13 @@
     if (normalized === "throw barrel through trap door" && game.flags?.barrelthrown) pushSceneEvent(tracker, "cellar:barrel_throw");
     if (normalized === "jump onto barrel") pushSceneEvent(tracker, "cellar:jump_barrel");
     if (normalized === "climb barrel") pushSceneEvent(tracker, "cellar:climb_barrel");
+
+    if (
+      (normalized === "climb into boat" || normalized === "climb in boat")
+      && beforeSnapshot.room === "west_bank"
+    ) {
+      pushSceneEvent(tracker, "mirkwood:river_crossing");
+    }
 
     if (normalized === 'say to bard "get strong arrow from quiver"' || normalized === "say to bard \"get strong arrow from quiver\"") {
       pushSceneEvent(tracker, "bard:get_strong_arrow");
@@ -795,6 +810,142 @@
     ]).has(targetId);
   }
 
+  function visitedRoomIdList() {
+    const visited = game.visitedRooms;
+    if (visited instanceof Set) return [...visited];
+    if (Array.isArray(visited)) return visited;
+    return [];
+  }
+
+  function mirkwoodUsedRiverCrossing() {
+    return visitedRoomIdList().some((room) => (
+      ["west_bank", "east_bank", "bewitched_gloomy_place"].includes(room)
+    ));
+  }
+
+  function mirkwoodCommittedForestRoadPath() {
+    return visitedRoomIdList().some((room) => (
+      ["forest_road", "mirkwood_forest_path"].includes(room)
+    ));
+  }
+
+  function mirkwoodForestWalkActive() {
+    return mirkwoodCommittedForestRoadPath()
+      && !game.flags?.mirkwoodjourneycomplete
+      && !["elvish_clearing", "elvenkings_halls", "cellar", "wooden_town", "long_lake"].includes(game.currentRoom || "");
+  }
+
+  function classifyMirkwoodCorridor(run = null) {
+    if (!run) return "";
+    const rooms = run.visitedRooms || [];
+    const events = run.sceneEvents || [];
+    const viaRiverBoat = events.includes("mirkwood:river_crossing")
+      || (rooms.includes("west_bank") && rooms.includes("east_bank"));
+    const viaForestRoad = events.includes("mirkwood:forest_road_entry")
+      || rooms.includes("mirkwood_forest_path");
+    const exitedViaForestInterior = viaForestRoad
+      && rooms.includes("place_of_black_spiders")
+      && !rooms.includes("east_bank")
+      && !rooms.includes("green_forest");
+
+    if (exitedViaForestInterior) return "forest_road";
+    if (viaRiverBoat || rooms.includes("west_bank")) return "river_crossing";
+    if (viaForestRoad && !rooms.includes("west_bank")) return "forest_road";
+    return "";
+  }
+
+  function forestRoadAllowsAutoplay(command = "", targetId = "") {
+    const normalized = normalize(command);
+    if (!normalized) return false;
+
+    if (game.currentRoom === "beorns_house") {
+      if ((game.player?.strength || 0) < 6) return true;
+      if (/^(open|take|eat|examine)/.test(normalized)) return true;
+      if (normalized === "east" && !mirkwoodCommittedForestRoadPath()) return true;
+      if (normalized === "north") return true;
+      return false;
+    }
+
+    if (["beorn_great_hall", "beorn_stable", "beorn_garden", "beorn_animal_yard"].includes(game.currentRoom || "")) {
+      return true;
+    }
+
+    if (game.currentRoom === "great_river" && normalized === "east") return true;
+
+    if (mirkwoodForestWalkActive()) {
+      if (["follow lights", "drink stream"].includes(normalized)) return false;
+      if (/rope|boat|across river/.test(normalized)) return false;
+      if (game.currentRoom === "gate_to_mirkwood" && normalized === "east") return false;
+      if (["west_bank", "east_bank", "green_forest", "bewitched_gloomy_place"].includes(game.currentRoom || "")) {
+        return false;
+      }
+    }
+
+    if (game.currentRoom === "gate_to_mirkwood" && normalized === "east" && !mirkwoodCommittedForestRoadPath()) {
+      return false;
+    }
+
+    if (["mirkwood_spider_grove", "place_of_black_spiders"].includes(game.currentRoom || "")) return true;
+    if (/^elven|^cellar|^wooden_town|^long_lake|^laketown/.test(game.currentRoom || "")) return true;
+    if (game.flags?.mirkwoodjourneycomplete) return true;
+    if (["elvish_clearing", "elvenkings_halls", "cellar", "wooden_town", "long_lake"].includes(game.currentRoom || "")) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function autoplayRouteCommandTo(destination = "") {
+    if (typeof game.autoplayRouteCommandTo !== "function") return "";
+    return String(game.autoplayRouteCommandTo(destination) || "").trim();
+  }
+
+  function mirkwoodMainTrailAdvanceCommand() {
+    const steps = {
+      forest_road: "south east",
+      mirkwood_forest_path: "east",
+      mirkwood_dark_glade: "east",
+      mirkwood_enchanted_stream: "north",
+      mirkwood_fallen_tree_crossing: "east",
+      mirkwood_spider_grove: "north",
+      mirkwood_ruined_clearing: "east",
+    };
+    if (game.currentRoom === "place_of_black_spiders" && game.flags?.mirkwooddwarvesfreed) {
+      return "north";
+    }
+    return steps[game.currentRoom] || "";
+  }
+
+  function mirkwoodForestRoadRouteCandidates(targetId = "") {
+    if (!targetNeedsMirkwoodTraversal(targetId)) return [];
+    if (mirkwoodUsedRiverCrossing() || game.currentRoom === "west_bank") return [];
+
+    const candidates = [];
+
+    if (game.currentRoom === "gate_to_mirkwood" && !mirkwoodCommittedForestRoadPath()) {
+      candidates.push({ command: "south", kind: "alternative_trigger" });
+    }
+
+    if (["beorns_house", "great_river"].includes(game.currentRoom || "")) {
+      const towardGate = autoplayRouteCommandTo("gate_to_mirkwood");
+      if (towardGate) candidates.push({ command: towardGate, kind: "alternative" });
+    }
+
+    if (
+      ["mirkwood_spider_grove", "place_of_black_spiders"].includes(game.currentRoom || "")
+      && !game.flags?.mirkwooddwarvesfreed
+    ) {
+      candidates.push({ command: "help dwarves", kind: "alternative" });
+    }
+
+    const trailCommand = mirkwoodMainTrailAdvanceCommand();
+    if (trailCommand && (mirkwoodCommittedForestRoadPath() || game.currentRoom === "forest_road")) {
+      candidates.push({ command: trailCommand, kind: "alternative" });
+    }
+
+    return candidates;
+  }
+
   function targetNeedsBeornArrival(targetId = "") {
     return new Set(["beorn_fed", "beorn_house", "mirkwood_entry"]).has(targetId) || targetNeedsMirkwoodTraversal(targetId);
   }
@@ -819,6 +970,7 @@
   function strategyPriority(strategyId = "") {
     if (strategyId === "optimal") return 0;
     if (strategyId === "alternative") return 1;
+    if (strategyId === "forest_road") return 1;
     if (strategyId === "failure") return 2;
     if (strategyId === "exploratory") return 3;
     return 9;
@@ -841,6 +993,11 @@
       id: "alternative",
       label: "Alternative success",
       description: "Prova varianti ancora vincenti quando lo scenario offre piu di una mossa sensata.",
+    },
+    {
+      id: "forest_road",
+      label: "Forest road Mirkwood",
+      description: "Attraversa Mirkwood dal sentiero forestale, senza la traversata in barca al West Bank.",
     },
     {
       id: "failure",
@@ -1275,7 +1432,7 @@
   const auditRouteNotes = {
     "after_trolls_cave:rivendell_complete": "Il preset parte dopo il rischio troll e arriva a Rivendell prima di altri trigger letali noti.",
     "at_beorn:mirkwood_cleared": "Con il loadout normale questo corridoio tende a restare vivo; i rami fatali dei ragni sono esposti dal preset Mirkwood Vulnerable.",
-    "at_beorn:laketown_arrival": "Il percorso vincente attraversa il West Bank in barca; la solution spine dovrebbe esporre il ramo mortale da swim o jump into river.",
+    "at_beorn:laketown_arrival": "Il percorso vincente puo` seguire il West Bank in barca oppure il sentiero forestale interno (gate south -> forest_road).",
     "laketown:bard_joined": "Questo traguardo è quasi immediato; i rami fatali di Erebor emergono dai preset Front Gate e Smaug Alive.",
   };
   const deathCatalogEntries = [
@@ -2118,7 +2275,7 @@
     }
 
     if (targetNeedsMirkwoodTraversal(targetId) || targetId === "mirkwood_cleared") {
-      if (/mirkwood|west_bank|east_bank|elvish_clearing|elvenkings_halls/.test(game.currentRoom || "")) score += 8;
+      if (/mirkwood|forest_road|west_bank|east_bank|elvish_clearing|elvenkings_halls/.test(game.currentRoom || "")) score += 8;
       if (game.flags?.mirkwoodjourneycomplete || game.currentRoom === "elvish_clearing") score += 220;
     }
 
@@ -2284,6 +2441,16 @@
     }
     if (game.currentRoom === "mirkwood_ruined_clearing" && !game.flags?.mirkwoodfollowedlights) {
       candidates.push({ command: "follow lights", kind: "exploratory" });
+    }
+
+    if (targetNeedsMirkwoodTraversal(String(state.activeExplorationRoute?.targetId || "")) && !mirkwoodUsedRiverCrossing()) {
+      if (game.currentRoom === "gate_to_mirkwood" && !mirkwoodCommittedForestRoadPath()) {
+        candidates.push({ command: "south", kind: "exploratory" });
+      }
+      const trailCommand = mirkwoodMainTrailAdvanceCommand();
+      if (trailCommand && (mirkwoodCommittedForestRoadPath() || game.currentRoom === "forest_road")) {
+        candidates.push({ command: trailCommand, kind: "exploratory" });
+      }
     }
 
     if (game.currentRoom === "west_bank") {
@@ -2594,11 +2761,16 @@
       candidates.push({ command: "wait", kind: "alternative_trigger" });
     }
 
+    for (const entry of mirkwoodForestRoadRouteCandidates(targetId)) {
+      candidates.push(entry);
+    }
+
     if (
       game.currentRoom === "mirkwood_enchanted_stream"
       && !game.flags?.mirkwooddrankstream
       && Number(game.player?.strength || 0) >= 5
       && (typeof game.mirkwoodEnergy !== "function" || game.mirkwoodEnergy() >= 3)
+      && !mirkwoodForestWalkActive()
     ) {
       candidates.push({ command: "drink stream", kind: "alternative_trigger" });
     }
@@ -2617,6 +2789,7 @@
       && !game.flags?.mirkwoodfollowedlights
       && Number(game.player?.strength || 0) >= 5
       && (typeof game.mirkwoodEnergy !== "function" || game.mirkwoodEnergy() >= 2)
+      && !mirkwoodForestWalkActive()
     ) {
       candidates.push({ command: "follow lights", kind: "alternative_trigger" });
     }
@@ -2770,6 +2943,11 @@
       candidates.push({ command: "jump into river", kind: "failure" });
     }
 
+    const targetId = String(state.activeExplorationRoute?.targetId || "").trim();
+    for (const entry of mirkwoodForestRoadRouteCandidates(targetId)) {
+      candidates.push(entry);
+    }
+
     const deduped = uniqueCandidates(candidates);
     if (strategyId === "failure") {
       return deduped.filter((entry) => entry.kind === "failure").length
@@ -2779,7 +2957,11 @@
     if (strategyId === "alternative") {
       return deduped.filter((entry) => entry.kind !== "failure");
     }
-    return deduped.filter((entry) => entry.kind === "optimal" || entry.kind === "alternative");
+    return deduped.filter((entry) => (
+      entry.kind === "optimal"
+      || entry.kind === "alternative"
+      || entry.kind === "alternative_trigger"
+    ));
   }
 
   function selectCommand(strategyId = "optimal", targetId = "") {
@@ -2798,6 +2980,25 @@
     if (strategyId === "alternative") {
       const alternativeDecision = alternativeSuccessDecision(targetId);
       if (alternativeDecision) return alternativeDecision;
+    }
+    if (strategyId === "forest_road") {
+      const forestCandidates = mirkwoodForestRoadRouteCandidates(targetId);
+      if (forestCandidates.length) {
+        return forestCandidates.find((entry) => entry.kind === "alternative_trigger") || forestCandidates[0];
+      }
+
+      const autopilot = game.nextAutoplayCommand();
+      if (autopilot && forestRoadAllowsAutoplay(autopilot, targetId)) {
+        return { command: autopilot, kind: "optimal" };
+      }
+
+      if (game.flags?.mirkwoodjourneycomplete || ["elvish_clearing", "elvenkings_halls", "cellar"].includes(game.currentRoom || "")) {
+        if (autopilot) return { command: autopilot, kind: "optimal" };
+        const candidates = strategyCandidates("optimal");
+        if (candidates.length) return candidates.find((entry) => entry.kind === "optimal") || candidates[0];
+      }
+
+      return null;
     }
     if (strategyId === "failure") {
       const fatalDecision = fatalTriggerDecision();
@@ -3309,6 +3510,9 @@
     const beornApproach = inferBeornApproachFromVisitedRooms(run.visitedRooms || []);
     if (beornApproach) pushMarker(`beorn:${beornApproach}`);
 
+    const corridor = classifyMirkwoodCorridor(run);
+    if (corridor) pushMarker(`mirkwood:${corridor}`);
+
     return markers;
   }
 
@@ -3329,7 +3533,8 @@
 
   function winningPathCoverageScore(group = null) {
     if (!group) return 0;
-    return (group.runs?.length || 0) * 1000 - (group.representativeRun?.commands?.length || 0);
+    const corridorBonus = group.markers?.includes("mirkwood:forest_road") ? 250 : 0;
+    return (group.runs?.length || 0) * 1000 + corridorBonus - (group.representativeRun?.commands?.length || 0);
   }
 
   function chooseRepresentativeWinningRun(runs = []) {
@@ -3347,6 +3552,8 @@
     if (markers.includes("beorn:approach_great_river")) parts.push("Great River");
     else if (markers.includes("beorn:approach_treeless_opening")) parts.push("Treeless opening");
     else if (markers.includes("beorn:approach_narrow_path")) parts.push("Narrow path");
+    if (markers.includes("mirkwood:forest_road")) parts.push("Forest road");
+    else if (markers.includes("mirkwood:river_crossing")) parts.push("River boat");
     if (markers.includes("mirkwood:follow_deer")) parts.push("Deer Mirkwood");
     else if (markers.includes("mirkwood:follow_lights")) parts.push("Lights Mirkwood");
     else if (markers.includes("mirkwood:drink_stream")) parts.push("Stream Mirkwood");
@@ -3408,7 +3615,7 @@
   }) {
     const preset = presetById[presetId];
     const target = targetById[targetId];
-    const strategyIds = ["optimal", "alternative"];
+    const strategyIds = ["optimal", "alternative", "forest_road"];
     const allRuns = [];
 
     for (const strategyId of strategyIds) {
