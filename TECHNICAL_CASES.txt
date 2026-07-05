@@ -7268,3 +7268,142 @@ Future debugging advice
   true" from "scene already witnessed" if either one drives special narration.
 - For high-stakes quest verbs, add the most natural synonyms players are likely
   to try, not only the original implementation wording.
+
+
+Case 151 - 2026-07-05 - Autoplay Lab forest_road strategy stalled at spider web exit
+--------------------------------------------------------------------------------------
+
+Symptom
+-------
+The `forest_road` winning-path strategy entered Mirkwood via `gate south` ->
+`forest_road`, freed the dwarves at `place_of_black_spiders`, then repeated
+`north` until the step limit without ever reaching Lake-town. The Solution Spine
+catalog showed only `River boat / Barrel jump` groups.
+
+Root cause
+----------
+The lab trail script assumed `north` was enough after `help dwarves`, but the
+game still blocks the exit to `elvish_clearing` with `spider_web_black_spiders`
+until Bilbo uses `break web with sword`. Because `mirkwoodForestRoadRouteCandidates`
+always returned the hardcoded trail move first, the strategy never delegated to
+autoplay (which already knows how to break webs when routing).
+
+Resolution
+----------
+- Added `forestRoadWebBreakCommand()` and probe blocking webs before trail
+  advance.
+- Deferred `north` at `place_of_black_spiders` until no blocking web remains.
+- Extended the trail map with `elvish_clearing: north east` and an explicit
+  `south` step from `elvenkings_halls` toward the cellar/barrel chapter.
+- Added `mirkwoodForestRoadPostExitActive()` so once Mirkwood is cleared the
+  strategy hands off to safe autoplay for Elvenking's halls, cellar, and
+  barrels instead of looping `north east` / `west` between clearing and halls.
+- Relaxed the river abort guard so a committed forest walk is not discarded
+  after unrelated `west_bank` flags on the visited-room set.
+- Allowed `wear ring` during the elf chapter when autoplay needs stealth.
+- Bumped `WINNING_PATH_CATALOG_VERSION` to 4 and the lab script cache buster.
+
+Files touched
+-------------
+- `autoplay-lab.js`
+- `autoplay-lab.html`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a lab route strategy hardcodes corridor moves, mirror any one-shot
+  obstacles the real game enforces on those exits (webs, doors, rescue gates).
+- If a strategy loops on the same command, check whether the engine rejects it
+  and whether exploratory/autoplay already has the missing affordance.
+
+
+Case 152 - 2026-07-05 - Headless route transcript scripts appeared hung because browser timers kept Node alive
+----------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Offline route checks such as `scripts/check-trolls-to-rivendell.js --full-transcript`
+looked extremely slow or never returned, even though only a few dozen commands were
+being simulated.
+
+Root cause
+----------
+The real `game.js` runtime schedules browser-style delays that are correct in the
+UI but wasteful in Node:
+
+- idle auto-advance timers (`IDLE_WAIT_MS = 30000`)
+- image transition timers (~1240 ms)
+- narration/voice pacing timers when enabled
+
+The simulation itself finished quickly, but Node kept waiting for pending
+`setTimeout` callbacks before exiting.
+
+Resolution
+----------
+Added `scripts/headless-boot.js` for offline route tools. It:
+
+- boots the real game engine in Node
+- forces headless timers to fire immediately (`setTimeout(..., 0)`)
+- sets `game.idleWaitMs = 0` and `game.voiceEnabled = false`
+- lets route scripts call `process.exit(0)` once transcript output is written
+
+After the change, Before Trolls -> Rivendell transcript generation completes in
+under one second.
+
+Files touched
+-------------
+- `scripts/headless-boot.js`
+- `scripts/check-trolls-to-rivendell.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Any new offline route/transcript script should reuse `headless-boot.js`
+  instead of copying a bare DOM boot.
+- If a headless game runner feels stuck with little output, inspect pending
+  timers before assuming the simulation logic itself is slow.
+
+
+Case 153 - 2026-07-05 - Troll-to-Rivendell transcript review exposed Gandalf and warg sanctuary leaks
+---------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Offline transcript review of Before Trolls -> Rivendell found two narrative
+breaks in both winning variants:
+
+- after `jump trolls`, Gandalf said "There are old matters in this house..."
+  while Bilbo stood on the dreary road
+- on arrival in Rivendell, "A vicious warg is here." appeared beside Elrond
+
+Root cause
+----------
+- `gandalfInitiative()` used the Bag End map prompt whenever Bilbo carried the
+  map but had not read it, regardless of current room
+- `vicious_warg` uses `movementMode: "always"` and could wander from its home
+  route into sanctuary rooms such as Rivendell
+
+Resolution
+----------
+- Restrict the Bag End house line to `IMMERSION_BAG_END_ROOMS` only
+- Block hostile wilderness characters from entering sanctuary rooms via
+  `characterCanTravelConnection()`
+- Clear any hostile already present when entering a sanctuary room
+- Fixed item copy: "sharp-edged goblin cleaver"
+- Added parser regressions for both issues
+
+Files touched
+-------------
+- `game.js`
+- `assets/game-data.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Initiative lines with spatial deixis ("this house", "here", "outside") should
+  be gated by room chapter, not only by inventory flags.
+- Any `movementMode: "always"` hostile needs sanctuary travel rules, not only a
+  spawn location in `game-data.js`.

@@ -1,5 +1,6 @@
 const fs = require("fs");
 const vm = require("vm");
+const { enableFastHeadlessMode } = require("./headless-boot");
 
 const outputLines = [];
 const AUTOPLAY_VICTORY_LINE = "Congratulations. You have killed Smaug and found the treasure - a real thief.";
@@ -149,6 +150,7 @@ function dispatchDocumentEvent(type, event = {}) {
 }
 
 function bootGame() {
+  enableFastHeadlessMode();
   const elements = new Map();
   for (const id of [
     "output",
@@ -276,12 +278,11 @@ function bootGame() {
       this._listeners.set(type, list);
     },
   };
-  global.requestAnimationFrame = (fn) => setTimeout(() => fn(Date.now()), 0);
-  global.cancelAnimationFrame = clearTimeout;
-
   vm.runInThisContext(fs.readFileSync("assets/game-data.js", "utf8"));
   vm.runInThisContext(fs.readFileSync("assets/map-layout-data.js", "utf8"));
   vm.runInThisContext(fs.readFileSync("game.js", "utf8"));
+  window.hobbitGame.idleWaitMs = 0;
+  window.hobbitGame.voiceEnabled = false;
   return window.hobbitGame.splitter.constructor;
 }
 
@@ -4797,6 +4798,37 @@ const gameCases = [
     ],
   },
   {
+    name: "jump trolls does not trigger Gandalf's Bag End map line on the road",
+    drive(game) {
+      game.execute("jump trolls");
+    },
+    expectedIncluded: [
+      "Jumped to Troll Approach.",
+      "You are in a gloomy empty land with dreary hills ahead.",
+    ],
+    notExpectedIncluded: [
+      "There are old matters in this house worth a patient hearing yet.",
+    ],
+  },
+  {
+    name: "entering Rivendell clears wandering hostiles from the sanctuary",
+    drive(game) {
+      game.execute("jump rivendell");
+      game.debugMovePlayer("hidden_valley_path", { markRoute: true });
+      game.characters.vicious_warg.position = "rivendell";
+      game.characters.vicious_warg.visible = true;
+      game.execute("east");
+      game.print(`Warg visible in Rivendell: ${game.peopleInRoom().some((character) => character.id === "vicious_warg") ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You are in the heart of Rivendell",
+      "Warg visible in Rivendell: no",
+    ],
+    notExpectedIncluded: [
+      "A vicious warg is here.",
+    ],
+  },
+  {
     name: "jump trolls lands one move before the opening troll argument",
     drive(game) {
       game.execute("jump trolls");
@@ -7961,7 +7993,10 @@ const gameCases = [
         && labSource.includes("forest_road: \"south east\"")
         && labSource.includes('id: "forest_road"')
         && labSource.includes("function classifyMirkwoodCorridor")
-        && labSource.includes("function forestRoadAllowsAutoplay");
+        && labSource.includes("function forestRoadAllowsAutoplay")
+        && labSource.includes("function forestRoadWebBreakCommand")
+        && labSource.includes('command: webBreakCommand, kind: "alternative_trigger"')
+        && labSource.includes("function mirkwoodForestRoadPostExitActive");
       game.print(`Lab pocket wait fatal trigger: ${pocketWaitFatalPresent ? "present" : "absent"}`);
       game.print(`Lab goblin scene markers gated: ${goblinSceneEventsGated ? "yes" : "no"}`);
       game.print(`Lab goblin canonical grouping gated: ${goblinCanonicalGated ? "yes" : "no"}`);
@@ -9774,3 +9809,5 @@ if (cliOptions.autoplayBatchCount > 0) {
     }
   }
 }
+
+process.exit(0);

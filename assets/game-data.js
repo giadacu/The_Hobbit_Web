@@ -1237,7 +1237,7 @@ window.HOBBIT_DATA = {
     "goblin_cleaver": {
       "id": "goblin_cleaver",
       "name": "goblin cleaver",
-      "description": "a sharp edged goblin cleaver, forged by ancient elves",
+      "description": "a sharp-edged goblin cleaver, forged by ancient elves",
       "container": false,
       "keyFor": null,
       "portable": true,

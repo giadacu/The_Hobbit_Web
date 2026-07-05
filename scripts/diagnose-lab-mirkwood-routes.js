@@ -126,6 +126,21 @@ function mirkwoodForestWalkActive(g) {
     && !["elvish_clearing", "elvenkings_halls", "cellar", "wooden_town", "long_lake"].includes(g.currentRoom || "");
 }
 
+function mirkwoodForestRoadPostExitActive(g) {
+  return Boolean(g.flags?.mirkwoodjourneycomplete)
+    || ["elvish_clearing", "elvenkings_halls", "dark_dungeon", "cellar", "long_lake"].includes(g.currentRoom || "");
+}
+
+function forestRoadWebBreakCommand(g) {
+  for (const connection of g.roomConnections?.() || []) {
+    const web = g.blockingWebFor?.(connection);
+    if (web && !web.broken) {
+      return g.findInInventory?.("majestic sword") ? "break web with sword" : "smash web";
+    }
+  }
+  return "";
+}
+
 function mirkwoodMainTrailAdvanceCommand(g) {
   const steps = {
     forest_road: "south east",
@@ -136,13 +151,16 @@ function mirkwoodMainTrailAdvanceCommand(g) {
     mirkwood_spider_grove: "north",
     mirkwood_ruined_clearing: "east",
   };
-  if (g.currentRoom === "place_of_black_spiders" && g.flags?.mirkwooddwarvesfreed) return "north";
+  if (g.currentRoom === "place_of_black_spiders" && g.flags?.mirkwooddwarvesfreed) {
+    return forestRoadWebBreakCommand(g) ? "" : "north";
+  }
   return steps[g.currentRoom] || "";
 }
 
 function forestRoadAllowsAutoplay(g, command) {
   const normalized = normalize(command);
   if (!normalized) return false;
+  if (normalized === "wear ring" && g.findInInventory?.("golden ring")) return true;
   if (g.currentRoom === "beorns_house") {
     if ((g.player?.strength || 0) < 6) return true;
     if (/^(open|take|eat|examine)/.test(normalized)) return true;
@@ -167,7 +185,10 @@ function forestRoadAllowsAutoplay(g, command) {
 }
 
 function mirkwoodForestRoadRouteCandidates(g) {
-  if (mirkwoodUsedRiverCrossing(g) || g.currentRoom === "west_bank") return [];
+  if ((mirkwoodUsedRiverCrossing(g) && !mirkwoodCommittedForestRoadPath(g)) || g.currentRoom === "west_bank") {
+    return [];
+  }
+  if (mirkwoodForestRoadPostExitActive(g)) return [];
   const candidates = [];
   if (g.currentRoom === "gate_to_mirkwood" && !mirkwoodCommittedForestRoadPath(g)) {
     candidates.push("south");
@@ -179,14 +200,25 @@ function mirkwoodForestRoadRouteCandidates(g) {
   if (["mirkwood_spider_grove", "place_of_black_spiders"].includes(g.currentRoom || "") && !g.flags?.mirkwooddwarvesfreed) {
     candidates.push("help dwarves");
   }
+  const webBreakCommand = forestRoadWebBreakCommand(g);
+  if (webBreakCommand) candidates.push(webBreakCommand);
   const trailCommand = mirkwoodMainTrailAdvanceCommand(g);
-  if (trailCommand && (mirkwoodCommittedForestRoadPath(g) || g.currentRoom === "forest_road")) {
+  if (
+    !g.flags?.mirkwoodjourneycomplete
+    && trailCommand
+    && (mirkwoodCommittedForestRoadPath(g) || g.currentRoom === "forest_road")
+  ) {
     candidates.push(trailCommand);
   }
   return candidates;
 }
 
 function selectForestRoadCommand(g) {
+  if (mirkwoodForestRoadPostExitActive(g)) {
+    const autopilot = g.nextAutoplayCommand();
+    if (autopilot && forestRoadAllowsAutoplay(g, autopilot)) return autopilot;
+    return null;
+  }
   const forestCandidates = mirkwoodForestRoadRouteCandidates(g);
   if (forestCandidates.length) return forestCandidates[0];
   const autopilot = g.nextAutoplayCommand();

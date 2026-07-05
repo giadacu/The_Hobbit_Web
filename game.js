@@ -680,6 +680,18 @@
     "beorn_animal_yard",
   ]);
 
+  function isSanctuaryRoom(roomId) {
+    if (!roomId) return false;
+    return IMMERSION_RIVENDELL_ROOMS.has(roomId)
+      || IMMERSION_BEORN_ROOMS.has(roomId)
+      || IMMERSION_BAG_END_ROOMS.has(roomId);
+  }
+
+  function isHostileWildernessCharacter(character) {
+    if (!character || character.friendly !== false) return false;
+    return !matches(character.name, "dragon");
+  }
+
   const IMMERSION_MIRKWOOD_ROOMS = new Set([
     "gate_to_mirkwood",
     "bewitched_gloomy_place",
@@ -13622,6 +13634,7 @@
       this.currentRoom = roomId;
       this.player.position = roomId;
       this.resetHiddenDoorSearchState(fromRoom, roomId);
+      this.clearHostilesFromSanctuaryRoom(roomId);
       this.visitedRooms.add(roomId);
       return true;
     }
@@ -15787,7 +15800,18 @@
       if (!this.canTravelConnection(connection)) return false;
       if (!character) return true;
       if (matches(character.name, "wood elf") && connection?.to === "cellar") return false;
+      if (isHostileWildernessCharacter(character) && isSanctuaryRoom(connection?.to)) return false;
       return true;
+    }
+
+    clearHostilesFromSanctuaryRoom(roomId = this.currentRoom) {
+      if (!isSanctuaryRoom(roomId)) return;
+      for (const character of Object.values(this.characters)) {
+        if (!isHostileWildernessCharacter(character)) continue;
+        if (character.position !== roomId) continue;
+        character.position = null;
+        character.visible = false;
+      }
     }
 
     canSeeConnection(connection) {
@@ -15902,6 +15926,7 @@
       }
       this.currentRoom = effectiveConnection.to;
       this.player.position = effectiveConnection.to;
+      this.clearHostilesFromSanctuaryRoom(effectiveConnection.to);
       this.resetHiddenDoorSearchState(previousRoom, effectiveConnection.to);
       if (this.sceneMapVisible) {
         this.sceneMapAutoFollow = true;
@@ -16290,7 +16315,7 @@
           message: "Gandalf taps the curious map and says 'Some roads are easier to see when a map has passed through wise hands.'",
         };
       }
-      if (this.autoplayHas("curious map") && !this.flags.mapread) {
+      if (this.autoplayHas("curious map") && !this.flags.mapread && IMMERSION_BAG_END_ROOMS.has(this.currentRoom)) {
         return {
           flag: "initiative_gandalf_asks_for_map",
           message: "Gandalf says 'There are old matters in this house worth a patient hearing yet.'",

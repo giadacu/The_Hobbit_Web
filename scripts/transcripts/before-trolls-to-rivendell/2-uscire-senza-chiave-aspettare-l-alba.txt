@@ -1,0 +1,134 @@
+BEFORE TROLLS -> RIVENDELL
+Variant: 2 · Uscire senza chiave, aspettare l'alba
+Seed: 1
+Success: yes
+Final room: rivendell
+Large key: yes
+Trolls transformed: yes
+Steps: 22
+
+[setup]
+You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions. To the east there is the round green door. The round green door is closed. You see: a heavy wooden chest reinforced with iron bands, a stout wooden dresser with brass handles, an elegant lamp with intricate engravings, a stack of aged parchment, a dark glass inkwell, a velvety, plush settee, a collection of well-loved books, a leather-bound old book, a beautifully crafted carpet with complex patterns, a regiment of polished pegs still enjoying a last quiet hour of order, a ceramic stand painted with little green leaves, a narrow console table with a polished top and a discreet little drawer. Gandalf waits by the round green door as though measuring the evening by expected knocks. Gandalf is carrying a curious map.
+Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.
+Jumped to Troll Approach.
+You are in a gloomy empty land with dreary hills ahead. Shadows cling to the barren earth, where withered grass and ancient stones lie scattered. The hills rise ominously, their somber peaks shrouded in mist, whispering secrets of old. The air is heavy with forgotten tales, and a pervasive melancholy hangs over the desolate landscape. Thorin rests with pack still within arm's reach. Fili studies the road ahead. Kili keeps a wary eye on the country round about. Dori, Nori, Oin, Gloin, Bifur, Bofur, Bombur, and Gandalf wait a little apart, keeping the quiet fellowship of the road.
+Gandalf eyes the pipe and says 'A wizard never objects to a good pipe, though the road needs your courage more.'
+
+> north
+(1/22 · room: trolls_clearing)
+You are in the trolls' clearing. Ancient trees encircle the open space, their branches forming a natural canopy overhead. The ground is covered in soft moss, interspersed with large, flat rocks. Scattered around the clearing are various makeshift shelters and a large fire pit, its embers still glowing faintly. Thorin rests with pack still within arm's reach. Balin keeps a wary eye on the country round about. Dori studies the road ahead. Nori, Ori, Oin, Bifur, and Gandalf are nearby as well.
+Hideous troll is here. He is carrying a large key.
+Vicious troll is here.
+Game saved.
+You crouch low behind a mossy boulder, heart pounding, as the trolls argue by the flickering campfire in the moonlit clearing.
+For a moment the firelight shows only vast shoulders, lurching shadows, and heavy arms striking the night air as the quarrel rises and falls.
+Gandalf says 'Stupidity leaves heavy footprints, and trolls are generous with both.'
+A troll sniffs the air and peers into the dark beyond the fire. This is no safe place to linger: one more false move and the whole clearing may be on you.
+
+> south west
+(2/22 · room: dreary)
+As the fire flares brighter, the whole ugly business comes clear at last: one of the trolls has already caught a dwarf and is brandishing him like the beginning of supper.
+What shall us do with him?
+Roast him!
+He wouldn't make above a mouthful.
+P'raps there are more like him round about.
+You are in a gloomy empty land with dreary hills ahead. Thorin studies the road ahead. Dwalin keeps a wary eye on the country round about. Balin rests with pack still within arm's reach. Fili, Kili, Nori, Oin, Gloin, Bifur, and Gandalf linger a little apart.
+
+> wait
+(3/22 · room: dreary)
+You wait.
+Time passes...
+
+> wait
+(4/22 · room: dreary)
+You wait.
+Time passes...
+
+> wait
+(5/22 · room: dreary)
+You wait.
+Time passes...
+Day dawns.
+Game saved.
+
+> north
+(6/22 · room: trolls_clearing)
+You are in the trolls' clearing. Thorin rests with pack still within arm's reach. Dwalin keeps a wary eye on the country round about. Fili studies the road ahead. Kili, Nori, Oin, Gloin, Bofur, Bombur, and Gandalf linger a little apart. Near the feet of one stone troll lies a large key, dropped in the last confusion before dawn. Morning has reduced menace to silence; the stone trolls keep their quarrel forever without coming any nearer.
+You see the stone remains of the trolls.
+
+> take large key
+(7/22 · room: trolls_clearing)
+You take the large key.
+
+> north
+(8/22 · room: hidden_path)
+You are in a hidden path with trolls' footprints. The narrow trail winds through dense, ancient forest. The ground is soft and mossy, marked by deep, unmistakable imprints. Vines and roots intertwine overhead, creating natural arches. The air is thick with the scent of damp foliage, whispering tales of the lumbering giants that once roamed here. To the north there is the heavy rock door. The heavy rock door is closed. Thorin rests with pack still within arm's reach. Dwalin keeps a wary eye on the country round about. Fili studies the road ahead. Kili, Dori, Nori, Ori, Oin, Bofur, Bombur, and Gandalf are close at hand.
+
+> unlock heavy rock door
+(9/22 · room: hidden_path)
+You unlock the heavy rock door with the large key.
+
+> open heavy rock door
+(10/22 · room: hidden_path)
+You open the heavy rock door.
+Dwalin says 'We keep moving, or the road will begin to think us ornamental.'
+
+> light lantern
+(11/22 · room: hidden_path)
+You light the brass lantern with the firestone. It makes a bright light that will last for a while.
+
+> north
+(12/22 · room: trolls_cave)
+You are in the trolls' cave. The cavern is small and dimly lit, with stalactites hanging from the ceiling like ancient teeth. The air is cool and damp, filled with the echo of dripping water. Shadows dance on the rugged walls, revealing crude drawings and remnants of past inhabitants. The ground is uneven, littered with bones and scattered treasures, whispering of the trolls' presence. To the south there is the heavy rock door. The heavy rock door is open. You see: discarded armor, relics of past battles, that hint at deeper stories worth examining, an arcane chest crafted by elves to hold swords with care, a sturdy rope. Thorin studies the road ahead. Dwalin keeps a wary eye on the country round about. Balin rests with pack still within arm's reach. Kili, Dori, Nori, Oin, Gloin, Bifur, Bofur, and Gandalf are nearby as well.
+
+> open arcane chest
+(13/22 · room: trolls_cave)
+You open the arcane chest.
+
+> examine arcane chest
+(14/22 · room: trolls_cave)
+You see an arcane chest crafted by elves to hold swords with care; inside are a majestic sword, ancient and luminous, a sharp-edged goblin cleaver, forged by ancient elves, a short strong dagger.
+
+> take sword
+(15/22 · room: trolls_cave)
+You take the majestic sword from the arcane chest.
+
+> take rope
+(16/22 · room: trolls_cave)
+You take the sturdy rope.
+
+> south
+(17/22 · room: hidden_path)
+You are in a hidden path with trolls' footprints. Thorin rests with pack still within arm's reach. Dwalin keeps a wary eye on the country round about. Balin studies the road ahead. Fili, Kili, Dori, Nori, Ori, Oin, Bifur, Bombur, and Gandalf are close at hand.
+Dwalin says 'We keep moving, or the road will begin to think us ornamental.'
+
+> south
+(18/22 · room: trolls_clearing)
+You are in the trolls' clearing. Thorin rests with pack still within arm's reach. Dwalin keeps a wary eye on the country round about. Balin studies the road ahead. Fili, Kili, Dori, Oin, Gloin, Bifur, Bombur, and Gandalf linger a little apart. Morning has reduced menace to silence; the stone trolls keep their quarrel forever without coming any nearer.
+You see the stone remains of the trolls.
+
+> south east
+(19/22 · room: trollshaws_road)
+The eastward road threads under beech and pine through the Trollshaws, where the land rises and falls in long uneasy folds. The air is colder here than it ought to be, and though the way is plain enough, the silence between the trees feels watchful rather than empty. Thorin rests with pack still within arm's reach. Fili keeps a wary eye on the country round about. Kili studies the road ahead. Dori, Nori, Oin, Gloin, Bofur, Bombur, and Gandalf are nearby as well.
+Wind races over the heights with a hollow cry, and even the stones seem to draw themselves in against it.
+
+> east
+(20/22 · room: hidden_valley_path)
+The path narrows abruptly at the edge of a steep hidden drop, then bends away in a sharp descent toward a green valley glimpsed far below. Pine roots clutch the soil, an old iron spike juts from the rock, and the whole way looks passable only to those willing to trust a rope and one another. You see: thick pine roots gripping the lip of the descent like old knotted hands, a weathered iron spike driven deep into the rock by some cautious traveller long ago, a steep drop into the sheltered valley below, too awkward to trust without support. Thorin rests with pack still within arm's reach. Fili keeps a wary eye on the country round about. Kili studies the road ahead. Nori, Gloin, Bofur, Bombur, and Gandalf are close at hand.
+
+> tie rope to roots
+(21/22 · room: hidden_valley_path)
+You fasten the sturdy rope twice around the pine roots and test it hard. They hold, and the way down at last looks honest enough to attempt.
+The brass lantern flickers and goes out.
+
+> east
+(22/22 · room: rivendell)
+With the rope taking the worst of the drop, the company picks its way safely into the hidden valley. Once all are down, the line is worked loose and taken up again before the last short stretch into Rivendell.
+You are in the heart of Rivendell, where carved stone, running water, and old trees are woven together so gently that no hand seems to dominate the place. Light falls softly through leaves and arches alike, and song lingers even when no singer is near. Thorin listens in spite of himself for distant song. Dwalin studies the elvish work with open respect. Dori looks more rested here than on the open road. Nori, Ori, Bofur, Bombur, and Gandalf are nearby as well. Elrond is here. He is carrying a gold necklace.
+Game saved.
+Gandalf says 'In Rivendell even burdens grow lighter, though none are quite forgotten.'
+Elrond says 'You have brought more into this house than road-dust and weariness. Some things should be looked on before you depart.'
+
+[final]
+room=rivendell
+commands=north -> south west -> wait -> wait -> wait -> north -> take large key -> north -> unlock heavy rock door -> open heavy rock door -> light lantern -> north -> open arcane chest -> examine arcane chest -> take sword -> take rope -> south -> south -> south east -> east -> tie rope to roots -> east

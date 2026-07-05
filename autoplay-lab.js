@@ -43,7 +43,7 @@
   const LAB_EXPLORE_MEMORY_KEY = "hobbit-lab-explore-memory-v2";
   const LAB_EXPLORE_MEMORY_VERSION = 3;
   const LAB_CONTINUOUS_LOG_KEY = "hobbit-lab-continuous-log-v1";
-  const WINNING_PATH_CATALOG_VERSION = 3;
+  const WINNING_PATH_CATALOG_VERSION = 4;
   const WINNING_PATH_MAX_COUNT = 8;
   const WINNING_PATH_WARMUP_DELAY_MS = 900;
   const CONTINUOUS_INTER_RUN_DELAY_MS = 140;
@@ -858,6 +858,8 @@
     const normalized = normalize(command);
     if (!normalized) return false;
 
+    if (normalized === "wear ring" && game.findInInventory?.("golden ring")) return true;
+
     if (game.currentRoom === "beorns_house") {
       if ((game.player?.strength || 0) < 6) return true;
       if (/^(open|take|eat|examine)/.test(normalized)) return true;
@@ -900,6 +902,21 @@
     return String(game.autoplayRouteCommandTo(destination) || "").trim();
   }
 
+  function mirkwoodForestRoadPostExitActive() {
+    return Boolean(game.flags?.mirkwoodjourneycomplete)
+      || ["elvish_clearing", "elvenkings_halls", "dark_dungeon", "cellar", "long_lake"].includes(game.currentRoom || "");
+  }
+
+  function forestRoadWebBreakCommand() {
+    for (const connection of game.roomConnections?.() || []) {
+      const web = game.blockingWebFor?.(connection);
+      if (web && !web.broken) {
+        return game.findInInventory?.("majestic sword") ? "break web with sword" : "smash web";
+      }
+    }
+    return "";
+  }
+
   function mirkwoodMainTrailAdvanceCommand() {
     const steps = {
       forest_road: "south east",
@@ -911,14 +928,17 @@
       mirkwood_ruined_clearing: "east",
     };
     if (game.currentRoom === "place_of_black_spiders" && game.flags?.mirkwooddwarvesfreed) {
-      return "north";
+      return forestRoadWebBreakCommand() ? "" : "north";
     }
     return steps[game.currentRoom] || "";
   }
 
   function mirkwoodForestRoadRouteCandidates(targetId = "") {
     if (!targetNeedsMirkwoodTraversal(targetId)) return [];
-    if (mirkwoodUsedRiverCrossing() || game.currentRoom === "west_bank") return [];
+    if ((mirkwoodUsedRiverCrossing() && !mirkwoodCommittedForestRoadPath()) || game.currentRoom === "west_bank") {
+      return [];
+    }
+    if (mirkwoodForestRoadPostExitActive()) return [];
 
     const candidates = [];
 
@@ -938,8 +958,17 @@
       candidates.push({ command: "help dwarves", kind: "alternative" });
     }
 
+    const webBreakCommand = forestRoadWebBreakCommand();
+    if (webBreakCommand) {
+      candidates.push({ command: webBreakCommand, kind: "alternative_trigger" });
+    }
+
     const trailCommand = mirkwoodMainTrailAdvanceCommand();
-    if (trailCommand && (mirkwoodCommittedForestRoadPath() || game.currentRoom === "forest_road")) {
+    if (
+      !game.flags?.mirkwoodjourneycomplete
+      && trailCommand
+      && (mirkwoodCommittedForestRoadPath() || game.currentRoom === "forest_road")
+    ) {
       candidates.push({ command: trailCommand, kind: "alternative" });
     }
 
@@ -2982,6 +3011,18 @@
       if (alternativeDecision) return alternativeDecision;
     }
     if (strategyId === "forest_road") {
+      if (mirkwoodForestRoadPostExitActive()) {
+        const postExitAutopilot = game.nextAutoplayCommand();
+        if (postExitAutopilot && forestRoadAllowsAutoplay(postExitAutopilot, targetId)) {
+          return { command: postExitAutopilot, kind: "optimal" };
+        }
+        const postExitCandidates = strategyCandidates("optimal");
+        if (postExitCandidates.length) {
+          return postExitCandidates.find((entry) => entry.kind === "optimal") || postExitCandidates[0];
+        }
+        return null;
+      }
+
       const forestCandidates = mirkwoodForestRoadRouteCandidates(targetId);
       if (forestCandidates.length) {
         return forestCandidates.find((entry) => entry.kind === "alternative_trigger") || forestCandidates[0];
