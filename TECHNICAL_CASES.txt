@@ -7608,3 +7608,37 @@ Future debugging advice
 - Short item `description` fields used in comma lists should not end with `.?!`
 - When joining multiple item labels, route through `inlineListLabel()` /
   `inventoryItemLabel()` rather than raw `describeItemShort()`
+
+
+Case 159 - 2026-07-05 - Mobile scene letterboxing above and below image
+-----------------------------------------------------------------------
+
+Symptom
+-------
+- After switching mobile scene images to full-width `object-fit: contain`, large
+  black bars appeared above and below the illustration
+
+Root cause
+----------
+- The scene panel kept a fixed height (`clamp(240px, 42dvh, 420px)`) while
+  landscape images at full width only need ~width/aspect-ratio height; `contain`
+  letterboxed inside the taller panel
+
+Resolution
+----------
+- On mobile, size the scene row with `grid-template-rows: auto` so the panel
+  hugs the image natural height (`#room-image` in document flow, `height: auto`)
+- Keep the keyboard-focus peek strip via `data-mobile-scene-collapsed` with a
+  fixed 28px height and `object-fit: cover` on the image
+
+Files touched
+-------------
+- `style.css`
+- `index.html` (cache-bust query)
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Full-width mobile scenes should not use a fixed `dvh` panel with `contain`;
+  either match panel height to image aspect ratio or use `cover` and accept crop
+- Collapsed keyboard peek still needs absolute positioning + `cover`
