@@ -1,0 +1,126 @@
+RIVENDELL READY -> AFTER GOLLUM (RING)
+Variant: 1 · Autoplay ottimale
+Seed: 1
+Success: yes
+Start room: rivendell
+Final room: deep_dark_lake
+Steps: 19
+
+[setup]
+You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions. To the east there is the round green door. The round green door is closed. You see: a heavy wooden chest reinforced with iron bands, a stout wooden dresser with brass handles, an elegant lamp with intricate engravings, a stack of aged parchment, a dark glass inkwell, a velvety, plush settee, a collection of well-loved books, a leather-bound old book, a beautifully crafted carpet with complex patterns, a regiment of polished pegs still enjoying a last quiet hour of order, a ceramic stand painted with little green leaves, a narrow console table with a polished top and a discreet little drawer. Gandalf waits by the round green door as though measuring the evening by expected knocks. Gandalf is carrying a curious map.
+Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.
+Jumped to Rivendell.
+You are in the heart of Rivendell, where carved stone, running water, and old trees are woven together so gently that no hand seems to dominate the place. Light falls softly through leaves and arches alike, and song lingers even when no singer is near. Thorin looks more rested here than on the open road. Dwalin studies the elvish work with open respect. Fili listens in spite of himself for distant song. Kili, Nori, Ori, Gloin, Bifur, Bofur, Bombur, and Gandalf are close at hand. Elrond is here. He is carrying a gold necklace.
+Gandalf says 'In Rivendell even burdens grow lighter, though none are quite forgotten.'
+Elrond says 'You have brought more into this house than road-dust and weariness. Some things should be looked on before you depart.'
+Somewhere in Rivendell a soft voice recites old lore, the words carrying only as music and not as sense.
+
+> talk to elrond
+(1/19 · room: rivendell)
+Elrond folds his hands and says 'Speak without haste. In Rivendell, even quiet words may be worth the hearing.'
+After hearing you out, Elrond's gaze lingers on the weathered things the company has carried so far. 'There are older matters in your keeping than road-dust alone,' he says quietly.
+Elrond says 'These halls were made for song and counsel, not for hurried hearts.'
+
+> ask elrond about journey
+(2/19 · room: rivendell)
+Elrond considers the journey, but gives no clear answer.
+As the talk deepens, Elrond's attention settles at last on the old tokens of the quest.
+At his quiet request, you place the curious map in Elrond's hands.
+Elrond spreads the weathered parchment before the Company, and all draw close while the Lord of Rivendell studies the ancient markings.
+Beneath Rivendell's light he studies the weathered parchment until pale moon-letters begin to answer him.
+When he speaks again, it is only to mark a narrow western door, and the season and light by which it may be found.
+Gandalf seems satisfied. Thorin straightens, and a steadier purpose settles over the company. The time for departure has finally come.
+Game saved.
+Elrond says 'Road-worn minds hear counsel better after rest and food.'
+
+> east
+(3/19 · room: misty_mountain)
+You are on a hard mountain path in the Misty Mountains. The trail runs among black crags and steep emptiness, with the cold sharpening and the sky gathering itself above the eastern heights. Gusts come and go without pattern, harder each time, and low cloud keeps drawing ragged shadows over the road as though the mountain were slowly making up its mind against your journey. Thorin keeps a wary eye on the country round about. Dwalin rests with pack still within arm's reach. Balin studies the road ahead. Oin, Gloin, and Gandalf wait a little apart, keeping the quiet fellowship of the road. Farther east the weather keeps thickening upon the heights, and more than one of the company has begun to study the sky as closely as the road.
+Gandalf says 'The mountains do not hate us, but they care very little whether we live.'
+Balin glances at your elvish blade and says 'A better knife than any pantry would usually require, Master Baggins.'
+
+> east
+(4/19 · room: narrow_place)
+You are in a narrow place with a dreadful drop into a dim valley. The path here pinches between raw stone and a black emptiness below, while the wind comes racing round the cliff in sudden blows that make the very ledge seem to flinch. To the east the traverse grows more exposed with every glance; to the north a dry cave-mouth opens under the rock, poor comfort perhaps, but honest shelter. Thorin keeps a wary eye on the country round about. Balin studies the road ahead. Dori rests with pack still within arm's reach. Ori, Bifur, Bofur, Bombur, and Gandalf are nearby as well. The cave to the north looks cheerless enough, yet it has the great virtue of being there.
+
+> north
+(5/19 · room: large_dry_cave)
+You are in a large dry cave. The ground is level enough for weary bodies, and the rock gives blessed shelter from the violence abroad on the heights. Light steals in through cracks and the cave-mouth, but every now and then a harder burst of wind goes booming past outside, making it plain that this place is no luxury: it is the one sensible refuge within reach. Below there is the small hidden crevice. The small hidden crevice is closed. Thorin studies the road ahead. Dwalin rests with pack still within arm's reach. Balin keeps a wary eye on the country round about. Kili, Ori, Oin, Gloin, Bifur, Bofur, and Gandalf linger a little apart. Each fresh roar past the cave-mouth makes the shelter seem less accidental and more providential.
+Wind races over the heights with a hollow cry, and even the stones seem to draw themselves in against it.
+
+> unlock small hidden crevice
+(6/19 · room: large_dry_cave)
+You unlock the small hidden crevice with the curious key.
+
+> open small hidden crevice
+(7/19 · room: large_dry_cave)
+You open the small hidden crevice.
+
+> light lantern
+(8/19 · room: large_dry_cave)
+You light the brass lantern with the firestone. It makes a bright light that will last for a while.
+
+> down
+(9/19 · room: dark_stuffy_passage_5)
+The air in this passage is stale and dead, carrying an old sour smell that seems unwilling to disperse. Above there is the small hidden crevice. The small hidden crevice is open. Thorin keeps a wary eye on every turning, however little the gloom allows. Kili keeps close to the wall, breathing carefully. Gandalf waits tensely in the dark.
+A nasty goblin is here.
+Gandalf says 'There are deep places under stone where even brave hearts must tread carefully.'
+
+> kill nasty goblin with sword
+(10/19 · room: dark_stuffy_passage_5)
+You bring the sword round with a swift hard stroke, and for a heartbeat the steel is all you can see. Every breath is labor now, and the next movement must be made by sheer stubbornness. For an instant the nasty goblin shows something very like fear, and that is enough. The nasty goblin falls in a heap upon the rock and does not rise again. The clash echoes wildly from stone to stone, and the dark gives back the sound in ugly fashion.
+
+> south
+(11/19 · room: dark_stuffy_passage_6)
+Shadows mass thickly in the cramped passage, and the narrow stone throws every small sound back at you. Thorin holds still whenever the tunnels seem to mutter among themselves. Kili waits tensely in the dark. Ori listens for any stir ahead. Gandalf is close at hand.
+
+> up
+(12/19 · room: dark_stuffy_passage_14)
+The passage smells of damp rot and old wood, a stale breath that only deepens the unease of the place. Thorin keeps close to the wall, breathing carefully. Balin breathes shallowly, as though even sound might draw trouble. Oin listens for any stir ahead. Bofur and Gandalf linger a little apart.
+Game saved.
+A hulking goblin drops out of a crack above and crashes into the company before anyone can shout warning.
+Thorin goes down under it with a cry, pinned in the foul dark while the brute hacks and claws for the kill.
+The thing is too strong to bring down in one rush. Bilbo must join the attack, and at least one companion must strike with him.
+Thorin is still trapped beneath the brute, and the narrow tunnel gives no time for hesitation.
+
+> kill hulking goblin with sword
+(13/19 · room: dark_stuffy_passage_14)
+Bilbo's majestic sword flashes in the dark and tears the hulking goblin half away from Thorin for one precious instant. But the brute is too strong to finish alone; another of the company must strike now.
+The hulking goblin bears Thorin hard against the stones, snarling for the throat. One more heartbeat of delay will be too late.
+
+> ask gandalf to attack hulking goblin
+(14/19 · room: dark_stuffy_passage_14)
+Game saved.
+Bilbo's desperate stroke opens the moment Gandalf needs. The hulking goblin lurches clear of Thorin, stumbles, and is finished there in the tunnel dust. The clash echoes wildly from stone to stone, and the dark gives back the sound in ugly fashion.
+
+> south west
+(15/19 · room: deep_dark_lake)
+You are beside the black underground lake. The air is cold, wet, and close; drops fall from unseen heights, whispers echo where no one should be standing, and the darkness feels alive with hidden movement beyond the reach of your hands. No answering voice of Gandalf or the dwarves reaches you here; somewhere in the goblin dark you have been cut off from the company. You are utterly alone here, cut off from the company by black water, blind passages, and a darkness that seems glad of the separation. The black water gives back no light. Somewhere beyond it, something waits with all the patience of hunger.
+Gollum is here.
+Game saved.
+Groping beside the water in the dark, your fingers close around a small cold ring. Almost without thinking, you slip it into your pocket.
+No answering voice of Gandalf or the dwarves reaches you here. Blind passages and black water have cut you off from the company.
+You catch a flash of pale eyes before the rest of him emerges from shadow, one hand on a boat, the other spread on the slick stones as if ready to spring.
+Gollum gives a thin smile. 'We knows a stranger when we smells one, yes. We talks first, perhaps.'
+He has not attacked yet, but every word feels like borrowed time. Speak carefully, and keep him talking.
+
+> ask gollum a riddle
+(16/19 · room: deep_dark_lake)
+Gollum paddles nearer, close enough now that you hear his breathing, and whispers 'If Baggins answers true, then Baggins may ask. If not, we eats him, yes.' Gollum hisses 'It comes first on little cat feet, and swallows torchlight, stars, and moon. What is it, eh?'
+
+> answer dark
+(17/19 · room: deep_dark_lake)
+Gollum nods reluctantly. 'Right, precious. Right.' Gollum murmurs 'Thirty white horses on a red hill. First they champ, then they stamp, then they stand still. What are they, precious?'
+The brass lantern flickers and goes out.
+
+> answer teeth
+(18/19 · room: deep_dark_lake)
+Gollum narrows his pale eyes. 'Baggins has answered. Now Baggins asks, yes. Ask it, precious, ask it.'
+
+> say to gollum "what have i got in my pocket"
+(19/19 · room: deep_dark_lake)
+You ask 'What have I got in my pocket?' Gollum freezes, then hisses wild guesses: 'Knife? String? Handses?' At last he slips away to fetch what he meant to give you, and the cave seems to hold its breath. Then he discovers that his ring is gone. He comes back shrieking for his precious, and the little ring in your pocket suddenly feels heavier than gold.
+
+[final]
+room=deep_dark_lake
+commands=talk to elrond -> ask elrond about journey -> east -> east -> north -> unlock small hidden crevice -> open small hidden crevice -> light lantern -> down -> kill nasty goblin with sword -> south -> up -> kill hulking goblin with sword -> ask gandalf to attack hulking goblin -> south west -> ask gollum a riddle -> answer dark -> answer teeth -> say to gollum "what have i got in my pocket"

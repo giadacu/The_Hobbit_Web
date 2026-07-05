@@ -7407,3 +7407,84 @@ Future debugging advice
   be gated by room chapter, not only by inventory flags.
 - Any `movementMode: "always"` hostile needs sanctuary travel rules, not only a
   spawn location in `game-data.js`.
+
+
+Case 154 - 2026-07-05 - Transcript review: misplaced Gandalf/Balin ambient lines and awkward Elrond topic
+------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Offline route transcripts showed immersion leaks after Case 153 fixes:
+- Gandalf's troll line ("Stupidity leaves heavy footprints...") at
+  `hidden_valley_path` on the descent toward Rivendell
+- Gandalf's Bag End pipe line in goblin tunnels during combat
+- Balin's "better knife than any pantry" remark at Long Lake / Lake-town
+- "Elrond considers journey, but gives no clear answer." (missing article)
+
+Root cause
+----------
+- `hidden_valley_path` was grouped under the Gandalf ambient key `trolls`
+- `gandalfInitiative()` pipe banter only checked inventory, not room/chapter
+- Balin's sting remark used a global `onceFlag` with no chapter gate
+- `formatConversationTopic()` returned bare nouns like `journey`
+
+Resolution
+----------
+- Map `hidden_valley_path` to the `rivendell` ambient bucket
+- Restrict pipe initiative to Bag End, Shire, Green Dragon, and dreary
+- Gate Balin's sting remark to early journey chapters after `trolls_cave`
+- Prefix common topic nouns with "the" in `formatConversationTopic()`
+- Added parser regressions for all four issues
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When reviewing transcripts, scan for deictic lines ("this house", pipe at
+  home) outside their intended rooms; ambient keys and initiative gates should
+  match player location, not just quest flags.
+
+
+Case 155 - 2026-07-05 - Transcript review: endgame stray period, Gollum ring-expiry image, spider rescue grammar
+-------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Narrative/grammar pass on remaining route transcripts found:
+- Troll key death printed a lone "." after the death paragraph
+- Gollum ring-expiry death after the pocket question used the wrong riddle-death
+  image (`gollum_wrong_answer_to_riddle_death.png`) and generic combat text
+- Spider rescue line mixed tenses: "you saw and slash"
+
+Root cause
+----------
+- `endGame()` appended "." via `/[.!?]*$/` when desc2 ended with legacy `.2`
+  delimiter, leaving a third print chunk that was only "."
+- `updateRingTimers()` only treated ring failure as fatal during
+  `awaitingPlayerRiddle`, not after `pocketQuestionAsked`
+- Rescue copy used present tense on the second verb
+
+Resolution
+----------
+- Strip trailing `.2`/`.3`/`.4` delimiters before normalizing endgame punctuation
+- Extend Gollum ring-expiry fatal branch to enraged post-pocket state
+- Use "saw and slashed" in spider rescue text
+- Updated parser expectation for rescue line; all 1247 parser tests pass
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `scripts/transcripts/` (regenerated death transcripts)
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Special-action desc2 strings still use `.2` paragraph breaks; endGame must
+  strip trailing delimiters before punctuation normalization.
+- Any new Gollum post-pocket timer death should gate on `pocketQuestionAsked`
+  and `enraged`, not only `awaitingPlayerRiddle`.

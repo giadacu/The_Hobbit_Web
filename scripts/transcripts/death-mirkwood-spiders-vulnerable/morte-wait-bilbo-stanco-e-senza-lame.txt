@@ -1,0 +1,36 @@
+DEATH · Mirkwood Spiders (Vulnerable)
+Variant: Morte · wait (Bilbo stanco e senza lame)
+Seed: 1
+Success: yes
+Start room: mirkwood_spider_grove
+Final room: mirkwood_spider_grove
+Steps: 2
+Outcome: fatal death
+Death choice: death
+Outcome code: death_spider
+Death image: spider_kills_bilbo_death.png
+
+[setup]
+You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions. To the east there is the round green door. The round green door is closed. You see: a heavy wooden chest reinforced with iron bands, a stout wooden dresser with brass handles, an elegant lamp with intricate engravings, a stack of aged parchment, a dark glass inkwell, a velvety, plush settee, a collection of well-loved books, a leather-bound old book, a beautifully crafted carpet with complex patterns, a regiment of polished pegs still enjoying a last quiet hour of order, a ceramic stand painted with little green leaves, a narrow console table with a polished top and a discreet little drawer. Gandalf waits by the round green door as though measuring the evening by expected knocks. Gandalf is carrying a curious map.
+Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.
+Jumped to Mirkwood.
+A black forest path runs under close-packed boughs where little light survives to touch the roots. The air is dry, stale, and old, and every turn seems just a little too like the last. Thorin carries his weariness like an insult, refusing to let the wood think it has mastered him. Bombur keeps glancing back along the path as though mistrusting how quickly it disappears behind him. Fili, Kili, and Gloin are nearby as well. The path keeps on, but with so little change from root to root that memory begins to lose its grip on direction.
+Bofur says 'This wood could make a hungry dwarf long for plain honest rain and an open sky.'
+
+> wait
+(1/2 · room: mirkwood_spider_grove)
+You wait.
+Time passes...
+A thread of web catches at your sleeve, though no breeze should have carried it so far.
+
+> wait
+(2/2 · room: mirkwood_spider_grove)
+You wait.
+Time passes...
+The great spider closes with you at once, turning the struggle into a rough and breathless grapple. Every breath is labor now, and the next movement must be made by sheer stubbornness. The great spider presses the advantage with hot fury. You collapse at last, and the fight is done. Leaves shiver overhead, and roots catch at every uncertain step beneath the boughs.
+So ends this thread of the tale. You have mastered 35.07% of this adventure.
+Type 'restart' to begin the tale again.
+
+[final]
+room=mirkwood_spider_grove
+commands=wait -> wait

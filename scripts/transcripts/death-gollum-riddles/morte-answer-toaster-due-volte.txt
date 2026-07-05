@@ -1,0 +1,43 @@
+DEATH · Gollum at Deep Dark Lake
+Variant: Morte · answer toaster (due volte)
+Seed: 1
+Success: yes
+Start room: deep_dark_lake
+Final room: deep_dark_lake
+Steps: 3
+Outcome: fatal death
+Death choice: death
+Outcome code: death_gollum
+Death image: gollum_wrong_answer_to_riddle_death.png
+
+[setup]
+You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions. To the east there is the round green door. The round green door is closed. You see: a heavy wooden chest reinforced with iron bands, a stout wooden dresser with brass handles, an elegant lamp with intricate engravings, a stack of aged parchment, a dark glass inkwell, a velvety, plush settee, a collection of well-loved books, a leather-bound old book, a beautifully crafted carpet with complex patterns, a regiment of polished pegs still enjoying a last quiet hour of order, a ceramic stand painted with little green leaves, a narrow console table with a polished top and a discreet little drawer. Gandalf waits by the round green door as though measuring the evening by expected knocks. Gandalf is carrying a curious map.
+Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.
+Jumped to Deep Dark Lake.
+It is pitch dark here. You cannot see the room, its exits, or anything else. You can only feel your way and move by guesswork.
+Game saved.
+Groping beside the water in the dark, your fingers close around a small cold ring. Almost without thinking, you slip it into your pocket.
+No answering voice of Gandalf or the dwarves reaches you here. Blind passages and black water have cut you off from the company.
+You catch a flash of pale eyes before the rest of him emerges from shadow, one hand on a boat, the other spread on the slick stones as if ready to spring.
+Gollum gives a thin smile. 'We knows a stranger when we smells one, yes. We talks first, perhaps.'
+He has not attacked yet, but every word feels like borrowed time. Speak carefully, and keep him talking.
+
+> ask gollum a riddle
+(1/3 · room: deep_dark_lake)
+Gollum paddles nearer, close enough now that you hear his breathing, and whispers 'If Baggins answers true, then Baggins may ask. If not, we eats him, yes.' Gollum hisses 'It comes first on little cat feet, and swallows torchlight, stars, and moon. What is it, eh?'
+
+> answer toaster
+(2/3 · room: deep_dark_lake)
+A low hiss leaks out of Gollum, thin and eager. 'No more mistakes now. The next false word ends the game, precious. Answer true, or not at all.' Gollum hisses 'It comes first on little cat feet, and swallows torchlight, stars, and moon. What is it, eh?'
+A drip falls somewhere beyond sight, then another, and the dark seems to listen to the sound of its own water.
+
+> answer toaster
+(3/3 · room: deep_dark_lake)
+Gollum's pale eyes flare with hunger. 'Wrong, precious. Wrong!' He springs from the boat and falls on you in the dark.
+Gollum catches you in the dark.
+So ends this thread of the tale. You have mastered 23.13% of this adventure.
+Type 'load' to open your safe moments in Deep Dark Lake, or 'restart' to begin the tale again.
+
+[final]
+room=deep_dark_lake
+commands=ask gollum a riddle -> answer toaster -> answer toaster

@@ -1772,7 +1772,11 @@
   const CONTEXTUAL_COMPANION_COMMENT_RULES = [
     {
       onceFlag: "stingremarked",
-      when: ({ game }) => game.player.inventory.some((itemId) => matches(game.items[itemId]?.name, "short strong dagger")),
+      when: ({ game, chapter }) => {
+        if (!game.player.inventory.some((itemId) => matches(game.items[itemId]?.name, "short strong dagger"))) return false;
+        if (!game.visitedRooms?.has("trolls_cave")) return false;
+        return ["bag_end", "shire", "journey"].includes(chapter);
+      },
       text: "Balin glances at your elvish blade and says 'A better knife than any pantry would usually require, Master Baggins.'",
     },
     {
@@ -10317,7 +10321,9 @@
       game.pendingEndgameChoice = options.fatal ? "death" : null;
       const totalRooms = Math.max(Object.keys(game.rooms).length, 1);
       const percentage = (game.visitedRooms.size / totalRooms) * 100;
-      const endMessage = message ? message.replace(/[.!?]*$/, ".") : "Your road ends here.";
+      let endMessage = message ? String(message) : "Your road ends here.";
+      endMessage = endMessage.replace(/([.!?])[234]+$/g, "$1");
+      endMessage = endMessage.replace(/[.!?]+$/, ".");
       const deathImage = options.fatal ? game.resolveFatalEndgameImage(endMessage, options) : "";
       if (deathImage) game.showTemporaryImage(deathImage, { alt: "Death scene", dismissOnNextCommand: false });
       game.print(endMessage, "danger");
@@ -14580,6 +14586,8 @@
       const text = normalize(topic);
       if (!text) return "the matter";
       if (text.startsWith("if ")) return `whether ${text.slice(3)}`;
+      if (["journey", "map", "quest", "road", "treasure", "dragon"].includes(text)) return `the ${text}`;
+      if (text.startsWith("the ") || text.startsWith("your ") || text.startsWith("my ")) return text;
       return text;
     }
 
@@ -16256,7 +16264,8 @@
       if (["hobbit_hole", "bilbos_garden"].includes(roomId)) return "bag_end";
       if (IMMERSION_SHIRE_ROOMS.has(roomId)) return "shire";
       if (["green_dragon_inn", "green_dragon_inn_outside"].includes(roomId)) return "green_dragon";
-      if (["trolls_clearing", "hidden_path", "trolls_cave", "trollshaws_road", "hidden_valley_path"].includes(roomId)) return "trolls";
+      if (["trolls_clearing", "hidden_path", "trolls_cave", "trollshaws_road"].includes(roomId)) return "trolls";
+      if (roomId === "hidden_valley_path") return "rivendell";
       if (roomId === "rivendell") return "rivendell";
       if (
         ["misty_mountain", "narrow_place", "large_dry_cave"].includes(roomId)
@@ -16322,10 +16331,16 @@
         };
       }
       if (this.autoplayHas("smoking pipe") && !this.flags.initiative_gandalf_pipe) {
-        return {
-          flag: "initiative_gandalf_pipe",
-          message: "Gandalf eyes the pipe and says 'A wizard never objects to a good pipe, though the road needs your courage more.'",
-        };
+        const room = this.currentRoom;
+        const pipeAtHome = IMMERSION_BAG_END_ROOMS.has(room)
+          || IMMERSION_SHIRE_ROOMS.has(room)
+          || ["green_dragon_inn", "green_dragon_inn_outside", "dreary"].includes(room);
+        if (pipeAtHome) {
+          return {
+            flag: "initiative_gandalf_pipe",
+            message: "Gandalf eyes the pipe and says 'A wizard never objects to a good pipe, though the road needs your courage more.'",
+          };
+        }
       }
       return this.gandalfAmbientInitiative();
     }
@@ -17703,7 +17718,7 @@
       this.drainMirkwoodEnergy(1, "The rescue is hard, breathless work in choking silk.");
       this.print(
         bladeReady
-          ? `With the ${tool.name}, you saw and slash through the clinging webs until at last the trapped dwarves can fight and stumble free.`
+          ? `With the ${tool.name}, you saw and slashed through the clinging webs until at last the trapped dwarves can fight and stumble free.`
           : "By stubborn force alone, you tear enough of the webbing apart to drag the trapped dwarves free."
       );
       return true;
@@ -17836,7 +17851,14 @@
         if (
           character.id === this.data.player
           && this.currentRoom === "deep_dark_lake"
-          && this.gollumState?.awaitingPlayerRiddle
+          && (
+            this.gollumState?.awaitingPlayerRiddle
+            || (
+              this.gollumState?.pocketQuestionAsked
+              && this.gollumState?.enraged
+              && !this.gollumState?.escaped
+            )
+          )
           && this.isGollumPresentInLake()
         ) {
           this.print(this.encounters.gollumRingExpiryDeath(), "danger");

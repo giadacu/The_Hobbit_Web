@@ -1,0 +1,94 @@
+IN MIRKWOOD -> OUT OF MIRKWOOD
+Variant: 1 · Autoplay ottimale
+Seed: 1
+Success: yes
+Start room: mirkwood_forest_path
+Final room: elvish_clearing
+Steps: 15
+
+[setup]
+You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions. To the east there is the round green door. The round green door is closed. You see: a heavy wooden chest reinforced with iron bands, a stout wooden dresser with brass handles, an elegant lamp with intricate engravings, a stack of aged parchment, a dark glass inkwell, a velvety, plush settee, a collection of well-loved books, a leather-bound old book, a beautifully crafted carpet with complex patterns, a regiment of polished pegs still enjoying a last quiet hour of order, a ceramic stand painted with little green leaves, a narrow console table with a polished top and a discreet little drawer. Gandalf waits by the round green door as though measuring the evening by expected knocks. Gandalf is carrying a curious map.
+Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.
+Jumped to Mirkwood.
+A black forest path runs under close-packed boughs where little light survives to touch the roots. The air is dry, stale, and old, and every turn seems just a little too like the last. Thorin carries his weariness like an insult, refusing to let the wood think it has mastered him. Ori walks with the careful reluctance of one who would gladly trade all these trees for a bare hillside. The path keeps on, but with so little change from root to root that memory begins to lose its grip on direction.
+Bofur says 'This wood could make a hungry dwarf long for plain honest rain and an open sky.'
+
+> north west
+(1/15 · room: forest_road)
+You are on the forest road beneath the eaves of Mirkwood. Thorin keeps close to the path, as though even a few careless steps might be too much invitation. The first stretch of road is plain enough, which somehow makes the dark beyond it seem all the more deliberate.
+Game saved.
+
+> north east
+(2/15 · room: gate_to_mirkwood)
+You are at the gate to Mirkwood, where the open lands fall behind and the first black boughs gather ahead with an unwelcoming patience. Thorin keeps his shoulders tight, as though expecting the wood itself to lean nearer. Fili watches the branches overhead with undisguised mistrust. Bofur waits a little apart with the restlessness of the road still on him. Behind you lies the open world; before you the forest waits with the patience of something that does not need to hurry.
+
+> east
+(3/15 · room: bewitched_gloomy_place)
+You are in a bewitched, gloomy place. The air is thick with a palpable sense of dread, and an unnatural fog clings to the ground, obscuring your view. Gnarled, twisted trees loom on the edges, their skeletal branches reaching out like grasping hands. The ground is damp and uneven, covered in a tangle of roots and fallen leaves. Strange, whispering voices seem to emanate from the shadows, weaving a chilling, incomprehensible murmur. Oin looks as if he would rather face open weather than another mile of this black wood. Bifur listens with a frown, as though the forest had been whispering just below the edge of sense. Thorin is nearby as well. Nothing here looks chosen; everything looks suffered.
+
+> east
+(4/15 · room: west_bank)
+You are at the west bank of the Black River. The river is shrouded in gloom, where dark waters flow silently under a brooding sky. Gnarled trees with twisted roots line the muddy shore, their branches reaching out like skeletal fingers. The air is thick with mist and the scent of damp earth, creating an atmosphere of somber stillness. You see: the fast black river with its dark waters, flowing silently and shrouded in gloom. Thorin keeps his shoulders tight, as though expecting the wood itself to lean nearer. At the riverbank the wood draws back a little, only to leave you in the company of darker water and poorer choices.
+Game saved.
+Thorin says 'A boat across the water is near enough to tempt a rope, if the hand is bold.'
+
+> look across river
+(5/15 · room: west_bank)
+You see the east bank of a black river.
+You see: the wooden boat.
+
+> throw rope across river
+(6/15 · room: west_bank)
+You throw the rope across the fast black river.
+It sails across and lands in the boat.
+
+> pull rope
+(7/15 · room: west_bank)
+You pull the rope.
+The boat glides across the river and lands on this side.
+
+> climb into boat
+(8/15 · room: east_bank)
+You climb into the wooden boat.
+With a lurch the boat glides across the river and lands on the other side.
+You are at the east bank of the Black River. The river is cloaked in shadows, where the dark waters glide past silently. Towering, ancient trees with thick, intertwining branches stand guard, their leaves whispering in the wind. The ground is soft and damp, covered in a layer of mist, exuding an air of quiet mystery and foreboding. Thorin holds himself with grim pride, as if yielding even to discomfort would be a kind of surrender to the forest. Bifur keeps close to the path, as though even a few careless steps might be too much invitation. Nori waits a little apart with the restlessness of the road still on him. Hunger, weariness, and the sameness of the trees make it hard to believe in straight roads.
+
+> east
+(9/15 · room: green_forest)
+You are in a green forest. The forest is a vibrant tapestry of life, where sunlight filters through the dense canopy, casting a golden glow on the lush undergrowth. Tall trees stand proudly, their leaves rustling in the gentle breeze. The air is filled with the scent of wildflowers and the sounds of chirping birds, creating a serene and enchanting sanctuary. You see: a thick spider web blocking the path. Thorin moves like someone afraid the trees may be listening. Ori wears the hungry road like an insult he means to outlast. The green wood ahead feels almost kindly after the black road, though the memory of Mirkwood has not left your nerves yet.
+Bofur says 'This wood could make a hungry dwarf long for plain honest rain and an open sky.'
+
+> break web with sword
+(10/15 · room: green_forest)
+You strike the spider web. The spider web breaks into pieces.
+
+> north east
+(11/15 · room: place_of_black_spiders)
+You are in a Place of Black Spiders, an eerie realm where darkness prevails. Enormous webs stretch between ancient, gnarled trees, their silken strands glistening with dew. The air is thick and musty, filled with the sound of skittering legs. Shadows lurk in every corner, and the atmosphere is tense with the constant presence of unseen dangers. You see: a thick spider web blocking the path. Thorin moves with the grim patience of one who knows that webs are only the visible part of the trap. Gloin looks about with open disgust, as if even Mirkwood had managed to become fouler than before. Bombur is nearby as well. The branches seem tied together by old malice, and the whole place has the feel of a trap long practiced in its work.
+The road through Mirkwood takes its due from you. Mirkwood energy: 4.
+Game saved.
+
+> help dwarves
+(12/15 · room: place_of_black_spiders)
+The rescue is hard, breathless work in choking silk. Mirkwood energy: 3.
+With the short strong dagger, you saw and slash through the clinging webs until at last the trapped dwarves can fight and stumble free.
+
+> break web with sword
+(13/15 · room: place_of_black_spiders)
+You strike the spider web. The spider web breaks into pieces.
+
+> wear ring
+(14/15 · room: place_of_black_spiders)
+You wear the golden ring and become unnoticeable.
+High in the webbed dark, a dry clicking starts and stops, like many little thoughts agreeing on hunger.
+
+> north
+(15/15 · room: elvish_clearing)
+A green wood opens here after the black oppression of Mirkwood, and the very air seems lighter for it. Yet the place is not unwatched: there is order in the trees, secrecy in the paths, and the sense that unseen eyes have long known you were coming. A wood elf is here.
+The wood elf cannot see you because you are wearing the ring.
+The wood elf looks around, puzzled, unable to see who is there.
+Laughter from a distant feast brushes the stone and fades into the flowing dark of the underground ways.
+
+[final]
+room=elvish_clearing
+commands=north west -> north east -> east -> east -> look across river -> throw rope across river -> pull rope -> climb into boat -> east -> break web with sword -> north east -> help dwarves -> break web with sword -> wear ring -> north

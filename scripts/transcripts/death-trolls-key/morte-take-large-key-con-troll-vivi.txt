@@ -1,0 +1,46 @@
+DEATH · Trolls at Clearing (large key)
+Variant: Morte · take large key con troll vivi
+Seed: 1
+Success: yes
+Start room: dreary
+Final room: trolls_clearing
+Steps: 2
+Outcome: fatal death
+Death choice: death
+Outcome code: death_troll
+Death image: troll_catches_bilbo_stealing_key_death.png
+
+[setup]
+You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions. To the east there is the round green door. The round green door is closed. You see: a heavy wooden chest reinforced with iron bands, a stout wooden dresser with brass handles, an elegant lamp with intricate engravings, a stack of aged parchment, a dark glass inkwell, a velvety, plush settee, a collection of well-loved books, a leather-bound old book, a beautifully crafted carpet with complex patterns, a regiment of polished pegs still enjoying a last quiet hour of order, a ceramic stand painted with little green leaves, a narrow console table with a polished top and a discreet little drawer. Gandalf waits by the round green door as though measuring the evening by expected knocks. Gandalf is carrying a curious map.
+Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.
+Jumped to Troll Approach.
+You are in a gloomy empty land with dreary hills ahead. Shadows cling to the barren earth, where withered grass and ancient stones lie scattered. The hills rise ominously, their somber peaks shrouded in mist, whispering secrets of old. The air is heavy with forgotten tales, and a pervasive melancholy hangs over the desolate landscape. Thorin studies the road ahead. Dwalin rests with pack still within arm's reach. Balin keeps a wary eye on the country round about. Fili, Kili, Dori, Nori, Ori, Bifur, Bombur, and Gandalf are nearby as well.
+Gandalf eyes the pipe and says 'A wizard never objects to a good pipe, though the road needs your courage more.'
+
+> north
+(1/2 · room: trolls_clearing)
+You are in the trolls' clearing. Ancient trees encircle the open space, their branches forming a natural canopy overhead. The ground is covered in soft moss, interspersed with large, flat rocks. Scattered around the clearing are various makeshift shelters and a large fire pit, its embers still glowing faintly. Thorin rests with pack still within arm's reach. Balin keeps a wary eye on the country round about. Dori studies the road ahead. Nori, Ori, Oin, Bifur, and Gandalf are nearby as well.
+Hideous troll is here. He is carrying a large key.
+Vicious troll is here.
+Game saved.
+You crouch low behind a mossy boulder, heart pounding, as the trolls argue by the flickering campfire in the moonlit clearing.
+For a moment the firelight shows only vast shoulders, lurching shadows, and heavy arms striking the night air as the quarrel rises and falls.
+Gandalf says 'Stupidity leaves heavy footprints, and trolls are generous with both.'
+A troll sniffs the air and peers into the dark beyond the fire. This is no safe place to linger: one more false move and the whole clearing may be on you.
+
+> take large key
+(2/2 · room: trolls_clearing)
+As the fire flares brighter, the whole ugly business comes clear at last: one of the trolls has already caught a dwarf and is brandishing him like the beginning of supper.
+What shall us do with him?
+Roast him!
+He wouldn't make above a mouthful.
+P'raps there are more like him round about.
+Game saved.
+You emerge from hiding and reach for the large key.
+With a guttural roar the troll pounces, and your adventure ends in its grasp before the others even stop laughing.
+So ends this thread of the tale. You have mastered 6.72% of this adventure.
+Type 'load' to open your safe moments in Trolls Clearing, or 'restart' to begin the tale again.
+
+[final]
+room=trolls_clearing
+commands=north -> take large key

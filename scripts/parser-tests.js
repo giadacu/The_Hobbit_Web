@@ -1348,7 +1348,7 @@ const gameCases = [
   {
     name: "ask about topic defaults to sole visible character",
     inputs: ["ask about the treasure"],
-    expectedIncluded: ["Gandalf considers treasure, but gives no clear answer."],
+    expectedIncluded: ["Gandalf considers the treasure, but gives no clear answer."],
     notExpectedIncluded: ["Use: ask [character] for [item], or ask [character] to [command]."],
   },
   {
@@ -1866,7 +1866,7 @@ const gameCases = [
   {
     name: "talk to gandalf about treasure works naturally",
     inputs: ["talk to gandalf about treasure"],
-    expectedIncluded: ["Gandalf considers treasure, but gives no clear answer."],
+    expectedIncluded: ["Gandalf considers the treasure, but gives no clear answer."],
     notExpectedIncluded: ["Gandalf listens intently, expecting your words."],
   },
   {
@@ -4798,6 +4798,56 @@ const gameCases = [
     ],
   },
   {
+    name: "hidden valley path uses Rivendell Gandalf ambient, not troll banter",
+    drive(game) {
+      game.print(`Hidden valley ambient key: ${game.gandalfAmbientKeyForRoom("hidden_valley_path")}`);
+    },
+    expectedIncluded: [
+      "Hidden valley ambient key: rivendell",
+    ],
+  },
+  {
+    name: "gandalf pipe initiative stays off the goblin tunnels",
+    drive(game) {
+      game.execute("jump gollum");
+      outputLines.length = 0;
+      game.flags.initiative_gandalf_pipe = false;
+      game.advanceCharacterTurn();
+      game.print(`Pipe line in lake: ${outputLines.some((line) => line.includes("A wizard never objects to a good pipe")) ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Pipe line in lake: no",
+    ],
+  },
+  {
+    name: "Balin sting remark waits until the troll-cave chapter, not Lake-town",
+    drive(game) {
+      game.execute("jump laketown");
+      game.visitedRooms.add("trolls_cave");
+      game.flags.stingremarked = false;
+      const dagger = game.items.short_strong_dagger;
+      if (dagger && !game.player.inventory.includes(dagger.id)) game.player.inventory.push(dagger.id);
+      outputLines.length = 0;
+      game.companionDirector.maybeComment();
+      game.print(`Sting remark at lake: ${outputLines.some((line) => line.includes("better knife than any pantry")) ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Sting remark at lake: no",
+    ],
+  },
+  {
+    name: "asking Elrond about the journey uses a natural topic phrase",
+    drive(game) {
+      game.execute("jump rivendell");
+      game.flags.rivendell_progress_talk = true;
+      game.execute("ask elrond about journey");
+      game.print(`Journey topic line: ${outputLines.find((line) => line.includes("considers")) || "none"}`);
+    },
+    expectedIncluded: [
+      "Journey topic line: Elrond considers the journey, but gives no clear answer.",
+    ],
+  },
+  {
     name: "jump trolls does not trigger Gandalf's Bag End map line on the road",
     drive(game) {
       game.execute("jump trolls");
@@ -7688,7 +7738,7 @@ const gameCases = [
       game.print(`Mirkwood dwarves freed: ${game.flags.mirkwooddwarvesfreed ? "yes" : "no"}`);
     },
     expectedIncluded: [
-      "With the short strong dagger, you saw and slash through the clinging webs until at last the trapped dwarves can fight and stumble free.",
+      "With the short strong dagger, you saw and slashed through the clinging webs until at last the trapped dwarves can fight and stumble free.",
       "Mirkwood dwarves freed: yes",
     ],
   },
@@ -8067,7 +8117,7 @@ const gameCases = [
       game.print(`Pocket wait death image: ${game.temporaryImage?.file || "none"}`);
     },
     expectedIncluded: [
-      /Gollum .*?(grapple|advantage|dark)/,
+      /Gollum .*?(grapple|advantage|dark|hurls)/,
       "Pocket wait endgame: yes",
       "Pocket wait room: deep_dark_lake",
       "Pocket wait death image: gollum_wrong_answer_to_riddle_death.png",

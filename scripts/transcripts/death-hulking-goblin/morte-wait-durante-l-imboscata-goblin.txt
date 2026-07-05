@@ -1,0 +1,51 @@
+DEATH · Hulking Goblin Ambush
+Variant: Morte · wait durante l'imboscata goblin
+Seed: 1
+Success: yes
+Start room: dark_stuffy_passage_14
+Final room: dark_stuffy_passage_14
+Steps: 4
+Outcome: fatal death
+Death choice: death
+Outcome code: death_goblin
+Death image: hulking_goblin_attack_death.png
+
+[setup]
+You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions. To the east there is the round green door. The round green door is closed. You see: a heavy wooden chest reinforced with iron bands, a stout wooden dresser with brass handles, an elegant lamp with intricate engravings, a stack of aged parchment, a dark glass inkwell, a velvety, plush settee, a collection of well-loved books, a leather-bound old book, a beautifully crafted carpet with complex patterns, a regiment of polished pegs still enjoying a last quiet hour of order, a ceramic stand painted with little green leaves, a narrow console table with a polished top and a discreet little drawer. Gandalf waits by the round green door as though measuring the evening by expected knocks. Gandalf is carrying a curious map.
+Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.
+Jumped to Rivendell.
+You are in the heart of Rivendell, where carved stone, running water, and old trees are woven together so gently that no hand seems to dominate the place. Light falls softly through leaves and arches alike, and song lingers even when no singer is near. Thorin studies the elvish work with open respect. Dwalin listens in spite of himself for distant song. Balin looks more rested here than on the open road. Fili, Kili, Nori, Ori, Bifur, Bombur, and Gandalf are nearby as well. Elrond is here. He is carrying a gold necklace.
+Gandalf says 'In Rivendell even burdens grow lighter, though none are quite forgotten.'
+Elrond says 'You have brought more into this house than road-dust and weariness. Some things should be looked on before you depart.'
+Game saved.
+A hulking goblin drops out of a crack above and crashes into the company before anyone can shout warning.
+Thorin goes down under it with a cry, pinned in the foul dark while the brute hacks and claws for the kill.
+The thing is too strong to bring down in one rush. Bilbo must join the attack, and at least one companion must strike with him.
+
+> look
+(1/4 · room: dark_stuffy_passage_14)
+It is pitch dark here. You cannot see the room, its exits, or anything else. You can only feel your way and move by guesswork.
+
+> wait
+(2/4 · room: dark_stuffy_passage_14)
+You wait.
+Time passes...
+Thorin is still trapped beneath the brute, and the narrow tunnel gives no time for hesitation.
+
+> wait
+(3/4 · room: dark_stuffy_passage_14)
+You wait.
+Time passes...
+The hulking goblin bears Thorin hard against the stones, snarling for the throat. One more heartbeat of delay will be too late.
+
+> wait
+(4/4 · room: dark_stuffy_passage_14)
+You wait.
+Time passes...
+The hulking goblin butchers Thorin before you can tear it loose, and the cries that follow bring more goblins out of the dark. The tunnels close over the whole company.
+So ends this thread of the tale. You have mastered 14.93% of this adventure.
+Type 'load' to open your safe moments in Dark Stuffy Passage 14, or 'restart' to begin the tale again.
+
+[final]
+room=dark_stuffy_passage_14
+commands=look -> wait -> wait -> wait

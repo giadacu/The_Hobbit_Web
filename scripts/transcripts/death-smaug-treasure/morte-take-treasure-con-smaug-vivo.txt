@@ -1,0 +1,57 @@
+DEATH · Smaug in Lower Halls (treasure)
+Variant: Morte · take treasure con Smaug vivo
+Seed: 1
+Success: yes
+Start room: lower_halls
+Final room: lower_halls
+Steps: 6
+Outcome: fatal death
+Death choice: death
+Outcome code: death_smaug
+Death image: smaug_incinirates_bilbo_lower_halls_death.png
+
+[setup]
+You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions. To the east there is the round green door. The round green door is closed. You see: a heavy wooden chest reinforced with iron bands, a stout wooden dresser with brass handles, an elegant lamp with intricate engravings, a stack of aged parchment, a dark glass inkwell, a velvety, plush settee, a collection of well-loved books, a leather-bound old book, a beautifully crafted carpet with complex patterns, a regiment of polished pegs still enjoying a last quiet hour of order, a ceramic stand painted with little green leaves, a narrow console table with a polished top and a discreet little drawer. Gandalf waits by the round green door as though measuring the evening by expected knocks. Gandalf is carrying a curious map.
+Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.
+Jumped to Smaug.
+You enter the lower halls of Erebor, a mighty chamber of pillars, carvings, and treasure under the Mountain's ancient stone. The air is warm, close, and faintly tainted by dragon-smoke, while every footfall seems an impertinence in a kingdom too old to forget itself. You see: a gilded vault, adorned with intricate designs of ancient craftmanship, the treasure of Smaug. Bard waits beyond the deeper passages, watching and listening. Smaug lies upon the treasure like a fallen hill of red-gold scale and coiled ruin, his breath moving the nearest coins in slow glittering tides. Bard is carrying a bow, a strong arrow, a quiver.
+A red golden dragon is here.
+Smaug stirs, one vast lid lifting over a watchful eye.
+
+> wear ring
+(1/6 · room: lower_halls)
+You wear the golden ring and become unnoticeable.
+Bard looks around, puzzled, unable to see who is there.
+Smaug's voice rolls through the hall, soft and terrible, as he begins to suspect an intruder.
+From somewhere in the old stone comes a dull settling sound, as though the Mountain remembered its own vast weight.
+
+> drop majestic sword
+(2/6 · room: lower_halls)
+You leave the majestic sword.
+
+> drop sturdy rope
+(3/6 · room: lower_halls)
+You leave the sturdy rope.
+
+> drop brass lantern
+(4/6 · room: lower_halls)
+You leave the brass lantern.
+
+> take treasure
+(5/6 · room: lower_halls)
+You take the treasure.
+The golden ring slips off your finger and falls back into your pocket.
+Smaug's patience breaks. Rage shakes the treasure as the dragon lashes the chamber with tail and voice.
+
+> wait
+(6/6 · room: lower_halls)
+You wait.
+Time passes...
+The red golden dragon comes on in a rush, clawing and striking at you with savage force. Weariness is already in the limbs, and the work is no longer easy. The red golden dragon presses the advantage with hot fury. You collapse at last, and the fight is done. The sound rings through the old stonework and seems for a moment to wake the mountain's memory.
+So ends this thread of the tale. You have mastered 47.76% of this adventure.
+Type 'restart' to begin the tale again.
+Dust stirs over ancient carvings, and for an instant the air seems warmer, touched by the memory of dragon-fire.
+
+[final]
+room=lower_halls
+commands=wear ring -> drop majestic sword -> drop sturdy rope -> drop brass lantern -> take treasure -> wait

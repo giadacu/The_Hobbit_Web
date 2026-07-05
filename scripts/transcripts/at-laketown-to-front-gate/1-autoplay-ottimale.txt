@@ -1,0 +1,49 @@
+AT LAKE-TOWN -> FRONT GATE
+Variant: 1 · Autoplay ottimale
+Seed: 1
+Success: yes
+Start room: wooden_town
+Final room: front_gate
+Steps: 7
+
+[setup]
+You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions. To the east there is the round green door. The round green door is closed. You see: a heavy wooden chest reinforced with iron bands, a stout wooden dresser with brass handles, an elegant lamp with intricate engravings, a stack of aged parchment, a dark glass inkwell, a velvety, plush settee, a collection of well-loved books, a leather-bound old book, a beautifully crafted carpet with complex patterns, a regiment of polished pegs still enjoying a last quiet hour of order, a ceramic stand painted with little green leaves, a narrow console table with a polished top and a discreet little drawer. Gandalf waits by the round green door as though measuring the evening by expected knocks. Gandalf is carrying a curious map.
+Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.
+Jumped to Lake-town.
+You are in Lake-town, where wet planks, boat-ropes, and curious faces surround the long labor of a town built upon dark water. Word of bedraggled strangers out of the river has run ahead of you, and the place now feels full of shrewd questions, rough hospitality, and a watchfulness that turns naturally toward the Mountain. Thorin watches the water and the people with equal suspicion. Dwalin seems steadier for the sound of human trade and labor. Balin keeps his cloak close in the lake-wind. Ori, Oin, and Bard linger a little apart. Bard is carrying a bow, a strong arrow, a quiver.
+Bard says 'Some roads should not be walked without a bow at your side.'
+The smell of tar, fish, wet rope, and cookfires hangs over the walkways in a busy human cloud.
+
+> ask bard to follow me
+(1/7 · room: wooden_town)
+Bard follows you as closely as possible.
+
+> say to bard "get strong arrow from quiver"
+(2/7 · room: wooden_town)
+Bard readies the strong arrow from his quiver.
+
+> north
+(3/7 · room: long_lake)
+You are at Long Lake, that stretches out like a shimmering ribbon of silver under the open sky. Dwalin studies the lake and distant town with a wary, measuring look. Ori looks as though the nearness of the Mountain matters more than the town below. Bard keeps his bow near and listens for bad news over the water. Bard is carrying a bow, a strong arrow, a quiver.
+
+> north
+(4/7 · room: strong_river)
+You stand at the edge of a strong river, its waters surging with an unstoppable force. The current roars loudly, creating swirling eddies and waves that crash against the rocky banks. The river's strength is palpable, a relentless torrent that carries debris swiftly downstream. The air is filled with the cool, misty spray, and the sound of rushing water drowns out all other noise. Dwalin studies the road ahead. Ori rests with pack still within arm's reach. Bard keeps his bow near and listens for bad news over the water. Bard is carrying a bow, a strong arrow, a quiver.
+
+> up
+(5/7 · room: bleak_barren_land)
+You find yourself on the edge of a bleak, barren land. The ground is cracked and dry, devoid of any vegetation. The air is heavy with the scent of dust and decay. Sparse, jagged rocks jut out from the earth, casting long shadows in the dim light. The landscape stretches out endlessly, a desolate expanse where the wind howls mournfully, carrying with it a sense of isolation and desolation. There is no sign of life, only the stark, unforgiving beauty of a land untouched by time. Thorin keeps his cloak close against the open wind off the water. Dwalin studies the lake and distant town with a wary, measuring look. Kili looks as though the nearness of the Mountain matters more than the town below. Ori, Bifur, and Bard are nearby as well. Bard is carrying a bow, a strong arrow, a quiver.
+
+> north
+(6/7 · room: ruins_of_the_town_of_dale)
+You stand amidst the ruins of the once-great town of Dale. Broken walls and crumbling towers rise from the bleak, barren land, silent witnesses to the town's former glory. The streets are littered with debris, overgrown with weeds and twisted vines. The charred remains of wooden houses and market stalls tell tales of a fierce, devastating battle. The air is thick with the scent of ash and decay. A sense of sorrow and lost grandeur permeates the atmosphere, as you navigate through the remnants of a proud civilization, now reduced to rubble and memories. Dwalin keeps his cloak close against the open wind off the water. Kili looks as though the nearness of the Mountain matters more than the town below. Ori studies the lake and distant town with a wary, measuring look. Bifur and Bard linger a little apart. Bard is carrying a bow, a strong arrow, a quiver.
+
+> north
+(7/7 · room: front_gate)
+You stand before the Front Gate of Erebor. Vast stonework and weathered carvings still command awe here, but the enormous entrance stands silent, sealed by age, ruin, and shadow. Whatever welcome it once gave, it gives none now. Thorin has little attention left for anything but the halls ahead. Dwalin runs a hand absently over old stone as if greeting kin. Balin stares toward the Mountain's depths with a hunger older than the journey. Fili, Dori, Nori, Ori, Oin, Gloin, Bifur, Bofur, and Bard are nearby as well. Bard is carrying a bow, a strong arrow, a quiver.
+Game saved.
+Bard tests his bowstring and says 'A bowman likes to know his moment before the sky darkens.'
+
+[final]
+room=front_gate
+commands=ask bard to follow me -> say to bard "get strong arrow from quiver" -> north -> north -> up -> north -> north

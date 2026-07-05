@@ -1,0 +1,123 @@
+AT BEORN -> OUT OF MIRKWOOD
+Variant: 1 · Sentiero forestale (forest road)
+Seed: 1
+Success: yes
+Start room: beorns_house
+Final room: elvenkings_halls
+Steps: 19
+Forest path visited: yes
+West bank visited: no
+
+[setup]
+You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions. To the east there is the round green door. The round green door is closed. You see: a heavy wooden chest reinforced with iron bands, a stout wooden dresser with brass handles, an elegant lamp with intricate engravings, a stack of aged parchment, a dark glass inkwell, a velvety, plush settee, a collection of well-loved books, a leather-bound old book, a beautifully crafted carpet with complex patterns, a regiment of polished pegs still enjoying a last quiet hour of order, a ceramic stand painted with little green leaves, a narrow console table with a polished top and a discreet little drawer. Gandalf waits by the round green door as though measuring the evening by expected knocks. Gandalf is carrying a curious map.
+Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.
+Jumped to Beorn's House.
+You are in Beorn's great house, built broad and strong of timber, with a central fire, long tables, and the scent of bread, honey, and clean straw. Everything is orderly, sturdy, and touched by the curious discipline of a household in which beasts and men alike keep good manners. You see: a heavy curtain. Thorin glances often toward the yard and its disciplined beasts. Dwalin seems impressed by the strength of the house. Balin watches the door with road-bred caution. Fili, Kili, Dori, Ori, Oin, Gloin, Bifur, Bofur, and Gandalf are nearby as well. Beorn is here.
+Before long the uncanny order of Beorn's house declares itself more plainly: great dogs pad in on their hind legs with trays, while sheep and horses move about the yard and door with the grave purpose of servants that know their business.
+Beorn gives no explanation worth calling one. Yet the board is soon spread with bread, honey, cream, and a prodigious supper, and for a while the whole house feels less strange than magnificently, stubbornly hospitable.
+Gandalf says 'Beorn's hospitality is a strong roof, but it is best not to test its beams.'
+Beorn says 'Keep to the path. Drink no water that runs black under the wood. Follow no lights, however fair they seem.'
+
+> open curtain
+(1/19 · room: beorns_house)
+You open the curtain.
+Beorn adds 'Trust your own bottle before any stream under those boughs.'
+The scent of warm bread, honey, and clean straw drifts through Beorn's stead like a promise of shelter honestly won.
+
+> open cupboard
+(2/19 · room: beorns_house)
+You open the cupboard.
+Beorn says 'And if the wood offers lights and laughter, keep your feet and let your hunger complain.'
+
+> examine cupboard
+(3/19 · room: beorns_house)
+You see a large cupboard set into the wall behind the curtain; inside is a delicious meal.
+
+> take meal
+(4/19 · room: beorns_house)
+You take the meal from the cupboard.
+Beorn eyes your weariness and says 'A hungry traveler thinks poorly. There is food in this house, if you have the sense to look for it.'
+
+> eat meal
+(5/19 · room: beorns_house)
+You eat the meal and gain strength.
+Beorn says 'Eat while food is before you, and speak plainly while peace still lasts.'
+
+> north
+(6/19 · room: great_river)
+You are at the Great River, broad and cold under a wide unsettled sky. Thorin watches the river and the banks with a traveller's respect. Dwalin keeps an eye on the wild land round about as though expecting movement. Balin seems relieved to be in open country again. Fili, Kili, Nori, Oin, Gloin, Bifur, Bofur, Bombur, and Gandalf wait a little apart, keeping the quiet fellowship of the road.
+Gandalf says 'When the wood grows silent, pay closer attention, not less.'
+
+> east
+(7/19 · room: gate_to_mirkwood)
+You are at the gate to Mirkwood, where the open lands fall behind and the first black boughs gather ahead with an unwelcoming patience. The air is colder under the trees, and the forest entrance looks less like a road than like a warning made practical. Thorin keeps his shoulders tight, as though expecting the wood itself to lean nearer. Ori glances often into the deeper dark between the trunks, unwilling to ignore what might be there. Even here at the threshold, the wood gives little welcome and less comfort.
+Bofur says 'This wood could make a hungry dwarf long for plain honest rain and an open sky.'
+
+> south
+(8/19 · room: forest_road)
+You are on the forest road beneath the eaves of Mirkwood. For a little while the way is still broad enough to seem trustworthy, but the trees already lean close and the light has begun to lose heart. Thorin keeps close to the path, as though even a few careless steps might be too much invitation. Kili listens with a frown, as though the forest had been whispering just below the edge of sense. The first stretch of road is plain enough, which somehow makes the dark beyond it seem all the more deliberate.
+Game saved.
+
+> south east
+(9/19 · room: mirkwood_forest_path)
+A black forest path runs under close-packed boughs where little light survives to touch the roots. The air is dry, stale, and old, and every turn seems just a little too like the last. Thorin holds himself with grim pride, as if yielding even to discomfort would be a kind of surrender to the forest. Kili walks with the careful reluctance of one who would gladly trade all these trees for a bare hillside. Fili waits a little apart with the restlessness of the road still on him. The path keeps on, but with so little change from root to root that memory begins to lose its grip on direction.
+The road through Mirkwood takes its due from you. Mirkwood energy: 4.
+
+> east
+(10/19 · room: mirkwood_dark_glade)
+A dim glade opens unexpectedly beneath the trees, though it offers no comfort. The silence is wrong, the moss is too soft, and even the shafts of light that reach the ground seem unwilling to stay. You see: a leaning stone mottled with black moss and older unease. Thorin looks as though hunger has only sharpened his impatience with every black mile of the road. Nori watches the dim glade with the suspicion one gives a silence too complete to be innocent. Dwalin waits a little apart with the restlessness of the road still on him. This glade offers space without relief, and the open patch feels less like mercy than a pause in being watched.
+The road through Mirkwood takes its due from you. Mirkwood energy: 3.
+
+> east
+(11/19 · room: mirkwood_enchanted_stream)
+A narrow dark stream winds through the wood, clear enough to tempt the thirsty and strange enough to warn the wise. It runs without song, as though afraid of being overheard. You see: slick stones half swallowed by the dark stream. Oin watches the dark current like one expecting it to offer a bargain not worth the price. Bifur studies the stream with the look of someone trying hard not to imagine how good the water might taste. Thorin and Nori linger a little apart. The road is still manageable, but only by the sort of attention that grows costly after too many dark miles.
+The road through Mirkwood takes its due from you. Mirkwood energy: 2.
+Game saved.
+
+> north
+(12/19 · room: mirkwood_fallen_tree_crossing)
+A mighty trunk has fallen across a murky runnel, making a crossing too narrow for comfort and too useful to ignore. Bark peels from it in long strips like weathered skin. You see: a broken snag jutting up beside the makeshift crossing. Thorin holds himself with grim pride, as if yielding even to discomfort would be a kind of surrender to the forest. Ori looks at the dark runnel below with the flat dislike reserved for places where slipping would be memorable. Kili waits a little apart with the restlessness of the road still on him. You can still master yourself, though not without feeling how much of your strength the wood has already claimed.
+The road through Mirkwood takes its due from you. Mirkwood energy: 1.
+
+> east
+(13/19 · room: mirkwood_spider_grove)
+The trees here are curtained with webbing from branch to branch, so that the grove looks wrapped in old frost though the air is warm and foul. Cocoon-shapes hang among the trunks where no fruit should grow. You see: web-wrapped shapes hanging disturbingly from the branches, a pale swollen sac wrapped in gray silk. Thorin keeps glancing upward, unwilling to let the silk-dark above out of his notice even for a breath. Bombur keeps his weapon ready and his dislike plainer still at the sight of so much silk overhead. Dwalin, Balin, and Ori are close at hand. Every silk-strung gap between the trunks looks as though it may tremble into life if touched too boldly.
+A great spider is here.
+The road through Mirkwood takes its due from you. Mirkwood energy: 0.
+From among the hanging cocoons there comes a muffled dwarvish cry. Someone is webbed up here, and not for comfort.
+
+> north
+(14/19 · room: mirkwood_ruined_clearing)
+Broken stones and choked foundations lie in this clearing, half swallowed by root and fern. Whatever stood here belonged to another age, and the wood has taken it back with ill grace. You see: a broken altar or plinth of age-smoothed stone. Thorin carries his weariness like an insult, refusing to let the wood think it has mastered him. Bofur holds himself between hunger and caution, plainly trusting neither the ruin nor the promise beyond it. Your thoughts come more slowly here, as though the wood were taking a toll not only from your feet but from your judgment.
+A web-spinner is here.
+Beyond the broken stones, warm lights flicker for an instant, and with them comes the faintest promise of laughter and a feast.
+Game saved.
+The ruin seems briefly gentler when a flicker of golden light touches one stone and is gone again.
+Bofur says 'This wood could make a hungry dwarf long for plain honest rain and an open sky.'
+
+> east
+(15/19 · room: place_of_black_spiders)
+You are in a Place of Black Spiders, an eerie realm where darkness prevails. Enormous webs stretch between ancient, gnarled trees, their silken strands glistening with dew. The air is thick and musty, filled with the sound of skittering legs. Shadows lurk in every corner, and the atmosphere is tense with the constant presence of unseen dangers. You see: a thick spider web blocking the path. Thorin moves with the grim patience of one who knows that webs are only the visible part of the trap. Nori stands in the web-dark with the fierce stillness of someone refusing to yield another inch to spiders. Dwalin and Bifur are nearby as well. The branches seem tied together by old malice, and the whole place has the feel of a trap long practiced in its work.
+Game saved.
+
+> help dwarves
+(16/19 · room: place_of_black_spiders)
+With the short strong dagger, you saw and slash through the clinging webs until at last the trapped dwarves can fight and stumble free.
+
+> break web with sword
+(17/19 · room: place_of_black_spiders)
+You strike the spider web. The spider web breaks into pieces.
+
+> north
+(18/19 · room: elvish_clearing)
+A green wood opens here after the black oppression of Mirkwood, and the very air seems lighter for it. Yet the place is not unwatched: there is order in the trees, secrecy in the paths, and the sense that unseen eyes have long known you were coming. A wood elf is here.
+The wood elf watches you closely and says 'This wood listens more kindly to honest footsteps than to hurried tongues.'
+Water murmurs under the halls, and above it comes the clink of cups and the music of a people at ease in secrecy.
+
+> north east
+(19/19 · room: elvenkings_halls)
+You stand in the great halls of the Elvenking, where carved wood, lantern-light, and hidden strength meet in a beauty that does not trouble to be soft. The place is rich without waste, secret without confusion, and wholly under watch. To the east there is the rusty door. The rusty door is closed.
+
+[final]
+room=elvenkings_halls
+commands=open curtain -> open cupboard -> examine cupboard -> take meal -> eat meal -> north -> east -> south -> south east -> east -> east -> north -> east -> north -> east -> help dwarves -> break web with sword -> north -> north east
