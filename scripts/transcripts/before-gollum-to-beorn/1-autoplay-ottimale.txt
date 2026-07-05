@@ -11,7 +11,6 @@ You are in Bilbo's round front hall, warm with polished wood, brass pegs, and ma
 Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.
 Jumped to Deep Dark Lake.
 It is pitch dark here. You cannot see the room, its exits, or anything else. You can only feel your way and move by guesswork.
-A drip falls somewhere beyond sight, then another, and the dark seems to listen to the sound of its own water.
 Game saved.
 Groping beside the water in the dark, your fingers close around a small cold ring. Almost without thinking, you slip it into your pocket.
 No answering voice of Gandalf or the dwarves reaches you here. Blind passages and black water have cut you off from the company.
@@ -26,6 +25,7 @@ Gollum paddles nearer, close enough now that you hear his breathing, and whisper
 > answer dark
 (2/18 · room: deep_dark_lake)
 Gollum nods reluctantly. 'Right, precious. Right.' Gollum murmurs 'Thirty white horses on a red hill. First they champ, then they stamp, then they stand still. What are they, precious?'
+A drip falls somewhere beyond sight, then another, and the dark seems to listen to the sound of its own water.
 
 > answer teeth
 (3/18 · room: deep_dark_lake)
@@ -80,11 +80,11 @@ Farther on, Gollum's voice turns raw with panic. 'Baggins! Thief!' It is not so 
 
 > east
 (13/18 · room: inside_goblins_gate)
-You are inside Goblin's Gate. Dimly lit, moss-covered stone walls surround you. A central stone table holds trinkets and bones. Stalactites hang from the high ceiling, casting eerie shadows. A shadowy staircase winds upwards on the far side. The air is damp and cool. Thorin keeps close to the wall, breathing carefully. Fili moves with one hand on the rough stone, unwilling to trust the dark. Kili breathes shallowly, as though even sound might draw trouble. Dori, Oin, and Gandalf wait a little apart, keeping the quiet fellowship of the road.
+You are inside goblin's gate, in a damp pillared hall lit by sickly torchlight. Moss streaks the stone, a rough table holds bones and stolen trinkets, and a shadowy stair climbs upward into the goblins' deeper ways. Thorin keeps close to the wall, breathing carefully. Fili moves with one hand on the rough stone, unwilling to trust the dark. Kili breathes shallowly, as though even sound might draw trouble. Dori, Oin, and Gandalf wait a little apart, keeping the quiet fellowship of the road.
 
 > up
 (14/18 · room: outside_goblins_gate)
-You are outside goblin's gate. The gate itself is a towering, blackened structure of iron and stone, festooned with cruel spikes and adorned with the gruesome trophies of past conquests. It looms ominously over the entrance to the subterranean realm, its massive doors scarred and pitted from centuries of conflict. Flickering torches, their flames a sickly green, cast an eerie light on the surrounding rocks, casting long, menacing shadows. Thorin waits tensely in the dark. Dwalin listens for any stir ahead. Balin waits in the foul dark like one expecting the mountain itself to betray him. Nori, Oin, Gloin, Bifur, Bofur, Bombur, and Gandalf are close at hand.
+You are outside goblin's gate, where a blackened arch of iron and stone closes the mouth of the tunnels. Green torches burn with an unhealthy light, cruel spikes and old trophies mark the goblins' dominion, and the rock face above seems to lean outward as though listening. Thorin waits tensely in the dark. Dwalin listens for any stir ahead. Balin waits in the foul dark like one expecting the mountain itself to betray him. Nori, Oin, Gloin, Bifur, Bofur, Bombur, and Gandalf are close at hand.
 Behind the goblin gate his lament rises once more, thin with distance and yet so bitter that escape still does not feel like safety. Your own breath comes back harsh and uneven, and for a dreadful instant it sounds as though the tunnels are betraying you to him.
 
 > east

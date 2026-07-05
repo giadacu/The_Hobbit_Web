@@ -15,7 +15,6 @@ You are in Bilbo's round front hall, warm with polished wood, brass pegs, and ma
 Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.
 Jumped to Deep Dark Lake.
 It is pitch dark here. You cannot see the room, its exits, or anything else. You can only feel your way and move by guesswork.
-A drip falls somewhere beyond sight, then another, and the dark seems to listen to the sound of its own water.
 Game saved.
 Groping beside the water in the dark, your fingers close around a small cold ring. Almost without thinking, you slip it into your pocket.
 No answering voice of Gandalf or the dwarves reaches you here. Blind passages and black water have cut you off from the company.
@@ -30,6 +29,7 @@ Gollum paddles nearer, close enough now that you hear his breathing, and whisper
 > answer dark
 (2/5 · room: deep_dark_lake)
 Gollum nods reluctantly. 'Right, precious. Right.' Gollum murmurs 'Thirty white horses on a red hill. First they champ, then they stamp, then they stand still. What are they, precious?'
+A drip falls somewhere beyond sight, then another, and the dark seems to listen to the sound of its own water.
 
 > answer teeth
 (3/5 · room: deep_dark_lake)

@@ -9,9 +9,7 @@ Steps: 9
 [setup]
 You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions. To the east there is the round green door. The round green door is closed. You see: a heavy wooden chest reinforced with iron bands, a stout wooden dresser with brass handles, an elegant lamp with intricate engravings, a stack of aged parchment, a dark glass inkwell, a velvety, plush settee, a collection of well-loved books, a leather-bound old book, a beautifully crafted carpet with complex patterns, a regiment of polished pegs still enjoying a last quiet hour of order, a ceramic stand painted with little green leaves, a narrow console table with a polished top and a discreet little drawer. Gandalf waits by the round green door as though measuring the evening by expected knocks. Gandalf is carrying a curious map.
 Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.
-Jumped to Mirkwood.
-A black forest path runs under close-packed boughs where little light survives to touch the roots. The air is dry, stale, and old, and every turn seems just a little too like the last. Dori looks worn by hunger and bad light. Gloin keeps glancing back along the path as though mistrusting how quickly it disappears behind him. Thorin lingers a little apart. The black boughs turn distance into guesswork, and every yard ahead seems borrowed from the same meagre pattern.
-Bofur says 'This wood could make a hungry dwarf long for plain honest rain and an open sky.'
+You are in the cellar where the king keeps his barrels of wine. To the north east there is the red door. The red door is closed. Below there is the large trap door. The large trap door is closed. You see: a sturdy wooden barrel. Thorin studies the halls as though measuring chances of escape. Dwalin waits with dwarf patience and dwarf resentment. Balin keeps quiet under the eyes of the Elvenking's folk. Fili, Kili, Dori, Nori, Ori, Oin, Gloin, Bifur, Bofur, and Bombur wait a little apart, keeping the quiet fellowship of the road. A butler is here. He is carrying a red key.
 The king's feasting has told on the place below. From the upper halls come muffled laughter and the last wandering echoes of song, while in the cellar the air is heavy with spilled wine, wet wood, and the comfortable slackness of servants kept too long at a good table.
 Empty barrels stand ready by the running water, and the butler's vigilance has plainly been dulled by duty, fatigue, and a cup or two beyond strict necessity. If there is ever to be a moment for desperate barrel-work, it is near enough to this one.
 Every now and then the butler turns toward the stair or the casks and leaves some other corner unwatched for a heartbeat. Any barrel-work will have to be done in such stolen instants.
@@ -45,12 +43,12 @@ Black water hurries below the opening, shouldering past the piles and posts unde
 You wait.
 Time passes...
 The butler turns away toward the stair with a muttered complaint, leaving the trap door and the packed barrels unwatched for a precious moment.
-Water murmurs under the halls, and above it comes the clink of cups and the music of a people at ease in secrecy.
 
 > ask thorin to throw barrels through trap door
 (6/9 · room: cellar)
 Thorin moves when the butler's back is turned, and together you send the dwarves' barrels one by one through the open trap door into the black rush below.
 There is muffled outrage from inside more than one cask, but the river takes them all the same, and in a few heartbeats the miserable little fleet is away beneath the halls.
+Water murmurs under the halls, and above it comes the clink of cups and the music of a people at ease in secrecy.
 
 > wait
 (7/9 · room: cellar)
@@ -71,7 +69,6 @@ Then the barrel lurches upright under you, the current catches it cleanly, and B
 By the time the halls fall behind, you are drenched, breathless, clinging to slippery wood with both arms, but still afloat and borne onward at the speed of the river.
 At last the racing black water widens, the low roof of branches breaks apart above you, and Long Lake opens ahead in cold daylight like a deliverance almost too sudden to trust.
 You are on the Long Lake, cold and broad under an exposed sky, with more than one barrel still bobbing nearby in miserable fellowship. From those dark casks come the thumps, groans, and outraged dwarf-mutterings of companions who have escaped the Elvenking's halls without in the least consenting to the comfort of the method. Dwalin studies the lake and distant town with a wary, measuring look. Ori looks as though the nearness of the Mountain matters more than the town below.
-The smell of tar, fish, wet rope, and cookfires hangs over the walkways in a busy human cloud.
 
 [final]
 room=long_lake

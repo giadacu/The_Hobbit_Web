@@ -250,8 +250,8 @@ window.HOBBIT_DATA = {
     },
     "inside_goblins_gate": {
       "id": "inside_goblins_gate",
-      "name": "Inside Goblins Gate",
-      "description": "You are inside Goblin's Gate. Dimly lit, moss-covered stone walls surround you. A central stone table holds trinkets and bones. Stalactites hang from the high ceiling, casting eerie shadows. A shadowy staircase winds upwards on the far side. The air is damp and cool.",
+      "name": "Inside goblin's gate",
+      "description": "You are inside goblin's gate, in a damp pillared hall lit by sickly torchlight. Moss streaks the stone, a rough table holds bones and stolen trinkets, and a shadowy stair climbs upward into the goblins' deeper ways.",
       "image": "inside_goblins_gate.jpeg",
       "transformedImage": null,
       "sound": "suspence"
@@ -370,8 +370,8 @@ window.HOBBIT_DATA = {
     },
     "outside_goblins_gate": {
       "id": "outside_goblins_gate",
-      "name": "Outside goblins gate",
-      "description": "You are outside goblin's gate. The gate itself is a towering, blackened structure of iron and stone, festooned with cruel spikes and adorned with the gruesome trophies of past conquests. It looms ominously over the entrance to the subterranean realm, its massive doors scarred and pitted from centuries of conflict. Flickering torches, their flames a sickly green, cast an eerie light on the surrounding rocks, casting long, menacing shadows.",
+      "name": "Outside goblin's gate",
+      "description": "You are outside goblin's gate, where a blackened arch of iron and stone closes the mouth of the tunnels. Green torches burn with an unhealthy light, cruel spikes and old trophies mark the goblins' dominion, and the rock face above seems to lean outward as though listening.",
       "image": "goblins_gate.jpeg",
       "transformedImage": null,
       "sound": "adventure"
@@ -459,7 +459,7 @@ window.HOBBIT_DATA = {
     "bewitched_gloomy_place": {
       "id": "bewitched_gloomy_place",
       "name": "Bewitched gloomy place",
-      "description": "You are in a bewitched, gloomy place. The air is thick with a palpable sense of dread, and an unnatural fog clings to the ground, obscuring your view. Gnarled, twisted trees loom on the edges, their skeletal branches reaching out like grasping hands. The ground is damp and uneven, covered in a tangle of roots and fallen leaves. Strange, whispering voices seem to emanate from the shadows, weaving a chilling, incomprehensible murmur.",
+      "description": "You are in a bewitched, gloomy place where the wood feels suffered rather than chosen. Unnatural fog clings to the roots, twisted trees lean in with skeletal branches, and half-heard whispers move through the shadows without ever becoming speech.",
       "image": "bewitched.jpeg",
       "transformedImage": null,
       "sound": "suspence"
@@ -467,7 +467,7 @@ window.HOBBIT_DATA = {
     "west_bank": {
       "id": "west_bank",
       "name": "West bank",
-      "description": "You are at the west bank of the Black River. The river is shrouded in gloom, where dark waters flow silently under a brooding sky. Gnarled trees with twisted roots line the muddy shore, their branches reaching out like skeletal fingers. The air is thick with mist and the scent of damp earth, creating an atmosphere of somber stillness.",
+      "description": "You are at the west bank of the Black River. The water runs fast and silent between muddy roots, offering passage where the forest offered only sameness. On the far side a boat lies among the reeds, if you can contrive to reach it.",
       "image": "west_bank.jpeg",
       "transformedImage": null,
       "sound": "suspence"
@@ -475,7 +475,7 @@ window.HOBBIT_DATA = {
     "east_bank": {
       "id": "east_bank",
       "name": "East bank",
-      "description": "You are at the east bank of the Black River. The river is cloaked in shadows, where the dark waters glide past silently. Towering, ancient trees with thick, intertwining branches stand guard, their leaves whispering in the wind. The ground is soft and damp, covered in a layer of mist, exuding an air of quiet mystery and foreboding.",
+      "description": "You are at the east bank of the Black River. The current slides past without sparkle or song, and the trees here seem a little less malign than those you left behind, though Mirkwood is not finished with you yet.",
       "image": "east_bank.jpeg",
       "transformedImage": null,
       "sound": "suspence"
@@ -483,7 +483,7 @@ window.HOBBIT_DATA = {
     "green_forest": {
       "id": "green_forest",
       "name": "Green forest",
-      "description": "You are in a green forest. The forest is a vibrant tapestry of life, where sunlight filters through the dense canopy, casting a golden glow on the lush undergrowth. Tall trees stand proudly, their leaves rustling in the gentle breeze. The air is filled with the scent of wildflowers and the sounds of chirping birds, creating a serene and enchanting sanctuary.",
+      "description": "You are in a green patch of forest where a little honest daylight still filters through the leaves. After the black miles behind you, even these ordinary trees feel like unexpected mercy, though spider-silk still blocks the way ahead.",
       "image": "green_forest.jpeg",
       "transformedImage": null,
       "sound": "suspence"
@@ -491,7 +491,7 @@ window.HOBBIT_DATA = {
     "place_of_black_spiders": {
       "id": "place_of_black_spiders",
       "name": "Place of black spiders",
-      "description": "You are in a Place of Black Spiders, an eerie realm where darkness prevails. Enormous webs stretch between ancient, gnarled trees, their silken strands glistening with dew. The air is thick and musty, filled with the sound of skittering legs. Shadows lurk in every corner, and the atmosphere is tense with the constant presence of unseen dangers.",
+      "description": "You are in a place of black spiders beneath Mirkwood's foulest boughs. Great webs bind tree to tree from root to crown, the air is warm and close with must and old poison, and every gap between the trunks looks ready to tremble into life at a touch.",
       "image": "spider_place.jpeg",
       "transformedImage": null,
       "sound": "suspence"

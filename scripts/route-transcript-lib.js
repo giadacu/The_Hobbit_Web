@@ -121,19 +121,29 @@ function defaultSetup(game, seed, jumpCommand, options = {}) {
 }
 
 function cellarEscapeSetup(game, seed) {
-  return defaultSetup(game, seed, "jump mirkwood", {
-    afterSetup(target) {
-      target.flags.mirkwooddwarvesfreed = true;
-      target.flags.mirkwoodjourneycomplete = true;
-      target.flags.barrel_company_prepared = false;
-      target.flags.barrel_company_launched = false;
-      target.flags.barrel_company_ready_prompted = false;
-      target.flags.barrelthrown = false;
-      target.flags.laketown_barrel_arrival_seen = false;
-      target.flags.laketown_barrel_arrival_pending = false;
-      target.debugMovePlayer("cellar", { markRoute: true });
-    },
-  });
+  outputLines.length = 0;
+  game.restartGame();
+  game.storySeed = seed;
+  if (typeof game.createGollumState === "function") {
+    game.gollumState = game.createGollumState();
+  }
+  game.handleJumpCommand("mirkwood", { silent: true });
+  game.storySeed = seed;
+  game.flags.mirkwooddwarvesfreed = true;
+  game.flags.mirkwoodjourneycomplete = true;
+  game.flags.barrel_company_prepared = false;
+  game.flags.barrel_company_launched = false;
+  game.flags.barrel_company_ready_prompted = false;
+  game.flags.barrelthrown = false;
+  game.flags.laketown_barrel_arrival_seen = false;
+  game.flags.laketown_barrel_arrival_pending = false;
+  game.debugMovePlayer("cellar", { markRoute: true });
+  game.companionDirector?.sync();
+  game.describeRoom({ full: true });
+  if (typeof game.checkSpecialSituations === "function") {
+    game.checkSpecialSituations();
+  }
+  return outputLines.slice();
 }
 
 function autoplayUntil(game, stopWhen, transcript, stepLimit = 120) {

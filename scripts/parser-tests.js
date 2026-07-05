@@ -5070,6 +5070,77 @@ const gameCases = [
     ],
   },
   {
+    name: "goblin gate room names use consistent lowercase gate copy",
+    setup(game) {
+      movePlayerTo(game, "inside_goblins_gate");
+    },
+    drive(game) {
+      game.print(`Inside gate name: ${game.room().name}`);
+      movePlayerTo(game, "outside_goblins_gate");
+      game.print(`Outside gate name: ${game.room().name}`);
+      game.describeRoom({ full: true });
+    },
+    expectedIncluded: [
+      "Inside gate name: Inside goblin's gate",
+      "Outside gate name: Outside goblin's gate",
+      "You are outside goblin's gate, where a blackened arch of iron and stone closes the mouth of the tunnels.",
+    ],
+    notExpectedIncluded: [
+      "Inside Goblins Gate",
+      "Outside goblins gate",
+      "festooned with cruel spikes",
+    ],
+  },
+  {
+    name: "mirkwood river and spider rooms use immersion-aligned descriptions",
+    setup(game) {
+      movePlayerTo(game, "west_bank");
+    },
+    drive(game) {
+      game.describeRoom({ full: true });
+      game.print(`West bank desc: ${game.contextualRoomDescription(game.rooms.west_bank)}`);
+      movePlayerTo(game, "green_forest");
+      game.print(`Green forest desc: ${game.contextualRoomDescription(game.rooms.green_forest)}`);
+      movePlayerTo(game, "place_of_black_spiders");
+      game.print(`Spider place desc: ${game.contextualRoomDescription(game.rooms.place_of_black_spiders)}`);
+      game.print(`Spider place name: ${game.rooms.place_of_black_spiders.name}`);
+    },
+    expectedIncluded: [
+      "West bank desc: You are at the west bank of the Black River. The water runs fast and silent between muddy roots",
+      "Green forest desc: You are in a green patch of forest where a little honest daylight still filters through the leaves.",
+      "Spider place desc: You are in a place of black spiders beneath Mirkwood's foulest boughs.",
+      "Spider place name: Place of black spiders",
+    ],
+    notExpectedIncluded: [
+      "Place of Black Spiders",
+      "vibrant tapestry of life",
+      "skeletal fingers",
+    ],
+  },
+  {
+    name: "cellar escape checkpoint opens with cellar room description not mirkwood jump text",
+    setup(game) {
+      const { cellarEscapeSetup } = require("./route-transcript-lib");
+      cellarEscapeSetup(game, 1);
+    },
+    drive(game) {
+      const setupText = outputLines.join(" ");
+      game.print(`Setup room: ${game.currentRoom}`);
+      game.print(`Has cellar room desc: ${setupText.includes("You are in the cellar where the king keeps his barrels of wine.") ? "yes" : "no"}`);
+      game.print(`Has mirkwood jump text: ${setupText.includes("Jumped to Mirkwood.") ? "yes" : "no"}`);
+      game.print(`Has mirkwood path desc: ${setupText.includes("black forest path runs under close-packed boughs") ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Setup room: cellar",
+      "Has cellar room desc: yes",
+      "The king's feasting has told on the place below.",
+    ],
+    notExpectedIncluded: [
+      "Has mirkwood jump text: yes",
+      "Has mirkwood path desc: yes",
+    ],
+  },
+  {
     name: "reaching the open ground after gollum starts the warg escape scene",
     setup(game) {
       game.currentRoom = "treeless_opening";

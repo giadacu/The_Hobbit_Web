@@ -14,14 +14,14 @@ Death image: spider_kills_bilbo_death.png
 You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions. To the east there is the round green door. The round green door is closed. You see: a heavy wooden chest reinforced with iron bands, a stout wooden dresser with brass handles, an elegant lamp with intricate engravings, a stack of aged parchment, a dark glass inkwell, a velvety, plush settee, a collection of well-loved books, a leather-bound old book, a beautifully crafted carpet with complex patterns, a regiment of polished pegs still enjoying a last quiet hour of order, a ceramic stand painted with little green leaves, a narrow console table with a polished top and a discreet little drawer. Gandalf waits by the round green door as though measuring the evening by expected knocks. Gandalf is carrying a curious map.
 Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.
 Jumped to Mirkwood.
-A black forest path runs under close-packed boughs where little light survives to touch the roots. The air is dry, stale, and old, and every turn seems just a little too like the last. Thorin looks worn by hunger and bad light. Nori keeps glancing back along the path as though mistrusting how quickly it disappears behind him. The black boughs turn distance into guesswork, and every yard ahead seems borrowed from the same meagre pattern.
+A black forest path runs under close-packed boughs where little light survives to touch the roots. The air is dry, stale, and old, and every turn seems just a little too like the last. Nori walks with the careful reluctance of one who would gladly trade all these trees for a bare hillside. Bifur keeps glancing back along the path as though mistrusting how quickly it disappears behind him. Thorin and Balin wait a little apart, keeping the quiet fellowship of the road. The black boughs turn distance into guesswork, and every yard ahead seems borrowed from the same meagre pattern.
+Dry leaves whisper together under the trees with no clear footfall among them.
 Bofur says 'This wood could make a hungry dwarf long for plain honest rain and an open sky.'
 
 > wait
 (1/2 · room: mirkwood_spider_grove)
 You wait.
 Time passes...
-A thread of web catches at your sleeve, though no breeze should have carried it so far.
 
 > wait
 (2/2 · room: mirkwood_spider_grove)

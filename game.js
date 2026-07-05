@@ -2024,6 +2024,15 @@
     data.rooms.wooden_town.description = "You are in Lake-town, a forest of timber halls, jetties, and plank bridges raised above the dark water. Merchants call, boats creak at their moorings, and the talk of trade, weather, and the Mountain moves continually through the town.";
     data.rooms.front_gate.description = "You stand before the Front Gate of Erebor, where vast stonework, weathered carvings, and old dwarf-craft still command awe despite ruin and neglect. The entrance itself stands mute and forbidding, giving no sign that it was ever meant to yield to strangers now.";
     data.rooms.lower_halls.description = "You enter the lower halls of Erebor, a mighty chamber of pillars, carvings, and treasure under the Mountain's ancient stone. The air is warm, close, and faintly tainted by dragon-smoke, while every footfall seems an impertinence in a kingdom too old to forget itself.";
+    data.rooms.bewitched_gloomy_place.description = "You are in a bewitched, gloomy place where the wood feels suffered rather than chosen. Unnatural fog clings to the roots, twisted trees lean in with skeletal branches, and half-heard whispers move through the shadows without ever becoming speech.";
+    data.rooms.west_bank.description = "You are at the west bank of the Black River. The water runs fast and silent between muddy roots, offering passage where the forest offered only sameness. On the far side a boat lies among the reeds, if you can contrive to reach it.";
+    data.rooms.east_bank.description = "You are at the east bank of the Black River. The current slides past without sparkle or song, and the trees here seem a little less malign than those you left behind, though Mirkwood is not finished with you yet.";
+    data.rooms.green_forest.description = "You are in a green patch of forest where a little honest daylight still filters through the leaves. After the black miles behind you, even these ordinary trees feel like unexpected mercy, though spider-silk still blocks the way ahead.";
+    data.rooms.place_of_black_spiders.description = "You are in a place of black spiders beneath Mirkwood's foulest boughs. Great webs bind tree to tree from root to crown, the air is warm and close with must and old poison, and every gap between the trunks looks ready to tremble into life at a touch.";
+    data.rooms.inside_goblins_gate.name = "Inside goblin's gate";
+    data.rooms.inside_goblins_gate.description = "You are inside goblin's gate, in a damp pillared hall lit by sickly torchlight. Moss streaks the stone, a rough table holds bones and stolen trinkets, and a shadowy stair climbs upward into the goblins' deeper ways.";
+    data.rooms.outside_goblins_gate.name = "Outside goblin's gate";
+    data.rooms.outside_goblins_gate.description = "You are outside goblin's gate, where a blackened arch of iron and stone closes the mouth of the tunnels. Green torches burn with an unhealthy light, cruel spikes and old trophies mark the goblins' dominion, and the rock face above seems to lean outward as though listening.";
 
     [
       ["bag_end_parlour", "Parlour", "This snug parlour is arranged for conversation rather than grandeur: deep chairs, a hearth laid ready, and several low tables already burdened with plates, cups, and evidence of hobbit forethought. It would be a perfect room for quiet company if Bag End still believed in quiet company.", "bag_end_parlour.jpeg", "relaxed"],
@@ -13534,7 +13543,7 @@
     }
 
     handleJumpCommand(target = "", options = {}) {
-      const { silentOnUnknown = false } = options;
+      const { silentOnUnknown = false, silent = false } = options;
       const normalizedTarget = normalize(String(target || "").replace(/^(?:to|into)\s+/, ""));
       if (!normalizedTarget) {
         this.listJumpCheckpoints();
@@ -13564,13 +13573,15 @@
       this.normalizeLanternState();
       this.companionDirector?.sync();
       this.visitedRooms = new Set([this.currentRoom, ...(this.visitedRooms || [])]);
-      this.print(`Jumped to ${preset.label}.`, "system");
-      this.describeRoom({ full: true });
-      if (this.currentRoom === "trolls_clearing" && !this.visitedTrollsClearing && !this.trollsTransformed) {
-        this.checkSpecialSituations();
-      }
-      if (this.currentRoom === "beorns_house" && !this.flags.beorn_dinner_seen) {
-        this.checkSpecialSituations();
+      if (!silent) {
+        this.print(`Jumped to ${preset.label}.`, "system");
+        this.describeRoom({ full: true });
+        if (this.currentRoom === "trolls_clearing" && !this.visitedTrollsClearing && !this.trollsTransformed) {
+          this.checkSpecialSituations();
+        }
+        if (this.currentRoom === "beorns_house" && !this.flags.beorn_dinner_seen) {
+          this.checkSpecialSituations();
+        }
       }
       return true;
     }

@@ -7488,3 +7488,48 @@ Future debugging advice
   strip trailing delimiters before punctuation normalization.
 - Any new Gollum post-pocket timer death should gate on `pocketQuestionAsked`
   and `enraged`, not only `awaitingPlayerRiddle`.
+
+
+Case 156 - 2026-07-05 - Stylistic transcript fixes: room copy, goblin gate names, cellar setup
+------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Narrative review flagged stylistic issues (troll dialect excluded):
+- `Place of Black Spiders` and west-bank/green-forest rooms used generic AI prose
+- Goblin gate room names/descriptions were inconsistent (`Inside Goblins Gate` vs
+  `outside goblin's gate`)
+- Cellar transcript setup printed Mirkwood jump text and feast lines without the
+  cellar room description first
+
+Root cause
+----------
+- Several Mirkwood river-route rooms still carried original game-data copy while
+  newer rooms were rewritten in `applyImmersionExpansion()`
+- Goblin gate names mixed title case and apostrophe usage
+- `cellarEscapeSetup()` used `jump mirkwood` then `debugMovePlayer("cellar")`
+  without calling `describeRoom()`
+
+Resolution
+----------
+- Rewrote descriptions for `bewitched_gloomy_place`, `west_bank`, `east_bank`,
+  `green_forest`, and `place_of_black_spiders` in `game-data.js` and
+  `applyImmersionExpansion()` overrides
+- Normalized goblin gate names/descriptions to `Inside/Outside goblin's gate`
+- Added silent mode to `handleJumpCommand()`; cellar checkpoint now describes
+  the cellar before feast/barrel scene lines
+- Added parser regressions for all three areas
+
+Files touched
+-------------
+- `game.js`
+- `assets/game-data.js`
+- `scripts/route-transcript-lib.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a debug checkpoint teleports after a jump, call `describeRoom({ full: true
+  })` at the final room or use `{ silent: true }` on the jump to avoid leaking
+  the wrong location's entry text into transcript setup.
