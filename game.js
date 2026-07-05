@@ -3281,7 +3281,7 @@
       if (this.state.thorinStage === 3) {
         return {
           message: "Thorin says 'Erebor was my people's kingdom under the Mountain, and it has long been lost to us.'",
-          cooldown: 2,
+          cooldown: 0,
           apply: () => {
             thorin.position = "hobbit_hole";
             this.state.thorinStage = 4;
@@ -3291,7 +3291,7 @@
       if (this.state.thorinStage === 4) {
         return {
           message: "Thorin says 'Smaug the dragon lies there now upon halls and treasure beyond counting, and all of it was won from us by fire and death.'",
-          cooldown: 2,
+          cooldown: 0,
           apply: () => {
             thorin.position = "hobbit_hole";
             this.state.thorinStage = 5;
@@ -3301,7 +3301,7 @@
       if (this.state.thorinStage === 5) {
         return {
           message: "Thorin says 'We mean to go back by secret ways, if fortune allows, and win our road into the Mountain again.'",
-          cooldown: 2,
+          cooldown: 0,
           apply: () => {
             thorin.position = "hobbit_hole";
             this.state.thorinStage = 6;
@@ -3311,7 +3311,7 @@
       if (this.state.thorinStage === 6) {
         return {
           message: "Thorin's gaze settles on you. 'And you, Master Baggins, are meant to be our burglar.' Gandalf adds softly, 'The world is wider than your garden gate, Master Baggins.'",
-          cooldown: 3,
+          cooldown: 0,
           apply: () => {
             thorin.position = "bag_end_parlour";
             this.state.thorinStage = 7;
@@ -12545,7 +12545,7 @@
         .map((c) => `${this.directionLead(c.direction)} there is the ${this.doors[c.door].name}. The ${this.doors[c.door].name} is ${this.doors[c.door].open ? "open" : "closed"}.`)
         .join(" ");
       const objects = this.itemsInRoom(this.currentRoom).filter((item) => item.visible && this.shouldListRoomItem(item));
-      const objectText = objects.length ? `You see: ${objects.map((item) => this.describeItemShort(item)).join(", ")}.` : "";
+      const objectText = objects.length ? `You see: ${objects.map((item) => this.inventoryItemLabel(item)).join(", ")}.` : "";
       const aftermathText = this.aftermath?.roomSummary(this.currentRoom) || "";
       const people = this.visiblePeopleInRoom().filter((p) => p.name !== "You" && p.visible);
       const arrivingPeople = people.filter((p) => p.justEntered);
@@ -13853,7 +13853,7 @@
 
     containerContentsDescription(visibleItems = []) {
       if (!visibleItems.length) return "";
-      const listed = visibleItems.map((child) => this.describeItemShort(child)).join(", ");
+      const listed = visibleItems.map((child) => this.inventoryItemLabel(child)).join(", ");
       return visibleItems.length === 1 ? `inside is ${listed}` : `inside are ${listed}`;
     }
 

@@ -2628,6 +2628,33 @@ const gameCases = [
     ],
   },
   {
+    name: "quest briefing advances one line per wait without extra cooldown",
+    setup(game) {
+      const controller = game.unexpectedParty;
+      controller.state.arrivalIndex = controller.roster.length;
+      controller.state.currentArrival = null;
+      controller.state.thorinArrived = true;
+      controller.state.thorinStage = 3;
+      controller.state.questBriefingDone = false;
+      controller.state.cooldown = 0;
+      game.currentRoom = "hobbit_hole";
+      game.player.position = "hobbit_hole";
+    },
+    drive(game) {
+      const controller = game.unexpectedParty;
+      controller.advanceTurn();
+      game.print(`Stage after first wait: ${controller.state.thorinStage}`);
+      controller.advanceTurn();
+      game.print(`Stage after second wait: ${controller.state.thorinStage}`);
+    },
+    expectedIncluded: [
+      "Erebor was my people's kingdom",
+      "Stage after first wait: 4",
+      "Smaug the dragon",
+      "Stage after second wait: 5",
+    ],
+  },
+  {
     name: "the road east stays closed until thorins briefing is done",
     drive(game) {
       game.currentRoom = "bilbos_garden";
@@ -3287,6 +3314,24 @@ const gameCases = [
     ],
     notExpectedIncluded: [
       "oil., a large key",
+    ],
+  },
+  {
+    name: "open container examine strips trailing punctuation from contents list",
+    drive(game) {
+      game.execute("open bottom drawer");
+      game.execute("take sturdy key");
+      game.execute("open door");
+      game.execute("go east");
+      game.execute("unlock shed with sturdy key");
+      game.execute("open shed");
+      game.execute("examine shed");
+    },
+    expectedIncluded: [
+      "You see a small garden shed for storing tools and gardening supplies; inside are a brass lantern with metal handle, wick, and oil, an organized tool rack holding shovels and rakes, a spacious potting bench for planting and repotting, a seed packet, a metal watering can for keeping plants hydrated.",
+    ],
+    notExpectedIncluded: [
+      "oil., an organized tool rack",
     ],
   },
   {

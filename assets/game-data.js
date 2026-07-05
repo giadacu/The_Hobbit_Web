@@ -2017,7 +2017,7 @@ window.HOBBIT_DATA = {
     "brass_lantern": {
       "id": "brass_lantern",
       "name": "brass lantern",
-      "description": "a brass lantern with metal handle, wick, and oil.",
+      "description": "a brass lantern with metal handle, wick, and oil",
       "container": false,
       "keyFor": null,
       "portable": true,

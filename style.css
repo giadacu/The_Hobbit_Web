@@ -1496,4 +1496,12 @@ body[data-layout="2"] .sidebar {
     padding: 0 18px;
     z-index: 30;
   }
+
+  .scene img,
+  .image-reveal img {
+    width: 100%;
+    max-width: 100%;
+    object-fit: contain;
+    object-position: center center;
+  }
 }

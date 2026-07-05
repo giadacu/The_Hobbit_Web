@@ -7533,3 +7533,78 @@ Future debugging advice
 - When a debug checkpoint teleports after a jump, call `describeRoom({ full: true
   })` at the final room or use `{ silent: true }` on the jump to avoid leaking
   the wrong location's entry text into transcript setup.
+
+
+Case 157 - 2026-07-05 - Quest briefing double-wait and mobile scene image width
+-------------------------------------------------------------------------------
+
+Symptom
+-------
+- During Thorin's opening mission speech at Bag End, each briefing line required
+  two `wait` commands instead of one
+- On mobile, room images were cropped (`object-fit: cover`) rather than shown
+  at full width
+
+Root cause
+----------
+- `nextQuestBriefingEvent()` used `cooldown: 2` (or 3) between lines; the global
+  `advanceTurn()` gate consumes one wait tick before firing the next event
+- Mobile inherited desktop `.scene img { object-fit: cover }` styling
+
+Resolution
+----------
+- Set quest briefing event cooldowns to `0` so one wait advances one line
+- On viewports `<= 860px`, use `object-fit: contain` with full width for scene
+  and reveal images
+- Added parser regression for one-wait-per-briefing-line pacing
+
+Files touched
+-------------
+- `game.js`
+- `style.css`
+- `index.html` (cache-bust query)
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Scripted multi-line sequences driven by `wait` should use `cooldown: 0`
+  unless deliberate pacing delay is intended.
+- Mobile scene styling lives in the `@media (max-width: 860px)` block; test image
+  changes on a narrow viewport, not only desktop layout 2.
+
+
+Case 158 - 2026-07-05 - Double period in open-container examine lists
+---------------------------------------------------------------------
+
+Symptom
+-------
+- Examining the open garden shed showed `...wick, and oil., an organized tool
+  rack...` (extra period before the comma)
+
+Root cause
+----------
+- `brass_lantern` item description ended with a full stop
+- `containerContentsDescription()` joined `describeItemShort()` labels with
+  commas but did not strip trailing punctuation (inventory already used
+  `inlineListLabel()` for this)
+
+Resolution
+----------
+- Removed the trailing period from `brass_lantern` in game data
+- Reused `inventoryItemLabel()` in `containerContentsDescription()` and room
+  object lists so list contexts strip trailing `.?!` consistently
+- Added parser regression for garden shed examine
+
+Files touched
+-------------
+- `assets/game-data.js`
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Short item `description` fields used in comma lists should not end with `.?!`
+- When joining multiple item labels, route through `inlineListLabel()` /
+  `inventoryItemLabel()` rather than raw `describeItemShort()`
