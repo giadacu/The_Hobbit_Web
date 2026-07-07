@@ -1580,7 +1580,7 @@
     ],
     green_dragon_inn_outside: [
       {
-        when: ({ game }) => game.flags.ponypassageopen || game.flags.ponysequencecompleted,
+        when: ({ game }) => game.flags.ponydeparturepending,
         image: "green_dragon_out_hedge_open.png",
       },
       {
@@ -10000,6 +10000,8 @@
 
       if (beforeDragonDefeat && !game.visitedRooms.has("dreary") && game.currentRoom !== "dreary") {
         if (game.currentRoom !== "green_dragon_inn_outside") return this.autoplayRouteCommandTo("green_dragon_inn_outside");
+        if (game.flags.ponybranchperched) return game.flags.ponyready ? "jump" : "wait";
+        if (game.flags.ponydeparturepending) return "east";
         if (!game.items.low_branch?.visible) return "examine oak tree";
         return "climb branch";
       }
@@ -10900,6 +10902,352 @@
       if (game.items.calm_pony) game.items.calm_pony.visible = false;
     }
 
+    ponyBranchPerched() {
+      return this.game.currentRoom === "green_dragon_inn_outside" && Boolean(this.game.flags.ponybranchperched);
+    }
+
+    ponyDeparturePending() {
+      return this.game.currentRoom === "green_dragon_inn_outside" && Boolean(this.game.flags.ponydeparturepending);
+    }
+
+    ponyRouteStillAvailable() {
+      return !this.game.flags.ponysequencecompleted;
+    }
+
+    ponyReadyForBranchJump() {
+      return this.ponyRouteStillAvailable() && Boolean(this.game.flags.ponyready);
+    }
+
+    ponySeenForBranchJump() {
+      return this.ponyRouteStillAvailable() && Boolean(this.game.flags.seenpony);
+    }
+
+    beginPonyBranchPerch() {
+      const game = this.game;
+      if (this.ponyDeparturePending()) {
+        game.print("You are already down on the pony with the hedge broken open before you.");
+        return true;
+      }
+      if (this.ponyBranchPerched()) {
+        game.print("You are already crouched on the low branch above the yard.");
+        return true;
+      }
+      game.flags.ponybranchperched = true;
+      game.print("You climb onto the low branch and settle yourself above the yard, testing the bark with hands and feet before trusting your weight to it.");
+      if (this.ponyReadyForBranchJump()) {
+        game.print("The pony waits directly below, calm enough for the attempt if you choose to let yourself fall.");
+      } else if (this.ponySeenForBranchJump()) {
+        game.print("From here you can watch the yard and the dark space beneath you, waiting for the pony to be brought properly under the branch.");
+      } else {
+        game.print("From here you have a better view of the inn yard and road, though nothing yet invites a reckless drop.");
+      }
+      return true;
+    }
+
+    clearPonyBranchPerch() {
+      this.game.flags.ponybranchperched = false;
+    }
+
+    beginPendingPonyDeparture(action = {}, options = {}) {
+      const game = this.game;
+      const leadLines = Array.isArray(options.leadLines) ? options.leadLines.filter(Boolean) : [];
+      if (action.desc1) game.print(actorActionSentence(game.player, action.desc1));
+      if (action.desc2) game.print(action.desc2);
+      leadLines.forEach((line) => game.print(line));
+      this.clearPonyBranchPerch();
+      game.flags.ponysequencecompleted = true;
+      game.flags.ponypassageopen = true;
+      game.flags.ponypreparing = false;
+      game.flags.ponyready = false;
+      game.flags.ponydeparturepending = true;
+      if (game.items.calm_pony) game.items.calm_pony.visible = false;
+      if (action.flag_out) this.setFlag(action.flag_out.replace("*", ""), true);
+      if (action.reveals) this.reveal(action.reveals);
+      game.showTemporaryImage("green_dragon_out_hedge_open.png", {
+        alt: "Bilbo on the pony as the hedge breaks open to the east",
+        dismissOnNextCommand: false,
+      });
+      game.print("The gap lies open to the east, and the pony bunches beneath you, waiting only for the road.");
+      return true;
+    }
+
+    beginPendingPonyDepartureFromBranch() {
+      return this.beginPendingPonyDeparture({}, {
+        leadLines: [
+          "You edge forward along the low branch, let yourself drop at the right instant, and land with more luck than grace upon the pony's back.",
+          "It bunches, plunges through the hedge in a shower of leaves and twigs, and leaves you one startled heartbeat to gather the reins before the open road takes over.",
+        ],
+      });
+    }
+
+    ponyBranchLookText() {
+      const game = this.game;
+      if (this.ponyReadyForBranchJump()) {
+        return "You cling to the low branch above the yard, with the pony standing squarely below and the inn wall close at your back. One clean drop would put you on the beast if your nerve holds.";
+      }
+      if (this.ponySeenForBranchJump()) {
+        return "You crouch on the low branch above the dark yard, peering down at the patch where the pony ought to be brought. For now there is only earth, shadow, and the risk of a foolish drop.";
+      }
+      return "You cling to the low branch above the yard, with the inn close behind you and the ground farther down than you liked from below.";
+    }
+
+    ponyBranchWaitText() {
+      return this.ponyReadyForBranchJump()
+        ? "You hold your place on the branch while the pony waits below, patient and ready for the attempt."
+        : "You wait on the branch, bark rough beneath your palms, listening for the pony to be brought underneath you.";
+    }
+
+    ponyBranchBlockedTravelText() {
+      return "From the branch you would only get yourself into trouble by trying to go anywhere. You should climb down or commit to the drop.";
+    }
+
+    ponyBranchClimbDownText() {
+      return "Thinking better of a reckless fall, you ease yourself down from the branch and regain the yard without injury.";
+    }
+
+    resolvePonyBranchFall() {
+      const game = this.game;
+      this.clearPonyBranchPerch();
+      const currentStrength = Math.max(0, Number(game.player.strength || 0));
+      const damage = currentStrength > 1 ? 1 : 0;
+      game.player.strength = Math.max(1, currentStrength - damage);
+      const strengthText = damage ? ` Strength: ${game.player.strength}.` : "";
+      game.print(`You let yourself drop too soon, find nothing but hard ground beneath you, and land awkwardly enough to jar the breath out of your ribs.${strengthText}`, damage ? "danger" : "");
+      return false;
+    }
+
+    ponyBranchDropIntent(text = "") {
+      const normalized = normalize(String(text || "").replace(/^(?:to|toward|towards)\s+/, ""));
+      if (!normalized) return true;
+      if (["down", "below", "pony", "horse", "ground", "yard"].includes(normalized)) return true;
+      return /\b(?:down|below|pony|horse|ground|yard)\b/.test(normalized);
+    }
+
+    ponyBranchSafeClimbDownIntent(text = "") {
+      const normalized = normalize(String(text || "").replace(/^(?:to|toward|towards)\s+/, ""));
+      if (!normalized) return false;
+      if (["down", "downward", "downwards", "ground", "yard", "off", "out"].includes(normalized)) return true;
+      return /\b(?:down|ground|yard|off|out)\b/.test(normalized);
+    }
+
+    handlePonyBranchCommand(command = "") {
+      if (!this.ponyBranchPerched()) return null;
+      const game = this.game;
+      const normalizedCommand = normalizeNaturalCommand(String(command || "").toLowerCase());
+      const rawCommand = normalize(String(command || "").toLowerCase());
+      if (!normalizedCommand) return false;
+
+      if (this.ponyReadyForBranchJump() && ["drop", "jump", "leap", "dive"].includes(rawCommand)) {
+        return this.beginPendingPonyDepartureFromBranch();
+      }
+      if (rawCommand === "leave") {
+        if (this.ponyReadyForBranchJump()) return this.beginPendingPonyDepartureFromBranch();
+        this.clearPonyBranchPerch();
+        game.print(this.ponyBranchClimbDownText());
+        return false;
+      }
+
+      if (game.isDirection(normalizedCommand) || normalizedCommand.startsWith("go ")) {
+        game.print(this.ponyBranchBlockedTravelText());
+        return false;
+      }
+
+      if (game.isTalkCommand(normalizedCommand)) {
+        game.print("From up here, hanging onto the branch seems wiser than trying to start a conversation.");
+        return false;
+      }
+
+      const parsed = game.parseStructuredCommand(normalizedCommand);
+      const verb = normalize(parsed.verb);
+      const object = normalize(parsed.object);
+
+      if (["look", "examine", "inspect"].includes(verb)) {
+        game.print(this.ponyBranchLookText());
+        return false;
+      }
+
+      if (verb === "wait") {
+        game.print(this.ponyBranchWaitText());
+        return false;
+      }
+
+      if (verb === "leave" && !object) {
+        if (this.ponyReadyForBranchJump()) return this.beginPendingPonyDepartureFromBranch();
+        this.clearPonyBranchPerch();
+        game.print(this.ponyBranchClimbDownText());
+        return false;
+      }
+
+      if (["jump", "leap", "drop", "dive"].includes(verb)) {
+        if (this.ponyReadyForBranchJump() && this.ponyBranchDropIntent(object || normalizedCommand.slice(verb.length).trim())) {
+          return this.beginPendingPonyDepartureFromBranch();
+        }
+        return this.resolvePonyBranchFall();
+      }
+
+      if (verb === "ride") {
+        if (this.ponyReadyForBranchJump()) return this.beginPendingPonyDepartureFromBranch();
+        return this.resolvePonyBranchFall();
+      }
+
+      if (verb === "climb") {
+        if (!object || /\bbranch\b/.test(object)) {
+          game.print("You are already on the branch.");
+          return false;
+        }
+        if (this.ponyBranchSafeClimbDownIntent(object)) {
+          this.clearPonyBranchPerch();
+          game.print(this.ponyBranchClimbDownText());
+          return false;
+        }
+        if (this.ponyReadyForBranchJump() && /\bpony\b/.test(object)) return this.beginPendingPonyDepartureFromBranch();
+        game.print(this.ponyBranchBlockedTravelText());
+        return false;
+      }
+
+      if (["get", "step", "walk", "run", "leave", "return"].includes(verb) && this.ponyBranchSafeClimbDownIntent(object || verb)) {
+        this.clearPonyBranchPerch();
+        game.print(this.ponyBranchClimbDownText());
+        return false;
+      }
+
+      if (NON_TURN_COMMAND_VERBS.has(verb)) return null;
+
+      game.print("You are in no position on the branch to manage that sensibly.");
+      return false;
+    }
+
+    ponyDepartureLookText() {
+      return "From the pony's back you have one last close glimpse of the inn behind you and the broken hedge before you. The opening east lies clear onto the dark road.";
+    }
+
+    ponyDepartureWaitText() {
+      return "The pony stamps once beneath you and tosses its head, ready to be off. The broken gap still lies open to the east.";
+    }
+
+    ponyDepartureBacktrackText() {
+      return "There is no neat way back from here; you are already down on the pony and committed past the hedge. If you mean to be off, go east.";
+    }
+
+    ponyDepartureBlockedActionText() {
+      return "This is no moment for fumbling. The pony is under you, the hedge is broken, and the road lies east.";
+    }
+
+    ponyDepartureForwardIntent(text = "") {
+      const normalized = normalize(String(text || "").replace(/^(?:to|toward|towards)\s+/, ""));
+      if (!normalized) return false;
+      if (["east", "e", "ahead", "forward", "dreary"].includes(normalized)) return true;
+      return /\b(?:east|road|opening|gap|passage|hedge|dreary)\b/.test(normalized);
+    }
+
+    ponyDepartureBackIntent(text = "") {
+      const normalized = normalize(String(text || "").replace(/^(?:to|toward|towards)\s+/, ""));
+      if (!normalized) return false;
+      if (["west", "w", "inside", "indoors", "back", "back inside", "inn", "tavern"].includes(normalized)) return true;
+      return /\b(?:west|inside|indoors|back|inn|green dragon|tavern)\b/.test(normalized);
+    }
+
+    completePendingPonyDeparture() {
+      if (!this.ponyDeparturePending()) return false;
+      const game = this.game;
+      const previousRoom = game.currentRoom;
+      game.flags.ponydeparturepending = false;
+      game.flags.ponypreparing = false;
+      game.flags.ponyready = false;
+      game.clearTemporaryImage({ render: false });
+      game.currentRoom = "dreary";
+      game.player.position = "dreary";
+      game.resetHiddenDoorSearchState(previousRoom, "dreary");
+      game.moveFollowers(previousRoom, "dreary", "east");
+      game.render();
+      game.describeRoom();
+      game.hazards?.maybeProgressAutosave(previousRoom, "dreary");
+      game.maybeAutosaveForRoom("dreary");
+      game.checkSpecialSituations();
+      return true;
+    }
+
+    handlePendingPonyDeparture(command = "") {
+      if (!this.ponyDeparturePending()) return null;
+      const game = this.game;
+      const normalizedCommand = normalizeNaturalCommand(String(command || "").toLowerCase());
+      if (!normalizedCommand) return false;
+
+      if (game.isDirection(normalizedCommand)) {
+        const direction = game.normalizeDirection(normalizedCommand);
+        if (direction === "east") return this.completePendingPonyDeparture();
+        if (direction === "west") {
+          game.print(this.ponyDepartureBacktrackText());
+          return false;
+        }
+        game.print(this.ponyDepartureBlockedActionText());
+        return false;
+      }
+
+      if (normalizedCommand.startsWith("go ")) {
+        const target = normalizedCommand.slice(3).trim();
+        if (this.ponyDepartureForwardIntent(target)) return this.completePendingPonyDeparture();
+        if (this.ponyDepartureBackIntent(target)) {
+          game.print(this.ponyDepartureBacktrackText());
+          return false;
+        }
+        game.print(this.ponyDepartureBlockedActionText());
+        return false;
+      }
+
+      if (this.ponyDepartureForwardIntent(normalizedCommand)) return this.completePendingPonyDeparture();
+      if (this.ponyDepartureBackIntent(normalizedCommand)) {
+        game.print(this.ponyDepartureBacktrackText());
+        return false;
+      }
+
+      if (game.isTalkCommand(normalizedCommand)) {
+        game.print(this.ponyDepartureBlockedActionText());
+        return false;
+      }
+
+      const parsed = game.parseStructuredCommand(normalizedCommand);
+      const verb = normalize(parsed.verb);
+      const object = normalize(parsed.object);
+
+      if (["look", "examine", "inspect"].includes(verb)) {
+        if (!object || /\b(?:pony|hedge|opening|gap|road|east|inn)\b/.test(object)) {
+          game.print(this.ponyDepartureLookText());
+        } else {
+          game.print(this.ponyDepartureBlockedActionText());
+        }
+        return false;
+      }
+
+      if (verb === "wait") {
+        game.print(this.ponyDepartureWaitText());
+        return false;
+      }
+
+      if (verb === "ride") {
+        if (!object || this.ponyDepartureForwardIntent(object)) return this.completePendingPonyDeparture();
+        if (this.ponyDepartureBackIntent(object)) {
+          game.print(this.ponyDepartureBacktrackText());
+          return false;
+        }
+        game.print(this.ponyDepartureBlockedActionText());
+        return false;
+      }
+
+      if (
+        ["enter", "climb", "dismount", "leave", "return", "step", "walk", "run"].includes(verb)
+        && this.ponyDepartureBackIntent(object || verb)
+      ) {
+        game.print(this.ponyDepartureBacktrackText());
+        return false;
+      }
+
+      if (NON_TURN_COMMAND_VERBS.has(verb)) return null;
+
+      game.print(this.ponyDepartureBlockedActionText());
+      return false;
+    }
+
     specialActionFatalImage(action = {}) {
       const location = normalize(action.location || "");
       const verb = normalize(action.verb || "");
@@ -10942,6 +11290,7 @@
         }
       }
       if (this.tryRivendellDescentAction(verb, objectText)) return true;
+      if (this.tryGreenDragonBranchAction(verb, objectText)) return true;
       for (const action of game.data.specialActions) {
         if (action.verb !== verb) continue;
         if (action.location && action.location !== roomName) continue;
@@ -11006,6 +11355,9 @@
           });
         }
         const actionEndsGame = String(action.destination || "").includes("endgame");
+        if (this.isPonySequenceAction(action)) {
+          return this.beginPendingPonyDeparture(action);
+        }
         if (action.desc1) game.print(actorActionSentence(game.player, action.desc1));
         if (action.desc2 && !actionEndsGame) game.print(action.desc2);
         if (!actionEndsGame) this.performSpecialActionTransfer(action);
@@ -11041,6 +11393,14 @@
         return Boolean(action.desc1 || action.desc2 || action.reveals || action.destination);
       }
       return false;
+    }
+
+    tryGreenDragonBranchAction(verb, objectText) {
+      const game = this.game;
+      if (game.currentRoom !== "green_dragon_inn_outside") return false;
+      const text = normalize(objectText);
+      if (verb !== "climb" || !/\bbranch\b/.test(text) || !game.items.low_branch?.visible) return false;
+      return this.beginPonyBranchPerch();
     }
 
     performSpecialActionTransfer(action) {
@@ -12116,6 +12476,12 @@
         return this.performAs(actor, () => this.processCommand(command));
       }
 
+      const ponyBranchResult = this.handlePonyBranchCommand(command);
+      if (ponyBranchResult !== null) return ponyBranchResult;
+
+      const ponyDepartureResult = this.handlePendingPonyDeparture(command);
+      if (ponyDepartureResult !== null) return ponyDepartureResult;
+
       if (this.handleSpiderEyesCommand(command)) return false;
 
       if (this.isDirection(command)) {
@@ -12178,6 +12544,7 @@
     commandConsumesTurn(command = "") {
       const normalizedCommand = normalizeNaturalCommand(String(command || "").toLowerCase());
       if (!normalizedCommand) return false;
+      if (this.ponyDeparturePending()) return false;
       if (this.isDirection(normalizedCommand)) return true;
       if (normalizedCommand.startsWith("go ")) return true;
       if (this.isTalkCommand(normalizedCommand)) return true;
@@ -13728,6 +14095,8 @@
       this.flags.ponyreadyturn = 0;
       this.flags.ponysequencecompleted = true;
       this.flags.ponypassageopen = true;
+      this.flags.ponybranchperched = false;
+      this.flags.ponydeparturepending = false;
       this.flags.ponyreadyannounced = true;
       this.visitedRooms.add("green_dragon_inn_outside");
       this.visitedRooms.add("green_dragon_inn");
@@ -18417,6 +18786,22 @@
       return this.specialActions.trySpecialAction(verb, objectText);
     }
 
+    ponyBranchPerched() {
+      return this.specialActions.ponyBranchPerched();
+    }
+
+    handlePonyBranchCommand(command = "") {
+      return this.specialActions.handlePonyBranchCommand(command);
+    }
+
+    ponyDeparturePending() {
+      return this.specialActions.ponyDeparturePending();
+    }
+
+    handlePendingPonyDeparture(command = "") {
+      return this.specialActions.handlePendingPonyDeparture(command);
+    }
+
     performSpecialActionTransfer(action) {
       return this.specialActions.performSpecialActionTransfer(action);
     }
@@ -18955,6 +19340,10 @@
       .replace(/^(?:who\s+are\s+you|what'?s\s+your\s+name)$/i, "talk")
       .replace(/^how\s+are\s+you$/i, "talk")
       .replace(/^can\s+you\s+help\s+me$/i, "help")
+      .replace(/^head\s+back\s+inside$/i, "go inside")
+      .replace(/^head\s+back\s+outside$/i, "go outside")
+      .replace(/^inside$/i, "go inside")
+      .replace(/^outside$/i, "go outside")
       .replace(/^enter$/i, "go inside")
       .replace(/^go\s+in$/i, "go inside")
       .replace(/^enter\s+(?:the\s+)?(?:house|home|inn)$/i, "go inside")

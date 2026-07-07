@@ -708,7 +708,7 @@ const cases = [
   {
     name: "head back inside alias",
     input: "Head back inside.",
-    expected: ["back inside"],
+    expected: ["go inside"],
   },
   {
     name: "get in alias",
@@ -2145,6 +2145,7 @@ const gameCases = [
       game.execute("south");
       game.print(`Pony visible after immediate exit: ${game.items.calm_pony.visible ? "yes" : "no"}`);
       game.execute("climb on branch");
+      game.print(`Perched on branch after climb: ${game.flags.ponybranchperched ? "yes" : "no"}`);
       game.print(`Pony visible after a beat: ${game.items.calm_pony.visible ? "yes" : "no"}`);
     },
     expectedIncluded: [
@@ -2152,7 +2153,8 @@ const gameCases = [
       "There is a pony there after all.",
       "Pony visible after window: no",
       "Pony visible after immediate exit: no",
-      "Better give the innfolk another moment",
+      "You climb onto the low branch",
+      "Perched on branch after climb: yes",
       "A hostler leads a calm pony beneath the oak",
       "Pony visible after a beat: yes",
     ],
@@ -2177,6 +2179,7 @@ const gameCases = [
 
       game.flags.ponysequencecompleted = true;
       game.flags.ponypassageopen = true;
+      game.flags.ponydeparturepending = true;
       game.print(`Green Dragon yard hedge open image: ${game.contextualRoomImage(game.room())}`);
     },
     expectedIncluded: [
@@ -2186,6 +2189,54 @@ const gameCases = [
       "Green Dragon yard preparing image: green_dragon_out_preparing_pony.png",
       "Green Dragon yard pony ready image: green_dragon_out_pony_ready.png",
       "Green Dragon yard hedge open image: green_dragon_out_hedge_open.png",
+    ],
+  },
+  {
+    name: "green dragon outside reverts to inn image after returning from dreary",
+    drive(game) {
+      game.execute("jump trolls");
+      game.execute("west");
+      game.print(`Green Dragon outside image after return: ${game.contextualRoomImage(game.room())}`);
+    },
+    expectedIncluded: [
+      "Jumped to Troll Approach.",
+      "Green Dragon outside image after return: Green_dragon_out.jpeg",
+    ],
+    notExpectedIncluded: [
+      "Green Dragon outside image after return: green_dragon_out_hedge_open.png",
+    ],
+  },
+  {
+    name: "bare inside command works after returning from dreary",
+    drive(game) {
+      game.execute("jump trolls");
+      game.execute("west");
+      game.execute("inside");
+      game.print(`Room after bare inside: ${game.currentRoom}`);
+    },
+    expectedIncluded: [
+      "Jumped to Troll Approach.",
+      "Room after bare inside: green_dragon_inn",
+    ],
+  },
+  {
+    name: "green dragon pony route cannot be reopened after returning from dreary",
+    drive(game) {
+      game.execute("jump trolls");
+      game.execute("west");
+      game.player.strength = 12;
+      game.items.low_branch.visible = true;
+      game.execute("climb branch");
+      game.execute("jump");
+      game.print(`Pony departure pending after replay attempt: ${game.flags.ponydeparturepending ? "yes" : "no"}`);
+      game.print(`Strength after replay attempt: ${game.player.strength}`);
+    },
+    expectedIncluded: [
+      "Jumped to Troll Approach.",
+      "You climb onto the low branch",
+      "You let yourself drop too soon",
+      "Pony departure pending after replay attempt: no",
+      "Strength after replay attempt: 11",
     ],
   },
   {
@@ -2202,16 +2253,24 @@ const gameCases = [
       game.player.position = "green_dragon_inn_outside";
       placeCharacterWithPlayer(game, "thorin");
       game.execute("climb onto branch");
+      game.execute("jump");
       game.print(`Pony jump temporary image: ${game.temporaryImage?.file || "none"}`);
       game.print(`Pony jump room: ${game.currentRoom}`);
+      game.print(`Pony jump pending flag: ${game.flags.ponydeparturepending ? "yes" : "no"}`);
       game.execute("look");
       game.print(`Pony jump temporary image after next command: ${game.temporaryImage?.file || "none"}`);
+      game.execute("east");
+      game.print(`Pony jump room after east: ${game.currentRoom}`);
+      game.print(`Pony jump temporary image after east: ${game.temporaryImage?.file || "none"}`);
     },
     expectedIncluded: [
       "Jumped to Green Dragon Inn.",
       "Pony jump temporary image: green_dragon_out_hedge_open.png",
-      "Pony jump room: dreary",
-      "Pony jump temporary image after next command: none",
+      "Pony jump room: green_dragon_inn_outside",
+      "Pony jump pending flag: yes",
+      "Pony jump temporary image after next command: green_dragon_out_hedge_open.png",
+      "Pony jump room after east: dreary",
+      "Pony jump temporary image after east: none",
     ],
   },
   {
@@ -3257,7 +3316,31 @@ const gameCases = [
     ],
   },
   {
-    name: "climb on branch still matches the pony sequence",
+    name: "jumping from the branch too soon causes a small fall",
+    setup(game) {
+      game.currentRoom = "green_dragon_inn_outside";
+      game.player.position = "green_dragon_inn_outside";
+      game.items.low_branch.visible = true;
+      game.flags.seenpony = true;
+      game.flags.ponypreparing = false;
+      game.flags.ponyready = false;
+      game.player.strength = 12;
+    },
+    drive(game) {
+      game.execute("climb on branch");
+      game.execute("jump");
+      game.print(`Still perched after bad jump: ${game.flags.ponybranchperched ? "yes" : "no"}`);
+      game.print(`Strength after bad jump: ${game.player.strength}`);
+    },
+    expectedIncluded: [
+      "You climb onto the low branch",
+      "You let yourself drop too soon",
+      "Still perched after bad jump: no",
+      "Strength after bad jump: 11",
+    ],
+  },
+  {
+    name: "climb on branch now perches before the pony jump sequence",
     setup(game) {
       game.currentRoom = "green_dragon_inn_outside";
       game.player.position = "green_dragon_inn_outside";
@@ -3269,10 +3352,42 @@ const gameCases = [
     drive(game) {
       game.execute("climb on branch");
       game.print(`Room after climb on branch: ${game.currentRoom}`);
+      game.print(`Perched after climb on branch: ${game.flags.ponybranchperched ? "yes" : "no"}`);
+      game.print(`Pony departure pending after climb on branch: ${game.flags.ponydeparturepending ? "yes" : "no"}`);
+      game.execute("jump");
+      game.print(`Perched after jump from branch: ${game.flags.ponybranchperched ? "yes" : "no"}`);
+      game.print(`Pony departure pending after jump from branch: ${game.flags.ponydeparturepending ? "yes" : "no"}`);
     },
     expectedIncluded: [
-      "You position yourself over the pony and jump on it.",
-      "Room after climb on branch: dreary",
+      "You climb onto the low branch",
+      "Room after climb on branch: green_dragon_inn_outside",
+      "Perched after climb on branch: yes",
+      "Pony departure pending after climb on branch: no",
+      "Perched after jump from branch: no",
+      "Pony departure pending after jump from branch: yes",
+    ],
+  },
+  {
+    name: "drop from a ready branch matches the successful pony jump",
+    setup(game) {
+      game.currentRoom = "green_dragon_inn_outside";
+      game.player.position = "green_dragon_inn_outside";
+      game.items.low_branch.visible = true;
+      game.flags.seenpony = true;
+      game.flags.ponypreparing = false;
+      game.flags.ponyready = true;
+    },
+    drive(game) {
+      game.execute("climb on branch");
+      game.execute("drop");
+      game.print(`Pony departure pending after drop from branch: ${game.flags.ponydeparturepending ? "yes" : "no"}`);
+      game.print(`Temporary image after drop from branch: ${game.temporaryImage?.file || "none"}`);
+    },
+    expectedIncluded: [
+      "You climb onto the low branch",
+      "You edge forward along the low branch",
+      "Pony departure pending after drop from branch: yes",
+      "Temporary image after drop from branch: green_dragon_out_hedge_open.png",
     ],
   },
   {

@@ -7642,3 +7642,175 @@ Future debugging advice
 - Full-width mobile scenes should not use a fixed `dvh` panel with `contain`;
   either match panel height to image aspect ratio or use `cover` and accept crop
 - Collapsed keyboard peek still needs absolute positioning + `cover`
+
+
+Case 160 - 2026-07-07 - The Green Dragon pony jump needed a command-gated second beat
+---------------------------------------------------------------------------------------
+
+Symptom
+-------
+- When Bilbo dropped from the branch onto the pony, the game jumped straight to
+  `dreary` and printed the gloomy empty land description before the hedge-break
+  image had room to land visually
+
+Root cause
+----------
+- The pony leap, hedge break, and move to `dreary` all happened inside one
+  special-action resolution
+- The temporary hedge image appeared, but the same command immediately called
+  the destination-room description path
+
+Resolution
+----------
+- Split the sequence into a transient `ponydeparturepending` state
+- The leap now finishes on the pony, keeps the hedge-break image on screen, and
+  waits for a follow-up travel command
+- `east` / `go east` / similar forward intent completes the move to `dreary`
+- `west`, `inside`, and similar backtracking intents are blocked with narrative
+  replies; `look` and `wait` describe the suspended moment without consuming a
+  turn
+- The completion step renders the `dreary` image before printing the room
+  description
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If a scene needs a cinematic beat, prefer a tiny transient state over forcing
+  spectacle and destination-room description into one parser action
+- When splitting a formerly single-turn scene across two commands, decide
+  explicitly whether the follow-up command should consume a turn
+
+
+Case 161 - 2026-07-07 - The Green Dragon outside image should not stay in the pony-transition art after the road opens
+-------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+- After leaving the inn, reaching `dreary`, and then coming back west, the
+  outside-of-inn scene could still show the hedge-break / pony-transition art
+  instead of the normal `inn outside` image
+
+Root cause
+----------
+- The contextual image rule for `green_dragon_inn_outside` treated
+  `ponypassageopen` / `ponysequencecompleted` as a persistent visual state
+- That made the transition image act like the room's long-term illustration
+  rather than a short-lived scene beat
+
+Resolution
+----------
+- Restricted `green_dragon_out_hedge_open.png` to the transient
+  `ponydeparturepending` state only
+- Added a regression test that returns west from `dreary` and confirms the room
+  falls back to `Green_dragon_out.jpeg`
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Distinguish between temporary scene art and stable room art; a one-shot
+  transition image should usually key off a transient flag, not a permanent
+  route-open flag
+
+
+Case 162 - 2026-07-07 - The Green Dragon branch should be a real perch, not an immediate pony-launch switch
+------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+- `climb branch` still behaved like a direct pony-launch trigger or a hard
+  refusal, depending on whether the pony was ready
+- The player could not perch on the branch first and then choose whether to
+  wait, climb down, or risk a bad drop before the pony was in place
+
+Root cause
+----------
+- The old Green Dragon special action treated the branch climb and the pony jump
+  as the same action
+- There was no transient state for "Bilbo is on the branch but has not dropped
+  yet"
+
+Resolution
+----------
+- Added a transient `ponybranchperched` state for Bilbo on the low branch
+- `climb branch` now perches Bilbo above the yard instead of launching the pony
+  sequence immediately
+- From the branch:
+  - `wait` lets time pass while perched
+  - `jump` / `drop` before the pony is ready makes Bilbo fall awkwardly and lose
+    a little strength
+  - `climb down` returns safely to the yard
+  - `jump` once the pony is ready starts the existing pony-departure beat
+- Updated autoplay and parser tests for the new 3-step flow:
+  branch -> pony -> east
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If an action needs anticipation and payoff, split the setup pose from the
+  payoff command rather than overloading one verb to do both
+- When introducing a transient traversal pose, update autoplay in the same pass
+  or old checkpoint-to-checkpoint routes may stall
+
+
+Case 163 - 2026-07-07 - The Green Dragon pony route could reopen after completion, and bare inside/drop commands felt inconsistent
+-------------------------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+- After reaching `dreary` and then returning west, the player could climb the
+  branch again and accidentally reopen the pony-departure transition
+- `drop` from a ready branch did not reliably behave like the successful jump
+- A bare `inside` command outside the inn did not behave like the more natural
+  `go inside`
+
+Root cause
+----------
+- The branch-perch logic still relied directly on `seenpony` / `ponyready`
+  flags even after `ponysequencecompleted`, so the branch could keep acting as
+  though the pony route were still active
+- The departure transition did not explicitly shut down the ready/preparing pony
+  flags once the one-shot route had been committed
+- Command normalization handled many `go inside` aliases, but not the bare
+  `inside` form players naturally try
+
+Resolution
+----------
+- Added explicit branch helpers that treat the pony route as available only
+  before `ponysequencecompleted`
+- Cleared pony preparation / ready flags when the pending hedge-break departure
+  begins and again when it resolves into `dreary`
+- Hardened the branch drop handling so `drop` uses the same success path as the
+  good branch jump
+- Normalized bare `inside` / `outside` to `go inside` / `go outside`
+- Added parser regressions for:
+  - returning west from `dreary` and trying to reopen the branch route
+  - `drop` from a ready branch
+  - bare `inside` after returning to the inn exterior
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When a traversal scene is meant to be one-shot, gate all later helper text and
+  command affordances through an explicit "route still available" check
+- For player-friendly travel verbs, add the shortest natural form as a parser
+  alias if a room already has a clear directional counterpart
