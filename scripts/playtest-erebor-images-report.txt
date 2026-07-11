@@ -1,6 +1,6 @@
 Erebor endgame image transition audit
-Date: 2026-07-11T14:28:37.506Z
-Image transitions logged: 56
+Date: 2026-07-11T16:18:06.731Z
+Image transitions logged: 55
 Issues: 0
 
 No image transition issues detected.
@@ -69,13 +69,16 @@ east @ erebor_treasure_approach
   temp=- displayed=treasure_approach.png
   smaugstate=sleeping
 east @ lower_halls
-  temp=smaug_stirs_curious.png displayed=smaug_stirs_curious.png
-  smaugstate=curious
+  temp=- displayed=smaug_sleeping_lower_halls.png
+  smaugstate=sleeping
 wear ring @ lower_halls
-  temp=- displayed=smaug_stirs_curious.png
-  smaugstate=suspicious
+  temp=- displayed=smaug_sleeping_lower_halls.png
+  smaugstate=sleeping
 ask smaug about treasure @ lower_halls
   temp=smaug_weak_spot_glimpse.png displayed=smaug_weak_spot_glimpse.png
+  smaugstate=sleeping
+ask bard about the weak spot @ lower_halls
+  temp=- displayed=smaug_stirs_curious.png
   smaugstate=suspicious
 west @ erebor_treasure_approach
   temp=- displayed=treasure_approach.png
@@ -107,32 +110,26 @@ south west @ front_gate
 west @ stoe_of_ravenhill
   temp=- displayed=ravenhill.jpeg
   smaugstate=sleeping
-say to bard "shoot dragon" @ stoe_of_ravenhill
-  temp=- displayed=ravenhill.jpeg
+wait @ stoe_of_ravenhill
+  temp=thrush_warning_ravenhill.png displayed=thrush_warning_ravenhill.png
   smaugstate=sleeping
-say to bard "shoot dragon" @ stoe_of_ravenhill
+wait @ stoe_of_ravenhill
   temp=ravenhill_dragon_sighting.png displayed=ravenhill_dragon_sighting.png
-  smaugstate=sleeping
-wait @ stoe_of_ravenhill
-  temp=- displayed=ravenhill.jpeg
-  smaugstate=sleeping
-wait @ stoe_of_ravenhill
-  temp=- displayed=ravenhill.jpeg
-  smaugstate=sleeping
-east @ front_gate
-  temp=- displayed=front_gate.jpeg
-  smaugstate=sleeping
-wait @ front_gate
-  temp=- displayed=front_gate.jpeg
-  smaugstate=sleeping
-west @ stoe_of_ravenhill
-  temp=- displayed=ravenhill.jpeg
   smaugstate=sleeping
 say to bard "shoot dragon" @ stoe_of_ravenhill
   temp=black_arrow_loosed.png displayed=black_arrow_loosed.png
   smaugstate=sleeping
-east @ front_gate
+wait @ stoe_of_ravenhill
   temp=smaug_falls_from_sky.png displayed=smaug_falls_from_sky.png
+  smaugstate=sleeping
+wait @ stoe_of_ravenhill
+  temp=laketown_burning.png displayed=laketown_burning.png
+  smaugstate=sleeping
+east @ front_gate
+  temp=dale_standoff_camps.png displayed=dale_standoff_camps.png
+  smaugstate=sleeping
+wait @ front_gate
+  temp=- displayed=front_gate.jpeg
   smaugstate=sleeping
 south @ ruins_of_the_town_of_dale
   temp=- displayed=ruins_of_Dale.jpeg

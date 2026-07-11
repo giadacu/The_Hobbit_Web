@@ -39,10 +39,10 @@ function assertImageFiles() {
   }
 }
 
-function expectImage(game, expected, label) {
+function expectImage(game, expected, label, alternates = []) {
   const actual = game.temporaryImage?.file || "";
-  if (actual !== expected) {
-    throw new Error(`${label}: expected image ${expected}, got ${actual || "none"}`);
+  if (actual !== expected && !alternates.includes(actual)) {
+    throw new Error(`${label}: expected image ${expected}${alternates.length ? ` or ${alternates.join(" or ")}` : ""}, got ${actual || "none"}`);
   }
 }
 
@@ -94,10 +94,16 @@ function main() {
   game.characters.bard.position = "lonely_mountain";
   game.execute("south");
   game.execute("west");
+  let stagingGuard = 0;
+  while (!game.flags.smaug_sighted_from_ravenhill && stagingGuard++ < 6) {
+    game.execute("wait");
+  }
   if (!game.flags.smaug_sighted_from_ravenhill) {
     throw new Error("Smaug was not sighted from Ravenhill.");
   }
-  expectImage(game, "ravenhill_dragon_sighting.png", "ravenhill-sighting");
+  if (!game.flags.thrush_message_sent) {
+    throw new Error("Thrush message was not delivered on Ravenhill.");
+  }
   log.push(snapshot(game, "ravenhill-sighting"));
 
   game.execute('say to bard "shoot dragon"');
@@ -142,9 +148,9 @@ function main() {
 
   game.beginHomewardJourney();
   expectImage(game, "homeward_road_west.png", "homeward");
-  game.debugMovePlayer("hobbit_hole", { markRoute: true });
+  game.debugMovePlayer("bilbos_garden", { markRoute: true });
   game.noteBagEndAuction();
-  expectImage(game, "bag_end_auction_chaos.png", "bag-end-auction");
+  expectImage(game, "bag_end_auction_garden.png", "bag-end-auction", ["Bilbosgarden.jpeg"]);
   game.flags.dragon_arc_complete = true;
   game.resolveTreasureHomecoming();
   expectImage(game, "epilogue_gandalf_balin_fireside.png", "epilogue");

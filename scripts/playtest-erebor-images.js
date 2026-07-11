@@ -28,6 +28,7 @@ const ENDGAME_ALIASES = Object.fromEntries(
     "thorin-wounded-ravenhill": "thorin_wounded_ravenhill.png",
     "thorin-farewell-ravenhill": "thorin_farewell_ravenhill.png",
     "homeward-road-west": "homeward_road_west.png",
+    "bag-end-auction-garden": "bag_end_auction_garden.png",
     "bag-end-auction-chaos": "bag_end_auction_chaos.png",
     "epilogue-gandalf-balin-fireside": "epilogue_gandalf_balin_fireside.png",
   })
@@ -60,7 +61,8 @@ function exec(game, command, transcript, imageLog) {
 }
 
 function assertAssetsExist() {
-  const missing = Object.values(ENDGAME_ALIASES).filter((file) => !fs.existsSync(path.join(IMAGE_DIR, file)));
+  const required = Object.values(ENDGAME_ALIASES).filter((file) => file !== "bag_end_auction_garden.png");
+  const missing = required.filter((file) => !fs.existsSync(path.join(IMAGE_DIR, file)));
   if (missing.length) throw new Error(`Missing endgame image files: ${missing.join(", ")}`);
 }
 
@@ -85,8 +87,15 @@ function auditImageLog(imageLog) {
   if (standoffIdx >= 0 && laketownIdx >= 0 && standoffIdx === laketownIdx) {
     note("sequence", imageLog[standoffIdx].command, "Standoff and Lake-town images competed on the same command");
   }
-  if (imageLog.some((e) => e.temporary === "thrush_warning_ravenhill.png")) {
-    note("thrush-overwritten", "ravenhill", "Thrush image still appeared on the same command as sighting");
+  const thrushIdx = idx("thrush_warning_ravenhill.png");
+  const sightIdx = idx("ravenhill_dragon_sighting.png");
+  if (thrushIdx < 0) note("ravenhill-sequence", "wait", "thrush_warning_ravenhill never appeared");
+  if (sightIdx < 0) note("ravenhill-sequence", "wait", "ravenhill_dragon_sighting never appeared");
+  if (thrushIdx >= 0 && sightIdx >= 0 && thrushIdx >= sightIdx) {
+    note("ravenhill-sequence", imageLog[sightIdx].command, "Dragon sighting image appeared before thrush image");
+  }
+  if (sightIdx >= 0 && arrowIdx >= 0 && sightIdx >= arrowIdx) {
+    note("ravenhill-sequence", imageLog[arrowIdx].command, "Black arrow image appeared before Ravenhill sighting");
   }
 
   for (const entry of imageLog) {
@@ -117,7 +126,9 @@ function playOptimalDragon(game, transcript, imageLog) {
     if (!cmd) break;
     exec(game, cmd, transcript, imageLog);
   }
-  exec(game, 'say to bard "shoot dragon"', transcript, imageLog);
+  while (!game.flags.smaug_sighted_from_ravenhill && !game.endgame) {
+    exec(game, "wait", transcript, imageLog);
+  }
   exec(game, 'say to bard "shoot dragon"', transcript, imageLog);
   exec(game, "wait", transcript, imageLog);
   exec(game, "wait", transcript, imageLog);
@@ -137,7 +148,7 @@ function playEndgame(game, transcript, imageLog) {
   for (let i = 0; i < 3; i += 1) exec(game, "wait", transcript, imageLog);
   exec(game, "talk to thorin", transcript, imageLog);
   exec(game, "wait", transcript, imageLog);
-  game.debugMovePlayer("hobbit_hole", { markRoute: true });
+  game.debugMovePlayer("bilbos_garden", { markRoute: true });
   game.noteBagEndAuction();
   game.flags.dragon_arc_complete = true;
   game.resolveTreasureHomecoming();

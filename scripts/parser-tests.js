@@ -3556,9 +3556,9 @@ const gameCases = [
     ],
   },
   {
-    name: "returning to hobbit hole reveals bag end nearly lost",
+    name: "returning to the garden reveals bag end nearly lost",
     drive(game) {
-      movePlayerTo(game, "hobbit_hole");
+      movePlayerTo(game, "bilbos_garden");
       game.flags.homeward_journey_started = true;
       game.flags.final_return_started = true;
       game.checkSpecialSituations();
@@ -3567,11 +3567,44 @@ const gameCases = [
       game.print(`Bag End auction autosave: ${game.autosaveMeta?.label || "none"}`);
     },
     expectedIncluded: [
-      "The sight within stops you short: labels, bundles, and inquisitive hands have plainly been at work in Bag End, as though its master were safely dead and his goods fit for division.",
-      "You have returned just in time to save your house from being lost piecemeal, though its peace and order have been badly shaken by the attempt.",
+      "The sight in the garden stops you short: neighbours, labels, and half-curious hands have gathered before your round door, as though Bag End's master were safely dead and his goods fit for division.",
+      "You have returned just in time. The house within may still be your own, but the Hill has already begun selling you out from the path.",
       "Bag End auction seen: yes",
       "Epilogue started: yes",
       "Bag End auction autosave: after finding Bag End nearly lost",
+    ],
+  },
+  {
+    name: "homecoming bag end uses return prose instead of opening party atmosphere",
+    drive(game) {
+      movePlayerTo(game, "hobbit_hole");
+      game.flags.homeward_journey_started = true;
+      game.flags.final_return_started = true;
+      game.flags.bag_end_auction_seen = true;
+      game.flags.epilogue_started = true;
+      game.execute("examine coat pegs");
+      game.print(`Party phase: ${game.bagEndPartyPhase()}`);
+    },
+    expectedIncluded: [
+      "Party phase: homecoming",
+      "a regiment of polished pegs standing tidy once more, as though Bag End had been won back from interruption",
+    ],
+    notExpectedIncluded: [
+      "dwarf-cloaks",
+      "oncoming invasion",
+    ],
+  },
+  {
+    name: "returning to hobbit hole reveals bag end nearly lost",
+    drive(game) {
+      movePlayerTo(game, "hobbit_hole");
+      game.flags.homeward_journey_started = true;
+      game.flags.final_return_started = true;
+      game.checkSpecialSituations();
+      game.print(`Bag End auction seen after hobbit hole only: ${game.flags.bag_end_auction_seen ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Bag End auction seen after hobbit hole only: no",
     ],
   },
   {
@@ -6787,6 +6820,20 @@ const gameCases = [
     ],
   },
   {
+    name: "tell bard about the weak spot shares the discovery",
+    drive(game) {
+      game.execute("jump smaug");
+      game.flags.bardreadiedarrow = true;
+      game.execute("ask smaug about treasure");
+      game.execute("tell bard about the weak spot");
+      game.print(`Weak spot shared with Bard: ${game.flags.smaug_weakspot_shared_with_bard ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "You tell Bard what you saw in the treasure-halls: beneath the jeweled mail of Smaug's left breast there is one small bare patch.",
+      "Weak spot shared with Bard: yes",
+    ],
+  },
+  {
     name: "bard weak spot briefing works while wearing the ring",
     drive(game) {
       game.execute("jump smaug");
@@ -6979,21 +7026,31 @@ const gameCases = [
       game.characters.bard.movementMode = "follow";
       game.execute("south");
       game.execute("west");
-      game.print(`Thrush message sent: ${game.flags.thrush_message_sent ? "yes" : "no"}`);
-      game.print(`Bard ready at Ravenhill: ${game.flags.bard_ready_at_ravenhill ? "yes" : "no"}`);
-      game.print(`Smaug sighted from Ravenhill: ${game.flags.smaug_sighted_from_ravenhill ? "yes" : "no"}`);
+      game.print(`After arrival bard ready: ${game.flags.bard_ready_at_ravenhill ? "yes" : "no"}`);
+      game.print(`After arrival thrush sent: ${game.flags.thrush_message_sent ? "yes" : "no"}`);
+      game.print(`After arrival sighted: ${game.flags.smaug_sighted_from_ravenhill ? "yes" : "no"}`);
+      game.execute("wait");
+      game.print(`After wait 1 thrush sent: ${game.flags.thrush_message_sent ? "yes" : "no"}`);
+      game.print(`Thrush image after wait 1: ${game.temporaryImage?.file || "none"}`);
+      game.execute("wait");
+      game.print(`After wait 2 sighted: ${game.flags.smaug_sighted_from_ravenhill ? "yes" : "no"}`);
+      game.print(`Sighting image after wait 2: ${game.temporaryImage?.file || "none"}`);
       game.print(`Black arrow committed: ${game.flags.black_arrow_committed ? "yes" : "no"}`);
       game.print(`Dragon alive after sighting: ${game.liveDragon() ? "yes" : "no"}`);
     },
     expectedIncluded: [
       "Bard steps onto the old stone of Ravenhill and measures the sky above the Mountain. 'Here,' he says softly. 'From this height he must break clear before he stoops on the Lake. If ever there was a place for the last shot, it is this one.'",
+      "After arrival bard ready: yes",
+      "After arrival thrush sent: no",
+      "After arrival sighted: no",
       "A thrush flutters down upon the stones and chatters urgently, confirming Bilbo's warning as though all the old friendship of bird and Dale were gathered into that one small witness.",
       "Bard hears, nods once, and his whole attention narrows to the bare patch beneath Smaug's left breast.",
+      "After wait 1 thrush sent: yes",
+      "Thrush image after wait 1: thrush_warning_ravenhill.png",
       "Then a dark shape lifts beyond the Mountain's shoulder, and for one clear instant Smaug shows black against the sky as he turns toward the Lake.",
       "Bard raises the bow and waits like stone, holding the black arrow ready for your word.",
-      "Thrush message sent: yes",
-      "Bard ready at Ravenhill: yes",
-      "Smaug sighted from Ravenhill: yes",
+      "After wait 2 sighted: yes",
+      "Sighting image after wait 2: ravenhill_dragon_sighting.png",
       "Black arrow committed: no",
       "Dragon alive after sighting: yes",
     ],
@@ -7121,6 +7178,44 @@ const gameCases = [
     ],
     notExpectedIncluded: [
       "Autoplay after weak-spot knowledge: say to bard \"shoot dragon\"",
+    ],
+  },
+  {
+    name: "autoplay shares the weak spot with Bard before leaving the lower halls",
+    drive(game) {
+      game.execute("jump smaug");
+      game.flags.bardreadiedarrow = true;
+      game.flags.smaug_weakspot_known = true;
+      game.characters.bard.carriedBy = game.player.id;
+      game.characters.bard.position = game.currentRoom;
+      game.characters.bard.followingPlayer = false;
+      game.characters.bard.movementMode = "follow";
+      game.print(`Autoplay before weak-spot sharing: ${game.nextAutoplayCommand()}`);
+    },
+    expectedIncluded: [
+      "Autoplay before weak-spot sharing: ask bard about the weak spot",
+    ],
+  },
+  {
+    name: "autoplay waits on Ravenhill until Smaug is sighted",
+    drive(game) {
+      game.execute("jump smaug");
+      game.flags.bardreadiedarrow = true;
+      game.flags.smaug_weakspot_known = true;
+      game.flags.smaug_weakspot_shared_with_bard = true;
+      game.currentRoom = "stoe_of_ravenhill";
+      game.player.position = "stoe_of_ravenhill";
+      game.characters.bard.carriedBy = game.player.id;
+      game.characters.bard.position = "stoe_of_ravenhill";
+      game.characters.bard.followingPlayer = false;
+      game.characters.bard.movementMode = "follow";
+      game.print(`Autoplay at Ravenhill before sighting: ${game.nextAutoplayCommand()}`);
+    },
+    expectedIncluded: [
+      "Autoplay at Ravenhill before sighting: wait",
+    ],
+    notExpectedIncluded: [
+      "Autoplay at Ravenhill before sighting: say to bard \"shoot dragon\"",
     ],
   },
   {
@@ -7558,7 +7653,26 @@ const gameCases = [
     ],
   },
   {
-    name: "asking bard about negotiation starts the standoff parley beat",
+    name: "asking bard about terms starts the standoff parley beat",
+    drive(game) {
+      movePlayerTo(game, "ruins_of_the_town_of_dale");
+      game.flags.dragondefeated = true;
+      game.flags.erebor_standoff_started = true;
+      game.flags.bard_camp_active = true;
+      game.flags.thorin_inside_erebor = true;
+      game.debugSetCharacterRoom("bard", "ruins_of_the_town_of_dale", { visible: true, movementMode: "never" });
+      game.execute("ask bard about terms");
+      game.print(`Negotiation started: ${game.flags.negotiation_started ? "yes" : "no"}`);
+      game.print(`Negotiation softened: ${game.flags.negotiation_softened_by_arkenstone ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Bard says 'Without some pledge or pressure greater than my word alone, Thorin will hear only one old claim set against another. We need more than indignation to begin this talk well.'",
+      "Negotiation started: yes",
+      "Negotiation softened: no",
+    ],
+  },
+  {
+    name: "asking bard about negotiation still starts the standoff parley beat",
     drive(game) {
       movePlayerTo(game, "ruins_of_the_town_of_dale");
       game.flags.dragondefeated = true;
@@ -7568,12 +7682,27 @@ const gameCases = [
       game.debugSetCharacterRoom("bard", "ruins_of_the_town_of_dale", { visible: true, movementMode: "never" });
       game.execute("ask bard about negotiation");
       game.print(`Negotiation started: ${game.flags.negotiation_started ? "yes" : "no"}`);
-      game.print(`Negotiation softened: ${game.flags.negotiation_softened_by_arkenstone ? "yes" : "no"}`);
     },
     expectedIncluded: [
       "Bard says 'Without some pledge or pressure greater than my word alone, Thorin will hear only one old claim set against another. We need more than indignation to begin this talk well.'",
       "Negotiation started: yes",
-      "Negotiation softened: no",
+    ],
+  },
+  {
+    name: "talking to bard before terms are raised points toward seeking terms",
+    drive(game) {
+      movePlayerTo(game, "ruins_of_the_town_of_dale");
+      game.flags.dragondefeated = true;
+      game.flags.erebor_standoff_started = true;
+      game.flags.bard_camp_active = true;
+      game.flags.thorin_inside_erebor = true;
+      game.debugSetCharacterRoom("bard", "ruins_of_the_town_of_dale", { visible: true, movementMode: "never" });
+      game.execute("talk to bard");
+      game.print(`Negotiation started after talk: ${game.flags.negotiation_started ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Bard says 'The dragon is dead, but the quarrel over the treasure is not. If you would help keep this from becoming war, ask me what terms the men of the Lake may reasonably seek.'",
+      "Negotiation started after talk: no",
     ],
   },
   {

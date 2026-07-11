@@ -132,10 +132,11 @@ function main() {
     ['say to bard "shoot dragon"', "wait"],
     (g, steps) => {
       if (g.flags.black_arrow_committed) return { status: "fail", issue: "Arrow loosed before sighting staged", issueType: "logic" };
-      if (!hasText(steps, /has not yet shown himself|measures the sky|dark shape lifts/i)) {
-        return { status: "warn", detail: "Staging may be unclear", issue: "No sighting staging text", issueType: "narrative" };
+      if (g.flags.smaug_sighted_from_ravenhill) return { status: "fail", issue: "Shoot command staged sighting instead of wait flow", issueType: "logic" };
+      if (!hasText(steps, /Wait|thrush|not yet/i)) {
+        return { status: "fail", issue: "No wait guidance before Ravenhill sighting", issueType: "narrative" };
       }
-      return { status: "ok", detail: "Sighting staged before kill shot" };
+      return { status: "ok", detail: "Shot blocked until sighting is staged by wait" };
     },
   );
 
@@ -394,7 +395,7 @@ function main() {
       g.currentRoom = "lower_halls";
       g.player.position = "lower_halls";
     },
-    ["insult smaug", "wait", "wait"],
+    ["insult smaug", "wait", "wait", "wait", "wait", "wait"],
     (g, steps) => {
       if (g.flags.dragondefeated) return { status: "fail", issue: "Dragon defeated by insult", issueType: "logic" };
       if (!g.endgame) return { status: "fail", issue: "Insult did not lead to fatal encounter", issueType: "logic" };

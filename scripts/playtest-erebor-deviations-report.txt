@@ -1,12 +1,12 @@
 Erebor endgame deviation playtest
-Date: 2026-07-11T14:36:42.364Z
+Date: 2026-07-11T16:19:06.359Z
 Scenarios: 22
 Issues: 0
 
 SUMMARY
 - [ok] shoot-no-weak-spot: Sparare senza conoscere il punto debole — Shot blocked with guidance
 - [ok] shoot-wrong-room: Sparare dal Front Gate invece che da Ravenhill — Wrong-room shot blocked
-- [ok] shoot-before-sighting: Sparare da Ravenhill prima dell'avvistamento — Sighting staged before kill shot
+- [ok] shoot-before-sighting: Sparare da Ravenhill prima dell'avvistamento — Shot blocked until sighting is staged by wait
 - [ok] treasure-visible: Prendere il tesoro visibile con Smaug vivo — Visible treasure take blocked
 - [ok] treasure-ring-death: Rubare il tesoro con l'anello (morte attesa) — Fatal end after treasure theft with ring
 - [ok] cup-visible: Rubare la coppa senza anello — Visible cup take blocked
@@ -40,52 +40,52 @@ SUMMARY
   You wait. Time passes... The camps and ruins lie below, but Ravenhill is the height Bard needs. Try west from here.
 
 --- shoot-before-sighting (ok) ---
-> say to bard "shoot dragon" @ stoe_of_ravenhill img=ravenhill_dragon_sighting.png endgame=false
-  Bard steps onto the old stone of Ravenhill and measures the sky above the Mountain. 'Here,' he says softly. 'From this height he must break clear before he stoops on the Lake. If ever there was a place for the last shot,
+> say to bard "shoot dragon" @ stoe_of_ravenhill img=- endgame=false
+  Bard keeps the black arrow low. 'Wait,' he says. 'Let me read the height and the wind before we speak of the shot.' Bard studies the height and says 'From here we command the Mountain's shoulder and the line of the Lake 
 > wait @ stoe_of_ravenhill img=- endgame=false
-  You wait. Time passes...
+  You wait. Time passes... Bard steps onto the old stone of Ravenhill and measures the sky above the Mountain. 'Here,' he says softly. 'From this height he must break clear before he stoops on the Lake. If ever there was a
 
 --- treasure-visible (ok) ---
-> take treasure @ lower_halls img=- endgame=false
-  The dragon guards the treasure too closely. You need the ring's cover or Bard's help. Smaug's voice rolls through the hall, soft and terrible, as he begins to suspect an intruder. Dust stirs over ancient carvings, and fo
-> wait @ lower_halls img=smaug_searching_lower_halls.png endgame=false
-  You wait. Time passes... Smaug rises from the treasure and begins to search the hall in deadly earnest.
+> take treasure @ lower_halls img=smaug_stirs_curious.png endgame=false
+  The dragon guards the treasure too closely. You need the ring's cover or Bard's help. Smaug stirs, one vast lid lifting over a watchful eye.
+> wait @ lower_halls img=- endgame=false
+  You wait. Time passes... Smaug's voice rolls through the hall, soft and terrible, as he begins to suspect an intruder.
 
 --- treasure-ring-death (ok) ---
 > wear ring @ lower_halls img=- endgame=false
-  You wear the golden ring and become unnoticeable. Bard looks around, puzzled, unable to see who is there. Smaug's voice rolls through the hall, soft and terrible, as he begins to suspect an intruder.
+  You wear the golden ring and become unnoticeable. Bard looks around, puzzled, unable to see who is there. Dust stirs over ancient carvings, and for an instant the air seems warmer, touched by the memory of dragon-fire.
 > drop majestic sword @ lower_halls img=- endgame=false
   You leave the majestic sword.
 > drop sturdy rope @ lower_halls img=- endgame=false
-  You leave the sturdy rope.
+  You leave the sturdy rope. Smaug's voice rolls through the hall, soft and terrible, as he begins to suspect an intruder.
 > drop brass lantern @ lower_halls img=- endgame=false
   You leave the brass lantern.
 > take treasure @ lower_halls img=smaug_enraged_lower_halls.png endgame=false
-  You take the treasure. The golden ring slides free from your finger and settles in your pocket. Smaug's patience breaks. Rage shakes the treasure as the dragon lashes the chamber with tail and voice.
+  You take the treasure. The golden ring slips off your finger and falls back into your pocket. Smaug's patience breaks. Rage shakes the treasure as the dragon lashes the chamber with tail and voice.
 > wait @ lower_halls img=smaug_incinirates_bilbo_lower_halls_death.png endgame=true
-  You wait. Time passes... The red golden dragon hurls itself at you, and in a moment the fight is all hands, blows, and confusion. Weariness is already in the limbs, and the work is no longer easy. You try to answer the s
+  You wait. Time passes... The red golden dragon hurls itself at you, and in a moment the fight is all hands, blows, and confusion. Weariness is already in the limbs, and the work is no longer easy. The red golden dragon p
 
 --- cup-visible (ok) ---
-> take cup @ lower_halls img=- endgame=false
-  The golden cup lies within a curl of the dragon's hoard. To take it now would surely wake Smaug. Smaug's voice rolls through the hall, soft and terrible, as he begins to suspect an intruder.
-> wait @ lower_halls img=smaug_searching_lower_halls.png endgame=false
-  You wait. Time passes... Smaug rises from the treasure and begins to search the hall in deadly earnest.
+> take cup @ lower_halls img=smaug_stirs_curious.png endgame=false
+  The golden cup lies within a curl of the dragon's hoard. To take it now would surely wake Smaug. Smaug stirs, one vast lid lifting over a watchful eye.
+> wait @ lower_halls img=- endgame=false
+  You wait. Time passes... Smaug's voice rolls through the hall, soft and terrible, as he begins to suspect an intruder.
 
 --- cup-ring-awakens (ok) ---
 > wear ring @ lower_halls img=- endgame=false
-  You slip the golden ring on and fade from notice. Bard looks around, puzzled, unable to see who is there. Smaug's voice rolls through the hall, soft and terrible, as he begins to suspect an intruder. Dust stirs over anci
-> take cup @ lower_halls img=smaug_searching_lower_halls.png endgame=false
-  You lift a small golden cup from the treasure and slip it away. For a moment the halls remain still, but somewhere upon the gold Smaug's sleep grows troubled. You take the golden cup. Smaug rises from the treasure and be
-> wait @ lower_halls img=- endgame=false
-  You wait. Time passes...
+  You slip the golden ring on and fade from notice. Bard looks around, puzzled, unable to see who is there.
+> take cup @ lower_halls img=golden_cup_stolen.png endgame=false
+  You lift a small golden cup from the treasure and slip it away. For a moment the halls remain still, but somewhere upon the gold Smaug's sleep grows troubled. Smaug's voice rolls through the hall, soft and terrible, as h
+> wait @ lower_halls img=smaug_searching_lower_halls.png endgame=false
+  You wait. Time passes... Smaug rises from the treasure and begins to search the hall in deadly earnest.
 > wait @ lower_halls img=- endgame=false
   You wait. Time passes...
 > wait @ lower_halls img=smaug_incinirates_bilbo_lower_halls_death.png endgame=true
-  You wait. Time passes... The golden ring slides free from your finger and settles in your pocket. The red golden dragon closes with you at once, turning the struggle into a rough and breathless grapple. Weariness is alre
+  You wait. Time passes... The golden ring slips off your finger and falls back into your pocket. The red golden dragon comes on in a rush, clawing and striking at you with savage force. Weariness is already in the limbs, 
 
 --- kill-smaug-sword (ok) ---
 > kill smaug with sword @ lower_halls img=smaug_incinirates_bilbo_lower_halls_death.png endgame=true
-  Your blade flashes before you have time to doubt yourself, drawing a bright arc through the gloom. Weariness is already in the limbs, and the work is no longer easy. The red golden dragon is on you at once with cruel cer
+  You bring the sword round with a swift hard stroke, and for a heartbeat the steel is all you can see. Weariness is already in the limbs, and the work is no longer easy. The red golden dragon is on you at once with cruel 
 
 --- battle-retreat (ok) ---
 > retreat @ ruins_of_the_town_of_dale img=- endgame=true
@@ -97,7 +97,7 @@ SUMMARY
 > wait @ ruins_of_the_town_of_dale img=- endgame=false
   You wait. Time passes... Gandalf says 'A ruined town is a stern book, if one has the heart to read it.'
 > wait @ ruins_of_the_town_of_dale img=- endgame=false
-  You wait. Time passes...
+  You wait. Time passes... The Mountain stands too still for comfort, while the open land below waits like a place expecting another blow.
 > wait @ ruins_of_the_town_of_dale img=- endgame=false
   You wait. Time passes...
 > wait @ ruins_of_the_town_of_dale img=- endgame=false
@@ -117,7 +117,7 @@ SUMMARY
 
 --- thorin-early-talk (ok) ---
 > talk to thorin @ front_gate img=- endgame=false
-  You speak, but only silence meets your words.
+  You speak, but only silence meets your words. A thin metallic whisper travels through the halls as treasure shifts against treasure in the deep.
 > wait @ front_gate img=- endgame=false
   You wait. Time passes... Voices rise and fall between the camps, but no one yet trusts the other enough to lay down pride or steel. Messengers come and go between the ruins and the northern watch, and more than one voice
 
@@ -159,15 +159,19 @@ SUMMARY
 > say to bard "shoot dragon" @ stoe_of_ravenhill img=- endgame=false
   Bard is not here just now.
 > wait @ stoe_of_ravenhill img=- endgame=false
-  You wait. Time passes... The Mountain stands too still for comfort, while the open land below waits like a place expecting another blow.
+  You wait. Time passes...
 
 --- insult-smaug (ok) ---
-> insult smaug @ lower_halls img=- endgame=false
-  You insult red golden dragon. Smaug's voice rolls through the hall, soft and terrible, as he begins to suspect an intruder.
+> insult smaug @ lower_halls img=smaug_stirs_curious.png endgame=false
+  You insult red golden dragon. Smaug stirs, one vast lid lifting over a watchful eye.
+> wait @ lower_halls img=- endgame=false
+  You wait. Time passes... Smaug's voice rolls through the hall, soft and terrible, as he begins to suspect an intruder.
+> wait @ lower_halls img=- endgame=false
+  You wait. Time passes...
 > wait @ lower_halls img=smaug_searching_lower_halls.png endgame=false
   You wait. Time passes... Smaug rises from the treasure and begins to search the hall in deadly earnest.
-> wait @ lower_halls img=smaug_stirs_curious.png endgame=true
-  You wait. Time passes... The red golden dragon hurls itself at you, and in a moment the fight is all hands, blows, and confusion. Weariness is already in the limbs, and the work is no longer easy. The red golden dragon p
+> wait @ lower_halls img=smaug_incinirates_bilbo_lower_halls_death.png endgame=true
+  You wait. Time passes... The red golden dragon comes on in a rush, clawing and striking at you with savage force. Weariness is already in the limbs, and the work is no longer easy. The whole thing turns in a heartbeat, s
 
 --- homeward-without-farewell (ok) ---
 > wait @ stoe_of_ravenhill img=- endgame=false

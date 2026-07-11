@@ -8198,3 +8198,101 @@ Future debugging advice
 - Treasure ring-death test must drop heavy inventory first (capacity 55)
 - Battle scenarios need full standoff flags via `setupBattle()` helper in script
 
+
+Case 171 - 2026-07-11 - Smaug/Ravenhill sequence pacing and staging
+-------------------------------------------------------------
+
+Symptom
+-------
+From a real `front_gate` playthrough:
+- First arrival in Lower Halls immediately showed Smaug searching.
+- Autoplay suggested `shoot dragon` at Ravenhill before Smaug appeared.
+- First `shoot` doubled as weak-spot briefing ("You tell Bard what you saw...").
+- Thrush prose appeared but `thrush_warning_ravenhill` image was skipped in favour
+  of `ravenhill_dragon_sighting` on the same command.
+
+Root cause
+----------
+- `advanceSmaugAwareness()` escalated from global `turnCount`, not turns in
+  `lower_halls`.
+- Autoplay only checked weak-spot knowledge + room for the dragon shot.
+- `handleBardDragonCommand()` auto-shared the weak spot on shoot attempts.
+- `stageRavenhillDragonSighting()` bundled bard-ready, thrush, and sighting.
+
+Resolution
+----------
+1. Track `smaug_hall_turns` for gradual Lower Halls escalation; reset on `jump smaug`.
+2. Autoplay: `ask bard about the weak spot` before routing; `wait` on Ravenhill
+   until `smaug_sighted_from_ravenhill`.
+3. Shoot no longer auto-shares the weak spot or stages Ravenhill beats.
+4. Split Ravenhill into `advanceRavenhillDragonEndgame()` steps across wait/arrival:
+   bard-ready -> thrush image -> dragon sighting image -> shoot.
+5. Added `scripts/playtest-erebor-sequence.js` for the full front_gate path.
+
+Files touched
+-------------
+- game.js
+- scripts/playtest-smaug-endgame.js
+- scripts/playtest-erebor-images.js
+- scripts/playtest-erebor-deviations.js
+- scripts/playtest-erebor-sequence.js
+- scripts/parser-tests.js
+
+Future debugging advice
+-----------------------
+- Run `node scripts/playtest-erebor-sequence.js` after Smaug/Ravenhill changes
+- Expect thrush image on its own wait before `ravenhill_dragon_sighting.png`
+
+
+Case 173 - 2026-07-11 - Bag End homecoming party bleed and garden auction
+---------------------------------------------------------------------------
+
+Symptom
+-------
+- After the long adventure, Bag End still used opening-party prose (coat pegs,
+  dwarf atmosphere, party phase).
+- Bag End auction scene fired inside `hobbit_hole`, clashing with static
+  interior images when searching for keys and storing treasure.
+
+Resolution
+----------
+1. `bagEndPartyPhase()` returns `homecoming` after homeward/epilogue; party
+   advance and dwarf talk/ask disabled.
+2. Atmospheric events in Bag End during homecoming use `homecoming_shire` pool.
+3. Auction moved to `bilbos_garden` with alias `bag-end-auction-garden` ->
+   `bag_end_auction_garden.png` (fallback `Bilbosgarden.jpeg`).
+4. Interior `hobbit_hole` after auction uses calm homecoming description.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+- scripts/playtest-smaug-endgame.js
+- scripts/playtest-erebor-images.js
+
+Future debugging advice
+-----------------------
+- Add `assets/local-images/bag_end_auction_garden.png` when art is ready
+- Auction must trigger in garden, not by entering `hobbit_hole` first
+
+
+Case 172 - 2026-07-11 - Standoff parley priming uses "terms" not "negotiation"
+-----------------------------------------------------------------------------
+
+Symptom
+-------
+After Smaug's fall, `ask bard about negotiation` felt unmotivated: the player had
+seen camp tension but no prior mention of a negotiation in progress.
+
+Resolution
+----------
+1. Standoff intro and Dale room text now mention whether terms may still be spoken.
+2. `talk to bard` before parley nudges toward asking about terms (without starting it).
+3. Autoplay uses `ask bard about terms`; `negotiation` remains a valid alias.
+4. First `ask bard about terms` starts parley; repeats get a shorter follow-up line.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+
