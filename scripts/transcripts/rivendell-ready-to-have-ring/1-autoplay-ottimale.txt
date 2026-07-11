@@ -7,8 +7,6 @@ Final room: deep_dark_lake
 Steps: 20
 
 [setup]
-You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions. To the east there is the round green door. The round green door is closed. You see: a heavy wooden chest reinforced with iron bands, a stout wooden dresser with brass handles, an elegant lamp with intricate engravings, a stack of aged parchment, a dark glass inkwell, a velvety, plush settee, a collection of well-loved books, a leather-bound old book, a beautifully crafted carpet with complex patterns, a regiment of polished pegs still enjoying a last quiet hour of order, a ceramic stand painted with little green leaves, a narrow console table with a polished top and a discreet little drawer. Gandalf waits by the round green door as though measuring the evening by expected knocks. Gandalf is carrying a curious map.
-Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.
 You are in the heart of Rivendell, where carved stone, running water, and old trees are woven together so gently that no hand seems to dominate the place. Light falls softly through leaves and arches alike, and song lingers even when no singer is near. Thorin listens in spite of himself for distant song. Dwalin studies the elvish work with open respect. Balin looks more rested here than on the open road. Fili, Kili, Dori, Nori, Ori, Bifur, Bofur, and Gandalf are close at hand. Elrond is here. He is carrying a gold necklace.
 
 > talk to elrond
@@ -97,7 +95,7 @@ Bilbo darts in again as Gandalf crashes into the brute from the flank; together 
 
 > south west
 (16/20 · room: deep_dark_lake)
-You are beside the black underground lake. The air is cold, wet, and close; drops fall from unseen heights, whispers echo where no one should be standing, and the darkness feels alive with hidden movement beyond the reach of your hands. No answering voice of Gandalf or the dwarves reaches you here; somewhere in the goblin dark you have been cut off from the company. You are utterly alone here, cut off from the company by black water, blind passages, and a darkness that seems glad of the separation. The black water gives back no light. Somewhere beyond it, something waits with all the patience of hunger.
+You are beside the black underground lake. The air is cold, wet, and close; drops fall from unseen heights, whispers echo where no one should be standing, and the darkness feels alive with hidden movement beyond the reach of your hands. You are utterly alone here, cut off from the company by black water, blind passages, and a darkness that seems glad of the separation. The black water gives back no light. Somewhere beyond it, something waits with all the patience of hunger.
 Gollum is here.
 Game saved.
 Groping beside the water in the dark, your fingers close around a small cold ring. Almost without thinking, you slip it into your pocket.

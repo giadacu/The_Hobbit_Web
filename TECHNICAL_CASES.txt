@@ -7878,3 +7878,195 @@ Future debugging advice
   `pocketQuestionAsked` + `enraged`, ring expiry), not only by foe kind
 - Companion ambient lines need both chapter and visit/progress guards, plus
   `onceFlag` when repetition reads mechanical in one playthrough
+
+
+Case 165 - 2026-07-11 - Second narrative playtest fixes: Gollum pocket, lake duplicate, Smaug/Bard, ambient leaks
+-----------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Second manual playtest surfaced eleven narrative defects, including:
+- Wearing the ring then asking Gollum the pocket question returned
+  `who's talking?` and blocked the riddle resolution
+- Deep Dark Lake arrival printed the Gandalf-isolation line twice
+- Gandalf pipe banter on `dreary` immediately after fleeing trolls
+- Gandalf troll ambient line on `hidden_path` during key escape
+- Smaug weak spot auto-shared with Bard on passive `wait`
+- `look` in `lower_halls` mid-Smaug scene reprinted "You enter the lower halls..."
+- Cellar trap-door death line missing final period
+
+Root cause
+----------
+- `handleTalk()` blocked all invisible speech before `handleGollumSpeech()`
+- `checkGollumEncounter()` repeated isolation prose already in room description
+- Pipe initiative still treated post-troll `dreary` like pre-journey comfort rooms
+- `hidden_path` remained in the Gandalf `trolls` ambient bucket (Case 154 fixed
+  only `hidden_valley_path`)
+- `checkSmaugDragonEndgameScenes()` called `shareSmaugWeakSpotWithBard()` on
+  every wait/room check without player briefing
+- `lower_halls` lacked live-dragon contextual descriptions for `look`
+- Trap-door `endGame()` message omitted terminal punctuation
+
+Resolution
+----------
+- Allow Gollum pocket speech while invisible during `awaitingPlayerRiddle`
+- Drop duplicate isolation print from `checkGollumEncounter()`
+- Gate `dreary` pipe banter with `!visitedTrollsClearing`
+- Map `hidden_path` to `mountains` ambient bucket
+- Remove passive weak-spot sharing; add `tryBardWeakSpotBriefing()` for explicit
+  ask/tell to Bard
+- Add contextual `lower_halls` descriptions for live Smaug states
+- Add period to trap-door death `endGame()` line
+- Parser regressions for all high/medium issues above
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Riddle-game speech that advances plot should bypass invisibility blocks when
+  the beat requires Bilbo to speak aloud
+- Scene arrival prose belongs in either static room description or encounter
+  hook, not both
+- Dragon endgame knowledge flags need explicit player briefing paths; passive
+  `wait` must not advance Bard's tactical state
+
+
+Case 166 - 2026-07-11 - Smaug endgame playtest: invisible Bard briefing and transitional images
+-------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Manual Smaug-endgame playtest showed:
+- `ask bard about the weak spot` while wearing the ring failed (`who's talking?`
+  or generic "considers weak spot") even though autoplay expects ring-first play
+- `ask bard about the weak spot` with article "the" did not match briefing terms
+- Dragon defeat, Ravenhill sighting, and Erebor standoff had no transitional art
+
+Root cause
+----------
+- `shareSmaugWeakSpotWithBard()` blocked invisible players entirely
+- `tryBardWeakSpotBriefing()` used `matchesAny()`, which failed on topics like
+  "the weak spot"
+- Endgame beats relied on room JPEG only; no `showTemporaryImage()` hooks
+
+Resolution
+----------
+- Allow whispered weak-spot briefing while invisible (variant prose)
+- Match briefing topics with `includes()` instead of token `matchesAny()`
+- Add transitional images: `ravenhill.jpeg` (sighting), `Smaug.jpeg` (fall),
+  `ruins_of_Dale.jpeg` (standoff)
+- Parser regression for invisible Bard briefing
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Bard briefing while invisible must use `bardAllowsUnseenSpeech()` and topic
+  matching with `includes()`, not `matchesAny()`
+- Dragon shot requires Ravenhill sighting before `black_arrow_committed`
+
+
+Case 167 - 2026-07-11 - Smaug endgame narrative pack and transitional image hooks
+---------------------------------------------------------------------------------
+
+Symptom
+-------
+Playtest follow-up left several endgame beats only partially wired:
+- No golden cup steal in `lower_halls`; `take cup` failed
+- No Ravenhill route guidance after weak-spot discovery
+- No Lake-town burning echo after dragon defeat
+- Standoff/battle/epilogue beats lacked transitional art hooks
+- New prompt-pack filenames had no aliases or graceful missing-asset fallback
+- Beorn north departure without supper, Elrond empty talk stacking, Gandalf
+  Mirkwood line repeating on `great_river`, Bofur hunger without Beorn meal
+
+Root cause
+----------
+- Cup item missing from `game-data.js`; take logic blocked visible theft only
+- Erebor inner rooms lacked contextual Ravenhill guidance on wait/look/tips
+- Dragon defeat printed fall prose but no distant Lake-town echo
+- Endgame functions used hard-coded legacy JPEGs only
+- `showTemporaryImage()` had no onerror fallback for assets not yet added
+- Travel/social edge cases never gated Beorn supper, Elrond talk, or ambient
+  bucket separation for `great_river` vs `mirkwood`
+
+Resolution
+----------
+- Add `golden_cup` at `lower_halls`; ring-covered theft sets `cuptaken` and
+  escalates Smaug awareness
+- Add `showEndgameSceneImage()` + `ENDGAME_SCENE_IMAGES` aliases for full
+  prompt-pack filenames with legacy JPEG fallback via `onerror`
+- Ravenhill route hints via `tryEreborRavenhillRouteHint()`, contextual room
+  descriptions, dynamic `tips`, and wait enrichment
+- `noteLaketownBurningEcho()` after dragon shot; standoff negotiation waits;
+  battle/epilogue image hooks on all major beats
+- Beorn departure gate without `beorn_dinner_seen`; Elrond counsel on empty talk;
+  `great_river` Gandalf ambient bucket; Bofur hunger gated on Beorn meal
+- Parser regressions for cup, Ravenhill hint, Lake-town echo, Beorn block,
+  Elrond talk; flaky deep-lake isolation test accepts both appeal variants
+
+Files touched
+-------------
+- `game.js`
+- `assets/game-data.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Wire new transitional art through `showEndgameSceneImage(name, { fallback })`
+  until assets exist; do not replace working legacy JPEGs in aliases
+- Smaug cup theft should escalate via `cuptaken`, not only `treasuretaken`
+- `great_river` and `mirkwood` need separate Gandalf ambient buckets
+
+
+Case 168 - 2026-07-11 - Endgame PNG assets and Lake-town echo image timing
+---------------------------------------------------------------------------
+
+Symptom
+-------
+After user added all 26 endgame scene images:
+- Transitional art did not load because aliases still pointed to `.jpeg` while
+  files on disk were `.png`
+- Dragon-shot turn showed `smaug_falls_from_sky.png` briefly, then
+  `laketown_burning.png` overwrote it in the same turn via
+  `noteLaketownBurningEcho()`
+- Parser test `Dragon image: smaug_falls_from_sky.png` failed intermittently
+
+Root cause
+----------
+- `ENDGAME_SCENE_IMAGES` aliases not updated when assets shipped as PNG
+- `noteLaketownBurningEcho()` ran on dragon defeat and replaced the fall image
+  before the player advanced a turn
+
+Resolution
+----------
+- Update all `ENDGAME_SCENE_IMAGES` aliases to `.png`
+- Split Lake-town echo: `noteLaketownBurningProse()` on dragon shot (text only);
+  `noteLaketownBurningEcho()` on `wait`/timed specials (prose + image)
+- Wire missing scene hooks: `black-arrow-loosed`, `thorin-farewell-ravenhill`,
+  `eagles-battle-turning` (Gandalf battle path)
+- Add `scripts/playtest-smaug-endgame.js` for end-to-end asset + beat checks
+
+Files touched
+-------------
+- `game.js`
+- `scripts/playtest-smaug-endgame.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- When new art ships, match alias extension to actual file on disk immediately
+- Do not call `showEndgameSceneImage()` twice in one turn unless intentional;
+  split prose vs image across turns for major beats
+- Run `node scripts/playtest-smaug-endgame.js` after endgame image or hook changes
+

@@ -1,0 +1,15 @@
+Smaug endgame playtest: PASS
+Images checked: 26
+Steps: 11
+
+{"label":"jump-smaug","room":"lower_halls","endgame":false,"image":"smaug_stirs_curious.png"}
+{"label":"weak-spot","room":"lower_halls","endgame":false,"image":"smaug_weak_spot_glimpse.png"}
+{"label":"cup-theft","room":"lower_halls","endgame":false,"image":"smaug_searching_lower_halls.png"}
+{"label":"ravenhill-sighting","room":"stoe_of_ravenhill","endgame":false,"image":"ravenhill_dragon_sighting.png"}
+{"label":"dragon-fall","room":"stoe_of_ravenhill","endgame":false,"image":"smaug_falls_from_sky.png"}
+{"label":"laketown-echo","room":"stoe_of_ravenhill","endgame":false,"image":"laketown_burning.png"}
+{"label":"standoff","room":"ruins_of_the_town_of_dale","endgame":false,"image":"dale_standoff_camps.png"}
+{"label":"dain-arrival","room":"ruins_of_the_town_of_dale","endgame":false,"image":"dain_iron_hills_arrival.png"}
+{"label":"battle-won","room":"stoe_of_ravenhill","endgame":false,"image":"eagles_battle_turning.png"}
+{"label":"thorin-farewell","room":"stoe_of_ravenhill","endgame":false,"image":"thorin_farewell_ravenhill.png"}
+{"label":"epilogue","room":"hobbit_hole","endgame":true,"image":"epilogue_gandalf_balin_fireside.png"}

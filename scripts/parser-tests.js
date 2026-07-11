@@ -4967,6 +4967,32 @@ const gameCases = [
     ],
   },
   {
+    name: "hidden path uses mountain Gandalf ambient, not troll banter",
+    drive(game) {
+      game.print(`Hidden path ambient key: ${game.gandalfAmbientKeyForRoom("hidden_path")}`);
+    },
+    expectedIncluded: [
+      "Hidden path ambient key: mountains",
+    ],
+  },
+  {
+    name: "gandalf pipe initiative stays off dreary after the troll encounter",
+    drive(game) {
+      game.execute("jump trolls");
+      game.execute("east");
+      game.currentRoom = "dreary";
+      game.player.position = "dreary";
+      game.visitedTrollsClearing = true;
+      outputLines.length = 0;
+      game.flags.initiative_gandalf_pipe = false;
+      game.advanceCharacterTurn();
+      game.print(`Pipe line on dreary after trolls: ${outputLines.some((line) => line.includes("A wizard never objects to a good pipe")) ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Pipe line on dreary after trolls: no",
+    ],
+  },
+  {
     name: "gandalf pipe initiative stays off the goblin tunnels",
     drive(game) {
       game.execute("jump gollum");
@@ -5197,9 +5223,12 @@ const gameCases = [
     },
     drive(game) {
       game.execute("south");
+      const isolationCount = outputLines.filter((line) => line.includes("No answering voice of Gandalf or the dwarves reaches you here")).length;
+      game.print(`Isolation line count: ${isolationCount}`);
     },
     expectedIncluded: [
       "No answering voice of Gandalf or the dwarves reaches you here. Blind passages and black water have cut you off from the company.",
+      "Isolation line count: 1",
     ],
   },
   {
@@ -6748,12 +6777,60 @@ const gameCases = [
       game.flags.bardreadiedarrow = true;
       game.execute("ask smaug about treasure");
       game.execute("west");
+      game.execute("ask bard about the weak spot");
       game.print(`Weak spot shared with Bard: ${game.flags.smaug_weakspot_shared_with_bard ? "yes" : "no"}`);
     },
     expectedIncluded: [
       "You tell Bard what you saw in the treasure-halls: beneath the jeweled mail of Smaug's left breast there is one small bare patch.",
       "Bard's face hardens as he hears you out. 'The left breast, then,' he says quietly. 'If he gives me that mark in the open, I will not waste the black arrow.'",
       "Weak spot shared with Bard: yes",
+    ],
+  },
+  {
+    name: "bard weak spot briefing works while wearing the ring",
+    drive(game) {
+      game.execute("jump smaug");
+      game.flags.bardreadiedarrow = true;
+      game.execute("ask smaug about treasure");
+      game.execute("wear ring");
+      game.execute("ask bard about the weak spot");
+      game.print(`Weak spot shared while invisible: ${game.flags.smaug_weakspot_shared_with_bard ? "yes" : "no"}`);
+      game.print(`Who's talking block: ${outputLines.some((line) => line.includes("who's talking?")) ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "From the shadows you whisper to Bard what you saw in the treasure-halls: beneath the jeweled mail of Smaug's left breast there is one small bare patch.",
+      "Weak spot shared while invisible: yes",
+      "Who's talking block: no",
+    ],
+  },
+  {
+    name: "waiting alone does not share the smaug weak spot with bard",
+    drive(game) {
+      game.execute("jump smaug");
+      game.flags.bardreadiedarrow = true;
+      game.execute("ask smaug about treasure");
+      game.execute("wait");
+      game.print(`Weak spot shared after wait: ${game.flags.smaug_weakspot_shared_with_bard ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Weak spot shared after wait: no",
+    ],
+  },
+  {
+    name: "lower halls look during smaug search avoids entry wording",
+    drive(game) {
+      game.execute("jump smaug");
+      game.flags.smaugstate = "searching";
+      game.flags.treasuretaken = true;
+      outputLines.length = 0;
+      game.execute("look");
+      const lookLine = outputLines.find((line) => /lower halls of Erebor/i.test(line)) || "";
+      game.print(`Look uses entry wording: ${/^You enter the lower halls/i.test(lookLine) ? "yes" : "no"}`);
+      game.print(`Look mentions prowling Smaug: ${lookLine.includes("prowls among the gold") ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Look uses entry wording: no",
+      "Look mentions prowling Smaug: yes",
     ],
   },
   {
@@ -6769,6 +6846,99 @@ const gameCases = [
       "Bard steadies the bow, then lowers it again. 'Not yet,' he says. 'Against such a beast a blind shot is only waste. We need his weakness, not courage alone.'",
       "Dragon alive after blind shot: yes",
       "Dragon defeated after blind shot: no",
+    ],
+  },
+  {
+    name: "golden cup can be stolen from lower halls while wearing the ring",
+    drive(game) {
+      game.execute("jump smaug");
+      game.execute("wear ring");
+      game.execute("take cup");
+      game.print(`Cup taken: ${game.findInInventory("golden cup") ? "yes" : "no"}`);
+      game.print(`Cup theft flagged: ${game.flags.cuptaken ? "yes" : "no"}`);
+      game.print(`Smaug state after cup theft: ${game.currentSmaugState()}`);
+    },
+    expectedIncluded: [
+      "You lift a small golden cup from the treasure and slip it away.",
+      "Cup taken: yes",
+      "Cup theft flagged: yes",
+      "Smaug state after cup theft: searching",
+    ],
+    notExpectedIncluded: [
+      "I don't see that here.",
+      "To take it now would surely wake Smaug.",
+    ],
+  },
+  {
+    name: "visible bilbo cannot take the golden cup under smaug's nose",
+    drive(game) {
+      game.execute("jump smaug");
+      game.execute("take cup");
+      game.print(`Cup taken visibly: ${game.findInInventory("golden cup") ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "The golden cup lies within a curl of the dragon's hoard. To take it now would surely wake Smaug.",
+      "Cup taken visibly: no",
+    ],
+  },
+  {
+    name: "wait in lower halls hints the Ravenhill route once weak spot is known",
+    drive(game) {
+      game.execute("jump smaug");
+      game.execute("ask smaug about treasure");
+      game.execute("wait");
+      game.print(`Ravenhill hint seen: ${outputLines.some((line) => /Ravenhill/i.test(line) && /Bard must reach/i.test(line)) ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Ravenhill hint seen: yes",
+    ],
+  },
+  {
+    name: "dragon defeat echoes lake-town burning once",
+    drive(game) {
+      game.execute("jump smaug");
+      game.flags.bardreadiedarrow = true;
+      game.flags.smaug_weakspot_known = true;
+      game.flags.smaug_weakspot_shared_with_bard = true;
+      game.flags.smaug_sighted_from_ravenhill = true;
+      game.flags.thrush_message_sent = true;
+      game.currentRoom = "stoe_of_ravenhill";
+      game.player.position = "stoe_of_ravenhill";
+      game.characters.bard.position = "stoe_of_ravenhill";
+      game.execute('say to bard "shoot dragon"');
+      game.execute("wait");
+      game.print(`Lake-town echo count: ${outputLines.filter((line) => /Lake-town is burning/i.test(line)).length}`);
+    },
+    expectedIncluded: [
+      "Far away, the dragon falls from the sky.",
+      "Lake-town is burning",
+      "Lake-town echo count: 1",
+    ],
+  },
+  {
+    name: "beorn blocks northern departure before supper is seen",
+    drive(game) {
+      game.execute("jump beorn");
+      game.flags.beorn_dinner_seen = false;
+      game.execute("north");
+      game.print(`Still at Beorn's house: ${game.currentRoom === "beorns_house" ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Beorn's house still holds the promise of supper",
+      "Still at Beorn's house: yes",
+    ],
+  },
+  {
+    name: "empty talk to elrond gives counsel instead of stacking prompts",
+    drive(game) {
+      game.execute("jump rivendell");
+      game.execute("talk to elrond");
+      game.print(`Elrond counsel line: ${outputLines.some((line) => /Speak plainly, Master Baggins/i.test(line)) ? "yes" : "no"}`);
+      game.print(`Generic listen line: ${outputLines.some((line) => /listens intently, expecting your words/i.test(line)) ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Elrond counsel line: yes",
+      "Generic listen line: no",
     ],
   },
   {
@@ -6829,6 +6999,31 @@ const gameCases = [
     ],
   },
   {
+    name: "endgame transitional image assets exist on disk",
+    drive(game) {
+      const fs = require("fs");
+      const path = require("path");
+      const imageDir = path.join(__dirname, "..", "assets", "local-images");
+      const files = [
+        "smaug_falls_from_sky.png",
+        "laketown_burning.png",
+        "dale_standoff_camps.png",
+        "dain_iron_hills_arrival.png",
+        "battle_five_armies_begins.png",
+        "eagles_battle_turning.png",
+        "thorin_farewell_ravenhill.png",
+        "epilogue_gandalf_balin_fireside.png",
+        "gollum_enraged_pocket_death.png",
+      ];
+      const missing = files.filter((file) => !fs.existsSync(path.join(imageDir, file)));
+      game.print(`Missing endgame assets: ${missing.length ? missing.join(", ") : "none"}`);
+      if (missing.length) throw new Error(`Missing endgame assets: ${missing.join(", ")}`);
+    },
+    expectedIncluded: [
+      "Missing endgame assets: none",
+    ],
+  },
+  {
     name: "bard shoots from Ravenhill only after the sighting is staged",
     drive(game) {
       game.execute("jump smaug");
@@ -6845,6 +7040,7 @@ const gameCases = [
       game.characters.bard.followingPlayer = false;
       game.characters.bard.movementMode = "follow";
       game.execute('say to bard "shoot dragon"');
+      game.print(`Dragon image: ${game.temporaryImage?.file || "none"}`);
       game.print(`Thrush message sent: ${game.flags.thrush_message_sent ? "yes" : "no"}`);
       game.print(`Bard ready at Ravenhill: ${game.flags.bard_ready_at_ravenhill ? "yes" : "no"}`);
       game.print(`Black arrow committed: ${game.flags.black_arrow_committed ? "yes" : "no"}`);
@@ -6853,6 +7049,7 @@ const gameCases = [
     },
     expectedIncluded: [
       "At your word Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky.",
+      "Dragon image: smaug_falls_from_sky.png",
       "Thrush message sent: yes",
       "Bard ready at Ravenhill: yes",
       "Black arrow committed: yes",
@@ -8356,6 +8553,31 @@ const gameCases = [
     ],
   },
   {
+    name: "gollum pocket question works while wearing the ring",
+    setup(game) {
+      game.currentRoom = "dark_stuffy_passage_13";
+      game.player.position = "dark_stuffy_passage_13";
+    },
+    drive(game) {
+      game.execute("south");
+      game.execute("ask gollum a riddle");
+      let riddle = game.currentGollumRiddle();
+      game.execute(`answer ${riddle.answers[0]}`);
+      riddle = game.currentGollumRiddle();
+      game.execute(`answer ${riddle.answers[0]}`);
+      game.execute("wear ring");
+      game.execute("say to gollum \"what have i got in my pocket\"");
+      game.print(`Pocket asked while invisible: ${game.gollumState?.pocketQuestionAsked ? "yes" : "no"}`);
+      game.print(`Who's talking block: ${outputLines.some((line) => line.includes("who's talking?")) ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Gollum narrows his pale eyes. 'Baggins has answered. Now Baggins asks, yes. Ask it, precious, ask it.'",
+      "You ask 'What have I got in my pocket?'",
+      "Pocket asked while invisible: yes",
+      "Who's talking block: no",
+    ],
+  },
+  {
     name: "gollum riddle path grants escape with ring",
     setup(game) {
       game.currentRoom = "dark_stuffy_passage_13";
@@ -8624,12 +8846,13 @@ const gameCases = [
       game.player.position = "deep_dark_lake";
       game.checkSpecialSituations();
     },
+    clearOutputAfterSetup: true,
     drive(game) {
       game.execute("ask gandalf for help");
       game.execute("talk to thorin");
     },
     expectedIncluded: [
-      /(cut you off from the company|out of earshot|No companion hears you)/,
+      /(?:cut off from the company|out of earshot, and no one answers you)/,
     ],
   },
   {

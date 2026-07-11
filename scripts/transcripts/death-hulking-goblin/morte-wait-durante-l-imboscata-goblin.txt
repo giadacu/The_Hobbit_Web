@@ -11,8 +11,6 @@ Outcome code: death_goblin
 Death image: hulking_goblin_attack_death.png
 
 [setup]
-You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions. To the east there is the round green door. The round green door is closed. You see: a heavy wooden chest reinforced with iron bands, a stout wooden dresser with brass handles, an elegant lamp with intricate engravings, a stack of aged parchment, a dark glass inkwell, a velvety, plush settee, a collection of well-loved books, a leather-bound old book, a beautifully crafted carpet with complex patterns, a regiment of polished pegs still enjoying a last quiet hour of order, a ceramic stand painted with little green leaves, a narrow console table with a polished top and a discreet little drawer. Gandalf waits by the round green door as though measuring the evening by expected knocks. Gandalf is carrying a curious map.
-Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.
 Game saved.
 A hulking goblin drops out of a crack above and crashes into the company before anyone can shout warning.
 Thorin goes down under it with a cry, pinned in the foul dark while the brute hacks and claws for the kill.

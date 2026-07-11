@@ -9,8 +9,6 @@ Large key: yes
 Trolls transformed: yes
 
 [setup]
-You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions. To the east there is the round green door. The round green door is closed. You see: a heavy wooden chest reinforced with iron bands, a stout wooden dresser with brass handles, an elegant lamp with intricate engravings, a stack of aged parchment, a dark glass inkwell, a velvety, plush settee, a collection of well-loved books, a leather-bound old book, a beautifully crafted carpet with complex patterns, a regiment of polished pegs still enjoying a last quiet hour of order, a ceramic stand painted with little green leaves, a narrow console table with a polished top and a discreet little drawer. Gandalf waits by the round green door as though measuring the evening by expected knocks. Gandalf is carrying a curious map.
-Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.
 You are in a gloomy empty land with dreary hills ahead. Shadows cling to the barren earth, where withered grass and ancient stones lie scattered. The hills rise ominously, their somber peaks shrouded in mist, whispering secrets of old. The air is heavy with forgotten tales, and a pervasive melancholy hangs over the desolate landscape. Thorin studies the road ahead. Dori keeps a wary eye on the country round about. Ori rests with pack still within arm's reach. Gloin, Bofur, and Gandalf are nearby as well.
 
 > north
@@ -31,7 +29,6 @@ A troll sniffs the air and peers into the dark beyond the fire. This is no safe 
 > south west
 (2/22 · room: dreary)
 You are in a gloomy empty land with dreary hills ahead. Thorin studies the road ahead. Balin keeps a wary eye on the country round about. Dori rests with pack still within arm's reach. Nori, Ori, Oin, Bifur, and Gandalf wait a little apart, keeping the quiet fellowship of the road.
-Gandalf eyes the pipe and says 'A wizard never objects to a good pipe, though the road needs your courage more.'
 
 > wait
 (3/22 · room: dreary)
@@ -63,6 +60,7 @@ You take the large key.
 > north
 (8/22 · room: hidden_path)
 You are in a hidden path with trolls' footprints. The narrow trail winds through dense, ancient forest. The ground is soft and mossy, marked by deep, unmistakable imprints. Vines and roots intertwine overhead, creating natural arches. The air is thick with the scent of damp foliage, whispering tales of the lumbering giants that once roamed here. To the north there is the heavy rock door. The heavy rock door is closed. Thorin rests with pack still within arm's reach. Dwalin keeps a wary eye on the country round about. Fili studies the road ahead. Dori, Nori, Ori, Bombur, and Gandalf linger a little apart.
+Gandalf says 'The mountains do not hate us, but they care very little whether we live.'
 
 > unlock heavy rock door
 (9/22 · room: hidden_path)

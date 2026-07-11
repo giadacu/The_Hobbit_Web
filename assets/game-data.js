@@ -1574,6 +1574,26 @@ window.HOBBIT_DATA = {
       "reveals": null,
       "specialChar": null
     },
+    "golden_cup": {
+      "id": "golden_cup",
+      "name": "golden cup",
+      "description": "a small ornate golden cup half-buried in the dragon's hoard",
+      "container": false,
+      "keyFor": null,
+      "portable": true,
+      "weight": 1,
+      "strength": 1,
+      "visible": true,
+      "open": false,
+      "locked": false,
+      "requiredKey": null,
+      "weapon": false,
+      "noLid": false,
+      "wearable": false,
+      "worn": false,
+      "reveals": null,
+      "specialChar": null
+    },
     "treasure": {
       "id": "treasure",
       "name": "treasure",
@@ -4043,6 +4063,10 @@ window.HOBBIT_DATA = {
     {
       "room": "cellar",
       "item": "barrel"
+    },
+    {
+      "room": "lower_halls",
+      "item": "golden_cup"
     },
     {
       "room": "lower_halls",
