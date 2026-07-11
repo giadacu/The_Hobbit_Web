@@ -7814,3 +7814,67 @@ Future debugging advice
   command affordances through an explicit "route still available" check
 - For player-friendly travel verbs, add the shortest natural form as a parser
   alias if a room already has a clear directional counterpart
+
+
+Case 164 - 2026-07-11 - Narrative playtest fixes: troll reveal timing, Gollum enraged death, ambient leaks
+------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Offline narrative playthrough of all route transcripts found several immersion
+issues:
+- troll captive dialogue printed while leaving the clearing instead of during
+  the encounter beat
+- Gollum post-pocket `wait` deaths used wrong-answer riddle image/copy
+- Balin's sting remark appeared on the Misty Mountains after Rivendell
+- Gandalf offered map/pipe initiative and generic "listens intently" talk during
+  the live troll encounter
+- Bofur's Mirkwood hunger line repeated across multiple rooms in one route
+- cellar butler window narration repeated the same opening every `wait`
+- route transcript setup still leaked Bag End boot text before jump checkpoints
+
+Root cause
+----------
+- `revealTrollCaptiveScene()` only ran on the next player command, so immediate
+  exits from `trolls_clearing` bundled captive dialogue with departure
+- fatal Gollum combat reused generic combat death text/image selection
+- companion comment gates were too broad (`journey` chapter, no `onceFlag` for
+  Bofur, no Rivendell visit guard)
+- Gandalf initiative/talk had no live-troll encounter guard
+- butler narration used one fixed sentence
+- `defaultSetup()` called `game.execute("jump ...")`, which replayed restart
+  room text in transcript setup
+
+Resolution
+----------
+- Reveal troll captive scene at end of the first turn in the clearing via
+  `advanceCharacterTurn()`
+- Added `gollumEnragedAttackOutcome()` and `gollum_enraged_pocket_death.png`
+  for post-pocket fatal attacks; kept wrong-answer image for riddle failures
+- Gated Balin's sting remark after Rivendell; added `bofur_mirkwood_hunger_remark`
+  once flag
+- Blocked Gandalf initiative and replaced bare talk with a hushed troll-clearing
+  line during live encounters
+- Rotated cellar butler window openings with `cyclingVariant()`
+- Switched route setup jumps to `handleJumpCommand(..., { silent: true })` and
+  cleared boot output before recording setup transcripts
+- Added parser regressions for all areas; regenerated route transcripts
+
+Files touched
+-------------
+- `game.js`
+- `scripts/route-transcript-lib.js`
+- `scripts/check-trolls-to-rivendell.js`
+- `scripts/parser-tests.js`
+- `autoplay-lab.js`
+- `scripts/transcripts/`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- Deferred scene beats tied to "next command" should also fire on turn advance
+  when leaving the scene on that command would misplace the prose
+- Distinguish Gollum death branches by game phase (`awaitingAnswer`,
+  `pocketQuestionAsked` + `enraged`, ring expiry), not only by foe kind
+- Companion ambient lines need both chapter and visit/progress guards, plus
+  `onceFlag` when repetition reads mechanical in one playthrough

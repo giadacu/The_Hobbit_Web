@@ -9,13 +9,12 @@ Steps: 7
 [setup]
 You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions. To the east there is the round green door. The round green door is closed. You see: a heavy wooden chest reinforced with iron bands, a stout wooden dresser with brass handles, an elegant lamp with intricate engravings, a stack of aged parchment, a dark glass inkwell, a velvety, plush settee, a collection of well-loved books, a leather-bound old book, a beautifully crafted carpet with complex patterns, a regiment of polished pegs still enjoying a last quiet hour of order, a ceramic stand painted with little green leaves, a narrow console table with a polished top and a discreet little drawer. Gandalf waits by the round green door as though measuring the evening by expected knocks. Gandalf is carrying a curious map.
 Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.
-Jumped to Lake-town.
-You are in Lake-town, where wet planks, boat-ropes, and curious faces surround the long labor of a town built upon dark water. Word of bedraggled strangers out of the river has run ahead of you, and the place now feels full of shrewd questions, rough hospitality, and a watchfulness that turns naturally toward the Mountain. Thorin keeps his cloak close in the lake-wind. Dwalin seems steadier for the sound of human trade and labor. Balin watches the water and the people with equal suspicion. Ori, Oin, and Bard wait a little apart, keeping the quiet fellowship of the road. Bard is carrying a bow, a strong arrow, a quiver.
-Bard says 'Some roads should not be walked without a bow at your side.'
+You are in Lake-town, where wet planks, boat-ropes, and curious faces surround the long labor of a town built upon dark water. Word of bedraggled strangers out of the river has run ahead of you, and the place now feels full of shrewd questions, rough hospitality, and a watchfulness that turns naturally toward the Mountain. Thorin watches the water and the people with equal suspicion. Dwalin keeps his cloak close in the lake-wind. Balin seems steadier for the sound of human trade and labor. Ori, Oin, and Bard linger a little apart. Bard is carrying a bow, a strong arrow, a quiver.
 
 > ask bard to follow me
 (1/7 · room: wooden_town)
 Bard follows you as closely as possible.
+Bard says 'Some roads should not be walked without a bow at your side.'
 
 > say to bard "get strong arrow from quiver"
 (2/7 · room: wooden_town)
@@ -24,6 +23,7 @@ Bard readies the strong arrow from his quiver.
 > north
 (3/7 · room: long_lake)
 You are at Long Lake, that stretches out like a shimmering ribbon of silver under the open sky. Dwalin studies the lake and distant town with a wary, measuring look. Ori looks as though the nearness of the Mountain matters more than the town below. Bard keeps his bow near and listens for bad news over the water. Bard is carrying a bow, a strong arrow, a quiver.
+Voices carry over the planks in snatches of prices, weather, fish, and rumors from the Mountain.
 
 > north
 (4/7 · room: strong_river)
@@ -39,7 +39,7 @@ You stand amidst the ruins of the once-great town of Dale. Broken walls and crum
 
 > north
 (7/7 · room: front_gate)
-You stand before the Front Gate of Erebor. Vast stonework and weathered carvings still command awe here, but the enormous entrance stands silent, sealed by age, ruin, and shadow. Whatever welcome it once gave, it gives none now. Thorin has little attention left for anything but the halls ahead. Dwalin runs a hand absently over old stone as if greeting kin. Balin stares toward the Mountain's depths with a hunger older than the journey. Fili, Dori, Nori, Ori, Oin, Gloin, Bifur, Bofur, and Bard are nearby as well. Bard is carrying a bow, a strong arrow, a quiver.
+You stand before the Front Gate of Erebor. Vast stonework and weathered carvings still command awe here, but the enormous entrance stands silent, sealed by age, ruin, and shadow. Whatever welcome it once gave, it gives none now. Thorin has little attention left for anything but the halls ahead. Dwalin runs a hand absently over old stone as if greeting kin. Fili stares toward the Mountain's depths with a hunger older than the journey. Kili, Nori, Ori, Oin, Bofur, Bombur, and Bard linger a little apart. Bard is carrying a bow, a strong arrow, a quiver.
 Game saved.
 Bard tests his bowstring and says 'A bowman likes to know his moment before the sky darkens.'
 

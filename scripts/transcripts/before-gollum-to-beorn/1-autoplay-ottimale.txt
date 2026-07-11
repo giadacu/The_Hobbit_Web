@@ -9,7 +9,6 @@ Steps: 18
 [setup]
 You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions. To the east there is the round green door. The round green door is closed. You see: a heavy wooden chest reinforced with iron bands, a stout wooden dresser with brass handles, an elegant lamp with intricate engravings, a stack of aged parchment, a dark glass inkwell, a velvety, plush settee, a collection of well-loved books, a leather-bound old book, a beautifully crafted carpet with complex patterns, a regiment of polished pegs still enjoying a last quiet hour of order, a ceramic stand painted with little green leaves, a narrow console table with a polished top and a discreet little drawer. Gandalf waits by the round green door as though measuring the evening by expected knocks. Gandalf is carrying a curious map.
 Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.
-Jumped to Deep Dark Lake.
 It is pitch dark here. You cannot see the room, its exits, or anything else. You can only feel your way and move by guesswork.
 Game saved.
 Groping beside the water in the dark, your fingers close around a small cold ring. Almost without thinking, you slip it into your pocket.
@@ -25,11 +24,11 @@ Gollum paddles nearer, close enough now that you hear his breathing, and whisper
 > answer dark
 (2/18 · room: deep_dark_lake)
 Gollum nods reluctantly. 'Right, precious. Right.' Gollum murmurs 'Thirty white horses on a red hill. First they champ, then they stamp, then they stand still. What are they, precious?'
-A drip falls somewhere beyond sight, then another, and the dark seems to listen to the sound of its own water.
 
 > answer teeth
 (3/18 · room: deep_dark_lake)
 Gollum narrows his pale eyes. 'Baggins has answered. Now Baggins asks, yes. Ask it, precious, ask it.'
+A drip falls somewhere beyond sight, then another, and the dark seems to listen to the sound of its own water.
 
 > say to gollum "what have i got in my pocket"
 (4/18 · room: deep_dark_lake)
@@ -37,15 +36,15 @@ You ask 'What have I got in my pocket?' Gollum freezes, then hisses wild guesses
 
 > wear ring
 (5/18 · room: deep_dark_lake)
-You slip the golden ring on and fade from notice.
+You wear the golden ring and become unnoticeable.
 
 > north
 (6/18 · room: dark_stuffy_passage_13)
-Hidden by the ring, you edge past Gollum while he gropes and hisses for his precious.
-You blunder into a jagged wall in the darkness and feel the breath go out of you. Strength: 3.
+Invisible under the ring, you slip past Gollum as he claws wildly about for his precious.
+Feeling your way in the dark, you misjudge the floor and plunge into a shallow cavity before hauling yourself out again. Strength: 2.
 It is pitch dark here. You cannot see the room, its exits, or anything else. You can only feel your way and move by guesswork.
 Game saved.
-A wet shriek races the walls behind you. 'Thief, thief, thief!' The echoes crowd so close that the dark feels full of reaching fingers. Invisible or no, each cry seems to find the very finger where the ring rests, as though Gollum's hunger could smell gold through dark and stone. Weariness is in your legs and throat alike now, so that even your frightened breathing feels like something hunting on your heels.
+Somewhere in the deep ways Gollum gives a choking wail, and the tunnels hand it on from crack to crack until it sounds as though he is crawling after you through the stone itself. Whenever he screams for his precious, it seems aimed not at the tunnels generally, but straight at the small circle hidden on your hand. Your own breath comes back harsh and uneven, and for a dreadful instant it sounds as though the tunnels are betraying you to him.
 
 > light lantern
 (7/18 · room: dark_stuffy_passage_13)
@@ -53,43 +52,43 @@ You light the brass lantern with the firestone. It makes a bright light that wil
 
 > north west
 (8/18 · room: dark_stuffy_passage_14)
-The passage smells of damp rot and old wood, a stale breath that only deepens the unease of the place. Thorin keeps close to the wall, breathing carefully. Ori waits tensely in the dark. Gandalf moves with one hand on the rough stone, unwilling to trust the dark.
+The passage smells of damp rot and old wood, a stale breath that only deepens the unease of the place. Thorin keeps close to the wall, breathing carefully. Nori waits tensely in the dark. Bifur listens for any stir ahead. Gandalf waits a little apart with the restlessness of the road still on him.
 Game saved.
+Somewhere in the deep ways Gollum gives a choking wail, and the tunnels hand it on from crack to crack until it sounds as though he is crawling after you through the stone itself. Invisible or no, each cry seems to find the very finger where the ring rests, as though Gollum's hunger could smell gold through dark and stone. Weariness is in your legs and throat alike now, so that even your frightened breathing feels like something hunting on your heels.
 
 > south
 (9/18 · room: dark_stuffy_passage_15)
-The narrow confines make your own heartbeat sound louder than it should, as though the dark were listening back. Thorin holds still whenever the tunnels seem to mutter among themselves. Kili keeps a wary eye on every turning, however little the gloom allows. Gandalf breathes shallowly, as though even sound might draw trouble.
+The narrow confines make your own heartbeat sound louder than it should, as though the dark were listening back. Thorin holds still whenever the tunnels seem to mutter among themselves. Dwalin stands with shoulders tight, listening for boots, claws, or worse. Dori listens for any stir ahead. Ori, Bofur, and Gandalf are close at hand.
 A hideous goblin is here.
 The golden ring slips off your finger and falls back into your pocket.
 Gandalf says 'Goblins love noise, darkness, and cruelty; let us offer them as little of ourselves as we can.'
-Close behind, Gollum's scream tears through the black passages: 'Thief! Thief! Baggins!' and for one sick instant it seems to come from just beyond the next turn. You are breathing too hard to feel truly hidden; every gasp seems loud enough to serve as a guide.
 
 > kill hideous goblin with sword
 (10/18 · room: dark_stuffy_passage_15)
-Your blade flashes before you have time to doubt yourself, drawing a bright arc through the gloom. Every breath is labor now, and the next movement must be made by sheer stubbornness. Bilbo scarcely knows how he manages it, but the hideous goblin is checked and driven back before the answer can come. The hideous goblin collapses among the stones and lies still. The clash echoes wildly from stone to stone, and the dark gives back the sound in ugly fashion.
+Your blade flashes before you have time to doubt yourself, drawing a bright arc through the gloom. Every breath is labor now, and the next movement must be made by sheer stubbornness. For an instant the hideous goblin shows something very like fear, and that is enough. The hideous goblin falls in a heap upon the rock and does not rise again. The sound runs through the cavern in harsh echoes, mingling with the drip of unseen water.
+A wet shriek races the walls behind you. 'Thief, thief, thief!' The echoes crowd so close that the dark feels full of reaching fingers. Weariness is in your legs and throat alike now, so that even your frightened breathing feels like something hunting on your heels.
 
 > north west
 (11/18 · room: dark_stuffy_passage_4)
-A musty reek of mold clings to this tunnel, and the low roof gives the unpleasant sense of stooping toward you. Thorin waits in the foul dark like one expecting the mountain itself to betray him. Kili holds still whenever the tunnels seem to mutter among themselves. Ori breathes shallowly, as though even sound might draw trouble. Gandalf is nearby as well.
+A musty reek of mold clings to this tunnel, and the low roof gives the unpleasant sense of stooping toward you. Thorin waits in the foul dark like one expecting the mountain itself to betray him. Dwalin listens for any stir ahead. Nori keeps close to the wall, breathing carefully. Gloin, Bifur, Bombur, and Gandalf are close at hand.
 A disgusting goblin is here.
 
 > kill disgusting goblin with sword
 (12/18 · room: dark_stuffy_passage_4)
-You bring the sword round with a swift hard stroke, and for a heartbeat the steel is all you can see. Every breath is labor now, and the next movement must be made by sheer stubbornness. The whole thing turns in a heartbeat, sudden and complete. The disgusting goblin collapses among the stones and lies still. Sparks and echoes leap together in the underground dark, as though deeper hollows were listening.
-Farther on, Gollum's voice turns raw with panic. 'Baggins! Thief!' It is not so near now, but no less dreadful for that. Your own breath comes back harsh and uneven, and for a dreadful instant it sounds as though the tunnels are betraying you to him.
+Steel sings in your hand as you strike, and the sudden light of the blade seems brighter than it ought. Every breath is labor now, and the next movement must be made by sheer stubbornness. The whole thing turns in a heartbeat, sudden and complete. The disgusting goblin crumples into the cavern dust, and the malice goes out of it. The sound runs through the cavern in harsh echoes, mingling with the drip of unseen water.
 
 > east
 (13/18 · room: inside_goblins_gate)
-You are inside goblin's gate, in a damp pillared hall lit by sickly torchlight. Moss streaks the stone, a rough table holds bones and stolen trinkets, and a shadowy stair climbs upward into the goblins' deeper ways. Thorin keeps close to the wall, breathing carefully. Fili moves with one hand on the rough stone, unwilling to trust the dark. Kili breathes shallowly, as though even sound might draw trouble. Dori, Oin, and Gandalf wait a little apart, keeping the quiet fellowship of the road.
+You are inside goblin's gate, in a damp pillared hall lit by sickly torchlight. Moss streaks the stone, a rough table holds bones and stolen trinkets, and a shadowy stair climbs upward into the goblins' deeper ways. Thorin keeps close to the wall, breathing carefully. Dwalin waits in the foul dark like one expecting the mountain itself to betray him. Ori waits tensely in the dark. Gandalf lingers a little apart.
+The mountain throws back a last torn cry from Gollum, and though it comes from far below now, it clings to you like cold water. You are breathing too hard to feel truly hidden; every gasp seems loud enough to serve as a guide.
 
 > up
 (14/18 · room: outside_goblins_gate)
-You are outside goblin's gate, where a blackened arch of iron and stone closes the mouth of the tunnels. Green torches burn with an unhealthy light, cruel spikes and old trophies mark the goblins' dominion, and the rock face above seems to lean outward as though listening. Thorin waits tensely in the dark. Dwalin listens for any stir ahead. Balin waits in the foul dark like one expecting the mountain itself to betray him. Nori, Oin, Gloin, Bifur, Bofur, Bombur, and Gandalf are close at hand.
-Behind the goblin gate his lament rises once more, thin with distance and yet so bitter that escape still does not feel like safety. Your own breath comes back harsh and uneven, and for a dreadful instant it sounds as though the tunnels are betraying you to him.
+You are outside goblin's gate, where a blackened arch of iron and stone closes the mouth of the tunnels. Green torches burn with an unhealthy light, cruel spikes and old trophies mark the goblins' dominion, and the rock face above seems to lean outward as though listening. Thorin waits tensely in the dark. Fili waits in the foul dark like one expecting the mountain itself to betray him. Kili listens for any stir ahead. Dori, Ori, and Gandalf are close at hand.
 
 > east
 (15/18 · room: treeless_opening)
-You are in a treeless opening where the mountain land begins to ease at last into broader reaches. Yet there is little softness in it: coarse grass lies bent beneath the wind, scattered stones show through the earth, and the sky above seems too large and changeable to trust for long. It feels less like peace than a place where shelter might be near, if the weather allows it. Thorin keeps an eye on the wild land round about as though expecting movement. Balin watches the river and the banks with a traveller's respect. Fili seems relieved to be in open country again. Kili, Dori, Ori, Gloin, Bofur, and Gandalf are close at hand.
+You are in a treeless opening where the mountain land begins to ease at last into broader reaches. Yet there is little softness in it: coarse grass lies bent beneath the wind, scattered stones show through the earth, and the sky above seems too large and changeable to trust for long. It feels less like peace than a place where shelter might be near, if the weather allows it. Thorin keeps an eye on the wild land round about as though expecting movement. Dwalin watches the river and the banks with a traveller's respect. Balin seems relieved to be in open country again. Fili, Nori, Oin, Gloin, Bifur, Bofur, Bombur, and Gandalf are nearby as well.
 Game saved.
 Bursting out from the goblin gate at last, you find Gandalf and the dwarves hard pressed in the open below the mountain.
 Wargs are already stealing in over the grass, and from the dark heights behind them goblin cries come shrill and eager. A ragged stand of pines at the clearing's edge is the only refuge within reach.
@@ -109,12 +108,12 @@ Then a great beating of wings comes out of the high dark. Eagles stoop from abov
 The black ridges sink behind you. Far ahead the valley opens under a whitening sky, and the Great River begins to gleam like pale metal through the mists of morning.
 By grey morning they set you down beside the Great River on the edge of Beorn's lands, shaken and weary, but alive.
 Game saved.
-You are at the Great River after the eagles' rescue. Dawn lies pale on the broad water, and the wild tumult of wolves, goblins, and burning pines already feels like something suffered in another night. Yet the weariness of it clings to the company, and the lands below promise shelter more than ease. Thorin watches the river and the banks with a traveller's respect. Dwalin keeps an eye on the wild land round about as though expecting movement. Fili seems relieved to be in open country again. Kili, Dori, Nori, Ori, Oin, Bifur, Bombur, and Gandalf are nearby as well.
+You are at the Great River after the eagles' rescue. Dawn lies pale on the broad water, and the wild tumult of wolves, goblins, and burning pines already feels like something suffered in another night. Yet the weariness of it clings to the company, and the lands below promise shelter more than ease. Thorin watches the river and the banks with a traveller's respect. Dwalin keeps an eye on the wild land round about as though expecting movement. Balin seems relieved to be in open country again. Kili, Dori, Nori, Ori, Oin, Gloin, Bifur, Bofur, Bombur, and Gandalf linger a little apart.
 
 > south
 (18/18 · room: beorns_house)
 The weather does not wholly clear, but the worst of its fury passes as you come down at last toward Beorn's lands, leaving only torn cloud and a bitter wind behind you on the heights.
-You are in Beorn's great house, built broad and strong of timber, with a central fire, long tables, and the scent of bread, honey, and clean straw. Everything is orderly, sturdy, and touched by the curious discipline of a household in which beasts and men alike keep good manners. You see: a heavy curtain. Thorin watches the door with road-bred caution. Fili glances often toward the yard and its disciplined beasts. Kili seems impressed by the strength of the house. Ori, Gloin, Bifur, and Gandalf linger a little apart. Beorn is here.
+You are in Beorn's great house, built broad and strong of timber, with a central fire, long tables, and the scent of bread, honey, and clean straw. Everything is orderly, sturdy, and touched by the curious discipline of a household in which beasts and men alike keep good manners. You see: a heavy curtain. Thorin watches the door with road-bred caution. Fili glances often toward the yard and its disciplined beasts. Dori seems impressed by the strength of the house. Nori, Bifur, and Gandalf are close at hand. Beorn is here.
 Game saved.
 Before long the uncanny order of Beorn's house declares itself more plainly: great dogs pad in on their hind legs with trays, while sheep and horses move about the yard and door with the grave purpose of servants that know their business.
 Beorn gives no explanation worth calling one. Yet the board is soon spread with bread, honey, cream, and a prodigious supper, and for a while the whole house feels less strange than magnificently, stubbornly hospitable.

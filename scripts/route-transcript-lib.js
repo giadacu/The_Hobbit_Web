@@ -105,14 +105,21 @@ function slugify(text = "") {
 function defaultSetup(game, seed, jumpCommand, options = {}) {
   outputLines.length = 0;
   game.restartGame();
+  outputLines.length = 0;
   game.storySeed = seed;
-  game.execute(jumpCommand);
+  const jumpTarget = String(jumpCommand || "").replace(/^jump\s+/i, "").trim();
+  if (jumpTarget) {
+    game.handleJumpCommand(jumpTarget, { silent: true });
+  }
   game.storySeed = seed;
   if (typeof game.createGollumState === "function") {
     game.gollumState = game.createGollumState();
   }
   if (typeof options.afterSetup === "function") {
     options.afterSetup(game);
+  }
+  if (game.currentRoom) {
+    game.describeRoom({ full: true });
   }
   if (typeof game.checkSpecialSituations === "function") {
     game.checkSpecialSituations();
@@ -123,6 +130,7 @@ function defaultSetup(game, seed, jumpCommand, options = {}) {
 function cellarEscapeSetup(game, seed) {
   outputLines.length = 0;
   game.restartGame();
+  outputLines.length = 0;
   game.storySeed = seed;
   if (typeof game.createGollumState === "function") {
     game.gollumState = game.createGollumState();

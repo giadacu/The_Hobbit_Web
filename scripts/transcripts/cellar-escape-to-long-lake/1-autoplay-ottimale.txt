@@ -31,7 +31,7 @@ No dwarf thinks much of the arrangement, but cramped discomfort weighs less than
 (3/9 · room: cellar)
 You wait.
 Time passes...
-The butler turns away toward the stair with a muttered complaint, leaving the trap door and the packed barrels unwatched for a precious moment.
+The butler fusses with a tray near the stair and, for a heartbeat, turns away, leaving the trap door and the packed barrels unwatched for a precious moment.
 
 > open trap door
 (4/9 · room: cellar)
@@ -42,7 +42,7 @@ Black water hurries below the opening, shouldering past the piles and posts unde
 (5/9 · room: cellar)
 You wait.
 Time passes...
-The butler turns away toward the stair with a muttered complaint, leaving the trap door and the packed barrels unwatched for a precious moment.
+Muttering over his cups, the butler turns his back, leaving the trap door and the packed barrels unwatched for a precious moment.
 
 > ask thorin to throw barrels through trap door
 (6/9 · room: cellar)
@@ -54,7 +54,7 @@ Water murmurs under the halls, and above it comes the clink of cups and the musi
 (7/9 · room: cellar)
 You wait.
 Time passes...
-The butler turns away toward the stair with a muttered complaint, leaving the open trap door and Bilbo's last empty barrel unwatched for a precious moment.
+With another impatient sigh, the butler pads toward the feast above, leaving the open trap door and Bilbo's last empty barrel unwatched for a precious moment.
 
 > throw barrel through trap door
 (8/9 · room: cellar)

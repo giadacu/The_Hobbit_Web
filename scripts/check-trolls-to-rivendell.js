@@ -42,10 +42,13 @@ function slugify(text = "") {
 function resetBeforeTrolls(game, seed) {
   outputLines.length = 0;
   game.restartGame();
+  outputLines.length = 0;
   game.storySeed = seed;
-  game.execute("jump trolls");
+  game.handleJumpCommand("trolls", { silent: true });
   game.storySeed = seed;
   if (typeof game.createGollumState === "function") game.gollumState = game.createGollumState();
+  game.describeRoom({ full: true });
+  if (typeof game.checkSpecialSituations === "function") game.checkSpecialSituations();
   return outputLines.slice();
 }
 

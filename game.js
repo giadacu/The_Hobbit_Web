@@ -1775,11 +1775,13 @@
       when: ({ game, chapter }) => {
         if (!game.player.inventory.some((itemId) => matches(game.items[itemId]?.name, "short strong dagger"))) return false;
         if (!game.visitedRooms?.has("trolls_cave")) return false;
+        if (game.visitedRooms?.has("rivendell")) return false;
         return ["bag_end", "shire", "journey"].includes(chapter);
       },
       text: "Balin glances at your elvish blade and says 'A better knife than any pantry would usually require, Master Baggins.'",
     },
     {
+      onceFlag: "bofur_mirkwood_hunger_remark",
       chapters: ["mirkwood"],
       text: "Bofur says 'This wood could make a hungry dwarf long for plain honest rain and an open sky.'",
     },
@@ -6258,6 +6260,15 @@
       const { character, remainder } = leadingCharacter;
       if (!remainder) {
         if (game.unexpectedParty?.blocksDirectInteraction(character, "talk")) return true;
+        if (
+          matches(character.name, "gandalf")
+          && game.currentRoom === "trolls_clearing"
+          && !game.trollsTransformed
+          && game.visitedTrollsClearing
+        ) {
+          game.print("Gandalf keeps his eyes on the fire and stays deathly still, daring you to break cover with speech.");
+          return true;
+        }
         game.print(`${sentenceDisplayCharacterName(character)} listens intently, expecting your words.`);
         return true;
       }
@@ -6628,6 +6639,15 @@
       if (special) {
         game.print(special);
         game.noteElrondPreparationInteraction(character, { mode: "talk" });
+        return;
+      }
+      if (
+        matches(character.name, "gandalf")
+        && game.currentRoom === "trolls_clearing"
+        && !game.trollsTransformed
+        && game.visitedTrollsClearing
+      ) {
+        game.print("Gandalf keeps his eyes on the fire and stays deathly still, daring you to break cover with speech.");
         return;
       }
       game.print(`${sentenceDisplayCharacterName(character)} listens intently, expecting your words.`);
@@ -8325,6 +8345,35 @@
       ];
       const variant = openers[Math.abs(hashString(`${game.storySeed}:gollum-opener`)) % openers.length];
       return game.gollumState?.met ? variant.repeat : variant.first;
+    }
+
+    gollumEnragedAttackOutcome() {
+      const styles = [
+        {
+          attack: "Gollum comes shrieking out of the dark with his precious lost and his patience gone, clawing at you before you can turn away.",
+          ending: "Gollum falls on you in a frenzy beside the black water.",
+        },
+        {
+          attack: "With a thin wild cry, Gollum hurls himself at you, all hunger and grief and rage together in one rush.",
+          ending: "Gollum drags you down among the wet stones by the lake.",
+        },
+        {
+          attack: "Gollum springs from the shadows, striking and snatching at you with desperate fury, as though tearing the ring from your very bones.",
+          ending: "Gollum overpowers you in the dark beside the black water.",
+        },
+      ];
+      const index = this.game.gollumState?.pocketQuestionAsked
+        ? Math.abs(hashString(`${this.game.storySeed}:gollum-enraged-death`)) % styles.length
+        : 0;
+      return styles[index] || styles[0];
+    }
+
+    gollumFatalDeathImage() {
+      const game = this.game;
+      if (game.gollumState?.pocketQuestionAsked && game.gollumState?.enraged) {
+        return "gollum_enraged_pocket_death.png";
+      }
+      return "gollum_wrong_answer_to_riddle_death.png";
     }
 
     gollumWrongAnswerOutcome() {
@@ -13016,6 +13065,11 @@
 
       if (text.includes("gollum catches you as the ring fails")) return "gollum_ring_effect_ends_death.png";
       if (
+        text.includes("gollum falls on you in a frenzy beside the black water")
+        || text.includes("gollum drags you down among the wet stones by the lake")
+        || text.includes("gollum overpowers you in the dark beside the black water")
+      ) return "gollum_enraged_pocket_death.png";
+      if (
         text.includes("gollum catches you in the dark")
         || text.includes("gollum tears you down beside the black water")
         || text.includes("gollum strangles you in the dark")
@@ -15456,16 +15510,23 @@
     }
 
     cellarButlerWindowNarration() {
+      const openings = [
+        "The butler turns away toward the stair with a muttered complaint, leaving",
+        "With another impatient sigh, the butler pads toward the feast above, leaving",
+        "Muttering over his cups, the butler turns his back, leaving",
+        "The butler fusses with a tray near the stair and, for a heartbeat, turns away, leaving",
+      ];
+      const opening = this.cyclingVariant("cellar-butler-window-opening", openings);
       if (this.flags.barrelthrown) {
-        return "The butler turns away toward the stair with a muttered complaint, leaving the open trap door unwatched for one precious moment.";
+        return `${opening} the open trap door unwatched for one precious moment.`;
       }
       if (this.flags.barrel_company_launched) {
-        return "The butler turns away toward the stair with a muttered complaint, leaving the open trap door and Bilbo's last empty barrel unwatched for a precious moment.";
+        return `${opening} the open trap door and Bilbo's last empty barrel unwatched for a precious moment.`;
       }
       if (this.flags.barrel_company_prepared) {
-        return "The butler turns away toward the stair with a muttered complaint, leaving the trap door and the packed barrels unwatched for a precious moment.";
+        return `${opening} the trap door and the packed barrels unwatched for a precious moment.`;
       }
-      return "The butler turns away toward the stair with a muttered complaint, leaving the trap door and the nearest casks unwatched for a precious moment.";
+      return `${opening} the trap door and the nearest casks unwatched for a precious moment.`;
     }
 
     markCellarImmediateBarrelJumpWindow() {
@@ -16527,6 +16588,9 @@
     advanceCharacterTurn(options = {}) {
       const { forceMove = false } = options;
       this.turnCount += 1;
+      if (this.trollCaptiveRevealPending()) {
+        this.revealTrollCaptiveScene();
+      }
       this.expireCellarButlerStealthWindow();
       this.updateRingTimers();
       this.updateLanternTimer();
@@ -16698,6 +16762,13 @@
     }
 
     gandalfInitiative(character) {
+      if (
+        this.currentRoom === "trolls_clearing"
+        && !this.trollsTransformed
+        && this.visitedTrollsClearing
+      ) {
+        return null;
+      }
       if (this.characterHas(character, "curious map") && !this.autoplayHas("curious map")) {
         return {
           flag: "initiative_gandalf_offer_map",
@@ -18425,7 +18496,7 @@
       if (key === "spider") return "spider_kills_bilbo_death.png";
       if (key === "wolf") return "warg_kills_bilbo_death.png";
       if (key === "dragon") return "smaug_incinirates_bilbo_lower_halls_death.png";
-      if (key === "gollum") return "gollum_wrong_answer_to_riddle_death.png";
+      if (key === "gollum") return this.encounters.gollumFatalDeathImage();
       return "";
     }
 
@@ -18629,6 +18700,18 @@
       this.aftermath?.registerCharacterDeath(fallen);
       attacker.attackFlag = 0;
       if (fallen.id === this.data.player) {
+        if (
+          matches(winner.name, "gollum")
+          && this.gollumState?.pocketQuestionAsked
+          && this.gollumState?.enraged
+        ) {
+          const outcome = this.encounters.gollumEnragedAttackOutcome();
+          this.endGame(outcome.ending, {
+            fatal: true,
+            deathImage: this.encounters.gollumFatalDeathImage(),
+          });
+          return "";
+        }
         this.endGame(message, { fatal: true, deathImage: this.fatalCombatImageForFoe(this.combatFoeKind(winner)) });
         return "";
       }

@@ -13,23 +13,23 @@ Death image: spider_kills_bilbo_death.png
 [setup]
 You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions. To the east there is the round green door. The round green door is closed. You see: a heavy wooden chest reinforced with iron bands, a stout wooden dresser with brass handles, an elegant lamp with intricate engravings, a stack of aged parchment, a dark glass inkwell, a velvety, plush settee, a collection of well-loved books, a leather-bound old book, a beautifully crafted carpet with complex patterns, a regiment of polished pegs still enjoying a last quiet hour of order, a ceramic stand painted with little green leaves, a narrow console table with a polished top and a discreet little drawer. Gandalf waits by the round green door as though measuring the evening by expected knocks. Gandalf is carrying a curious map.
 Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.
-Jumped to Mirkwood.
-A black forest path runs under close-packed boughs where little light survives to touch the roots. The air is dry, stale, and old, and every turn seems just a little too like the last. Thorin looks worn by hunger and bad light. There is a dry oppressive stillness here, as though the wood were saving its breath for some later unkindness.
-Bofur says 'This wood could make a hungry dwarf long for plain honest rain and an open sky.'
+The trees here are curtained with webbing from branch to branch, so that the grove looks wrapped in old frost though the air is warm and foul. Cocoon-shapes hang among the trunks where no fruit should grow. You see: web-wrapped shapes hanging disturbingly from the branches, a pale swollen sac wrapped in gray silk. Thorin keeps glancing upward, unwilling to let the silk-dark above out of his notice even for a breath. You can still master yourself, though not without feeling how much of your strength the wood has already claimed.
+A great spider is here.
 
 > wait
 (1/2 · room: mirkwood_spider_grove)
 You wait.
 Time passes...
-A thread of web catches at your sleeve, though no breeze should have carried it so far.
+Bofur says 'This wood could make a hungry dwarf long for plain honest rain and an open sky.'
 
 > wait
 (2/2 · room: mirkwood_spider_grove)
 You wait.
 Time passes...
-The great spider closes with you at once, turning the struggle into a rough and breathless grapple. Every breath is labor now, and the next movement must be made by sheer stubbornness. The great spider presses the advantage with hot fury. You collapse at last, and the fight is done. Leaves shiver overhead, and roots catch at every uncertain step beneath the boughs.
+The great spider closes with you at once, turning the struggle into a rough and breathless grapple. Every breath is labor now, and the next movement must be made by sheer stubbornness. You try to answer the stroke, but cannot wholly recover the ground already lost. You fall and lie still.
 So ends this thread of the tale. You have mastered 35.07% of this adventure.
 Type 'restart' to begin the tale again.
+A thread of web catches at your sleeve, though no breeze should have carried it so far.
 
 [final]
 room=mirkwood_spider_grove

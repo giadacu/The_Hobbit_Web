@@ -13,23 +13,21 @@ Death image: bilbo_black_river_death.png
 [setup]
 You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End. Lamps gleam upon the curved walls, the carpet is thick beneath your feet, and the whole smial carries that unmistakable hobbit air of order, comfort, and carefully stored provisions. To the east there is the round green door. The round green door is closed. You see: a heavy wooden chest reinforced with iron bands, a stout wooden dresser with brass handles, an elegant lamp with intricate engravings, a stack of aged parchment, a dark glass inkwell, a velvety, plush settee, a collection of well-loved books, a leather-bound old book, a beautifully crafted carpet with complex patterns, a regiment of polished pegs still enjoying a last quiet hour of order, a ceramic stand painted with little green leaves, a narrow console table with a polished top and a discreet little drawer. Gandalf waits by the round green door as though measuring the evening by expected knocks. Gandalf is carrying a curious map.
 Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.
-Jumped to Beorn's House.
-You are in Beorn's great house, built broad and strong of timber, with a central fire, long tables, and the scent of bread, honey, and clean straw. Everything is orderly, sturdy, and touched by the curious discipline of a household in which beasts and men alike keep good manners. You see: a heavy curtain. Thorin watches the door with road-bred caution. Balin glances often toward the yard and its disciplined beasts. Fili seems impressed by the strength of the house. Kili, Nori, Oin, Bifur, Bofur, Bombur, and Gandalf wait a little apart, keeping the quiet fellowship of the road. Beorn is here.
+You are in Beorn's great house, built broad and strong of timber, with a central fire, long tables, and the scent of bread, honey, and clean straw. Everything is orderly, sturdy, and touched by the curious discipline of a household in which beasts and men alike keep good manners. You see: a heavy curtain. Thorin watches the door with road-bred caution. Dwalin glances often toward the yard and its disciplined beasts. Fili seems impressed by the strength of the house. Dori, Oin, Gloin, Bifur, and Gandalf linger a little apart. Beorn is here.
 Before long the uncanny order of Beorn's house declares itself more plainly: great dogs pad in on their hind legs with trays, while sheep and horses move about the yard and door with the grave purpose of servants that know their business.
 Beorn gives no explanation worth calling one. Yet the board is soon spread with bread, honey, cream, and a prodigious supper, and for a while the whole house feels less strange than magnificently, stubbornly hospitable.
-Gandalf says 'Beorn's hospitality is a strong roof, but it is best not to test its beams.'
-Beorn says 'Keep to the path. Drink no water that runs black under the wood. Follow no lights, however fair they seem.'
 
 > open curtain
 (1/10 · room: beorns_house)
 You open the curtain.
-Beorn adds 'Trust your own bottle before any stream under those boughs.'
-The scent of warm bread, honey, and clean straw drifts through Beorn's stead like a promise of shelter honestly won.
+Gandalf says 'Beorn's hospitality is a strong roof, but it is best not to test its beams.'
+Beorn says 'Keep to the path. Drink no water that runs black under the wood. Follow no lights, however fair they seem.'
+From the yard comes the measured sound of hooves and the uncanny quiet of beasts that know their work.
 
 > open cupboard
 (2/10 · room: beorns_house)
 You open the cupboard.
-Beorn says 'And if the wood offers lights and laughter, keep your feet and let your hunger complain.'
+Beorn adds 'Trust your own bottle before any stream under those boughs.'
 
 > examine cupboard
 (3/10 · room: beorns_house)
@@ -38,30 +36,30 @@ You see a large cupboard set into the wall behind the curtain; inside is a delic
 > take meal
 (4/10 · room: beorns_house)
 You take the meal from the cupboard.
-Beorn eyes your weariness and says 'A hungry traveler thinks poorly. There is food in this house, if you have the sense to look for it.'
+Beorn says 'And if the wood offers lights and laughter, keep your feet and let your hunger complain.'
 
 > eat meal
 (5/10 · room: beorns_house)
 You eat the meal and gain strength.
-Beorn says 'Eat while food is before you, and speak plainly while peace still lasts.'
+Beorn says 'I like roads best when goblins are far from them and wargs farther still.'
 
 > north
 (6/10 · room: great_river)
-You are at the Great River, broad and cold under a wide unsettled sky. Thorin watches the river and the banks with a traveller's respect. Dwalin keeps an eye on the wild land round about as though expecting movement. Balin seems relieved to be in open country again. Fili, Kili, Nori, Oin, Gloin, Bifur, Bofur, Bombur, and Gandalf wait a little apart, keeping the quiet fellowship of the road.
+You are at the Great River, broad and cold under a wide unsettled sky. Thorin watches the river and the banks with a traveller's respect. Dwalin keeps an eye on the wild land round about as though expecting movement. Balin seems relieved to be in open country again. Fili, Kili, Dori, Nori, Ori, Oin, Gloin, Bofur, Bombur, and Gandalf wait a little apart, keeping the quiet fellowship of the road.
 Gandalf says 'When the wood grows silent, pay closer attention, not less.'
 
 > east
 (7/10 · room: gate_to_mirkwood)
-You are at the gate to Mirkwood, where the open lands fall behind and the first black boughs gather ahead with an unwelcoming patience. The air is colder under the trees, and the forest entrance looks less like a road than like a warning made practical. Thorin keeps his shoulders tight, as though expecting the wood itself to lean nearer. Ori glances often into the deeper dark between the trunks, unwilling to ignore what might be there. Even here at the threshold, the wood gives little welcome and less comfort.
+You are at the gate to Mirkwood, where the open lands fall behind and the first black boughs gather ahead with an unwelcoming patience. The air is colder under the trees, and the forest entrance looks less like a road than like a warning made practical. Thorin keeps his shoulders tight, as though expecting the wood itself to lean nearer. Nori walks with the patience of one enduring a road he has no liking for. Behind you lies the open world; before you the forest waits with the patience of something that does not need to hurry.
 Bofur says 'This wood could make a hungry dwarf long for plain honest rain and an open sky.'
 
 > east
 (8/10 · room: bewitched_gloomy_place)
-You are in a bewitched, gloomy place where the wood feels suffered rather than chosen. Unnatural fog clings to the roots, twisted trees lean in with skeletal branches, and half-heard whispers move through the shadows without ever becoming speech. Thorin wears the hungry road like an insult he means to outlast. Kili looks as if he would rather face open weather than another mile of this black wood. Nothing here looks chosen; everything looks suffered.
+You are in a bewitched, gloomy place where the wood feels suffered rather than chosen. Unnatural fog clings to the roots, twisted trees lean in with skeletal branches, and half-heard whispers move through the shadows without ever becoming speech. Thorin wears the hungry road like an insult he means to outlast. Ori moves like someone afraid the trees may be listening. This side-path gloom has the blurred quality of a place reached by enchantment rather than intention.
 
 > east
 (9/10 · room: west_bank)
-You are at the west bank of the Black River. The water runs fast and silent between muddy roots, offering passage where the forest offered only sameness. On the far side a boat lies among the reeds, if you can contrive to reach it. You see: the fast black river with its dark waters, flowing silently and shrouded in gloom. Thorin keeps his shoulders tight, as though expecting the wood itself to lean nearer. Ori keeps close to the path, as though even a few careless steps might be too much invitation. At the riverbank the wood draws back a little, only to leave you in the company of darker water and poorer choices.
+You are at the west bank of the Black River. The water runs fast and silent between muddy roots, offering passage where the forest offered only sameness. On the far side a boat lies among the reeds, if you can contrive to reach it. You see: the fast black river with its dark waters, flowing silently and shrouded in gloom. Thorin keeps his shoulders tight, as though expecting the wood itself to lean nearer. Bifur walks with the patience of one enduring a road he has no liking for. Nori lingers a little apart. The black river offers movement where the forest offered only sameness, but it is not a friendly change.
 Game saved.
 Thorin says 'A boat across the water is near enough to tempt a rope, if the hand is bold.'
 

@@ -1322,8 +1322,9 @@
           && (
             deathImage === "gollum_wrong_answer_to_riddle_death.png"
             || deathImage === "gollum_ring_effect_ends_death.png"
+            || deathImage === "gollum_enraged_pocket_death.png"
             || game.currentRoom === "deep_dark_lake"
-            || /gollum catches you as the ring fails|gollum catches you in the dark|gollum tears you down beside the black water|gollum strangles you in the dark|gollum drags you under the dark lake|gollums whisper curdles into a hiss/i.test(tail)
+            || /gollum catches you as the ring fails|gollum catches you in the dark|gollum tears you down beside the black water|gollum strangles you in the dark|gollum drags you under the dark lake|gollum falls on you in a frenzy beside the black water|gollum drags you down among the wet stones by the lake|gollum overpowers you in the dark beside the black water|gollums whisper curdles into a hiss/i.test(tail)
           )
         );
       },
