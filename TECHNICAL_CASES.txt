@@ -8070,3 +8070,131 @@ Future debugging advice
   split prose vs image across turns for major beats
 - Run `node scripts/playtest-smaug-endgame.js` after endgame image or hook changes
 
+
+Case 168 - 2026-07-11 - Erebor endgame narrative consistency fixes
+------------------------------------------------------------------
+
+Symptom
+-------
+Final-sequence playtest from Front Gate onward surfaced four narrative issues:
+- `craftmanship` typo in the gilded vault description
+- Climax mixed "strong arrow" prose with "black arrow" dialogue
+- Bard still listed as carrying the arrow after the dragon shot
+- First standoff turn at Front Gate described Thorin outside, then cutscene
+  said he had gone within Erebor
+
+Root cause
+----------
+1. Typo lived in `assets/game-data.js` item copy.
+2. The arrow item was named `strong arrow` while dragon-endgame dialogue and
+   images already used `black arrow`.
+3. `black_arrow_committed` did not remove the arrow from Bard's inventory.
+4. `describeRoom()` synced and printed companions before `checkEreborStandoff()`
+   ran `beginEreborStandoff()` on the same movement turn.
+
+Resolution
+----------
+1. Fixed spelling to `craftsmanship`.
+2. Renamed the item display name to `black arrow` and aligned readiness/shoot
+   prose; kept `\barrow\b` command parsing so older phrasing still works.
+3. On dragon shot, detach the arrow from Bard's inventory.
+4. Added `maybeBeginEreborStandoffBeforeRoomView()` at the start of
+   `describeRoom()` so standoff companion placement happens before room text.
+
+Files touched
+-------------
+- assets/game-data.js
+- game.js
+- autoplay-lab.js
+- scripts/parser-tests.js
+- scripts/playtest-erebor-narrative.js
+
+Future debugging advice
+-----------------------
+- Run `node scripts/playtest-erebor-narrative.js` after standoff or Bard
+  loadout changes
+- If a milestone cutscene moves companions, trigger it before `describeRoom()`
+  prints people in the room
+
+
+Case 169 - 2026-07-11 - Erebor endgame image transition sequencing
+---------------------------------------------------------------
+
+Symptom
+-------
+Graphic transition audit from Front Gate onward found several beats where two
+endgame images competed on the same command, or the room art no longer matched
+Smaug's live state after a temporary overlay was dismissed.
+
+Observed behavior
+-----------------
+- `black-arrow-loosed` and `smaug-falls-from-sky` were both shown on the shot
+- `thrush-warning-ravenhill` was immediately overwritten by
+  `ravenhill-dragon-sighting` during staging
+- `laketown-burning` could replace `smaug-falls-from-sky` on the first post-shot
+  wait, and `dale-standoff-camps` could replace Lake-town on the first return
+  to Front Gate
+- After leaving Lower Halls, the base `lower_halls.jpeg` could return while
+  Smaug was still alive
+
+Resolution
+----------
+1. Split the dragon-shot art across turns:
+   - shot command -> `black_arrow_loosed`
+   - next command -> `smaug_falls_from_sky`
+2. Keep thrush prose on Ravenhill staging, but skip the thrush image when the
+   sighting image follows in the same beat.
+3. Defer Lake-town and standoff images across later commands with
+   `laketown_burning_image_armed/ready` and `pending_standoff_image`.
+4. Added contextual Lower Halls room-image rules keyed to `smaugstate`.
+5. Added `scripts/playtest-erebor-images.js` to audit the full transition chain.
+
+Files touched
+-------------
+- game.js
+- scripts/playtest-smaug-endgame.js
+- scripts/parser-tests.js
+- scripts/playtest-erebor-images.js
+
+Future debugging advice
+-----------------------
+- Run `node scripts/playtest-erebor-images.js` after endgame image hook changes
+- Treat each major endgame beat as one visible image per player command unless
+  the second image is intentionally deferred to the next command
+
+
+Case 170 - 2026-07-11 - Erebor endgame deviation playtest
+---------------------------------------------------------
+
+Symptom
+-------
+Need automated coverage for non-optimal player actions through the Erebor
+endgame (wrong shots, visible theft, battle alternatives, standoff skips) to
+catch soft-locks and narrative contradictions.
+
+Resolution
+----------
+Added `scripts/playtest-erebor-deviations.js` with 22 headless scenarios covering:
+- blocked dragon shots (no weak spot, wrong room, no Bard, unshared weak spot)
+- treasure/cup theft paths (visible block, ring death, cup escalation)
+- fatal deviations (sword attack, insult Smaug, battle retreat)
+- standoff/battle branches (no negotiation, wait-only Dain, Thorin hardening,
+  Gandalf+Bard, Thorin×2, Gandalf×2, rushed return after dragon kill)
+- homeward/farewell gates
+
+All 22 scenarios pass. Standoff requires `negotiation_started` (e.g. ask Bard)
+before Dain arrives on wait — by design, not a soft-lock.
+
+OOM note: cap `outputLines` during multi-scenario runs and call `process.exit(0)`
+after report write, same pattern as `playtest-erebor-narrative.js`.
+
+Files touched
+-------------
+- scripts/playtest-erebor-deviations.js
+
+Future debugging advice
+-----------------------
+- Run `node scripts/playtest-erebor-deviations.js` after endgame logic changes
+- Treasure ring-death test must drop heavy inventory first (capacity 55)
+- Battle scenarios need full standoff flags via `setupBattle()` helper in script
+

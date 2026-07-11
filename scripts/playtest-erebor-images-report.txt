@@ -1,0 +1,175 @@
+Erebor endgame image transition audit
+Date: 2026-07-11T14:28:37.506Z
+Image transitions logged: 56
+Issues: 0
+
+No image transition issues detected.
+
+--- TRANSITION LOG ---
+[setup] @ front_gate
+  temp=- displayed=front_gate.jpeg
+ask bard to follow me @ front_gate
+  temp=- displayed=front_gate.jpeg
+  smaugstate=sleeping
+say to bard "get black arrow from quiver" @ front_gate
+  temp=- displayed=front_gate.jpeg
+  smaugstate=sleeping
+read map @ front_gate
+  temp=- displayed=front_gate.jpeg
+  smaugstate=sleeping
+north east @ erebor_hidden_door
+  temp=- displayed=erebor_narrow_hidden_door.png
+  smaugstate=sleeping
+wait @ erebor_hidden_door
+  temp=- displayed=erebor_narrow_hidden_door.png
+  smaugstate=sleeping
+wait @ erebor_hidden_door
+  temp=- displayed=erebor_narrow_hidden_door.png
+  smaugstate=sleeping
+wait @ erebor_hidden_door
+  temp=- displayed=erebor_narrow_hidden_door.png
+  smaugstate=sleeping
+unlock secret door with curious key @ erebor_hidden_door
+  temp=- displayed=erebor_narrow_hidden_door.png
+  smaugstate=sleeping
+open secret door @ erebor_hidden_door
+  temp=- displayed=erebor_narrow_hidden_door.png
+  smaugstate=sleeping
+east @ erebor_hidden_door
+  temp=- displayed=erebor_narrow_hidden_door.png
+  smaugstate=sleeping
+read map @ erebor_hidden_door
+  temp=- displayed=erebor_narrow_hidden_door.png
+  smaugstate=sleeping
+wait @ erebor_hidden_door
+  temp=- displayed=erebor_narrow_hidden_door.png
+  smaugstate=sleeping
+wait @ erebor_hidden_door
+  temp=- displayed=erebor_narrow_revealed_door.png
+  smaugstate=sleeping
+unlock secret door @ erebor_hidden_door
+  temp=- displayed=erebor_narrow_revealed_door.png
+  smaugstate=sleeping
+open secret door @ erebor_hidden_door
+  temp=- displayed=erebor_narrow_open_door.png
+  smaugstate=sleeping
+east @ erebor_watch_chamber
+  temp=- displayed=erebor_watch_chamber.png
+  smaugstate=sleeping
+east @ erebor_upper_tunnels
+  temp=- displayed=erebor_upper_tunnels.png
+  smaugstate=sleeping
+east @ erebor_abandoned_workshop
+  temp=- displayed=erebor_abandoned_workshop.png
+  smaugstate=sleeping
+north @ erebor_great_hall
+  temp=- displayed=erebor_great_hall.png
+  smaugstate=sleeping
+east @ erebor_treasure_approach
+  temp=- displayed=treasure_approach.png
+  smaugstate=sleeping
+east @ lower_halls
+  temp=smaug_stirs_curious.png displayed=smaug_stirs_curious.png
+  smaugstate=curious
+wear ring @ lower_halls
+  temp=- displayed=smaug_stirs_curious.png
+  smaugstate=suspicious
+ask smaug about treasure @ lower_halls
+  temp=smaug_weak_spot_glimpse.png displayed=smaug_weak_spot_glimpse.png
+  smaugstate=suspicious
+west @ erebor_treasure_approach
+  temp=- displayed=treasure_approach.png
+  smaugstate=sleeping
+west @ erebor_great_hall
+  temp=- displayed=erebor_great_hall.png
+  smaugstate=sleeping
+east @ erebor_treasure_approach
+  temp=- displayed=treasure_approach.png
+  smaugstate=sleeping
+west @ erebor_great_hall
+  temp=- displayed=erebor_great_hall.png
+  smaugstate=sleeping
+south @ erebor_abandoned_workshop
+  temp=- displayed=erebor_abandoned_workshop.png
+  smaugstate=sleeping
+west @ erebor_upper_tunnels
+  temp=- displayed=erebor_upper_tunnels.png
+  smaugstate=sleeping
+west @ erebor_watch_chamber
+  temp=- displayed=erebor_watch_chamber.png
+  smaugstate=sleeping
+west @ erebor_hidden_door
+  temp=- displayed=erebor_narrow_open_door.png
+  smaugstate=sleeping
+south west @ front_gate
+  temp=- displayed=front_gate.jpeg
+  smaugstate=sleeping
+west @ stoe_of_ravenhill
+  temp=- displayed=ravenhill.jpeg
+  smaugstate=sleeping
+say to bard "shoot dragon" @ stoe_of_ravenhill
+  temp=- displayed=ravenhill.jpeg
+  smaugstate=sleeping
+say to bard "shoot dragon" @ stoe_of_ravenhill
+  temp=ravenhill_dragon_sighting.png displayed=ravenhill_dragon_sighting.png
+  smaugstate=sleeping
+wait @ stoe_of_ravenhill
+  temp=- displayed=ravenhill.jpeg
+  smaugstate=sleeping
+wait @ stoe_of_ravenhill
+  temp=- displayed=ravenhill.jpeg
+  smaugstate=sleeping
+east @ front_gate
+  temp=- displayed=front_gate.jpeg
+  smaugstate=sleeping
+wait @ front_gate
+  temp=- displayed=front_gate.jpeg
+  smaugstate=sleeping
+west @ stoe_of_ravenhill
+  temp=- displayed=ravenhill.jpeg
+  smaugstate=sleeping
+say to bard "shoot dragon" @ stoe_of_ravenhill
+  temp=black_arrow_loosed.png displayed=black_arrow_loosed.png
+  smaugstate=sleeping
+east @ front_gate
+  temp=smaug_falls_from_sky.png displayed=smaug_falls_from_sky.png
+  smaugstate=sleeping
+south @ ruins_of_the_town_of_dale
+  temp=- displayed=ruins_of_Dale.jpeg
+  smaugstate=sleeping
+ask bard about negotiation @ ruins_of_the_town_of_dale
+  temp=- displayed=ruins_of_Dale.jpeg
+  smaugstate=sleeping
+wait @ ruins_of_the_town_of_dale
+  temp=- displayed=ruins_of_Dale.jpeg
+  smaugstate=sleeping
+wait @ ruins_of_the_town_of_dale
+  temp=dain_iron_hills_arrival.png displayed=dain_iron_hills_arrival.png
+  smaugstate=sleeping
+wait @ ruins_of_the_town_of_dale
+  temp=battle_five_armies_begins.png displayed=battle_five_armies_begins.png
+  smaugstate=sleeping
+wait @ ruins_of_the_town_of_dale
+  temp=- displayed=ruins_of_Dale.jpeg
+  smaugstate=sleeping
+follow gandalf @ stoe_of_ravenhill
+  temp=battle_ravenhill_gandalf.png displayed=battle_ravenhill_gandalf.png
+  smaugstate=sleeping
+help bard @ ruins_of_the_town_of_dale
+  temp=beorn_bear_battle.png displayed=beorn_bear_battle.png
+  smaugstate=sleeping
+wait @ stoe_of_ravenhill
+  temp=thorin_wounded_ravenhill.png displayed=thorin_wounded_ravenhill.png
+  smaugstate=sleeping
+wait @ stoe_of_ravenhill
+  temp=- displayed=ravenhill.jpeg
+  smaugstate=sleeping
+wait @ stoe_of_ravenhill
+  temp=- displayed=ravenhill.jpeg
+  smaugstate=sleeping
+talk to thorin @ stoe_of_ravenhill
+  temp=thorin_farewell_ravenhill.png displayed=thorin_farewell_ravenhill.png
+  smaugstate=sleeping
+wait @ lane_beneath_hill
+  temp=homeward_road_west.png displayed=homeward_road_west.png
+  smaugstate=sleeping

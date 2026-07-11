@@ -2339,7 +2339,7 @@ const gameCases = [
       game.characters.red_golden_dragon.visible = true;
     },
     inputs: ["Bard, can you shoot the dragon?"],
-    expectedIncluded: ["At your word Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky."],
+    expectedIncluded: ["At your word Bard draws his bow, sets the black arrow to the string, and shoots. Far away, the dragon falls from the sky."],
     notExpectedIncluded: ["I'm not sure how to do that.", "The red golden dragon attacks you."],
   },
   {
@@ -2360,7 +2360,7 @@ const gameCases = [
       game.characters.red_golden_dragon.visible = true;
     },
     inputs: ["Bard, can you take the shot?"],
-    expectedIncluded: ["At your word Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky."],
+    expectedIncluded: ["At your word Bard draws his bow, sets the black arrow to the string, and shoots. Far away, the dragon falls from the sky."],
     notExpectedIncluded: ["I'm not sure how to do that.", "I don't see that here."],
   },
   {
@@ -2381,7 +2381,7 @@ const gameCases = [
       game.characters.red_golden_dragon.visible = true;
     },
     inputs: ["Bard, loose the arrow!"],
-    expectedIncluded: ["At your word Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky."],
+    expectedIncluded: ["At your word Bard draws his bow, sets the black arrow to the string, and shoots. Far away, the dragon falls from the sky."],
     notExpectedIncluded: ["I'm not sure how to do that.", "I don't see that here."],
   },
   {
@@ -2402,7 +2402,7 @@ const gameCases = [
       game.characters.red_golden_dragon.visible = true;
     },
     inputs: ["Ask Bard to fire at the dragon."],
-    expectedIncluded: ["At your word Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky."],
+    expectedIncluded: ["At your word Bard draws his bow, sets the black arrow to the string, and shoots. Far away, the dragon falls from the sky."],
     notExpectedIncluded: ["I'm not sure how to do that."],
   },
   {
@@ -7040,7 +7040,9 @@ const gameCases = [
       game.characters.bard.followingPlayer = false;
       game.characters.bard.movementMode = "follow";
       game.execute('say to bard "shoot dragon"');
-      game.print(`Dragon image: ${game.temporaryImage?.file || "none"}`);
+      game.print(`Dragon image after shot: ${game.temporaryImage?.file || "none"}`);
+      game.execute("wait");
+      game.print(`Dragon image after follow-up: ${game.temporaryImage?.file || "none"}`);
       game.print(`Thrush message sent: ${game.flags.thrush_message_sent ? "yes" : "no"}`);
       game.print(`Bard ready at Ravenhill: ${game.flags.bard_ready_at_ravenhill ? "yes" : "no"}`);
       game.print(`Black arrow committed: ${game.flags.black_arrow_committed ? "yes" : "no"}`);
@@ -7048,8 +7050,9 @@ const gameCases = [
       game.print(`Dragon defeated after true shot: ${game.flags.dragondefeated ? "yes" : "no"}`);
     },
     expectedIncluded: [
-      "At your word Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky.",
-      "Dragon image: smaug_falls_from_sky.png",
+      "At your word Bard draws his bow, sets the black arrow to the string, and shoots. Far away, the dragon falls from the sky.",
+      "Dragon image after shot: black_arrow_loosed.png",
+      "Dragon image after follow-up: smaug_falls_from_sky.png",
       "Thrush message sent: yes",
       "Bard ready at Ravenhill: yes",
       "Black arrow committed: yes",

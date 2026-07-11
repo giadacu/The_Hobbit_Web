@@ -1,0 +1,208 @@
+EREbor final sequence narrative audit
+Date: 2026-07-11T14:30:38.330Z
+
+Milestones:
+  secretDoor: yes
+  dragonDefeated: yes
+  standoff: yes
+  dain: yes
+  battle: yes
+  thorinFallen: yes
+  reconciled: yes
+  homeward: yes
+  epilogue: yes
+  won: yes
+
+Steps played: 49
+Final room: hobbit_hole
+Issues found: 0
+
+No automated narrative issues detected.
+
+--- MAIN TRANSCRIPT (last 40 steps) ---
+> east (erebor_watch_chamber)
+This small chamber above the approach was plainly meant for quiet eyes and patient watches. Slits in the stone command the way below, and the dust has not quite smothered the old discipline of the place. To the west there is the secret door. The secret door is open. You see: weathered carvings of kings, hammers, ravens, and mountain stars, a low chest for blankets, oil, and the supplies of a patient watch. Thorin has little attention left for anything but the halls ahead. Fili runs a hand absently over old stone as if greeting kin. Kili stares toward the Mountain's depths with a hunger older than the journey. Dori, Ori, Bofur, and Bard are nearby as well. Bard is carrying a bow, a black arrow, a quiver.
+
+> east (erebor_upper_tunnels)
+The upper tunnels run on in exact dwarf-work, their walls scored with tool-marks, way-runes, and faint traces of old soot. Each turning feels deliberate, as though planned by minds that despised waste. You see: a neatly recessed cache cut straight into the tunnel wall. Thorin runs a hand absently over old stone as if greeting kin. Fili stares toward the Mountain's depths with a hunger older than the journey. Nori has little attention left for anything but the halls ahead. Gloin, Bifur, and Bard wait a little apart, keeping the quiet fellowship of the road. Bard is carrying a bow, a black arrow, a quiver.
+
+> east (erebor_abandoned_workshop)
+Benches, tools, and half-finished work remain in the abandoned workshop as though the hands that used them expected to return at once. Dragon-fire and long neglect have only sharpened the sense of interruption. You see: old tools left where labor ended suddenly and too long ago, a soot-dark cabinet of narrow drawers for a master's tools. Thorin runs a hand absently over old stone as if greeting kin. Dwalin has little attention left for anything but the halls ahead. Balin stares toward the Mountain's depths with a hunger older than the journey. Nori, Oin, Gloin, Bifur, Bombur, and Bard are close at hand. Bard is carrying a bow, a black arrow, a quiver.
+
+> north (erebor_great_hall)
+The great hall of Erebor opens wide and stately, its pillars carved with kings, hammers, and mountains under stars. Even emptied of life, it possesses a grandeur that seems to challenge ruin itself. You see: deep runes cut in the stone by hands that expected their work to be remembered, a raised dais from which kings once judged, feasted, and were remembered. Thorin stares toward the Mountain's depths with a hunger older than the journey. Balin runs a hand absently over old stone as if greeting kin. Kili has little attention left for anything but the halls ahead. Nori, Gloin, Bifur, Bofur, and Bard are close at hand. Bard is carrying a bow, a black arrow, a quiver.
+Dust stirs over ancient carvings, and for an instant the air seems warmer, touched by the memory of dragon-fire.
+
+> east (erebor_treasure_approach)
+Gold-dust glitters in the cracks ahead, and the air grows warmer with every step. The silence here is not empty; it is the held breath of a house occupied by something too mighty to disturb lightly. You see: a drift of coins washed together like metal sand. Thorin runs a hand absently over old stone as if greeting kin. Balin has little attention left for anything but the halls ahead. Fili stares toward the Mountain's depths with a hunger older than the journey. Kili, Dori, Nori, Ori, Bofur, Bombur, and Bard are nearby as well. Bard is carrying a bow, a black arrow, a quiver.
+
+> east (lower_halls)
+You are in the lower halls of Erebor, a mighty chamber of pillars, carvings, and treasure under the Mountain's ancient stone. The air is warm, close, and faintly tainted by dragon-smoke, while Smaug lies upon the gold like a fallen hill of scale and flame. You see: a gilded vault, adorned with intricate designs of ancient craftsmanship, a small ornate golden cup half-buried in the dragon's hoard, the treasure of Smaug. Bard holds himself near the threshold, torn between caution and longing. Smaug lies upon the treasure like a fallen hill of red-gold scale and coiled ruin, his breath moving the nearest coins in slow glittering tides. Bard is carrying a bow, a black arrow, a quiver.
+A red golden dragon is here.
+Smaug stirs, one vast lid lifting over a watchful eye.
+
+> wear ring (lower_halls)
+You draw the golden ring onto your finger and pass from sight.
+Smaug's voice rolls through the hall, soft and terrible, as he begins to suspect an intruder.
+
+> ask smaug about treasure (lower_halls)
+Smaug says 'My armour is like tenfold shields, my teeth are swords, my claws are spears, and this wealth is mine by fire and fear.' As the dragon rolls and gloats among the treasure, you catch sight of one small bare place in the jeweled mail of his left breast.
+
+> west (erebor_treasure_approach)
+Bard falls back with you from the deeper halls at once, keeping close now that the dragon's road plainly leads outward.
+Gold-dust glitters in the cracks ahead, and the air grows warmer with every step. Thorin runs a hand absently over old stone as if greeting kin. Dwalin stares toward the Mountain's depths with a hunger older than the journey. Fili has little attention left for anything but the halls ahead. Nori, Ori, Oin, Gloin, Bifur, Bofur, and Bard linger a little apart. Bard is carrying a bow, a black arrow, a quiver.
+
+> west (erebor_great_hall)
+The great hall of Erebor opens wide and stately, its pillars carved with kings, hammers, and mountains under stars. Thorin stares toward the Mountain's depths with a hunger older than the journey. Dwalin has little attention left for anything but the halls ahead. Fili runs a hand absently over old stone as if greeting kin. Dori, Ori, Oin, and Bombur wait a little apart, keeping the quiet fellowship of the road.
+From somewhere in the old stone comes a dull settling sound, as though the Mountain remembered its own vast weight.
+
+> east (erebor_treasure_approach)
+Gold-dust glitters in the cracks ahead, and the air grows warmer with every step. Thorin runs a hand absently over old stone as if greeting kin. Balin has little attention left for anything but the halls ahead. Fili stares toward the Mountain's depths with a hunger older than the journey. Kili, Dori, Nori, Ori, Bofur, Bombur, and Bard are nearby as well. Bard is carrying a bow, a black arrow, a quiver.
+The golden ring loosens on your finger, then drops into your pocket.
+
+> west (erebor_great_hall)
+The great hall of Erebor opens wide and stately, its pillars carved with kings, hammers, and mountains under stars. Thorin stares toward the Mountain's depths with a hunger older than the journey. Balin runs a hand absently over old stone as if greeting kin. Kili has little attention left for anything but the halls ahead. Nori, Gloin, Bifur, Bofur, and Bard are close at hand. Bard is carrying a bow, a black arrow, a quiver.
+
+> south (erebor_abandoned_workshop)
+Benches, tools, and half-finished work remain in the abandoned workshop as though the hands that used them expected to return at once. Thorin runs a hand absently over old stone as if greeting kin. Dori stares toward the Mountain's depths with a hunger older than the journey. Gloin has little attention left for anything but the halls ahead. Bifur and Bard are close at hand. Bard is carrying a bow, a black arrow, a quiver.
+
+> west (erebor_upper_tunnels)
+The upper tunnels run on in exact dwarf-work, their walls scored with tool-marks, way-runes, and faint traces of old soot. Thorin runs a hand absently over old stone as if greeting kin. Dwalin stares toward the Mountain's depths with a hunger older than the journey. Balin has little attention left for anything but the halls ahead. Ori, Oin, Bifur, Bombur, and Bard linger a little apart. Bard is carrying a bow, a black arrow, a quiver.
+
+> west (erebor_watch_chamber)
+This small chamber above the approach was plainly meant for quiet eyes and patient watches. Thorin has little attention left for anything but the halls ahead. Balin stares toward the Mountain's depths with a hunger older than the journey. Kili runs a hand absently over old stone as if greeting kin. Nori, Gloin, Bifur, Bofur, and Bard linger a little apart. Bard is carrying a bow, a black arrow, a quiver.
+
+> west (erebor_hidden_door)
+You stand before a narrow hidden door cunningly wrought into the western side of the Mountain, so artfully fitted that even found, it seems half a secret still. Thorin has little attention left for anything but the halls ahead. Dori stares toward the Mountain's depths with a hunger older than the journey. Gloin runs a hand absently over old stone as if greeting kin. Bifur and Bard linger a little apart. Bard is carrying a bow, a black arrow, a quiver.
+
+> south west (front_gate)
+You stand before the Front Gate of Erebor. Thorin has little attention left for anything but the halls ahead. Balin runs a hand absently over old stone as if greeting kin. Fili stares toward the Mountain's depths with a hunger older than the journey. Kili, Dori, Nori, Ori, Bofur, Bombur, and Bard linger a little apart. Bard is carrying a bow, a black arrow, a quiver.
+
+> west (stoe_of_ravenhill)
+You are on Ravenhill above the desolation, where the Mountain's western shoulder, the ruined lands below, and the line of Long Lake all lie open together. It is plain why a bowman would choose this height: if Smaug comes abroad toward the town, he must show himself clear against the sky here before he can sweep down. Dwalin keeps his cloak close against the open wind off the water. Kili looks as though the nearness of the Mountain matters more than the town below. Ori studies the lake and distant town with a wary, measuring look. Bifur and Bard wait a little apart, keeping the quiet fellowship of the road. Bard is carrying a bow, a black arrow, a quiver.
+Bard studies the height and says 'From here we command the Mountain's shoulder and the line of the Lake together. If Smaug comes, he must show himself cleanly.'
+
+> say to bard "shoot dragon" (stoe_of_ravenhill)
+You tell Bard what you saw in the treasure-halls: beneath the jeweled mail of Smaug's left breast there is one small bare patch.
+Bard's face hardens as he hears you out. 'The left breast, then,' he says quietly. 'If he gives me that mark in the open, I will not waste the black arrow.'
+Far below, small sounds of watchfires, tools, and anxious voices drift across the desolation without ever softening it.
+
+> say to bard "shoot dragon" (stoe_of_ravenhill)
+Bard steps onto the old stone of Ravenhill and measures the sky above the Mountain. 'Here,' he says softly. 'From this height he must break clear before he stoops on the Lake. If ever there was a place for the last shot, it is this one.'
+A thrush flutters down upon the stones and chatters urgently, confirming Bilbo's warning as though all the old friendship of bird and Dale were gathered into that one small witness.
+Bard hears, nods once, and his whole attention narrows to the bare patch beneath Smaug's left breast.
+Then a dark shape lifts beyond the Mountain's shoulder, and for one clear instant Smaug shows black against the sky as he turns toward the Lake.
+Bard raises the bow and waits like stone, holding the black arrow ready for your word.
+
+> say to bard "shoot dragon" (stoe_of_ravenhill)
+At your word Bard draws his bow, sets the black arrow to the string, and shoots. Far away, the dragon falls from the sky.
+Far below the Mountain, a dull glow and a pillar of smoke tell their own story: Lake-town is burning, though whether from dragon-fire or dragon-fall you cannot yet be certain.
+Balin says 'Better the sound of hammers and market-calls than dragon-fire over a town.'
+
+> east (front_gate)
+By the time you come again beneath the Gate, men from the Lake have gathered among the ruins of Dale and made a wary camp there.
+Thorin has gone within Erebor with the dwarves, while Bard and Gandalf remain without, watching the Mountain as though Smaug's fall had cleared the way for a different danger.
+Game saved.
+You stand before the Front Gate of Erebor. Farther down among the ruins, campfires glimmer where Bard's people have made their stand beneath the Mountain.
+Game saved.
+
+> south (ruins_of_the_town_of_dale)
+You stand among the ruins of Dale, where rough shelters, watch-fires, and hurried councils now occupy the broken streets. Gandalf moves through the camp with the look of someone measuring how little folly would be needed to spoil a victory. Bard keeps his place among the broken stones like a captain who expects words to fail before steel does. Men of the Lake move between fallen stones with bundles, spears, and wary purpose, as though rebuilding and wariness have become the same labor. Bard is carrying a bow, a quiver.
+Gandalf says 'A ruined town is a stern book, if one has the heart to read it.'
+
+> ask bard about negotiation (ruins_of_the_town_of_dale)
+Bard says 'Without some pledge or pressure greater than my word alone, Thorin will hear only one old claim set against another. We need more than indignation to begin this talk well.'
+
+> wait (ruins_of_the_town_of_dale)
+You wait.
+Time passes...
+Voices rise and fall between the camps, but no one yet trusts the other enough to lay down pride or steel.
+Messengers come and go between the ruins and the northern watch, and more than one voice begins to speak uneasily of dwarf-standards on the march from the Iron Hills.
+
+> wait (ruins_of_the_town_of_dale)
+You wait.
+Time passes...
+Gandalf moves among the ruins with the look of a man counting how much quarrel the day can bear before it turns to worse.
+A stir runs through the camp: mail-clad dwarves have come at last from the Iron Hills under Dain, and their coming is more fit for battle than for patient speech.
+What had been a hard negotiation beneath the Mountain now feels one step nearer open war, for Thorin is no longer shut up with only his own company behind him.
+Game saved.
+
+> wait (ruins_of_the_town_of_dale)
+You wait.
+Time passes...
+Before any bargain can ripen, a black tide of goblins and wargs comes pouring out of the north. Horns answer horns, and the whole valley below Erebor turns in a moment from standoff to war.
+Gandalf's voice cuts through the uproar: 'Choose quickly, Bilbo. Follow me, stand with Thorin, help Bard, or retreat while retreat is still possible.'
+Game saved.
+
+> follow gandalf (stoe_of_ravenhill)
+You race after Gandalf toward Ravenhill, where the whole field may be read in one dreadful glance.
+From the height the goblin onset shows its full width, and Gandalf wastes no breath on comfort: someone must steady the day before it collapses altogether.
+
+> help bard (ruins_of_the_town_of_dale)
+You help Bard steady the battered line until the counterstroke goes in at the right moment, and from that moment the goblin host begins at last to buckle.
+Then the eagles are among the enemy in earnest, and with them comes Beorn in a wrath beyond reason, tearing into the goblin host until its last hard courage gives way.
+When the tumult clears, the goblins are broken and scattered. Erebor stands, but the cost of the day is written everywhere among the stones.
+Game saved.
+
+> wait (stoe_of_ravenhill)
+You wait.
+Time passes...
+When the first hard business of victory is under way, word comes quietly that Thorin has been brought to Ravenhill, sorely wounded and asking for Bilbo.
+You go up among the broken stones and find Gandalf beside him. The fury of battle is gone from Thorin now, and there is little strength left to him.
+Beorn stands nearby, still grim from battle, and it is plain from the bearing of the dwarves that he was the one who bore Thorin wounded out of the ruin of the field.
+Game saved.
+  ...
+
+> talk to thorin (stoe_of_ravenhill)
+Game saved.
+Thorin opens his eyes and says 'Farewell, good thief. There is more in you of good than you know: courage and wisdom, blended in measure. If more of us valued food and cheer and song above hoarded gold, it would be a merrier world.'
+
+> wait (lane_beneath_hill)
+You wait.
+Time passes...
+Before you turn west, your share of the treasure is at last made over to you: enough to make the road home heavy, but not empty.
+After Thorin's farewell, the road turns west at last. Long miles pass, the seasons soften, and the Mountain falls away behind memory into tale.
+In time you come again beneath your own Hill, only to find home less patient than you had imagined. Word has run ahead of you in the Shire more quickly than you have.
+Game saved.
+  ...
+
+> west (bilbos_garden)
+You are in the front garden before Bag End, where clipped borders, herbs, and bright flowers soften the green slope.
+
+> open round green door (bilbos_garden)
+You open the round green door.
+Ori slips away in search of room, food, or both.
+A light breeze stirs the herbs and clipped borders, carrying soil, roses, and the quiet comfort of the Hill.
+
+> west (hobbit_hole)
+You are in Bilbo's round front hall, warm with polished wood, brass pegs, and many inviting doors leading deeper into Bag End.
+The sight within stops you short: labels, bundles, and inquisitive hands have plainly been at work in Bag End, as though its master were safely dead and his goods fit for division.
+You have returned just in time to save your house from being lost piecemeal, though its peace and order have been badly shaken by the attempt.
+Game saved.
+From the kitchen comes the warm homely sound of cutlery, cupboard doors, and something sizzling in butter.
+
+> lift carpet (hobbit_hole)
+You lift the carpet.
+Under the carpet there is a small key.
+
+> unlock chest (hobbit_hole)
+You unlock the heavy wooden chest with the small key.
+
+> open chest (hobbit_hole)
+You open the heavy wooden chest.
+
+> put treasure in chest (hobbit_hole)
+You put the treasure in the heavy wooden chest.
+You settle the treasure safely into the heavy wooden chest. At last it is home, yet the tale does not feel wholly ended.
+Game saved.
+Balin comes in again from the garden.
+
+> wait (hobbit_hole)
+You wait.
+Time passes...
+At length there comes a comfortable knock at Bag End, and before long Gandalf is seated by the fire with Balin beside him.
+Balin looks long at Bilbo and smiles, though there is grief in it too; Gandalf seems content, as if the tale has reached the quiet harbour he expected for it all along.
+They look from Bilbo to the chest and back again, and for a while the talk is of roads, losses, wonders, and the queer shape a well-ended tale may take.
+There is laughter still, and good firelight, and the comfort of things restored; yet the evening keeps a thread of sadness in it, as all true endings do when brave folk are missing from the table.
+  ...
+

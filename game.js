@@ -486,7 +486,7 @@
         game.debugMovePlayer("lower_halls", { markRoute: true });
         game.debugSetCharacterRoom("bard", "lower_halls");
         game.debugGiveCharacterItem("bow", "bard");
-        game.debugGiveCharacterItem("strong arrow", "bard");
+        game.debugGiveCharacterItem("black arrow", "bard");
         game.debugSetCharacterRoom("dragon", "lower_halls");
         game.flags.smaug_weakspot_known = false;
         game.flags.smaug_weakspot_shared_with_bard = false;
@@ -494,6 +494,11 @@
         game.flags.smaug_sighted_from_ravenhill = false;
         game.flags.bard_ready_at_ravenhill = false;
         game.flags.black_arrow_committed = false;
+        game.flags.pending_smaug_fall_image = false;
+        game.flags.smaug_fall_image_seen = false;
+        game.flags.laketown_burning_image_armed = false;
+        game.flags.laketown_burning_image_ready = false;
+        game.flags.pending_standoff_image = false;
         game.flags.dragondefeated = false;
       },
     },
@@ -1625,6 +1630,24 @@
     trolls_cave: [
       {
         image: "trolls_cave_loot.png",
+      },
+    ],
+    lower_halls: [
+      {
+        when: ({ game }) => game.liveDragon() && game.flags.smaugstate === "enraged",
+        image: "smaug_enraged_lower_halls.png",
+      },
+      {
+        when: ({ game }) => game.liveDragon() && game.flags.smaugstate === "searching",
+        image: "smaug_searching_lower_halls.png",
+      },
+      {
+        when: ({ game }) => game.liveDragon() && ["curious", "suspicious"].includes(game.flags.smaugstate),
+        image: "smaug_stirs_curious.png",
+      },
+      {
+        when: ({ game }) => game.liveDragon(),
+        image: "smaug_sleeping_lower_halls.png",
       },
     ],
     treeless_opening: [
@@ -6172,7 +6195,7 @@
       if (/\bget\b/.test(text) && /\barrow\b/.test(text) && /\bquiver\b/.test(text)) {
         const hasArrow = character.inventory.some((itemId) => matches(game.items[itemId]?.name, "arrow"));
         if (hasArrow) game.flags.bardreadiedarrow = true;
-        game.print(hasArrow ? "Bard readies the strong arrow from his quiver." : "Bard searches his quiver, but finds no arrow.");
+        game.print(hasArrow ? "Bard readies the black arrow from his quiver." : "Bard searches his quiver, but finds no arrow.");
         return true;
       }
       const dragon = Object.values(game.characters).find((candidate) => matches(candidate.name, "dragon"));
@@ -6212,6 +6235,11 @@
         return true;
       }
       game.flags.black_arrow_committed = true;
+      const arrowId = character.inventory.find((itemId) => matches(game.items[itemId]?.name, "arrow"));
+      if (arrowId) {
+        game.detachItem(arrowId);
+        character.inventory = character.inventory.filter((id) => id !== arrowId);
+      }
       dragon.visible = false;
       dragon.attackFlag = 0;
       game.flags.dragondefeated = true;
@@ -6219,12 +6247,8 @@
         alt: "The black arrow flies toward Smaug",
         dismissOnNextCommand: true,
       });
-      game.showEndgameSceneImage("smaug-falls-from-sky", {
-        fallback: "Smaug.jpeg",
-        alt: "Smaug falls from the sky beyond the Mountain",
-        dismissOnNextCommand: true,
-      });
-      game.print("At your word Bard draws his bow, sets the strong arrow to the string, and shoots. Far away, the dragon falls from the sky.");
+      game.flags.pending_smaug_fall_image = true;
+      game.print("At your word Bard draws his bow, sets the black arrow to the string, and shoots. Far away, the dragon falls from the sky.");
       game.noteLaketownBurningProse();
       return true;
     }
@@ -10344,7 +10368,7 @@
           if (commandToBard) return commandToBard;
           return this.autoplayRouteCommandTo("west_bank");
         }
-        if (!game.flags.bardreadiedarrow) return this.autoplayDirectedCharacterCommand("bard", "say to bard \"get strong arrow from quiver\"");
+        if (!game.flags.bardreadiedarrow) return this.autoplayDirectedCharacterCommand("bard", "say to bard \"get black arrow from quiver\"");
         if (game.currentRoom === "lower_halls" && game.liveDragon() && !game.smaugWeakSpotKnown()) return "ask smaug about treasure";
         if (game.liveDragon() && game.smaugWeakSpotKnown()) {
           if (game.currentRoom !== "stoe_of_ravenhill") return this.autoplayRouteCommandTo("stoe_of_ravenhill");
@@ -12482,6 +12506,28 @@
         if (this.temporaryImageDismissOnNextCommand && normalize(lower)) {
           this.clearTemporaryImage({ render: false });
         }
+        if (this.flags.pending_smaug_fall_image && normalize(lower)) {
+          this.flags.pending_smaug_fall_image = false;
+          this.flags.smaug_fall_image_seen = true;
+          this.flags.laketown_burning_image_armed = true;
+          this.showEndgameSceneImage("smaug-falls-from-sky", {
+            fallback: "Smaug.jpeg",
+            alt: "Smaug falls from the sky beyond the Mountain",
+            dismissOnNextCommand: true,
+          });
+        }
+        if (this.flags.laketown_burning_image_ready && normalize(lower)) {
+          this.flags.laketown_burning_image_ready = false;
+          this.noteLaketownBurningEcho();
+        }
+        if (this.flags.pending_standoff_image && normalize(lower) && this.flags.laketown_burning_echo_seen) {
+          this.flags.pending_standoff_image = false;
+          this.showEndgameSceneImage("dale-standoff-camps", {
+            fallback: "ruins_of_Dale.jpeg",
+            alt: "Camps gather among the ruins of Dale beneath Erebor",
+            dismissOnNextCommand: true,
+          });
+        }
         if (this.pendingRestartConfirmation) {
           this.handleRestartConfirmation(rawCommand);
           return;
@@ -13070,10 +13116,17 @@
       return this.connections.filter((connection) => connection.from === roomId);
     }
 
+    maybeBeginEreborStandoffBeforeRoomView() {
+      if (this.flags.erebor_standoff_started || !this.flags.dragondefeated) return false;
+      if (!["front_gate", "ruins_of_the_town_of_dale", "stoe_of_ravenhill", "little_steep_bay"].includes(this.currentRoom)) return false;
+      return this.beginEreborStandoff();
+    }
+
     describeRoom(options = {}) {
       const config = typeof options === "boolean"
         ? { initial: options, full: options }
         : { initial: false, full: false, ...options };
+      this.maybeBeginEreborStandoffBeforeRoomView();
       this.companionDirector?.sync();
       this.aftermath?.notePlayerRoom();
       const room = this.room();
@@ -17267,6 +17320,12 @@
 
     noteLaketownBurningEcho() {
       if (!this.flags.dragondefeated || this.flags.laketown_burning_echo_seen) return false;
+      if (this.flags.laketown_burning_image_armed) {
+        this.flags.laketown_burning_image_armed = false;
+        this.flags.laketown_burning_image_ready = true;
+        return false;
+      }
+      if (!this.flags.smaug_fall_image_seen) return false;
       this.flags.laketown_burning_echo_seen = true;
       if (!this.flags.laketown_burning_echo_prose_seen) this.noteLaketownBurningProse();
       this.showEndgameSceneImage("laketown-burning", {
@@ -17382,14 +17441,16 @@
       return true;
     }
 
-    deliverThrushMessage() {
+    deliverThrushMessage(options = {}) {
       if (!this.smaugWeakSpotSharedWithBard() || this.thrushMessageSent()) return false;
       this.flags.thrush_message_sent = true;
-      this.showEndgameSceneImage("thrush-warning-ravenhill", {
-        fallback: "ravenhill.jpeg",
-        alt: "A thrush confirms Bilbo's warning on Ravenhill",
-        dismissOnNextCommand: true,
-      });
+      if (!options.skipImage) {
+        this.showEndgameSceneImage("thrush-warning-ravenhill", {
+          fallback: "ravenhill.jpeg",
+          alt: "A thrush confirms Bilbo's warning on Ravenhill",
+          dismissOnNextCommand: true,
+        });
+      }
       this.print("A thrush flutters down upon the stones and chatters urgently, confirming Bilbo's warning as though all the old friendship of bird and Dale were gathered into that one small witness.");
       this.print("Bard hears, nods once, and his whole attention narrows to the bare patch beneath Smaug's left breast.");
       return true;
@@ -17403,7 +17464,7 @@
         this.flags.bard_ready_at_ravenhill = true;
         this.print("Bard steps onto the old stone of Ravenhill and measures the sky above the Mountain. 'Here,' he says softly. 'From this height he must break clear before he stoops on the Lake. If ever there was a place for the last shot, it is this one.'");
       }
-      if (!this.thrushMessageSent()) this.deliverThrushMessage();
+      if (!this.thrushMessageSent()) this.deliverThrushMessage({ skipImage: true });
       this.flags.smaug_sighted_from_ravenhill = true;
       this.showEndgameSceneImage("ravenhill-dragon-sighting", {
         fallback: "ravenhill.jpeg",
@@ -17706,11 +17767,15 @@
 
       this.print("By the time you come again beneath the Gate, men from the Lake have gathered among the ruins of Dale and made a wary camp there.");
       this.print("Thorin has gone within Erebor with the dwarves, while Bard and Gandalf remain without, watching the Mountain as though Smaug's fall had cleared the way for a different danger.");
-      this.showEndgameSceneImage("dale-standoff-camps", {
-        fallback: "ruins_of_Dale.jpeg",
-        alt: "Camps gather among the ruins of Dale beneath Erebor",
-        dismissOnNextCommand: true,
-      });
+      if (this.flags.laketown_burning_echo_seen) {
+        this.showEndgameSceneImage("dale-standoff-camps", {
+          fallback: "ruins_of_Dale.jpeg",
+          alt: "Camps gather among the ruins of Dale beneath Erebor",
+          dismissOnNextCommand: true,
+        });
+      } else {
+        this.flags.pending_standoff_image = true;
+      }
       this.companionDirector?.sync();
       this.recordProgressAutosave(
         "autosave_milestone_erebor_standoff",

@@ -102,6 +102,10 @@ function main() {
 
   game.execute('say to bard "shoot dragon"');
   if (!game.flags.dragondefeated) throw new Error("Dragon was not defeated.");
+  expectImage(game, "black_arrow_loosed.png", "black-arrow-loosed");
+  log.push(snapshot(game, "black-arrow"));
+
+  game.execute("wait");
   expectImage(game, "smaug_falls_from_sky.png", "dragon-fall");
   log.push(snapshot(game, "dragon-fall"));
 

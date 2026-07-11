@@ -1297,7 +1297,7 @@ window.HOBBIT_DATA = {
     "gilded_vault": {
       "id": "gilded_vault",
       "name": "gilded vault",
-      "description": "a gilded vault, adorned with intricate designs of ancient craftmanship",
+      "description": "a gilded vault, adorned with intricate designs of ancient craftsmanship",
       "container": true,
       "keyFor": null,
       "portable": false,
@@ -1556,8 +1556,8 @@ window.HOBBIT_DATA = {
     },
     "strong_arrow": {
       "id": "strong_arrow",
-      "name": "strong arrow",
-      "description": "a pointy steel arrow",
+      "name": "black arrow",
+      "description": "the black arrow, a heavy shaft kept for the last need",
       "container": false,
       "keyFor": null,
       "portable": true,

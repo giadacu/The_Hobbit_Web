@@ -186,7 +186,7 @@
     if (normalized === 'say to gollum "what\'s in my pocket"' || normalized === "say to gollum \"what's in my pocket\"") {
       return "gollum pocket riddle";
     }
-    if (/^say to bard "get strong arrow from quiver"$/.test(normalized)) return "bard get strong arrow";
+    if (/^say to bard "get (?:black|strong) arrow from quiver"$/.test(normalized)) return "bard get black arrow";
     if (/^say to bard "get arrow from quiver"$/.test(normalized)) return "bard get arrow";
     if (/^say to bard "shoot dragon"$/.test(normalized)) return "dragon shoot";
     if (/^say to bard "take shot"$/.test(normalized)) return "dragon take shot";
@@ -259,7 +259,8 @@
       pushSceneEvent(tracker, "mirkwood:river_crossing");
     }
 
-    if (normalized === 'say to bard "get strong arrow from quiver"' || normalized === "say to bard \"get strong arrow from quiver\"") {
+    if (normalized === 'say to bard "get black arrow from quiver"' || normalized === "say to bard \"get black arrow from quiver\""
+      || normalized === 'say to bard "get strong arrow from quiver"' || normalized === "say to bard \"get strong arrow from quiver\"") {
       pushSceneEvent(tracker, "bard:get_strong_arrow");
     }
     if (normalized === 'say to bard "get arrow from quiver"' || normalized === "say to bard \"get arrow from quiver\"") {
@@ -2505,7 +2506,7 @@
     }
 
     if (!game.flags?.dragondefeated && bardWithPlayer() && !game.flags?.bardreadiedarrow) {
-      candidates.push({ command: "say to bard \"get strong arrow from quiver\"", kind: "exploratory" });
+      candidates.push({ command: "say to bard \"get black arrow from quiver\"", kind: "exploratory" });
       candidates.push({ command: "say to bard \"get arrow from quiver\"", kind: "exploratory" });
     }
 

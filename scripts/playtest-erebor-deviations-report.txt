@@ -1,0 +1,191 @@
+Erebor endgame deviation playtest
+Date: 2026-07-11T14:36:42.364Z
+Scenarios: 22
+Issues: 0
+
+SUMMARY
+- [ok] shoot-no-weak-spot: Sparare senza conoscere il punto debole — Shot blocked with guidance
+- [ok] shoot-wrong-room: Sparare dal Front Gate invece che da Ravenhill — Wrong-room shot blocked
+- [ok] shoot-before-sighting: Sparare da Ravenhill prima dell'avvistamento — Sighting staged before kill shot
+- [ok] treasure-visible: Prendere il tesoro visibile con Smaug vivo — Visible treasure take blocked
+- [ok] treasure-ring-death: Rubare il tesoro con l'anello (morte attesa) — Fatal end after treasure theft with ring
+- [ok] cup-visible: Rubare la coppa senza anello — Visible cup take blocked
+- [ok] cup-ring-awakens: Rubare la coppa con l'anello — Cup theft leads to fatal grapple
+- [ok] kill-smaug-sword: Attaccare Smaug con la spada — Fatal combat outcome
+- [ok] battle-retreat: Ritirarsi dalla Battaglia delle Cinque Armate — Battle retreat is fatal
+- [ok] standoff-no-negotiation: Standoff: wait senza mai avviare il negoziato — Dain blocked until negotiation begins (player must ask Bard/Gandalf)
+- [ok] standoff-wait-only: Standoff: negoziato avviato, poi solo wait — Dain arrives on wait without further parley
+- [ok] negotiation-failure-thorin: Chiedere a Thorin i termini dopo l'arrivo di Dain — Thorin hardens standoff after Dain
+- [ok] thorin-early-talk: Parlare con Thorin prima della caduta — Early Thorin talk does not skip farewell
+- [ok] dragon-kill-skip-waits: Uccidere il drago e correre subito al Front Gate — Image chain: black_arrow_loosed.png -> smaug_falls_from_sky.png
+- [ok] mixed-battle-choices: Battaglia: prima Gandalf, poi Bard — Gandalf then Bard wins battle
+- [ok] battle-thorin-thorin: Battaglia: stare con Thorin due volte — Thorin-front-gate path resolves
+- [ok] battle-double-gandalf: Battaglia: seguire Gandalf due volte (vittoria aquile) — Ravenhill twice triggers eagle victory
+- [ok] no-bard-at-ravenhill: Sparare senza Bard sulla collina — Shot blocked without Bard
+- [ok] insult-smaug: Insultare Smaug nelle Lower Halls — Insult escalates to fatal Smaug attack
+- [ok] homeward-without-farewell: Tentare il ritorno senza l'addio di Thorin — Homeward blocked until farewell
+- [ok] leave-halls-without-bard: Uscire dalle Lower Halls senza Bard — Exited to smooth_straight_passage without carrying Bard
+- [ok] weak-spot-without-sharing: Sparare con weak spot noto ma non condiviso con Bard — Shot blocked until Bard knows weak spot
+
+--- shoot-no-weak-spot (ok) ---
+> say to bard "shoot dragon" @ stoe_of_ravenhill img=- endgame=false
+  Bard steadies the bow, then lowers it again. 'Not yet,' he says. 'Against such a beast a blind shot is only waste. We need his weakness, not courage alone.' Bard studies the height and says 'From here we command the Moun
+> wait @ stoe_of_ravenhill img=- endgame=false
+  You wait. Time passes...
+
+--- shoot-wrong-room (ok) ---
+> say to bard "shoot dragon" @ front_gate img=- endgame=false
+  Bard studies the Mountain and shakes his head. 'Not from here,' he says. 'Ravenhill commands the Mountain's shoulder and the road to the Lake together. There the dragon must show himself clean against the sky, and there 
+> wait @ front_gate img=- endgame=false
+  You wait. Time passes... The camps and ruins lie below, but Ravenhill is the height Bard needs. Try west from here.
+
+--- shoot-before-sighting (ok) ---
+> say to bard "shoot dragon" @ stoe_of_ravenhill img=ravenhill_dragon_sighting.png endgame=false
+  Bard steps onto the old stone of Ravenhill and measures the sky above the Mountain. 'Here,' he says softly. 'From this height he must break clear before he stoops on the Lake. If ever there was a place for the last shot,
+> wait @ stoe_of_ravenhill img=- endgame=false
+  You wait. Time passes...
+
+--- treasure-visible (ok) ---
+> take treasure @ lower_halls img=- endgame=false
+  The dragon guards the treasure too closely. You need the ring's cover or Bard's help. Smaug's voice rolls through the hall, soft and terrible, as he begins to suspect an intruder. Dust stirs over ancient carvings, and fo
+> wait @ lower_halls img=smaug_searching_lower_halls.png endgame=false
+  You wait. Time passes... Smaug rises from the treasure and begins to search the hall in deadly earnest.
+
+--- treasure-ring-death (ok) ---
+> wear ring @ lower_halls img=- endgame=false
+  You wear the golden ring and become unnoticeable. Bard looks around, puzzled, unable to see who is there. Smaug's voice rolls through the hall, soft and terrible, as he begins to suspect an intruder.
+> drop majestic sword @ lower_halls img=- endgame=false
+  You leave the majestic sword.
+> drop sturdy rope @ lower_halls img=- endgame=false
+  You leave the sturdy rope.
+> drop brass lantern @ lower_halls img=- endgame=false
+  You leave the brass lantern.
+> take treasure @ lower_halls img=smaug_enraged_lower_halls.png endgame=false
+  You take the treasure. The golden ring slides free from your finger and settles in your pocket. Smaug's patience breaks. Rage shakes the treasure as the dragon lashes the chamber with tail and voice.
+> wait @ lower_halls img=smaug_incinirates_bilbo_lower_halls_death.png endgame=true
+  You wait. Time passes... The red golden dragon hurls itself at you, and in a moment the fight is all hands, blows, and confusion. Weariness is already in the limbs, and the work is no longer easy. You try to answer the s
+
+--- cup-visible (ok) ---
+> take cup @ lower_halls img=- endgame=false
+  The golden cup lies within a curl of the dragon's hoard. To take it now would surely wake Smaug. Smaug's voice rolls through the hall, soft and terrible, as he begins to suspect an intruder.
+> wait @ lower_halls img=smaug_searching_lower_halls.png endgame=false
+  You wait. Time passes... Smaug rises from the treasure and begins to search the hall in deadly earnest.
+
+--- cup-ring-awakens (ok) ---
+> wear ring @ lower_halls img=- endgame=false
+  You slip the golden ring on and fade from notice. Bard looks around, puzzled, unable to see who is there. Smaug's voice rolls through the hall, soft and terrible, as he begins to suspect an intruder. Dust stirs over anci
+> take cup @ lower_halls img=smaug_searching_lower_halls.png endgame=false
+  You lift a small golden cup from the treasure and slip it away. For a moment the halls remain still, but somewhere upon the gold Smaug's sleep grows troubled. You take the golden cup. Smaug rises from the treasure and be
+> wait @ lower_halls img=- endgame=false
+  You wait. Time passes...
+> wait @ lower_halls img=- endgame=false
+  You wait. Time passes...
+> wait @ lower_halls img=smaug_incinirates_bilbo_lower_halls_death.png endgame=true
+  You wait. Time passes... The golden ring slides free from your finger and settles in your pocket. The red golden dragon closes with you at once, turning the struggle into a rough and breathless grapple. Weariness is alre
+
+--- kill-smaug-sword (ok) ---
+> kill smaug with sword @ lower_halls img=smaug_incinirates_bilbo_lower_halls_death.png endgame=true
+  Your blade flashes before you have time to doubt yourself, drawing a bright arc through the gloom. Weariness is already in the limbs, and the work is no longer easy. The red golden dragon is on you at once with cruel cer
+
+--- battle-retreat (ok) ---
+> retreat @ ruins_of_the_town_of_dale img=- endgame=true
+  You turn from the field while there is still a gap to do it, but in the confusion of broken stone, fleeing men, and the first rush of goblins, retreat becomes rout. The battle sweeps over you before you can win clear. So
+
+--- standoff-no-negotiation (ok) ---
+> wait @ ruins_of_the_town_of_dale img=- endgame=false
+  You wait. Time passes...
+> wait @ ruins_of_the_town_of_dale img=- endgame=false
+  You wait. Time passes... Gandalf says 'A ruined town is a stern book, if one has the heart to read it.'
+> wait @ ruins_of_the_town_of_dale img=- endgame=false
+  You wait. Time passes...
+> wait @ ruins_of_the_town_of_dale img=- endgame=false
+  You wait. Time passes...
+> wait @ ruins_of_the_town_of_dale img=- endgame=false
+  You wait. Time passes...
+
+--- standoff-wait-only (ok) ---
+> wait @ ruins_of_the_town_of_dale img=- endgame=false
+  You wait. Time passes... Voices rise and fall between the camps, but no one yet trusts the other enough to lay down pride or steel. Messengers come and go between the ruins and the northern watch, and more than one voice
+> wait @ ruins_of_the_town_of_dale img=dain_iron_hills_arrival.png endgame=false
+  You wait. Time passes... Gandalf moves among the ruins with the look of a man counting how much quarrel the day can bear before it turns to worse. A stir runs through the camp: mail-clad dwarves have come at last from th
+> wait @ ruins_of_the_town_of_dale img=battle_five_armies_begins.png endgame=false
+  You wait. Time passes... Before any bargain can ripen, a black tide of goblins and wargs comes pouring out of the north. Horns answer horns, and the whole valley below Erebor turns in a moment from standoff to war. Ganda
+
+--- negotiation-failure-thorin (ok) ---
+> ask thorin about negotiation @ front_gate img=- endgame=false
+  Thorin says 'With Dain come axes enough that I need not bargain out of fear. If Bard seeks terms, he will learn that my patience is not surrender.'
+
+--- thorin-early-talk (ok) ---
+> talk to thorin @ front_gate img=- endgame=false
+  You speak, but only silence meets your words.
+> wait @ front_gate img=- endgame=false
+  You wait. Time passes... Voices rise and fall between the camps, but no one yet trusts the other enough to lay down pride or steel. Messengers come and go between the ruins and the northern watch, and more than one voice
+
+--- dragon-kill-skip-waits (ok) ---
+> say to bard "shoot dragon" @ stoe_of_ravenhill img=black_arrow_loosed.png endgame=false
+  At your word Bard draws his bow, sets the black arrow to the string, and shoots. Far away, the dragon falls from the sky. Far below the Mountain, a dull glow and a pillar of smoke tell their own story: Lake-town is burni
+> east @ front_gate img=smaug_falls_from_sky.png endgame=false
+  By the time you come again beneath the Gate, men from the Lake have gathered among the ruins of Dale and made a wary camp there. Thorin has gone within Erebor with the dwarves, while Bard and Gandalf remain without, watc
+> south @ ruins_of_the_town_of_dale img=- endgame=false
+  You stand among the ruins of Dale, where rough shelters, watch-fires, and hurried councils now occupy the broken streets. Gandalf moves through the camp with the look of someone measuring how little folly would be needed
+> wait @ ruins_of_the_town_of_dale img=- endgame=false
+  You wait. Time passes...
+
+--- mixed-battle-choices (ok) ---
+> follow gandalf @ stoe_of_ravenhill img=battle_ravenhill_gandalf.png endgame=false
+  You race after Gandalf toward Ravenhill, where the whole field may be read in one dreadful glance. From the height the goblin onset shows its full width, and Gandalf wastes no breath on comfort: someone must steady the d
+> help bard @ ruins_of_the_town_of_dale img=beorn_bear_battle.png endgame=false
+  You help Bard steady the battered line until the counterstroke goes in at the right moment, and from that moment the goblin host begins at last to buckle. Then the eagles are among the enemy in earnest, and with them com
+> wait @ stoe_of_ravenhill img=thorin_wounded_ravenhill.png endgame=false
+  You wait. Time passes... When the first hard business of victory is under way, word comes quietly that Thorin has been brought to Ravenhill, sorely wounded and asking for Bilbo. You go up among the broken stones and find
+
+--- battle-thorin-thorin (ok) ---
+> stand with thorin @ front_gate img=battle_front_gate_thorin.png endgame=false
+  You hurry to Thorin at the Gate, where dwarf-axes are already ringing against shield and stone. Thorin's mood is terrible and kingly together. 'Then stand fast,' he says. 'If Erebor is to be held indeed, it will be held 
+> stand with thorin @ front_gate img=beorn_bear_battle.png endgame=false
+  You stand with Thorin through the worst of it as he bursts from the Gate with his kin, and the sudden fury of that charge helps crack the battle's black center before relief arrives. Then the eagles are among the enemy i
+> wait @ stoe_of_ravenhill img=thorin_wounded_ravenhill.png endgame=false
+  You wait. Time passes... When the first hard business of victory is under way, word comes quietly that Thorin has been brought to Ravenhill, sorely wounded and asking for Bilbo. You go up among the broken stones and find
+
+--- battle-double-gandalf (ok) ---
+> follow gandalf @ stoe_of_ravenhill img=battle_ravenhill_gandalf.png endgame=false
+  You race after Gandalf toward Ravenhill, where the whole field may be read in one dreadful glance. From the height the goblin onset shows its full width, and Gandalf wastes no breath on comfort: someone must steady the d
+> follow gandalf @ stoe_of_ravenhill img=eagles_battle_turning.png endgame=false
+  You keep to Gandalf through smoke and shouting until at last the clouds break above the Mountain and help comes out of the air: eagles wheel down, and the black host begins to break. Then the eagles are among the enemy i
+> wait @ stoe_of_ravenhill img=thorin_wounded_ravenhill.png endgame=false
+  You wait. Time passes... When the first hard business of victory is under way, word comes quietly that Thorin has been brought to Ravenhill, sorely wounded and asking for Bilbo. You go up among the broken stones and find
+
+--- no-bard-at-ravenhill (ok) ---
+> say to bard "shoot dragon" @ stoe_of_ravenhill img=- endgame=false
+  Bard is not here just now.
+> wait @ stoe_of_ravenhill img=- endgame=false
+  You wait. Time passes... The Mountain stands too still for comfort, while the open land below waits like a place expecting another blow.
+
+--- insult-smaug (ok) ---
+> insult smaug @ lower_halls img=- endgame=false
+  You insult red golden dragon. Smaug's voice rolls through the hall, soft and terrible, as he begins to suspect an intruder.
+> wait @ lower_halls img=smaug_searching_lower_halls.png endgame=false
+  You wait. Time passes... Smaug rises from the treasure and begins to search the hall in deadly earnest.
+> wait @ lower_halls img=smaug_stirs_curious.png endgame=true
+  You wait. Time passes... The red golden dragon hurls itself at you, and in a moment the fight is all hands, blows, and confusion. Weariness is already in the limbs, and the work is no longer easy. The red golden dragon p
+
+--- homeward-without-farewell (ok) ---
+> wait @ stoe_of_ravenhill img=- endgame=false
+  You wait. Time passes...
+> wait @ stoe_of_ravenhill img=- endgame=false
+  You wait. Time passes... Gandalf says 'A ruined town is a stern book, if one has the heart to read it.'
+> wait @ stoe_of_ravenhill img=- endgame=false
+  You wait. Time passes...
+
+--- leave-halls-without-bard (ok) ---
+> east @ smooth_straight_passage img=- endgame=false
+  Bard falls back with you from the deeper halls at once, keeping close now that the dragon's road plainly leads outward. You find yourself in a smooth, straight passage. The walls are meticulously carved from solid stone,
+> wait @ smooth_straight_passage img=- endgame=false
+  You wait. Time passes...
+
+--- weak-spot-without-sharing (ok) ---
+> say to bard "shoot dragon" @ stoe_of_ravenhill img=- endgame=false
+  You tell Bard what you saw in the treasure-halls: beneath the jeweled mail of Smaug's left breast there is one small bare patch. Bard's face hardens as he hears you out. 'The left breast, then,' he says quietly. 'If he g
+> wait @ stoe_of_ravenhill img=- endgame=false
+  You wait. Time passes...
+
