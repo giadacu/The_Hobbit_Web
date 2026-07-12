@@ -152,6 +152,7 @@ function main() {
   game.noteBagEndAuction();
   expectImage(game, "bag_end_auction_garden.png", "bag-end-auction", ["Bilbosgarden.jpeg"]);
   game.flags.dragon_arc_complete = true;
+  game.debugMovePlayer("hobbit_hole", { markRoute: true });
   game.resolveTreasureHomecoming();
   expectImage(game, "epilogue_gandalf_balin_fireside.png", "epilogue");
   log.push(snapshot(game, "epilogue"));

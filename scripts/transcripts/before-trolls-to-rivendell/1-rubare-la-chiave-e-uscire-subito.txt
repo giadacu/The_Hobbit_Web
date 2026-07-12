@@ -2,11 +2,10 @@ BEFORE TROLLS -> RIVENDELL
 Variant: 1 · Rubare la chiave e uscire subito
 Seed: 1
 Success: yes
-Start room: dreary
 Final room: rivendell
-Steps: 18
 Large key: yes
 Trolls transformed: yes
+Steps: 18
 
 [setup]
 You are in a gloomy empty land with dreary hills ahead. Shadows cling to the barren earth, where withered grass and ancient stones lie scattered. The hills rise ominously, their somber peaks shrouded in mist, whispering secrets of old. The air is heavy with forgotten tales, and a pervasive melancholy hangs over the desolate landscape. Thorin studies the road ahead. Dori keeps a wary eye on the country round about. Ori rests with pack still within arm's reach. Gloin, Bofur, and Gandalf are nearby as well.

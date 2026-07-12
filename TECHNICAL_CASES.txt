@@ -8296,3 +8296,76 @@ Files touched
 - game.js
 - scripts/parser-tests.js
 
+
+Case 174 - 2026-07-12 - Elvenking Halls south exit bypasses capture narrative
+-------------------------------------------------------------------------------
+
+Symptom
+-------
+Random playtesting from `elvenkings_halls` onward found that `south` goes straight
+to `cellar` without setting `elvenking_prisoner_seen` or playing the Elvenking
+questioning / capture beats. Autoplay intentionally uses this shortcut (Case 152),
+so the optimal path also skips the prison chapter.
+
+Secondary: entering `dark_dungeon` without `elvenking_prisoner_seen` still shows
+the legacy placeholder description from `game-data.js` instead of immersion text.
+
+Resolution
+----------
+1. Added `elvenCellarTravelGate()` blocking `elvenkings_halls -> cellar` until
+   `elvenking_prisoner_seen`.
+2. Added `checkElvenWoodElfEscort()` so the wood elf meets Bilbo in the halls
+   after Mirkwood (from clearing or on direct arrival).
+3. Autoplay now `wait`s in the halls until capture, then follows the existing
+   dungeon -> cellar path.
+4. Added a fallback immersion description for `dark_dungeon` when the prisoner
+   flag is not yet set.
+5. Added parser regressions and kept `scripts/playtest-elvenking-random.js`.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+- scripts/playtest-elvenking-random.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- Run `node scripts/playtest-elvenking-random.js` after elven/barrel chapter edits
+- Expected flow: halls -> wait/capture -> dungeon -> break red door -> cellar
+- `south` from halls opens only after `elvenking_prisoner_seen` (e.g. return visit)
+
+
+Case 175 - 2026-07-12 - Transcript step labels dark_dungeon while halls description prints first
+-----------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Route transcripts for `north east` from `elvish_clearing` showed `(room: dark_dungeon)` while the
+first prose line was still the Elvenking's Halls room description, then capture lines, then the
+dungeon description — all in one command step.
+
+Root cause
+----------
+On movement into `elvenkings_halls`, `move()` called `describeRoom()` before
+`checkSpecialSituations()`. Escort + kidnapping in the same turn teleported Bilbo to
+`dark_dungeon` and called `describeRoom()` again. Transcript `execStep` records the final room
+after the command, so the header said `dark_dungeon` while output still began with halls text.
+
+Resolution
+----------
+Added `elvenHallsImmediateCapturePending()` and skip the halls `describeRoom()` on entry when
+escort and capture will fire on the same turn (ring-hidden first turn still shows halls). Added a
+parser regression and regenerated `at-beorn-to-laketown` transcripts.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+- scripts/transcripts/at-beorn-to-laketown/
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- If a single command ends in a different room than its first describeRoom, check whether
+  post-move `checkSpecialSituations()` teleports the player in the same turn.

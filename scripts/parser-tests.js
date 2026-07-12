@@ -6788,7 +6788,7 @@ const gameCases = [
       "Bard room after standoff: ruins_of_the_town_of_dale",
       "Gandalf room after standoff: ruins_of_the_town_of_dale",
       "Thorin room after standoff: erebor_great_hall",
-      "Standoff autosave: after the camps gather beneath Erebor",
+      "Standoff autosave: after reaching the Front Gate",
     ],
   },
   {
@@ -6909,7 +6909,7 @@ const gameCases = [
       "You lift a small golden cup from the treasure and slip it away.",
       "Cup taken: yes",
       "Cup theft flagged: yes",
-      "Smaug state after cup theft: searching",
+      "Smaug state after cup theft: suspicious",
     ],
     notExpectedIncluded: [
       "I don't see that here.",
@@ -9128,6 +9128,80 @@ const gameCases = [
     ],
     notExpectedIncluded: [
       "Wood elf after capture: beorns_house",
+    ],
+  },
+  {
+    name: "elven halls entry skips room describe when immediate capture follows",
+    setup(game) {
+      game.execute("jump mirkwood");
+      game.flags.mirkwooddwarvesfreed = true;
+      game.flags.mirkwoodjourneycomplete = true;
+      movePlayerTo(game, "elvish_clearing");
+      game.debugSetCharacterRoom("wood_elf", "elvish_clearing", { visible: true, movementMode: "never" });
+      game.flags.initiative_wood_elf_warning = true;
+    },
+    inputs: ["north east"],
+    expectedIncluded: [
+      "The wood elf's patience hardens. 'You have come far enough,' he says.",
+      "You are in the dark dungeon beneath the Elvenking's halls, where damp stone, iron, and old restraint",
+    ],
+    notExpectedIncluded: [
+      "You stand in the great halls of the Elvenking, where carved wood, lantern-light, and hidden strength",
+    ],
+  },
+  {
+    name: "elven halls south to cellar blocked before capture",
+    setup(game) {
+      movePlayerTo(game, "elvenkings_halls");
+      game.flags.elvenking_prisoner_seen = false;
+    },
+    inputs: ["south"],
+    expectedIncluded: [
+      "The stair down toward the king's wine-cellars is watched too closely.",
+    ],
+    notExpectedIncluded: [
+      "You are in the cellar where the king keeps his barrels of wine.",
+    ],
+  },
+  {
+    name: "elven halls autoplay waits for capture before reaching cellar",
+    setup(game) {
+      game.execute("jump mirkwood");
+      game.flags.mirkwooddwarvesfreed = true;
+      game.flags.mirkwoodjourneycomplete = true;
+      movePlayerTo(game, "elvenkings_halls");
+    },
+    drive(game) {
+      for (let step = 0; step < 24 && game.currentRoom !== "cellar" && !game.endgame; step += 1) {
+        const command = game.nextAutoplayCommand();
+        if (!command) break;
+        game.execute(command);
+      }
+      game.print(`Elven autoplay final room: ${game.currentRoom}`);
+      game.print(`Elven prisoner flag: ${game.flags.elvenking_prisoner_seen ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Elven prisoner flag: yes",
+      "Elven autoplay final room: cellar",
+    ],
+    notExpectedIncluded: [
+      "Elven prisoner flag: no",
+    ],
+  },
+  {
+    name: "dark dungeon fallback description avoids legacy placeholder",
+    setup(game) {
+      movePlayerTo(game, "dark_dungeon");
+      game.flags.elvenking_prisoner_seen = false;
+    },
+    drive(game) {
+      game.describeRoom({ full: true });
+    },
+    expectedIncluded: [
+      "You are in the dark dungeon beneath the Elvenking's halls, where damp stone, iron rings, and stale torch-smoke",
+    ],
+    notExpectedIncluded: [
+      "whispering secrets of forgotten ages",
     ],
   },
   {

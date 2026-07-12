@@ -4,7 +4,7 @@ Seed: 1
 Success: yes
 Start room: beorns_house
 Final room: wooden_town
-Steps: 32
+Steps: 34
 Forest path visited: no
 West bank visited: yes
 Long lake visited: yes
@@ -15,179 +15,191 @@ Before long the uncanny order of Beorn's house declares itself more plainly: gre
 Beorn gives no explanation worth calling one. Yet the board is soon spread with bread, honey, cream, and a prodigious supper, and for a while the whole house feels less strange than magnificently, stubbornly hospitable.
 
 > open curtain
-(1/32 · room: beorns_house)
+(1/34 · room: beorns_house)
 You open the curtain.
 Gandalf says 'Beorn's hospitality is a strong roof, but it is best not to test its beams.'
 Beorn says 'Keep to the path. Drink no water that runs black under the wood. Follow no lights, however fair they seem.'
 From the yard comes the measured sound of hooves and the uncanny quiet of beasts that know their work.
 
 > open cupboard
-(2/32 · room: beorns_house)
+(2/34 · room: beorns_house)
 You open the cupboard.
 Beorn adds 'Trust your own bottle before any stream under those boughs.'
 
 > examine cupboard
-(3/32 · room: beorns_house)
+(3/34 · room: beorns_house)
 You see a large cupboard set into the wall behind the curtain; inside is a delicious meal.
 
 > take meal
-(4/32 · room: beorns_house)
+(4/34 · room: beorns_house)
 You take the meal from the cupboard.
 Beorn says 'And if the wood offers lights and laughter, keep your feet and let your hunger complain.'
 
 > eat meal
-(5/32 · room: beorns_house)
+(5/34 · room: beorns_house)
 You eat the meal and gain strength.
 Beorn says 'I like roads best when goblins are far from them and wargs farther still.'
 
 > north
-(6/32 · room: great_river)
+(6/34 · room: great_river)
 You are at the Great River, broad and cold under a wide unsettled sky. Thorin watches the river and the banks with a traveller's respect. Dwalin keeps an eye on the wild land round about as though expecting movement. Balin seems relieved to be in open country again. Fili, Kili, Dori, Nori, Ori, Oin, Gloin, Bofur, Bombur, and Gandalf wait a little apart, keeping the quiet fellowship of the road.
-Gandalf says 'When the wood grows silent, pay closer attention, not less.'
+Gandalf says 'The river runs wide here, and the woods beyond look less friendly than the water.'
 
 > east
-(7/32 · room: gate_to_mirkwood)
+(7/34 · room: gate_to_mirkwood)
 You are at the gate to Mirkwood, where the open lands fall behind and the first black boughs gather ahead with an unwelcoming patience. The air is colder under the trees, and the forest entrance looks less like a road than like a warning made practical. Thorin keeps his shoulders tight, as though expecting the wood itself to lean nearer. Nori walks with the patience of one enduring a road he has no liking for. Behind you lies the open world; before you the forest waits with the patience of something that does not need to hurry.
 Bofur says 'This wood could make a hungry dwarf long for plain honest rain and an open sky.'
 
 > east
-(8/32 · room: bewitched_gloomy_place)
+(8/34 · room: bewitched_gloomy_place)
 You are in a bewitched, gloomy place where the wood feels suffered rather than chosen. Unnatural fog clings to the roots, twisted trees lean in with skeletal branches, and half-heard whispers move through the shadows without ever becoming speech. Thorin wears the hungry road like an insult he means to outlast. Ori moves like someone afraid the trees may be listening. This side-path gloom has the blurred quality of a place reached by enchantment rather than intention.
 
 > east
-(9/32 · room: west_bank)
+(9/34 · room: west_bank)
 You are at the west bank of the Black River. The water runs fast and silent between muddy roots, offering passage where the forest offered only sameness. On the far side a boat lies among the reeds, if you can contrive to reach it. You see: the fast black river with its dark waters, flowing silently and shrouded in gloom. Thorin keeps his shoulders tight, as though expecting the wood itself to lean nearer. Bifur walks with the patience of one enduring a road he has no liking for. Nori lingers a little apart. The black river offers movement where the forest offered only sameness, but it is not a friendly change.
 Game saved.
 Thorin says 'A boat across the water is near enough to tempt a rope, if the hand is bold.'
 
 > look across river
-(10/32 · room: west_bank)
+(10/34 · room: west_bank)
 You see the east bank of a black river.
 You see: the wooden boat.
 
 > throw rope across river
-(11/32 · room: west_bank)
+(11/34 · room: west_bank)
 You throw the rope across the fast black river.
 It sails across and lands in the boat.
 
 > pull rope
-(12/32 · room: west_bank)
+(12/34 · room: west_bank)
 You pull the rope.
 The boat glides across the river and lands on this side.
 
 > climb into boat
-(13/32 · room: east_bank)
+(13/34 · room: east_bank)
 You climb into the wooden boat.
 With a lurch the boat glides across the river and lands on the other side.
 You are at the east bank of the Black River. The current slides past without sparkle or song, and the trees here seem a little less malign than those you left behind, though Mirkwood is not finished with you yet. Thorin holds himself with grim pride, as if yielding even to discomfort would be a kind of surrender to the forest. Bombur looks worn by hunger and bad light. Gloin is nearby as well. Hunger, weariness, and the sameness of the trees make it hard to believe in straight roads.
 
 > east
-(14/32 · room: green_forest)
+(14/34 · room: green_forest)
 You are in a green patch of forest where a little honest daylight still filters through the leaves. After the black miles behind you, even these ordinary trees feel like unexpected mercy, though spider-silk still blocks the way ahead. You see: a thick spider web blocking the path. Thorin moves like someone afraid the trees may be listening. Ori wears the hungry road like an insult he means to outlast. Kili waits a little apart with the restlessness of the road still on him. The green wood ahead feels almost kindly after the black road, though the memory of Mirkwood has not left your nerves yet.
 
 > break web with sword
-(15/32 · room: green_forest)
+(15/34 · room: green_forest)
 You strike the spider web. The spider web breaks into pieces.
 
 > north east
-(16/32 · room: place_of_black_spiders)
+(16/34 · room: place_of_black_spiders)
 You are in a place of black spiders beneath Mirkwood's foulest boughs. Great webs bind tree to tree from root to crown, the air is warm and close with must and old poison, and every gap between the trunks looks ready to tremble into life at a touch. You see: a thick spider web blocking the path. Thorin moves with the grim patience of one who knows that webs are only the visible part of the trap. The branches seem tied together by old malice, and the whole place has the feel of a trap long practiced in its work.
 The road through Mirkwood takes its due from you. Mirkwood energy: 4.
 Game saved.
 
 > help dwarves
-(17/32 · room: place_of_black_spiders)
+(17/34 · room: place_of_black_spiders)
 The rescue is hard, breathless work in choking silk. Mirkwood energy: 3.
 With the short strong dagger, you saw and slashed through the clinging webs until at last the trapped dwarves can fight and stumble free.
 
 > break web with sword
-(18/32 · room: place_of_black_spiders)
+(18/34 · room: place_of_black_spiders)
 You strike the spider web. The spider web breaks into pieces.
 
 > wear ring
-(19/32 · room: place_of_black_spiders)
+(19/34 · room: place_of_black_spiders)
 You wear the golden ring and become unnoticeable.
 
 > north
-(20/32 · room: elvish_clearing)
+(20/34 · room: elvish_clearing)
 A green wood opens here after the black oppression of Mirkwood, and the very air seems lighter for it. Yet the place is not unwatched: there is order in the trees, secrecy in the paths, and the sense that unseen eyes have long known you were coming. A wood elf is here.
 The wood elf cannot see you because you are wearing the ring.
 The wood elf looks around, puzzled, unable to see who is there.
 Water murmurs under the halls, and above it comes the clink of cups and the music of a people at ease in secrecy.
 
 > north east
-(21/32 · room: elvenkings_halls)
+(21/34 · room: elvenkings_halls)
 You stand in the great halls of the Elvenking, where carved wood, lantern-light, and hidden strength meet in a beauty that does not trouble to be soft. The place is rich without waste, secret without confusion, and wholly under watch. To the east there is the rusty door. The rusty door is closed.
+The wood elf cannot see you because you are wearing the ring.
 
-> south
-(22/32 · room: cellar)
-You are in the cellar where the king keeps his barrels of wine. To the north east there is the red door. The red door is closed. Below there is the large trap door. The large trap door is closed. You see: a sturdy wooden barrel. Thorin studies the halls as though measuring chances of escape. Dwalin waits with dwarf patience and dwarf resentment. Balin keeps quiet under the eyes of the Elvenking's folk. Fili, Kili, Dori, Nori, Ori, Oin, Gloin, Bifur, Bofur, and Bombur wait a little apart, keeping the quiet fellowship of the road. A butler is here. He is carrying a red key.
+> remove ring
+(22/34 · room: elvenkings_halls)
+You slip the golden ring off and return to sight.
+The wood elf watches you closely and says 'This wood listens more kindly to honest footsteps than to hurried tongues.'
+
+> wait
+(23/34 · room: dark_dungeon)
+You wait.
+Time passes...
+The wood elf's patience hardens. 'You have come far enough,' he says.
+You are led at last before the Elvenking, who questions you coolly about your name, your companions, and what business has brought such travelers through his wood.
+Bilbo keeps his own counsel. At that the king's face grows no harsher, only more remote, and he orders that you be shut up in darkness until you learn either trust or weariness.
+The wood elf captures you.
+You are in the dark dungeon beneath the Elvenking's halls, where damp stone, iron, and old restraint have none of the woodland grace shown above. The memory of lantern-light, the king's measured questions, and your own stubborn silence still hangs over the place more heavily than the chains. To the west there is the rusty door. The rusty door is closed. To the south west there is the red door. The red door is closed.
+
+> break red door with sword
+(24/34 · room: dark_dungeon)
+You strike the red door. The red door breaks into pieces.
+
+> south west
+(25/34 · room: cellar)
+You are in the cellar where the king keeps his barrels of wine. To the north east there is the red door. The red door is open. Below there is the large trap door. The large trap door is closed. You see: a sturdy wooden barrel. Thorin studies the halls as though measuring chances of escape. Dwalin waits with dwarf patience and dwarf resentment. Balin keeps quiet under the eyes of the Elvenking's folk. Fili, Kili, Dori, Nori, Ori, Oin, Gloin, Bifur, Bofur, and Bombur wait a little apart, keeping the quiet fellowship of the road. A butler is here. He is carrying a red key.
 Game saved.
 The king's feasting has told on the place below. From the upper halls come muffled laughter and the last wandering echoes of song, while in the cellar the air is heavy with spilled wine, wet wood, and the comfortable slackness of servants kept too long at a good table.
 Empty barrels stand ready by the running water, and the butler's vigilance has plainly been dulled by duty, fatigue, and a cup or two beyond strict necessity. If there is ever to be a moment for desperate barrel-work, it is near enough to this one.
 Every now and then the butler turns toward the stair or the casks and leaves some other corner unwatched for a heartbeat. Any barrel-work will have to be done in such stolen instants.
 The dwarves crowd close among the casks, plainly waiting for Bilbo's word before any of them agrees to be packed into a barrel.
-The butler looks around, puzzled, unable to see who is there.
-
-> wait
-(23/32 · room: cellar)
-You wait.
-Time passes...
-The golden ring slides free from your finger and settles in your pocket.
 The butler mutters 'Barrels are for wine, not for wandering burglars.'
-The butler fusses with a tray near the stair and, for a heartbeat, turns away, leaving the trap door and the nearest casks unwatched for a precious moment.
+With another impatient sigh, the butler pads toward the feast above, leaving the trap door and the nearest casks unwatched for a precious moment.
 
 > ask thorin to enter barrels
-(24/32 · room: cellar)
+(26/34 · room: cellar)
 Thorin gives the word at last, and the worst labor is not your own barrel at all, but the dwarves'. One by one, amid muttering, indignation, and hurried whispers, you contrive to get them stowed into the empty casks before the chance above your head closes again.
 No dwarf thinks much of the arrangement, but cramped discomfort weighs less than the Elvenking's cells. By the time the last lid is settled, the whole desperate escape has become a matter not of one barrel, but of a miserable little fleet.
 
 > wait
-(25/32 · room: cellar)
+(27/34 · room: cellar)
 You wait.
 Time passes...
-The butler turns away toward the stair with a muttered complaint, leaving the trap door and the packed barrels unwatched for a precious moment.
+Muttering over his cups, the butler turns his back, leaving the trap door and the packed barrels unwatched for a precious moment.
 
 > open trap door
-(26/32 · room: cellar)
+(28/34 · room: cellar)
 You open the large trap door.
 Black water hurries below the opening, shouldering past the piles and posts under the halls with unpleasant force.
 
 > wait
-(27/32 · room: cellar)
+(29/34 · room: cellar)
 You wait.
 Time passes...
-With another impatient sigh, the butler pads toward the feast above, leaving the trap door and the packed barrels unwatched for a precious moment.
+The butler fusses with a tray near the stair and, for a heartbeat, turns away, leaving the trap door and the packed barrels unwatched for a precious moment.
 
 > ask thorin to throw barrels through trap door
-(28/32 · room: cellar)
+(30/34 · room: cellar)
 Thorin moves when the butler's back is turned, and together you send the dwarves' barrels one by one through the open trap door into the black rush below.
 There is muffled outrage from inside more than one cask, but the river takes them all the same, and in a few heartbeats the miserable little fleet is away beneath the halls.
 
 > wait
-(29/32 · room: cellar)
+(31/34 · room: cellar)
 You wait.
 Time passes...
-Muttering over his cups, the butler turns his back, leaving the open trap door and Bilbo's last empty barrel unwatched for a precious moment.
+The butler turns away toward the stair with a muttered complaint, leaving the open trap door and Bilbo's last empty barrel unwatched for a precious moment.
 
 > throw barrel through trap door
-(30/32 · room: cellar)
+(32/34 · room: cellar)
 You wrestle an empty barrel to the opening and heave it through. It strikes the black water below with a hollow, violent crash, vanishes among the piles and foaming shadows for one dreadful instant, and then shoots out again, bobbing wildly as the current claims it.
 If you mean to trust yourself to it, you must follow at once.
 
 > jump onto barrel
-(31/32 · room: long_lake)
+(33/34 · room: long_lake)
 You seize your moment, spring through the open trap door, and come down half upon the barrel and half into the freezing black rush beneath the halls.
 For one sickening instant there is nothing but thunder, blind water, striking timber, and the certainty that the whole desperate plan has failed.
 Then the barrel lurches upright under you, the current catches it cleanly, and Bilbo goes spinning away through black arches and broken flashes of lantern-light toward the open day beyond.
 By the time the halls fall behind, you are drenched, breathless, clinging to slippery wood with both arms, but still afloat and borne onward at the speed of the river.
 At last the racing black water widens, the low roof of branches breaks apart above you, and Long Lake opens ahead in cold daylight like a deliverance almost too sudden to trust.
 You are on the Long Lake, cold and broad under an exposed sky, with more than one barrel still bobbing nearby in miserable fellowship. From those dark casks come the thumps, groans, and outraged dwarf-mutterings of companions who have escaped the Elvenking's halls without in the least consenting to the comfort of the method. Dwalin studies the lake and distant town with a wary, measuring look. Ori looks as though the nearness of the Mountain matters more than the town below.
-Voices carry over the planks in snatches of prices, weather, fish, and rumors from the Mountain.
 
 > east
-(32/32 · room: wooden_town)
-You are in Lake-town, a forest of timber halls, jetties, and plank bridges raised above the dark water. Merchants call, boats creak at their moorings, and the talk of trade, weather, and the Mountain moves continually through the town. Thorin watches the water and the people with equal suspicion. Dwalin keeps his cloak close in the lake-wind. Balin seems steadier for the sound of human trade and labor. Ori, Oin, and Bard linger a little apart. Bard is carrying a bow, a strong arrow, a quiver.
+(34/34 · room: wooden_town)
+You are in Lake-town, a forest of timber halls, jetties, and plank bridges raised above the dark water. Merchants call, boats creak at their moorings, and the talk of trade, weather, and the Mountain moves continually through the town. Thorin watches the water and the people with equal suspicion. Dwalin keeps his cloak close in the lake-wind. Balin seems steadier for the sound of human trade and labor. Ori, Oin, and Bard linger a little apart. Bard is carrying a bow, a black arrow, a quiver.
 Game saved.
 Cold hands haul you in from the lake-side landing at last, more like driftwood than travelers. The town's folk stare, laugh, pity, and question by turns, for dwarves and half-drowned strangers do not come bobbing in from the dark every evening.
 Soon other barrels are being hooked in and broken open amid spluttering outrage, and the dwarves come out of them one after another stiff, bruised, furious, and indisputably alive.
@@ -196,4 +208,4 @@ Bard says 'Some roads should not be walked without a bow at your side.'
 
 [final]
 room=wooden_town
-commands=open curtain -> open cupboard -> examine cupboard -> take meal -> eat meal -> north -> east -> east -> east -> look across river -> throw rope across river -> pull rope -> climb into boat -> east -> break web with sword -> north east -> help dwarves -> break web with sword -> wear ring -> north -> north east -> south -> wait -> ask thorin to enter barrels -> wait -> open trap door -> wait -> ask thorin to throw barrels through trap door -> wait -> throw barrel through trap door -> jump onto barrel -> east
+commands=open curtain -> open cupboard -> examine cupboard -> take meal -> eat meal -> north -> east -> east -> east -> look across river -> throw rope across river -> pull rope -> climb into boat -> east -> break web with sword -> north east -> help dwarves -> break web with sword -> wear ring -> north -> north east -> remove ring -> wait -> break red door with sword -> south west -> ask thorin to enter barrels -> wait -> open trap door -> wait -> ask thorin to throw barrels through trap door -> wait -> throw barrel through trap door -> jump onto barrel -> east

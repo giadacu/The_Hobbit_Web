@@ -1340,6 +1340,9 @@
         when: ({ game }) => game.flags.elvenking_prisoner_seen,
         text: "You are in the dark dungeon beneath the Elvenking's halls, where damp stone, iron, and old restraint have none of the woodland grace shown above. The memory of lantern-light, the king's measured questions, and your own stubborn silence still hangs over the place more heavily than the chains.",
       },
+      {
+        text: "You are in the dark dungeon beneath the Elvenking's halls, where damp stone, iron rings, and stale torch-smoke replace every grace of the woodland above. The place feels ordered, cold, and older than mercy.",
+      },
     ],
     elven_prison_cells: [
       {
@@ -9668,6 +9671,10 @@
       if (["long_lake", "wooden_town", "strong_river", "stoe_of_ravenhill", "little_steep_bay", "bleak_barren_land", "ruins_of_the_town_of_dale", "front_gate"].includes(game.currentRoom)) {
         game.noteLaketownBurningEcho();
       }
+      if (game.currentRoom === "elvenkings_halls" && !game.flags.elvenking_prisoner_seen) {
+        this.checkElvenWoodElfEscort();
+        this.checkKidnapping();
+      }
       game.tryEreborRavenhillRouteHint();
       this.checkSmaugDragonEndgameScenes();
     }
@@ -9749,6 +9756,7 @@
       this.checkCellarFeast();
       this.checkDwarfBarrelLoading();
       this.checkLaketownArrival();
+      this.checkElvenWoodElfEscort();
       this.checkKidnapping();
       this.checkTrollsClearing();
       this.checkEreborStandoff();
@@ -9969,13 +9977,54 @@
       );
     }
 
+    checkElvenWoodElfEscort() {
+      const game = this.game;
+      if (game.currentRoom !== "elvenkings_halls" || game.flags.elvenking_prisoner_seen) return false;
+      const woodElf = game.characters.wood_elf;
+      if (!woodElf) return false;
+      if (woodElf.position === "elvenkings_halls" && woodElf.visible) return false;
+      const escortFromClearing = woodElf.position === "elvish_clearing" || Boolean(game.flags.initiative_wood_elf_warning);
+      const escortFromDirectArrival = Boolean(game.flags.mirkwoodjourneycomplete) && !woodElf.position;
+      if (!escortFromClearing && !escortFromDirectArrival) return false;
+      woodElf.position = "elvenkings_halls";
+      woodElf.visible = true;
+      woodElf.hasMetPlayer = true;
+      woodElf.movementMode = "never";
+      return true;
+    }
+
+    elvenHallsImmediateCapturePending() {
+      const game = this.game;
+      if (game.currentRoom !== "elvenkings_halls" || game.flags.elvenking_prisoner_seen) return false;
+      const woodElf = Object.values(game.characters).find((p) => normalize(p.name) === "wood elf");
+      if (!woodElf) return false;
+      if (game.player.wearingRing && game.player.noticeable === false) {
+        const ringWaits = Number(game.flags.elven_halls_ring_wait_turns || 0);
+        if (ringWaits < 1) return false;
+      }
+      if (woodElf.position === game.currentRoom && woodElf.visible) return true;
+      if (woodElf.position === "elvenkings_halls" && woodElf.visible) return false;
+      const escortFromClearing = woodElf.position === "elvish_clearing" || Boolean(game.flags.initiative_wood_elf_warning);
+      const escortFromDirectArrival = Boolean(game.flags.mirkwoodjourneycomplete) && !woodElf.position;
+      return escortFromClearing || escortFromDirectArrival;
+    }
+
     checkKidnapping() {
       const game = this.game;
       const woodElf = Object.values(game.characters).find((p) => normalize(p.name) === "wood elf" && p.visible);
       if (!woodElf || woodElf.position !== game.player.position) return;
       if (game.player.wearingRing && game.player.noticeable === false) {
-        game.print("The wood elf cannot see you because you are wearing the ring.");
-        return;
+        if (game.currentRoom === "elvenkings_halls") {
+          game.flags.elven_halls_ring_wait_turns = Number(game.flags.elven_halls_ring_wait_turns || 0) + 1;
+          if (game.flags.elven_halls_ring_wait_turns <= 1) {
+            game.print("The wood elf cannot see you because you are wearing the ring.");
+            return;
+          }
+          game.print("The ring hides you well, but not the creak of the boards under an invisible foot. The wood elf's head turns sharply toward the sound, and for a moment even ring-silent hiding seems a poor trade against capture.");
+        } else {
+          game.print("The wood elf cannot see you because you are wearing the ring.");
+          return;
+        }
       }
       if (game.currentRoom === "elvish_clearing") {
         if (!game.flags.initiative_wood_elf_warning) {
@@ -10388,6 +10437,11 @@
         return "climb into boat";
       }
 
+      if (game.currentRoom === "elvenkings_halls" && !game.flags.elvenking_prisoner_seen) {
+        if (game.player.wearingRing && game.player.noticeable === false) return "remove ring";
+        return "wait";
+      }
+
       if (game.currentRoom === "dark_dungeon") {
         const redDoor = game.doors.porta_dark_dungeon_cellar;
         if (redDoor && !redDoor.open) return this.autoplayHas("majestic sword") ? "break red door with sword" : "wait";
@@ -10410,7 +10464,7 @@
           if (bard?.position === game.currentRoom && bard.visible) return "ask bard to follow me";
           const bardCorridor = {
             elvish_clearing: "north east",
-            elvenkings_halls: "south",
+            elvenkings_halls: game.flags.elvenking_prisoner_seen ? "south" : "wait",
             cellar: game.doors.porta_cellar_long_lake?.open ? "down" : "open trap door",
             long_lake: "east",
           };
@@ -13927,6 +13981,11 @@
       return connection.from === "treeless_opening" && ["outside_goblins_gate", "beorns_house"].includes(connection.to);
     }
 
+    elvenCellarTravelGate(connection) {
+      if (!connection || this.flags.elvenking_prisoner_seen) return false;
+      return connection.from === "elvenkings_halls" && connection.to === "cellar";
+    }
+
     narrativeTravelBlock(connection) {
       if (!connection) return false;
       return this.liveTrollExposureGate(connection)
@@ -13935,6 +13994,7 @@
         || this.rivendellPreparationGate(connection)
         || this.rivendellMapCarryGate(connection)
         || this.wargEscapeTravelGate(connection)
+        || this.elvenCellarTravelGate(connection)
         || this.dryCaveCrackTravelGate(connection)
         || this.beornMountainStormGate(connection)
         || this.beornDepartureGate(connection)
@@ -13989,6 +14049,16 @@
         }
         return "Below the pines the wolves prowl too thickly for any honest descent, and goblin cries from the heights promise worse if you try the ground too soon.";
       }
+      if (this.elvenCellarTravelGate(connection)) {
+        const attempts = Number(this.flags.elvencellarblockedattempts || 0);
+        if (attempts <= 0) {
+          return "The stair down toward the king's wine-cellars is watched too closely. Even in the looseness of feasting, no honest guest would wander that way openly through the halls.";
+        }
+        if (attempts === 1) {
+          return "Elven servants pass the head of the stair with purposeful eyes. Whatever business lies below, you will not reach it by strolling southward under these roof-beams.";
+        }
+        return "The way south remains no open road. Whatever lies below must be sought by other paths than this, under the Elvenking's watchful halls.";
+      }
       if (this.dryCaveCrackTravelGate(connection)) {
         if (!this.flags.drycavecrackairnoticed) return "The passage seems to end in blank stone, yet a faint thread of colder air says the hidden crack must still be there somewhere.";
         if (!this.flags.drycavecrackseamfound) return "You know now that air comes through the stone, but you have not yet found the seam by touch.";
@@ -14033,6 +14103,10 @@
       }
       if (this.wargEscapeTravelGate(connection)) {
         this.flags.wargescapeblockedattempts = Number(this.flags.wargescapeblockedattempts || 0) + 1;
+        return;
+      }
+      if (this.elvenCellarTravelGate(connection)) {
+        this.flags.elvencellarblockedattempts = Number(this.flags.elvencellarblockedattempts || 0) + 1;
         return;
       }
       if (this.beornMountainStormGate(connection)) {
@@ -16694,7 +16768,13 @@
       }
       const transitionNarrative = this.movementTransitionNarrative(previousRoom, effectiveConnection.to, direction);
       if (transitionNarrative) this.print(transitionNarrative);
-      this.describeRoom();
+      const skipRoomDescribeForImmediateElvenCapture = (
+        effectiveConnection.to === "elvenkings_halls"
+        && this.hazards?.elvenHallsImmediateCapturePending?.()
+      );
+      if (!skipRoomDescribeForImmediateElvenCapture) {
+        this.describeRoom();
+      }
       this.noteMirkwoodTravel(previousRoom, effectiveConnection.to, direction);
       this.triggerSpiderEyesEncounter(previousRoom, effectiveConnection.to, direction);
       this.hazards?.maybeProgressAutosave(previousRoom, effectiveConnection.to);

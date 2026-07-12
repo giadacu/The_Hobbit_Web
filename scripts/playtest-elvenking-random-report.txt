@@ -1,0 +1,42 @@
+Elvenking Halls onward — random playtest report
+Date: 2026-07-12T12:02:17.510Z
+Runs: 60 (mixed, failure, optimal, 20 seeds each)
+Step limit: 400
+
+Unique issues: 0
+
+No automated narrative/sequence issues detected.
+
+Milestone reach (across all runs):
+  laketown: 20/60
+  frontGate: 20/60
+  dragon: 20/60
+  epilogue: 20/60
+  death: 20/60
+  softlock: 0/60
+
+Stalled/death runs: 40
+  mixed:1: room=cellar steps=133 death=true
+    tail: inventory (elvenkings_halls->elvenkings_halls) | south (elvenkings_halls->cellar) | south east (cellar->elven_underground_river) | north west (elven_underground_river->cellar) | inventory (cellar->cellar) | jump trap door (cellar->cellar)
+  mixed:18: room=cellar steps=7 death=true
+    tail: south west (dark_dungeon->cellar) | east (cellar->elven_storage_rooms) | wear ring (elven_storage_rooms->elven_storage_rooms) | wait (elven_storage_rooms->elven_storage_rooms) | west (elven_storage_rooms->cellar) | jump trap door (cellar->cellar)
+  mixed:35: room=cellar steps=21 death=true
+    tail: down (cellar->cellar) | look (cellar->cellar) | inventory (cellar->cellar) | down (cellar->cellar) | down (cellar->cellar) | jump trap door (cellar->cellar)
+  mixed:52: room=cellar steps=71 death=true
+    tail: inventory (elven_storage_rooms->elven_storage_rooms) | look (elven_storage_rooms->elven_storage_rooms) | inventory (elven_storage_rooms->elven_storage_rooms) | west (elven_storage_rooms->cellar) | wear ring (cellar->cellar) | down (cellar->cellar)
+  mixed:69: room=cellar steps=17 death=true
+    tail: inventory (dark_dungeon->dark_dungeon) | wait (dark_dungeon->dark_dungeon) | west (dark_dungeon->dark_dungeon) | break red door with sword (dark_dungeon->dark_dungeon) | south west (dark_dungeon->cellar) | jump trap door (cellar->cellar)
+  mixed:86: room=cellar steps=15 death=true
+    tail: open trap door (cellar->cellar) | inventory (cellar->cellar) | east (cellar->elven_storage_rooms) | west (elven_storage_rooms->cellar) | look (cellar->cellar) | jump trap door (cellar->cellar)
+  mixed:103: room=cellar steps=49 death=true
+    tail: wait (elven_underground_river->elven_underground_river) | wear ring (elven_underground_river->elven_underground_river) | look (elven_underground_river->elven_underground_river) | inventory (elven_underground_river->elven_underground_river) | north west (elven_underground_river->cellar) | jump trap door (cellar->cellar)
+  mixed:120: room=cellar steps=5 death=true
+    tail: break red door with sword (dark_dungeon->dark_dungeon) | west (dark_dungeon->dark_dungeon) | south west (dark_dungeon->cellar) | wait (cellar->cellar) | jump trap door (cellar->cellar)
+  mixed:137: room=cellar steps=11 death=true
+    tail: north (cellar->elvenkings_halls) | south (elvenkings_halls->cellar) | open trap door (cellar->cellar) | wait (cellar->cellar) | open trap door (cellar->cellar) | jump trap door (cellar->cellar)
+  mixed:154: room=cellar steps=33 death=true
+    tail: north east (elvenkings_halls->elven_feast_hall) | south west (elven_feast_hall->elvenkings_halls) | north (elvenkings_halls->elven_guard_post) | south (elven_guard_post->elvenkings_halls) | south (elvenkings_halls->cellar) | jump trap door (cellar->cellar)
+  mixed:171: room=cellar steps=32 death=true
+    tail: south west (dark_dungeon->cellar) | inventory (cellar->cellar) | wait (cellar->cellar) | wear ring (cellar->cellar) | wait (cellar->cellar) | jump trap door (cellar->cellar)
+  mixed:188: room=cellar steps=10 death=true
+    tail: south west (dark_dungeon->cellar) | south east (cellar->elven_underground_river) | north west (elven_underground_river->cellar) | open trap door (cellar->cellar) | wait (cellar->cellar) | jump trap door (cellar->cellar)

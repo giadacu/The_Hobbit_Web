@@ -1,5 +1,5 @@
 Erebor endgame image transition audit
-Date: 2026-07-11T16:18:06.731Z
+Date: 2026-07-12T11:58:21.292Z
 Image transitions logged: 55
 Issues: 0
 
@@ -134,7 +134,7 @@ wait @ front_gate
 south @ ruins_of_the_town_of_dale
   temp=- displayed=ruins_of_Dale.jpeg
   smaugstate=sleeping
-ask bard about negotiation @ ruins_of_the_town_of_dale
+ask bard about terms @ ruins_of_the_town_of_dale
   temp=- displayed=ruins_of_Dale.jpeg
   smaugstate=sleeping
 wait @ ruins_of_the_town_of_dale
