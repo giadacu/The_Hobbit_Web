@@ -5447,6 +5447,7 @@
         return game.print(`${sentenceDisplayCharacterName(character)} will not let you pick them up.`);
       }
       if (character.carriedBy === game.player.id) return game.print(`${sentenceDisplayCharacterName(character)} is already with you.`);
+      if (game.blockUnseenPresenceInteraction(character)) return;
       character.carriedBy = game.player.id;
       character.position = game.currentRoom;
       character.followingPlayer = false;
@@ -6439,6 +6440,7 @@
       if (!item) return game.print(game.heldItemMessage(intent.itemName) || `${game.player.name} does not have the ${intent.itemName}.`);
       if (!target) return game.print(this.absentEncounteredCharacterMessage(intent.targetName) || `There is no one named ${intent.targetName} here.`);
       if (game.unexpectedParty?.blocksDirectInteraction(target, "gift")) return;
+      if (game.blockUnseenPresenceInteraction(target)) return;
       if (target.id === game.player.id) return game.print(`${game.player.name} already has the ${item.name}.`);
       const protectedReason = this.protectedQuestGearGiftMessage(target, item);
       if (protectedReason) return game.print(protectedReason);
@@ -6484,6 +6486,7 @@
       if (!item) return game.print(game.heldItemMessage(intent.itemName) || `${game.player.name} does not have the ${intent.itemName}.`);
       if (!target) return game.print(this.absentEncounteredCharacterMessage(intent.targetName) || `There is no one named ${intent.targetName} here.`);
       if (game.unexpectedParty?.blocksDirectInteraction(target, "gift")) return;
+      if (game.blockUnseenPresenceInteraction(target)) return;
       game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "show")} the ${item.name} to ${displayCharacterName(target)}.`);
       this.reactToShownItem(target, item);
     }
@@ -6585,7 +6588,7 @@
     receiveItemFromCharacter(character, itemName) {
       const game = this.game;
       if (character.friendly === false) return this.respondToTalk(character);
-      if (game.player.name === "You" && game.player.noticeable === false) return game.print(`${sentenceDisplayCharacterName(character)} says 'who's talking?'`);
+      if (game.blockUnseenPresenceInteraction(character)) return;
       const held = game.findCharacterItem(character, itemName);
       if (!held) return game.print(`${sentenceDisplayCharacterName(character)} does not have the ${itemName}.`);
       if (held.worn) return game.print(`${sentenceDisplayCharacterName(character)} is wearing the ${held.item.name}.`);
@@ -6599,6 +6602,7 @@
     takeItemFromCharacter(character, itemName) {
       const game = this.game;
       if (character.friendly === false) return this.respondToTalk(character);
+      if (game.blockUnseenPresenceInteraction(character)) return;
       const held = game.findCharacterItem(character, itemName);
       if (!held) return game.print(`${sentenceDisplayCharacterName(character)} does not have the ${itemName}.`);
       if (held.worn) return game.print(`${sentenceDisplayCharacterName(character)} is wearing the ${held.item.name}.`);
@@ -10260,6 +10264,7 @@
         }
         if (!game.smaugWeakSpotKnown()) return "ask smaug about treasure";
         if (!game.smaugWeakSpotSharedWithBard()) return "ask bard about the weak spot";
+        if (game.player.noticeable === false) return "remove ring";
         if (
           game.flags.bardreadiedarrow
           && (
@@ -10477,6 +10482,7 @@
         if (game.currentRoom === "lower_halls" && game.liveDragon() && !game.smaugWeakSpotKnown()) return "ask smaug about treasure";
         if (game.liveDragon() && game.smaugWeakSpotKnown()) {
           if (!game.smaugWeakSpotSharedWithBard()) return "ask bard about the weak spot";
+          if (game.player.noticeable === false) return "remove ring";
           if (game.currentRoom !== "stoe_of_ravenhill") return this.autoplayRouteCommandTo("stoe_of_ravenhill");
           if (!game.smaugSightedFromRavenhill()) return "wait";
           return this.autoplayDirectedCharacterCommand("bard", "say to bard \"shoot dragon\"");
@@ -10500,6 +10506,7 @@
         if (game.liveDragon()) {
           if (!game.smaugWeakSpotKnown()) return "ask smaug about treasure";
           if (!game.smaugWeakSpotSharedWithBard()) return "ask bard about the weak spot";
+          if (game.player.noticeable === false) return "remove ring";
           return this.autoplayRouteCommandTo("stoe_of_ravenhill");
         }
         const prepTreasureLoad = this.autoplayTreasurePickupPrepCommand();
@@ -13132,7 +13139,9 @@
       if (!room) return "";
       const context = this.narrativeContext({ room, roomId: room.id, chapter: this.companionDirector?.chapterForRoom(room.id) || "" });
       const match = (CONTEXTUAL_ROOM_IMAGE_RULES[room.id] || []).find((rule) => !rule.when || rule.when(context));
-      return match?.image || room.image || "";
+      const configured = match?.image || room.image || "";
+      if (match) return resolveLatestImageFile(configured);
+      return resolveLatestImageFile(configured, { roomId: room.id });
     }
 
     clearIdleAdvanceTimer() {
@@ -13356,10 +13365,13 @@
     resolveTemporaryImageName(imageName = "") {
       const raw = String(imageName || "").trim();
       if (!raw) return "";
-      if (/\.[a-z0-9]+$/i.test(raw)) return raw;
-      const normalized = normalize(raw);
-      const dashed = normalized.replace(/[_\s]+/g, "-");
-      return TEMPORARY_IMAGE_ALIASES[dashed] || TEMPORARY_IMAGE_ALIASES[normalized] || raw;
+      let resolved = raw;
+      if (!/\.[a-z0-9]+$/i.test(raw)) {
+        const normalized = normalize(raw);
+        const dashed = normalized.replace(/[_\s]+/g, "-");
+        resolved = TEMPORARY_IMAGE_ALIASES[dashed] || TEMPORARY_IMAGE_ALIASES[normalized] || raw;
+      }
+      return resolveLatestImageFile(resolved);
     }
 
     resolveFatalEndgameImage(message = "", options = {}) {
@@ -15290,6 +15302,7 @@
         if (!this.player.inventory.includes(id)) this.player.inventory.push(id);
       }
       this.print(this.ringRemoveMessage(this.player));
+      this.maybeCatchUpBardSmaugRetreat();
     }
 
     give(command) {
@@ -16297,6 +16310,7 @@
       if (verb === "answer" && this.handleGollumAnswer(text.replace(/^gollum'?s?\s+riddle\b/, "").trim())) return;
       const target = this.resolveCharacterTarget(text.replace(/^(?:from|to)\s+/, ""));
       if (target) {
+        if (this.blockUnseenPresenceInteraction(target)) return;
         const messages = {
           thank: actorizeSecondPerson(this.player, `You thank ${target.name}.`),
           flatter: actorizeSecondPerson(this.player, `You flatter ${target.name}.`),
@@ -16824,37 +16838,63 @@
       return null;
     }
 
+    bardEligibleForSmaugRetreat(bard) {
+      return Boolean(
+        bard
+        && this.liveDragon()
+        && !bard.carriedBy
+        && !bard.followingPlayer
+        && bard.visible
+        && bard.position === "lower_halls",
+      );
+    }
+
+    announceBardSmaugRetreat() {
+      if (this.flags.bard_retreating_from_smaug) return;
+      this.flags.bard_retreating_from_smaug = true;
+      this.print("Bard falls back with you from the deeper halls at once, keeping close now that the dragon's road plainly leads outward.");
+    }
+
+    maybeStartBardSmaugRetreat(fromRoom, toRoom, direction) {
+      if (this.player.noticeable === false) return false;
+      const bard = this.characters.bard;
+      if (!this.bardEligibleForSmaugRetreat(bard) || fromRoom !== "lower_halls" || bard.position !== fromRoom) return false;
+      this.moveCharacter(bard, toRoom, direction, { silent: true });
+      bard.justEntered = false;
+      bard.followingPlayer = true;
+      bard.movementMode = "follow";
+      this.announceBardSmaugRetreat();
+      return true;
+    }
+
+    maybeCatchUpBardSmaugRetreat() {
+      if (this.player.noticeable === false) return false;
+      const bard = this.characters.bard;
+      if (!this.bardEligibleForSmaugRetreat(bard) || this.currentRoom === "lower_halls") return false;
+      if (this.findTravelDistance("lower_halls", this.currentRoom) >= 99) return false;
+      this.moveCharacter(bard, this.currentRoom, null, { silent: true });
+      bard.justEntered = false;
+      bard.followingPlayer = true;
+      bard.movementMode = "follow";
+      this.announceBardSmaugRetreat();
+      return true;
+    }
+
     moveFollowers(fromRoom, toRoom, direction) {
       for (const character of Object.values(this.characters)) {
         if (character.carriedBy !== this.player.id) continue;
         this.moveCharacter(character, toRoom, direction, { silent: true });
         if (this.characterCannotFollowVertical(character, direction)) {
           this.releaseCarriedCharacter(character, {
-            follow: true,
+            follow: this.player.noticeable !== false,
             room: toRoom,
-            message: carriedCompanionVerticalReleaseMessage(character) || `${sentenceDisplayCharacterName(character)} follows you once clear of the climb.`,
+            message: this.player.noticeable === false
+              ? ""
+              : carriedCompanionVerticalReleaseMessage(character) || `${sentenceDisplayCharacterName(character)} follows you once clear of the climb.`,
           });
         }
       }
-      const bard = this.characters.bard;
-      if (
-        this.liveDragon()
-        && fromRoom === "lower_halls"
-        && bard
-        && !bard.carriedBy
-        && !bard.followingPlayer
-        && bard.visible
-        && bard.position === fromRoom
-      ) {
-        this.moveCharacter(bard, toRoom, direction, { silent: true });
-        bard.justEntered = false;
-        bard.followingPlayer = true;
-        bard.movementMode = "follow";
-        if (!this.flags.bard_retreating_from_smaug) {
-          this.flags.bard_retreating_from_smaug = true;
-          this.print("Bard falls back with you from the deeper halls at once, keeping close now that the dragon's road plainly leads outward.");
-        }
-      }
+      this.maybeStartBardSmaugRetreat(fromRoom, toRoom, direction);
       if (this.player.noticeable === false) return;
       for (const character of Object.values(this.characters)) {
         if (character.id === this.player.id) continue;
@@ -17569,6 +17609,16 @@
       if (this.player.name !== "You" || this.player.noticeable !== false) return false;
       if (matches(character?.name, "gollum") && this.encounters?.gollumAllowsUnseenSpeech(speech)) return false;
       if (matches(character?.name, "bard") && this.bardAllowsUnseenSpeech(speech)) return false;
+      return true;
+    }
+
+    presenceBlockedByInvisibility(character) {
+      return this.player.name === "You" && this.player.noticeable === false && Boolean(character);
+    }
+
+    blockUnseenPresenceInteraction(character) {
+      if (!this.presenceBlockedByInvisibility(character)) return false;
+      this.print(`${sentenceDisplayCharacterName(character)} says 'who's talking?'`);
       return true;
     }
 
@@ -20746,6 +20796,24 @@
     return hash;
   }
 
+  function fileStem(filename = "") {
+    const base = String(filename).split("/").pop() || "";
+    const dot = base.lastIndexOf(".");
+    return dot > 0 ? base.slice(0, dot).toLowerCase() : base.toLowerCase();
+  }
+
+  function resolveLatestImageFile(configuredFile = "", options = {}) {
+    const file = String(configuredFile || "").trim();
+    if (!file) return "";
+    const manifest = window.IMAGE_MANIFEST;
+    if (!manifest) return file;
+    const roomId = options.roomId || "";
+    if (roomId && manifest.rooms?.[roomId]) return manifest.rooms[roomId];
+    const stem = fileStem(file);
+    if (manifest.stems?.[stem]) return manifest.stems[stem];
+    return file;
+  }
+
   function assetUrl(root, file) {
     return `${root}${String(file).split("/").map(encodeURIComponent).join("/")}${ASSET_QUERY_SUFFIX}`;
   }
@@ -23190,6 +23258,19 @@
     if (normalized === "southwest") return "south west";
     return normalized;
   }
+
+  window.__IMAGE_MANIFEST_SOURCE__ = function exportImageManifestSource() {
+    return {
+      roomImages: Object.fromEntries(
+        Object.entries(DATA.rooms)
+          .filter(([, room]) => room?.image)
+          .map(([id, room]) => [id, room.image]),
+      ),
+      contextualRules: CONTEXTUAL_ROOM_IMAGE_RULES,
+      endgameAliases: ENDGAME_SCENE_IMAGES,
+      temporaryAliases: TEMPORARY_IMAGE_ALIASES,
+    };
+  };
 
   window.hobbitGame = new HobbitGame(DATA);
   const fontReady = document.fonts?.ready || Promise.resolve();

@@ -280,6 +280,8 @@ function bootGame() {
   };
   vm.runInThisContext(fs.readFileSync("assets/game-data.js", "utf8"));
   vm.runInThisContext(fs.readFileSync("assets/map-layout-data.js", "utf8"));
+  const manifestPath = "assets/image-manifest.js";
+  if (fs.existsSync(manifestPath)) vm.runInThisContext(fs.readFileSync(manifestPath, "utf8"));
   vm.runInThisContext(fs.readFileSync("game.js", "utf8"));
   window.hobbitGame.idleWaitMs = 0;
   window.hobbitGame.voiceEnabled = false;
@@ -6851,6 +6853,80 @@ const gameCases = [
     ],
   },
   {
+    name: "bard smaug retreat is silent while wearing the ring",
+    drive(game) {
+      game.execute("jump smaug");
+      game.flags.bardreadiedarrow = true;
+      game.execute("ask smaug about treasure");
+      game.execute("ask bard about the weak spot");
+      game.execute("wear ring");
+      outputLines.length = 0;
+      game.execute("east");
+      const bard = game.characters.bard;
+      game.print(`Retreat line printed: ${outputLines.some((line) => line.includes("Bard falls back with you from the deeper halls")) ? "yes" : "no"}`);
+      game.print(`Bard stayed in lower halls: ${bard?.position === "lower_halls" ? "yes" : "no"}`);
+      game.print(`Bard following while invisible: ${bard?.followingPlayer ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Retreat line printed: no",
+      "Bard stayed in lower halls: yes",
+      "Bard following while invisible: no",
+    ],
+  },
+  {
+    name: "bard smaug retreat resumes after removing the ring",
+    drive(game) {
+      game.execute("jump smaug");
+      game.flags.bardreadiedarrow = true;
+      game.execute("ask smaug about treasure");
+      game.execute("ask bard about the weak spot");
+      game.execute("wear ring");
+      game.execute("east");
+      outputLines.length = 0;
+      game.execute("remove ring");
+      const bard = game.characters.bard;
+      game.print(`Retreat line printed: ${outputLines.some((line) => line.includes("Bard falls back with you from the deeper halls")) ? "yes" : "no"}`);
+      game.print(`Bard caught up: ${bard?.position === game.currentRoom ? "yes" : "no"}`);
+      game.print(`Bard following after ring removed: ${bard?.followingPlayer ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Retreat line printed: yes",
+      "Bard caught up: yes",
+      "Bard following after ring removed: yes",
+    ],
+  },
+  {
+    name: "invisible presence interactions are blocked for companions",
+    drive(game) {
+      game.execute("jump smaug");
+      game.execute("wear ring");
+      outputLines.length = 0;
+      game.execute("thank bard");
+      const thankBlocked = outputLines.some((line) => line.includes("who's talking?"));
+      outputLines.length = 0;
+      game.execute("give rope to bard");
+      const giveBlocked = outputLines.some((line) => line.includes("who's talking?"));
+      outputLines.length = 0;
+      game.execute("show map to bard");
+      const showBlocked = outputLines.some((line) => line.includes("who's talking?"));
+      outputLines.length = 0;
+      game.execute("take bard");
+      const carryBlocked = outputLines.some((line) => line.includes("who's talking?"));
+      game.print(`Thank blocked: ${thankBlocked ? "yes" : "no"}`);
+      game.print(`Give blocked: ${giveBlocked ? "yes" : "no"}`);
+      game.print(`Show blocked: ${showBlocked ? "yes" : "no"}`);
+      game.print(`Carry blocked: ${carryBlocked ? "yes" : "no"}`);
+      game.print(`Bard carried while invisible: ${game.characters.bard?.carriedBy === game.player.id ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Thank blocked: yes",
+      "Give blocked: yes",
+      "Show blocked: yes",
+      "Carry blocked: yes",
+      "Bard carried while invisible: no",
+    ],
+  },
+  {
     name: "waiting alone does not share the smaug weak spot with bard",
     drive(game) {
       game.execute("jump smaug");
@@ -9186,6 +9262,20 @@ const gameCases = [
     ],
     notExpectedIncluded: [
       "Elven prisoner flag: no",
+    ],
+  },
+  {
+    name: "image manifest prefers newest room asset for gate to mirkwood",
+    setup(game) {
+      movePlayerTo(game, "gate_to_mirkwood");
+    },
+    drive(game) {
+      game.print(`Gate image: ${game.contextualRoomImage(game.room())}`);
+      game.print(`Configured image: ${game.room()?.image || "none"}`);
+    },
+    expectedIncluded: [
+      "Gate image: gate_to_mirkwood.png",
+      "Configured image: Mirkwood.jpeg",
     ],
   },
   {

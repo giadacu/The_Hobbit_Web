@@ -8369,3 +8369,119 @@ Future debugging advice
 -----------------------
 - If a single command ends in a different room than its first describeRoom, check whether
   post-move `checkSpecialSituations()` teleports the player in the same turn.
+
+
+Case 167 - 2026-07-12 - Bard Smaug retreat ignored ring invisibility
+----------------------------------------------------------------------
+
+Symptom
+-------
+While Bilbo wears the golden ring in the lower halls, moving outward still prints
+"Bard falls back with you from the deeper halls at once..." and Bard follows as if
+he could see the player.
+
+Root cause
+----------
+`moveFollowers()` had a Bard-only Smaug-retreat block that ran before the global
+`if (this.player.noticeable === false) return;` guard used for ordinary followers.
+That special case neither checked ring invisibility nor deferred the retreat.
+
+Resolution
+----------
+- Extract Bard Smaug retreat into `maybeStartBardSmaugRetreat()`, gated on
+  `player.noticeable !== false`.
+- Add `maybeCatchUpBardSmaugRetreat()` from `removeRing()` so Bard can rejoin
+  after the player becomes visible again on the Mountain path.
+- Teach erebor autoplay to `remove ring` before routing out of lower halls.
+- Parser regressions for silent invisible retreat and post-ring catch-up.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- Any new special follower logic in `moveFollowers()` must respect
+  `player.noticeable === false` the same way the generic follower loop does.
+- If NPC movement still happens while invisible, check for early-return blocks
+  placed after bespoke companion handling.
+
+
+Case 168 - 2026-07-12 - Ring invisibility gaps in social and physical NPC interactions
+--------------------------------------------------------------------------------------
+
+Symptom
+-------
+While wearing the ring, Bilbo could still thank/flatter NPCs, give or show items,
+take items from companions, or pick up Bard/Thorin as if they could see him.
+Carried companions could also print a follow line after a vertical climb.
+
+Root cause
+----------
+Only talk/ask/tell paths used `speechBlockedByInvisibility()` or direct
+`noticeable === false` checks. `socialAction()`, `give()`, `show()`,
+`takeItemFromCharacter()`, and `carryCharacter()` did not. The carried-companion
+release path in `moveFollowers()` always announced following after climbs.
+
+Resolution
+----------
+- Add `presenceBlockedByInvisibility()` and `blockUnseenPresenceInteraction()`
+  for non-dialogue social/physical contact with visible NPCs.
+- Apply the helper to thank/flatter/insult/call-style `socialAction()` targets,
+  `give()`, `show()`, `takeItemFromCharacter()`, and `carryCharacter()`.
+- Reuse the helper in `receiveItemFromCharacter()` for consistency.
+- Suppress vertical-release follow prose and `followingPlayer` while invisible.
+- Parser regression for blocked thank/give/show/carry actions.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- Plot-advancing whispers still belong in `speechBlockedByInvisibility()` with
+  explicit exceptions; ordinary visible contact should use
+  `blockUnseenPresenceInteraction()`.
+
+
+Case 176 - 2026-07-13 - Room images should auto-pick newest file for same location
+-----------------------------------------------------------------------------------
+
+Symptom
+-------
+Replacing legacy JPEG room art with new PNGs (see `docs/image-regen-mirkwood-onward.md`)
+required manual `"image"` updates in `game-data.js` even when the new file clearly
+belonged to the same room (e.g. `gate_to_mirkwood.png` vs `Mirkwood.jpeg`).
+
+Resolution
+----------
+1. Added `scripts/generate-image-manifest.js` to scan `assets/local-images/`, group
+   candidates per room id (configured name, `{room_id}.*`, legacy filename map),
+   and per asset stem (same basename, different extension), then pick the newest mtime.
+2. Generated `assets/image-manifest.js` loaded before `game.js` in `index.html`.
+3. `resolveLatestImageFile()` in `game.js` applies manifest picks in
+   `contextualRoomImage()` and `resolveTemporaryImageName()`.
+4. Headless boot loads the manifest for parser tests.
+
+Workflow after adding art: save PNG -> `node scripts/generate-image-manifest.js` -> reload game.
+
+Files touched
+-------------
+- game.js
+- scripts/generate-image-manifest.js
+- assets/image-manifest.js
+- scripts/headless-boot.js
+- index.html
+- scripts/parser-tests.js
+- docs/image-regen-mirkwood-onward.md
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- Re-run the manifest generator after adding or replacing images in `local-images/`.
+- If a room still shows the old art, add its legacy filename to `LEGACY_FILE_TO_ROOM`
+  in the generator or rename the new file to `{room_id}.png`.

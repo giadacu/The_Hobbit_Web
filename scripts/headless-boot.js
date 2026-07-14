@@ -135,6 +135,8 @@ function bootGame() {
 
   vm.runInThisContext(fs.readFileSync(path.join(root, "assets/game-data.js"), "utf8"));
   vm.runInThisContext(fs.readFileSync(path.join(root, "assets/map-layout-data.js"), "utf8"));
+  const manifestPath = path.join(root, "assets/image-manifest.js");
+  if (fs.existsSync(manifestPath)) vm.runInThisContext(fs.readFileSync(manifestPath, "utf8"));
   vm.runInThisContext(fs.readFileSync(path.join(root, "game.js"), "utf8"));
 
   const game = global.hobbitGame;
