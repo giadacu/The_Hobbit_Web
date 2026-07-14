@@ -1,0 +1,10 @@
+Bag End party image playtest: PASS
+Images checked: 7
+Checks: 6
+
+{"label":"first-knock-hall","room":"hobbit_hole","phase":"quiet","image":"unexpected_party_first_knock.png"}
+{"label":"first-knock-garden","room":"bilbos_garden","phase":"quiet","image":"unexpected_party_first_knock_garden.png"}
+{"label":"thorin-hall","room":"hobbit_hole","phase":"briefing","image":"unexpected_party_thorin_at_door_hall.png"}
+{"label":"thorin-garden","room":"bilbos_garden","phase":"briefing","image":"unexpected_party_thorin_at_door_garden.png"}
+{"label":"persistent-variants","phase":"arrivals","hobbit_hole":"hobbit_hole_party.png","bag_end_parlour":"bag_end_parlour_party.png","bag_end_kitchen":"bag_end_kitchen_party.png"}
+{"label":"no-wrong-room-cutscene","room":"bag_end_parlour","phase":"quiet","image":"-"}

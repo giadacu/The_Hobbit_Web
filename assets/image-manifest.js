@@ -1,5 +1,5 @@
 window.IMAGE_MANIFEST = {
-  "generatedAt": "2026-07-14T06:44:04.352Z",
+  "generatedAt": "2026-07-14T14:33:02.253Z",
   "imageDir": "assets/local-images/",
   "rooms": {
     "hobbit_hole": "hobbit_hole.jpeg",
@@ -270,11 +270,14 @@ window.IMAGE_MANIFEST = {
     "erebor_abandoned_workshop": "erebor_abandoned_workshop.png",
     "erebor_great_hall": "erebor_great_hall.png",
     "treasure_approach": "treasure_approach.png",
+    "hobbit_hole_party": "hobbit_hole_party.png",
     "hobbit_hole_open_door_open_chest_with_treasure": "hobbit_hole_open_door_open_chest_with_treasure.png",
     "hobbit_hole_open_door_open_chest": "hobbit_hole_open_door_open_chest.png",
     "hobbit_hole_open_chest": "hobbit_hole_open_chest.png",
     "hobbit_hole_open_door": "hobbit_hole_open_door.png",
     "bilbosgarden_open_door": "bilbosgarden_open_door.png",
+    "bag_end_parlour_party": "bag_end_parlour_party.png",
+    "bag_end_kitchen_party": "bag_end_kitchen_party.png",
     "bag_end_guest_room_open_trunk": "bag_end_guest_room_open_trunk.png",
     "erebor_narrow_open_door": "erebor_narrow_open_door.png",
     "erebor_narrow_revealed_door": "erebor_narrow_revealed_door.png",

@@ -1544,6 +1544,10 @@
   const CONTEXTUAL_ROOM_IMAGE_RULES = {
     hobbit_hole: [
       {
+        when: ({ game }) => ["arrivals", "briefing"].includes(game.bagEndPartyPhase()),
+        image: "hobbit_hole_party.png",
+      },
+      {
         when: ({ game }) => game.items.heavy_wooden_chest?.open
           && game.isInside("heavy_wooden_chest", "treasure"),
         image: "hobbit_hole_open_door_open_chest_with_treasure.png",
@@ -1569,6 +1573,18 @@
       {
         when: ({ game }) => game.doorOpenByName("round green door"),
         image: "bilbosgarden_open_door.png",
+      },
+    ],
+    bag_end_parlour: [
+      {
+        when: ({ game }) => ["arrivals", "briefing"].includes(game.bagEndPartyPhase()),
+        image: "bag_end_parlour_party.png",
+      },
+    ],
+    bag_end_kitchen: [
+      {
+        when: ({ game }) => ["arrivals", "briefing"].includes(game.bagEndPartyPhase()),
+        image: "bag_end_kitchen_party.png",
       },
     ],
     bag_end_guest_room: [
@@ -3075,6 +3091,20 @@
       return this.state.enabled && this.isPartyRoom(this.game.currentRoom);
     }
 
+    maybeShowArrivalScene(kind = "") {
+      const roomId = this.game.currentRoom;
+      let file = "";
+      if (kind === "first_knock") {
+        if (roomId === "hobbit_hole") file = "unexpected_party_first_knock.png";
+        else if (roomId === "bilbos_garden") file = "unexpected_party_first_knock_garden.png";
+      } else if (kind === "thorin_arrival") {
+        if (roomId === "hobbit_hole") file = "unexpected_party_thorin_at_door_hall.png";
+        else if (roomId === "bilbos_garden") file = "unexpected_party_thorin_at_door_garden.png";
+      }
+      if (!file) return false;
+      return this.game.showTemporaryImage(file, { dismissOnNextCommand: true });
+    }
+
     advanceTurn() {
       if (!this.canAdvance()) return false;
       this.ensureCharacters();
@@ -3260,6 +3290,7 @@
               : "Heavy boots sound upon the path outside, and a solid knock follows at the round green door.",
             cooldown: 1,
             apply: () => {
+              this.maybeShowArrivalScene("first_knock");
               this.state.currentArrival.stage = 1;
             },
           };
@@ -3380,6 +3411,7 @@
             : "The round green door opens, and there stands Thorin Oakenshield, dark-cloaked, proud, and unmistakably the leader of those already gathered within.",
           cooldown: 1,
           apply: () => {
+            this.maybeShowArrivalScene("thorin_arrival");
             this.setPartyDoorOpen(true);
             thorin.position = "bilbos_garden";
             this.state.thorinStage = 2;

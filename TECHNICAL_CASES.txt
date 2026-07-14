@@ -8485,3 +8485,68 @@ Future debugging advice
 - Re-run the manifest generator after adding or replacing images in `local-images/`.
 - If a room still shows the old art, add its legacy filename to `LEGACY_FILE_TO_ROOM`
   in the generator or rename the new file to `{room_id}.png`.
+
+
+Case 177 - 2026-07-14 - Bag End arrival images needed room-aware hooks and persistent party variants
+-----------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Adding new art for the dwarves' arrival at Bag End risked two immersion breaks:
+
+- a hall-based cutscene could fire while Bilbo was actually in the garden or
+  another room
+- after a strong arrival image, exploration could snap back to static empty
+  Bag End JPEGs and feel visually inconsistent
+
+Root cause
+----------
+The arrival sequence was driven by `UnexpectedPartyController` text beats, but
+there was no room-aware image hook for:
+
+- the first Dwalin knock
+- Thorin's arrival
+
+Bag End also lacked contextual room-image variants for the active party phase.
+
+Resolution
+----------
+1. Added Bag End contextual image variants for:
+   - `hobbit_hole`
+   - `bag_end_parlour`
+   - `bag_end_kitchen`
+   during `arrivals` and `briefing`.
+2. Added `maybeShowArrivalScene()` in `UnexpectedPartyController` so temporary
+   images trigger only when the current room matches the available art:
+   - hall image from `hobbit_hole`
+   - garden image from `bilbos_garden`
+3. Left other Bag End rooms text-only for those beats instead of forcing a
+   wrong-angle cutscene.
+4. Added `scripts/playtest-bag-end-party-images.js` to verify:
+   - first knock in hall
+   - first knock in garden
+   - Thorin arrival in hall
+   - Thorin arrival in garden
+   - persistent party variants
+   - no incorrect cutscene in other Bag End rooms
+5. Documented the image workflow in `docs/image-regen-bag-end-party.md`.
+
+Files touched
+-------------
+- game.js
+- assets/image-manifest.js
+- scripts/playtest-bag-end-party-images.js
+- scripts/playtest-bag-end-party-images-report.txt
+- docs/image-regen-bag-end-party.md
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- For chapter-specific art beats, prefer room-aware hooks instead of global
+  cutscene triggers.
+- If a story beat can happen from multiple player locations, either provide one
+  image per valid viewpoint or deliberately skip the image outside supported
+  rooms.
+- After adding new Bag End art, re-run both:
+  - `node scripts/generate-image-manifest.js`
+  - `node scripts/playtest-bag-end-party-images.js`
