@@ -2946,6 +2946,7 @@
         thorinStage: Number.isFinite(savedState?.thorinStage) ? Math.max(0, Math.min(7, savedState.thorinStage)) : 0,
         thorinArrived: Boolean(savedState?.thorinArrived),
         questBriefingDone: Boolean(savedState?.questBriefingDone),
+        quietStartShown: Boolean(savedState?.quietStartShown),
       };
       if (this.state.arrivalIndex < this.state.arrived.length) this.state.arrivalIndex = this.state.arrived.length;
       this.reconcileCharacters();
@@ -3095,14 +3096,54 @@
       const roomId = this.game.currentRoom;
       let file = "";
       if (kind === "first_knock") {
-        if (roomId === "hobbit_hole") file = "unexpected_party_first_knock.png";
-        else if (roomId === "bilbos_garden") file = "unexpected_party_first_knock_garden.png";
+        if (roomId === "hobbit_hole" || roomId === "bilbos_garden") file = "Dwalin_glimpse_bag_end_start.png";
       } else if (kind === "thorin_arrival") {
-        if (roomId === "hobbit_hole") file = "unexpected_party_thorin_at_door_hall.png";
-        else if (roomId === "bilbos_garden") file = "unexpected_party_thorin_at_door_garden.png";
+        if (roomId === "hobbit_hole" || roomId === "bilbos_garden") file = "Thorin_glimpse_bag_end_start.png";
       }
       if (!file) return false;
-      return this.game.showTemporaryImage(file, { dismissOnNextCommand: true });
+      return this.game.showTemporaryImage(file, {
+        dismissOnNextCommand: true,
+        effect: "party-glimpse",
+      });
+    }
+
+    gandalfGlimpseFile(kind = "briefing") {
+      const inGarden = this.game.currentRoom === "bilbos_garden";
+      if (kind === "quiet_start") {
+        return inGarden
+          ? "gandalf_glimpse_bag_end_quiet_start_garden.png"
+          : "gandalf_glimpse_bag_end_quiet_start.png";
+      }
+      if (kind === "not_yet") {
+        return inGarden
+          ? "gandalf_glimpse_bag_end_not_yet_garden.png"
+          : "gandalf_glimpse_bag_end_not_yet.png";
+      }
+      return inGarden
+        ? "gandalf_glimpse_bag_end_briefing_garden.png"
+        : "gandalf_glimpse_bag_end_briefing.png";
+    }
+
+    partyBackdropImage() {
+      const room = this.game.room();
+      if (!room) return "";
+      const file = this.game.contextualRoomImage(room);
+      return /party\.(?:png|webp|jpe?g)$/i.test(file) ? file : "";
+    }
+
+    showPartyGlimpse(subject = "companions", options = {}) {
+      const file = subject === "gandalf"
+        ? this.gandalfGlimpseFile(options.kind || "briefing")
+        : this.partyBackdropImage();
+      if (!file) return false;
+      return this.game.showTemporaryImage(file, {
+        alt: subject === "gandalf"
+          ? "A fleeting glimpse of Gandalf among the gathering"
+          : "A fleeting glimpse of dwarves crowding Bag End",
+        dismissOnNextCommand: true,
+        effect: "party-glimpse",
+        focus: subject === "gandalf" ? "left" : "right",
+      });
     }
 
     advanceTurn() {
@@ -3128,6 +3169,21 @@
     }
 
     nextEvent() {
+      if (!this.state.quietStartShown && this.state.arrivalIndex === 0 && !this.state.currentArrival) {
+        return {
+          message: this.pick([
+            "Gandalf lingers nearby with the look of someone waiting for a carefully arranged evening to begin.",
+            "Gandalf seems in no hurry. He watches Bag End as though listening for the first note of a tune only he already knows.",
+            "There is a strange composure about Gandalf, as if the comfort of Bag End were only the quiet before a larger design.",
+          ], this.seededHash(`gandalf-quiet-start:${this.state.turnCounter}:${this.game.currentRoom}`)),
+          cooldown: 2,
+          apply: () => {
+            this.state.quietStartShown = true;
+            this.showPartyGlimpse("gandalf", { kind: "quiet_start" });
+          },
+        };
+      }
+
       if (this.state.arrivalIndex >= this.roster.length && !this.state.currentArrival && !this.state.thorinArrived) {
         return this.nextThorinEvent();
       }
@@ -3382,6 +3438,7 @@
               if (!this.state.arrived.includes(dwarf.id)) this.state.arrived.push(dwarf.id);
               this.state.arrivalIndex = Math.min(this.roster.length, this.state.arrivalIndex + 1);
               this.state.currentArrival = null;
+              this.showPartyGlimpse("companions");
             },
           };
         }
@@ -3473,6 +3530,7 @@
           message: "Thorin's gaze settles on you. 'And you, Master Baggins, are meant to be our burglar.' Gandalf adds softly, 'The world is wider than your garden gate, Master Baggins.'",
           cooldown: 0,
           apply: () => {
+            this.showPartyGlimpse("gandalf", { kind: "briefing" });
             thorin.position = "bag_end_parlour";
             this.state.thorinStage = 7;
             this.state.questBriefingDone = true;
@@ -6896,22 +6954,30 @@
       if (game.temporaryImage?.file) {
         roomImage.removeAttribute("hidden");
         const src = assetUrl(IMAGE_ROOT, game.temporaryImage.file);
-        this.swapRoomImage(scene, src);
+        this.swapRoomImage(scene, src, game.temporaryImage.presentation);
         roomImage.alt = game.temporaryImage.alt || room.name || "Story image";
       } else if (game.roomIsDark()) {
         this.finishImageTransition(scene);
         game.currentImageSrc = "";
+        game.currentImagePresentationKey = "";
+        game.currentImagePresentation = null;
+        this.applyImagePresentation(roomImage, null);
+        this.applySceneImagePresentation(scene, null);
         roomImage.setAttribute("hidden", "hidden");
         roomImage.removeAttribute("src");
         roomImage.alt = "";
       } else if (room?.image) {
         roomImage.removeAttribute("hidden");
         const src = assetUrl(IMAGE_ROOT, game.contextualRoomImage(room));
-        this.swapRoomImage(scene, src);
+        this.swapRoomImage(scene, src, null);
         roomImage.alt = room.name;
       } else {
         this.finishImageTransition(scene);
         game.currentImageSrc = "";
+        game.currentImagePresentationKey = "";
+        game.currentImagePresentation = null;
+        this.applyImagePresentation(roomImage, null);
+        this.applySceneImagePresentation(scene, null);
         roomImage.setAttribute("hidden", "hidden");
         roomImage.removeAttribute("src");
         roomImage.alt = "";
@@ -7607,17 +7673,56 @@
       return this.adjustSceneMapZoom(direction, { skipCapture: true });
     }
 
-    swapRoomImage(scene, nextSrc) {
+    imagePresentationKey(presentation = null) {
+      if (!presentation) return "";
+      const effect = String(presentation.effect || "").trim();
+      const focus = String(presentation.focus || "").trim();
+      return effect || focus ? `${effect}|${focus}` : "";
+    }
+
+    applyImagePresentation(element, presentation = null) {
+      if (!element) return;
+      const effect = String(presentation?.effect || "").trim();
+      const focus = String(presentation?.focus || "").trim();
+      if (effect) element.setAttribute("data-image-effect", effect);
+      else element.removeAttribute("data-image-effect");
+      if (focus) element.setAttribute("data-image-focus", focus);
+      else element.removeAttribute("data-image-focus");
+    }
+
+    applySceneImagePresentation(scene, presentation = null) {
+      if (!scene) return;
+      const effect = String(presentation?.effect || "").trim();
+      const focus = String(presentation?.focus || "").trim();
+      if (effect) scene.setAttribute("data-image-effect", effect);
+      else scene.removeAttribute("data-image-effect");
+      if (focus) scene.setAttribute("data-image-focus", focus);
+      else scene.removeAttribute("data-image-focus");
+    }
+
+    swapRoomImage(scene, nextSrc, presentation = null) {
       const game = this.game;
       const previousSrc = game.currentImageSrc || roomImage.getAttribute("src") || "";
-      if (previousSrc === nextSrc) {
+      const previousPresentation = game.currentImagePresentation || null;
+      const previousKey = `${previousSrc}|${game.currentImagePresentationKey || ""}`;
+      const nextPresentationKey = this.imagePresentationKey(presentation);
+      const nextKey = `${nextSrc}|${nextPresentationKey}`;
+      if (previousKey === nextKey) {
         if (roomImage.getAttribute("src") !== nextSrc) roomImage.src = nextSrc;
+        this.applyImagePresentation(roomImage, presentation);
+        this.applySceneImagePresentation(scene, presentation);
         game.currentImageSrc = nextSrc;
+        game.currentImagePresentationKey = nextPresentationKey;
+        game.currentImagePresentation = presentation ? { ...presentation } : null;
         return;
       }
 
       roomImage.src = nextSrc;
+      this.applyImagePresentation(roomImage, presentation);
+      this.applySceneImagePresentation(scene, presentation);
       game.currentImageSrc = nextSrc;
+      game.currentImagePresentationKey = nextPresentationKey;
+      game.currentImagePresentation = presentation ? { ...presentation } : null;
 
       if (!previousSrc || !imageReveal || !imageRevealFill || !imageRevealOutline) {
         this.finishImageTransition(scene);
@@ -7629,6 +7734,8 @@
       imageRevealOutline.src = nextSrc;
       imageRevealFill.alt = "";
       imageRevealOutline.alt = "";
+      this.applyImagePresentation(imageRevealFill, previousPresentation);
+      this.applyImagePresentation(imageRevealOutline, presentation);
       imageReveal.removeAttribute("hidden");
 
       scene?.classList.remove("is-transitioning");
@@ -7653,6 +7760,8 @@
       imageRevealOutline?.removeAttribute("src");
       if (imageRevealFill) imageRevealFill.alt = "";
       if (imageRevealOutline) imageRevealOutline.alt = "";
+      this.applyImagePresentation(imageRevealFill, null);
+      this.applyImagePresentation(imageRevealOutline, null);
     }
 
     loadLayoutModePreference() {
@@ -12171,6 +12280,8 @@
       this.outputPinnedToBottom = true;
       this.pendingInitialCommandFocus = true;
       this.currentImageSrc = roomImage.getAttribute("src") || "";
+      this.currentImagePresentationKey = "";
+      this.currentImagePresentation = null;
       this.imageTransitionCycle = 0;
       this.temporaryImage = null;
       this.temporaryImageDismissOnNextCommand = false;
@@ -13460,9 +13571,15 @@
     showTemporaryImage(imageName, options = {}) {
       const file = this.resolveTemporaryImageName(imageName);
       if (!file) return false;
+      const effect = String(options.effect || "").trim();
+      const focus = String(options.focus || "").trim();
       this.temporaryImage = {
         file,
         alt: String(options.alt || options.label || imageName || "").trim(),
+        presentation: {
+          effect,
+          focus,
+        },
       };
       this.temporaryImageDismissOnNextCommand = options.dismissOnNextCommand !== false;
       this.sceneMapVisible = false;
@@ -14114,6 +14231,9 @@
       if (!this.narrativeTravelBlock(connection)) return "";
       const attempts = Number(this.flags.bagendexitattempts || 0);
       const thorinPresent = Boolean(this.unexpectedParty?.state?.thorinArrived);
+      if (attempts <= 0 && this.unexpectedParty?.isPartyRoom(this.currentRoom)) {
+        this.unexpectedParty?.showPartyGlimpse("gandalf", { kind: "not_yet" });
+      }
       if (!thorinPresent) {
         if (attempts <= 0) return 'Gandalf lifts a hand. "Not yet, Bilbo. There is more company yet to come."';
         if (attempts === 1) return "You make as if to slip away, but Gandalf's look makes it plain that he expects you to stay.";
@@ -14459,6 +14579,8 @@
       this.autosaveMeta = null;
       this.cancelOutputScrollAnimation({ jumpToTarget: false });
       output.classList.remove("end-screen");
+      this.currentImagePresentationKey = "";
+      this.currentImagePresentation = null;
       this.initState();
       input.value = "";
     }

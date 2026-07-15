@@ -8550,3 +8550,142 @@ Future debugging advice
 - After adding new Bag End art, re-run both:
   - `node scripts/generate-image-manifest.js`
   - `node scripts/playtest-bag-end-party-images.js`
+
+
+Case 178 - 2026-07-15 - A visual "Gandalf glimpse" cannot be faked from art that does not contain Gandalf
+-----------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+A new Bag End transition was meant to briefly show Gandalf during the quest
+briefing, but the implemented glimpse only cropped the existing party image.
+That produced no actual Gandalf presence because the source art showed dwarves
+only.
+
+Root cause
+----------
+The transition system was technically correct, but the chosen source asset was
+wrong for the narrative beat. Reusing `hobbit_hole_party.png` could only create
+different crops of dwarf-filled art, not introduce a character absent from the
+image.
+
+Resolution
+----------
+1. Kept the lightweight crop-based glimpse for the early dwarf crowding beat.
+2. Switched the Gandalf briefing glimpse to a dedicated temporary image asset:
+   `Gandalf_glimpse_bag_end_start.png`
+3. Updated the Bag End image playtest so the Gandalf beat now verifies the real
+   dedicated asset instead of the generic party image.
+
+Files touched
+-------------
+- game.js
+- scripts/playtest-bag-end-party-images.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- Crop/zoom transitions can emphasize subjects already present in an image, but
+  they cannot invent missing characters.
+- If a story beat depends on a specific character being visible, require at
+  least one dedicated asset for that beat and test for the exact filename.
+
+
+Case 179 - 2026-07-15 - Bag End arrival cutscenes should use dedicated glimpse art, not flat room-replacement scenes
+---------------------------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The early Bag End arrival beats visually felt flatter than the later Gandalf
+glimpse. Dwalin's first knock and Thorin's arrival still used older full-scene
+door images that read more like static room replacements than transitional
+character glimpses.
+
+Root cause
+----------
+Those beats still pointed to legacy hall/garden cutscene assets. Even though
+they were room-aware, they were not stylistically aligned with the newer
+partial-figure glimpse art and did not benefit from the same lightweight
+transition treatment.
+
+Resolution
+----------
+1. Replaced the old first-knock and Thorin-at-door temporary images with new
+   dedicated glimpse assets:
+   - `Dwalin_glimpse_bag_end_start.png`
+   - `Thorin_glimpse_bag_end_start.png`
+2. Allowed each glimpse asset to be used from both supported viewpoints:
+   - `hobbit_hole`
+   - `bilbos_garden`
+   rather than maintaining separate hall/garden files for the same beat.
+3. Routed those temporary images through the existing `party-glimpse`
+   presentation so they inherit the same soft transitional treatment as the
+   Gandalf beat.
+4. Updated the Bag End playtest to verify the new filenames and presentation
+   metadata for both hall and garden triggers.
+
+Files touched
+-------------
+- game.js
+- scripts/playtest-bag-end-party-images.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- If two viewpoints share the same narrative beat and the art is intentionally
+  close-up/partial-figure, a single dedicated glimpse asset can be cleaner than
+  separate room-specific full scenes.
+- Keep Bag End transitional beats stylistically grouped: dedicated glimpse art
+  plus the same presentation effect is easier to maintain than mixing old room
+  replacements with newer focused character shots.
+
+
+Case 180 - 2026-07-15 - Gandalf glimpse beats needed room-aware interior and garden variants
+---------------------------------------------------------------------------------------------
+
+Symptom
+-------
+After adding multiple Gandalf glimpse assets, the Bag End sequence still only
+used a single indoor Gandalf image. That broke viewpoint consistency whenever
+Bilbo was waiting in the garden, especially for the "not yet" exit-block beat.
+
+Root cause
+----------
+The Gandalf glimpse hook selected one fixed file instead of resolving variants
+from the current Bag End viewpoint. The sequence also lacked dedicated triggers
+for:
+
+- a quiet pre-arrival Gandalf beat
+- the first "not yet" exit block
+- the later briefing beat
+
+Resolution
+----------
+1. Added room-aware Gandalf file selection for three beat kinds:
+   - `quiet_start`
+   - `not_yet`
+   - `briefing`
+2. Mapped each beat to an indoor or garden variant depending on whether Bilbo
+   is in `bilbos_garden`.
+3. Added a new quiet-start event before the first dwarf arrival.
+4. Triggered the first `not yet` Gandalf glimpse when the Bag End exit block
+   fires for the first time.
+5. Updated the Bag End image playtest to verify:
+   - quiet-start hall
+   - quiet-start garden
+   - not-yet garden
+   - briefing hall
+   - briefing garden
+
+Files touched
+-------------
+- game.js
+- scripts/playtest-bag-end-party-images.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- For portable character glimpses, resolve the asset from the current
+  viewpoint at show time rather than hardcoding one file per story beat.
+- If a beat can occur indoors or outdoors while the same conversation
+  continues, keep the trigger shared and switch only the art variant.
