@@ -3092,7 +3092,29 @@
       return this.state.enabled && this.isPartyRoom(this.game.currentRoom);
     }
 
+    partyGlimpsesAllowed() {
+      return this.allowPartyGlimpses !== false;
+    }
+
+    queuePartyGlimpse(pending) {
+      this.pendingGlimpse = pending;
+      return false;
+    }
+
+    flushPendingGlimpse() {
+      const pending = this.pendingGlimpse;
+      if (!pending || !this.partyGlimpsesAllowed()) return false;
+      // Do not replace a glimpse already shown this command (e.g. blocked-exit not_yet).
+      if (this.game.temporaryImage?.file) return false;
+      this.pendingGlimpse = null;
+      if (pending.type === "arrival") return this.maybeShowArrivalScene(pending.kind);
+      return this.showPartyGlimpse(pending.subject || "companions", pending.options || {});
+    }
+
     maybeShowArrivalScene(kind = "") {
+      if (!this.partyGlimpsesAllowed()) {
+        return this.queuePartyGlimpse({ type: "arrival", kind });
+      }
       const roomId = this.game.currentRoom;
       let file = "";
       if (kind === "first_knock") {
@@ -3132,6 +3154,9 @@
     }
 
     showPartyGlimpse(subject = "companions", options = {}) {
+      if (!this.partyGlimpsesAllowed()) {
+        return this.queuePartyGlimpse({ type: "party", subject, options: { ...options } });
+      }
       const file = subject === "gandalf"
         ? this.gandalfGlimpseFile(options.kind || "briefing")
         : this.partyBackdropImage();
@@ -3146,26 +3171,37 @@
       });
     }
 
-    advanceTurn() {
-      if (!this.canAdvance()) return false;
-      this.ensureCharacters();
-      this.reconcileCharacters();
-      this.state.turnCounter += 1;
-      if (this.state.cooldown > 0) {
-        this.state.cooldown -= 1;
-        if (this.state.cooldown > 0) return false;
-      }
+    advanceTurn(options = {}) {
+      this.allowPartyGlimpses = options.allowPartyGlimpses !== false;
+      try {
+        if (this.allowPartyGlimpses && this.pendingGlimpse) {
+          const flushed = this.flushPendingGlimpse();
+          // Keep the deferred image on screen for this command; any new beat
+          // may queue its glimpse for the following stationary turn.
+          if (flushed) this.allowPartyGlimpses = false;
+        }
+        if (!this.canAdvance()) return false;
+        this.ensureCharacters();
+        this.reconcileCharacters();
+        this.state.turnCounter += 1;
+        if (this.state.cooldown > 0) {
+          this.state.cooldown -= 1;
+          if (this.state.cooldown > 0) return false;
+        }
 
-      const event = this.nextEvent();
-      if (!event) {
-        this.state.cooldown = this.pickCooldown(4, 6);
-        return false;
-      }
+        const event = this.nextEvent();
+        if (!event) {
+          this.state.cooldown = this.pickCooldown(4, 6);
+          return false;
+        }
 
-      if (event.apply) event.apply();
-      this.game.print(event.message);
-      this.state.cooldown = event.cooldown ?? this.pickCooldown(3, 5);
-      return true;
+        if (event.apply) event.apply();
+        this.game.print(event.message);
+        this.state.cooldown = event.cooldown ?? this.pickCooldown(3, 5);
+        return true;
+      } finally {
+        this.allowPartyGlimpses = true;
+      }
     }
 
     nextEvent() {
@@ -3260,7 +3296,7 @@
           cooldown: this.pickCooldown(profile.approachCooldown[0], profile.approachCooldown[1]),
           apply: () => {
             this.setPartyDoorOpen(true);
-            dwarf.position = "bilbos_garden";
+            dwarf.position = this.game.currentRoom === "bilbos_garden" ? "bilbos_garden" : "hobbit_hole";
             this.state.currentArrival.stage = 2;
           },
         };
@@ -3303,12 +3339,14 @@
       if (stage === 0) {
         return {
           message: this.game.currentRoom === "bilbos_garden"
-            ? `${pairLabel} come through the garden gate together and make straight for the round green door.`
-            : `Another pair arrives together: ${pairLabel} stand at the round green door almost shoulder to shoulder.`,
+            ? `${pairLabel} come through the garden gate together, boots and packs announcing them before faces do.`
+            : `Another knock comes close upon the last, and ${pairLabel} are through the round green door together almost at once.`,
           cooldown: 1,
           apply: () => {
             this.setPartyDoorOpen(true);
-            for (const dwarf of dwarves) dwarf.position = "bilbos_garden";
+            for (const dwarf of dwarves) {
+              dwarf.position = this.game.currentRoom === "bilbos_garden" ? "bilbos_garden" : "hobbit_hole";
+            }
             this.state.currentArrival.stage = 1;
           },
         };
@@ -3318,7 +3356,7 @@
         return {
           message: this.game.currentRoom === "bilbos_garden"
             ? `${pairLabel} duck through the round green door together and vanish inside in a bustle of cloaks, packs, and cheerful appetite.`
-            : `${pairLabel} come in together, shedding travel-cloaks and adding at once to the cheerful disorder of Bag End.`,
+            : `${pairLabel} shed travel-cloaks at once, adding to the cheerful disorder of Bag End.`,
           cooldown: 1,
           apply: () => {
             this.setPartyDoorOpen(true);
@@ -3354,12 +3392,12 @@
         if (stage === 1) {
           return {
             message: this.game.currentRoom === "bilbos_garden"
-              ? "A blue-hooded dwarf comes through the gate and makes directly for the round green door."
-              : "The round green door opens to reveal a blue-hooded dwarf standing broad and patient upon the step.",
+              ? "Heavy boots come on from the gate toward the round green door, and a blue hood answers the knock without ceremony."
+              : "The latch lifts, and a blue-hooded dwarf is through the round green door almost before you can take him in.",
             cooldown: 1,
             apply: () => {
               this.setPartyDoorOpen(true);
-              dwarf.position = "bilbos_garden";
+              dwarf.position = this.game.currentRoom === "bilbos_garden" ? "bilbos_garden" : "hobbit_hole";
               this.state.currentArrival.stage = 2;
             },
           };
@@ -3368,7 +3406,7 @@
           return {
             message: this.game.currentRoom === "bilbos_garden"
               ? "Dwalin ducks through the round green door, and almost at once his voice can be heard within asking for food before introductions."
-              : "Dwalin ducks inside and says that food would be welcome before he troubles to introduce himself.",
+              : "Dwalin is inside at once, saying that food would be welcome before he troubles to introduce himself.",
             cooldown: 1,
             apply: () => {
               this.setPartyDoorOpen(true);
@@ -3406,12 +3444,12 @@
         if (stage === 1) {
           return {
             message: this.game.currentRoom === "bilbos_garden"
-              ? "A white-bearded dwarf passes through the gate with courteous calm, observing everything as he comes."
-              : "The round green door opens upon a white-bearded dwarf whose bright eyes seem to miss nothing.",
+              ? "An older tread comes up from the gate with courteous calm, unhurried even at Bag End's threshold."
+              : "The round green door opens again, and a white-bearded dwarf comes in at once, bright eyes taking in the room.",
             cooldown: 1,
             apply: () => {
               this.setPartyDoorOpen(true);
-              dwarf.position = "bilbos_garden";
+              dwarf.position = this.game.currentRoom === "bilbos_garden" ? "bilbos_garden" : "hobbit_hole";
               this.state.currentArrival.stage = 2;
             },
           };
@@ -3420,7 +3458,7 @@
           return {
             message: this.game.currentRoom === "bilbos_garden"
               ? "Balin bows his head beneath the round green door and passes inside with easy courtesy."
-              : "Balin enters with an easy bow, polite in manner and quietly observant of the whole room at once.",
+              : "Balin offers an easy bow, polite in manner and quietly observant of the whole room at once.",
             cooldown: 1,
             apply: () => {
               this.setPartyDoorOpen(true);
@@ -3464,13 +3502,13 @@
       if (this.state.thorinStage === 1) {
         return {
           message: this.game.currentRoom === "bilbos_garden"
-            ? "A dwarf wrapped in a dark cloak comes through the gate: taller than the others, proud, and imposing even before he speaks."
-            : "The round green door opens, and there stands Thorin Oakenshield, dark-cloaked, proud, and unmistakably the leader of those already gathered within.",
+            ? "A darker tread comes through the gate: slower, graver, and heavier with purpose than any that came before."
+            : "The round green door opens once more, and Thorin Oakenshield comes in at once—dark-cloaked, proud, and unmistakably the leader of those already gathered within.",
           cooldown: 1,
           apply: () => {
             this.maybeShowArrivalScene("thorin_arrival");
             this.setPartyDoorOpen(true);
-            thorin.position = "bilbos_garden";
+            thorin.position = this.game.currentRoom === "bilbos_garden" ? "bilbos_garden" : "hobbit_hole";
             this.state.thorinStage = 2;
           },
         };
@@ -3479,7 +3517,7 @@
         return {
           message: this.game.currentRoom === "bilbos_garden"
             ? "Thorin stoops beneath the round green door and passes inside. The voices within falter almost at once, as though the whole gathering has changed shape."
-            : "Thorin stoops beneath the round green door and enters Bag End. The talk falters almost at once; what had been a merry dinner begins to feel like the threshold of a grave business.",
+            : "Thorin is among them now. The talk falters almost at once; what had been a merry dinner begins to feel like the threshold of a grave business.",
           cooldown: 1,
           apply: () => {
             this.setPartyDoorOpen(true);
@@ -3738,16 +3776,16 @@
             "A solid knock carries across the garden to the round green door.",
           ],
           approachHall: [
-            "The round green door opens, and {name} can be glimpsed outside.",
-            "The round green door opens just enough to reveal {name} waiting on the step.",
+            "The latch lifts at the round green door, and before you can take him in, {name} is already stooping through.",
+            "The round green door yields at once; {name} comes straight in from the step outside.",
           ],
           approachGarden: [
-            "{name} comes through the garden gate and makes for the round green door.",
-            "{name} crosses the garden path with steady, purposeful steps.",
+            "Boots sound on the garden path, coming on toward the round green door.",
+            "The garden gate clicks, and a purposeful tread approaches the round green door.",
           ],
           entryHall: [
-            "{name} steps inside, brushing road dust from his cloak.",
-            "{name} steps in from the step outside and looks round Bag End approvingly.",
+            "{name} brushes road dust from his cloak and looks round Bag End approvingly.",
+            "{name} is inside now, taking in the hall with a traveller's quick appraisal.",
           ],
           entryGarden: [
             "{name} ducks through the round green door and disappears inside.",
@@ -3773,16 +3811,16 @@
             "A quick knock rattles the round green door before you.",
           ],
           approachHall: [
-            "The round green door swings open, and {name} is already on the step as if impatient to be admitted.",
-            "The round green door opens wide enough for a glimpse of {name}, boots planted squarely outside.",
+            "The round green door swings inward, and {name} is through it almost at once, impatient of ceremony.",
+            "A brisk scrape of boots answers the knock; {name} comes in without waiting to be announced.",
           ],
           approachGarden: [
-            "{name} strides through the gate and heads straight for the round green door.",
-            "{name} enters the garden without hesitation and comes directly to the door.",
+            "A brisk tread crosses the garden toward the round green door, wasting no time on the flowers.",
+            "Footsteps come hard up the path, as if whoever walks there already knows the door will open.",
           ],
           entryHall: [
-            "{name} comes in briskly, as though he has half-expected to find the room waiting for him.",
-            "{name} steps smartly inside and gives the room one measuring glance.",
+            "{name} is in with a businesslike air, as though he has half-expected to find the room waiting for him.",
+            "{name} gives the hall one measuring glance, already quite at home with the interruption.",
           ],
           entryGarden: [
             "{name} slips through the round green door with practised ease.",
@@ -3808,16 +3846,16 @@
             "Someone knocks patiently at the round green door while the garden gate clicks shut behind them.",
           ],
           approachHall: [
-            "The round green door opens, and {name} can be seen outside, looking in with calm interest.",
-            "The round green door opens, framing {name} on the doorstep with travel-stained cloak and all.",
+            "The round green door opens, and {name} comes in at once with calm, unhurried interest.",
+            "There is a soft scrape on the step; then {name} is indoors, travel-stained cloak and all.",
           ],
           approachGarden: [
-            "{name} enters by the garden gate, taking a moment to glance round before approaching the door.",
-            "{name} walks up the garden path at an unhurried pace toward the round green door.",
+            "An unhurried tread comes up the garden path toward the round green door.",
+            "The garden gate shuts softly, and patient footsteps draw near the round green door.",
           ],
           entryHall: [
-            "{name} enters with a courteous nod, bringing the smell of road and weather indoors.",
-            "{name} steps inside carefully, as though unwilling to disturb the comfort of the place too suddenly.",
+            "{name} offers a courteous nod, bringing the smell of road and weather indoors.",
+            "{name} enters carefully, as though unwilling to disturb the comfort of the place too suddenly.",
           ],
           entryGarden: [
             "{name} bows his head under the round door and passes inside.",
@@ -12870,10 +12908,12 @@
         const commandContexts = this.splitter.commandContexts || [];
         let forceNpcMovement = false;
         let shouldAdvanceTurn = false;
+        let playerMoved = false;
         for (const [index, command] of commands.entries()) {
           this.maybeRevealTrollCaptiveScene(command);
           if (normalize(command) === "wait") forceNpcMovement = true;
           const moved = this.processCommand(command);
+          if (moved) playerMoved = true;
           if (this.commandConsumesTurn(command)) shouldAdvanceTurn = true;
           if (this.shouldRememberSharedDelegatedContext(command)) {
             this.rememberSharedDelegatedContext(commandContexts[index]);
@@ -12881,7 +12921,10 @@
           if (moved || this.pendingClarification) break;
         }
         if (shouldAdvanceTurn && !this.endgame && !this.pendingClarification) {
-          this.advanceCharacterTurn({ forceMove: forceNpcMovement });
+          this.advanceCharacterTurn({
+            forceMove: forceNpcMovement,
+            suppressPartyGlimpses: playerMoved,
+          });
         }
         this.render();
       } finally {
@@ -17157,7 +17200,7 @@
     }
 
     advanceCharacterTurn(options = {}) {
-      const { forceMove = false } = options;
+      const { forceMove = false, suppressPartyGlimpses = false } = options;
       this.turnCount += 1;
       if (this.trollCaptiveRevealPending()) {
         this.revealTrollCaptiveScene();
@@ -17179,7 +17222,7 @@
         if (this.maybeAmbientCharacterSpeech(character)) continue;
         this.decideCharacterMovement(character, { forceMove });
       }
-      this.unexpectedParty?.advanceTurn();
+      this.unexpectedParty?.advanceTurn({ allowPartyGlimpses: !suppressPartyGlimpses });
       this.companionDirector?.sync();
       this.advanceGollumActivity();
       this.advanceGollumPursuitEcho();

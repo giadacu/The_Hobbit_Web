@@ -8689,3 +8689,81 @@ Future debugging advice
   viewpoint at show time rather than hardcoding one file per story beat.
 - If a beat can occur indoors or outdoors while the same conversation
   continues, keep the trigger shared and switch only the art variant.
+
+Case 181 - 2026-07-17 - Bag End arrival prose claimed doorway figures the art cannot show
+-----------------------------------------------------------------------------------------
+
+Symptom
+-------
+During Unexpected Party arrivals in the hall (and to a lesser extent the
+garden), narration said the round green door opened to reveal a dwarf on the
+step while the room image still showed an empty open doorway.
+
+Root cause
+----------
+Arrival stage text (approachHall, scripted Dwalin/Balin/Thorin, paired
+arrivals) asserted a framed visual of the visitor. Only Dwalin/Thorin have
+temporary glimpse art; the persistent hall/garden images never show arrivals
+on the threshold. Opening the door early also left the empty portal as the
+focal image while text promised a figure there.
+
+Resolution
+----------
+1. Rewrote hall approach/entry beats so visitors come straight in (or are
+   heard) rather than posing in the empty doorway frame.
+2. Softened garden approach beats to path/gate sound and tread, without
+   claiming a clear portrait on the path.
+3. When the player is in the hall, place the arriving dwarf in hobbit_hole at
+   the approach stage so state matches the entry prose.
+4. Updated paired-arrival strings and parser expectations; quiet-start must be
+   accounted for before knock/door-open assertions in tests.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- Do not narrate a figure framed in the open round door unless a glimpse or
+  room image actually shows them.
+- Hall text may name someone entering the room you occupy; garden text should
+  prefer sound/motion until entry or a glimpse beat.
+
+Case 182 - 2026-07-17 - Bag End party glimpses flashed over room image after moves
+-----------------------------------------------------------------------------------
+
+Symptom
+-------
+While moving between Bag End rooms during the Unexpected Party, the destination
+room image appeared briefly and was immediately replaced by a Gandalf (or other
+party) glimpse from the same turn's party advance.
+
+Root cause
+----------
+execute() clears any temporary image, then processCommand updates the room and
+renders it, then advanceCharacterTurn -> unexpectedParty.advanceTurn() may call
+showPartyGlimpse / maybeShowArrivalScene on the same command.
+
+Resolution
+----------
+When the player successfully changes rooms on a command, party advance still
+prints narrative beats but suppresses temporary party glimpse images for that
+turn. Suppressed glimpses are queued and shown on the next non-move party
+advance (wait / look / idle wait), re-resolved for the current room so a
+hall-queued quiet start can appear as the garden variant after stepping
+outside. Blocked exit "not yet" glimpses are unchanged (they are not
+successful moves).
+
+Files touched
+-------------
+- game.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- If a Bag End beat seems to miss its glimpse after a move, check
+  unexpectedParty.pendingGlimpse; it should flush on the next stationary
+  advanceTurn.
+- Keep not_yet / blocked-travel glimpses separate from the move-suppress path.

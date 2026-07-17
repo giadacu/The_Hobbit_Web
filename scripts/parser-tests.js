@@ -2600,6 +2600,7 @@ const gameCases = [
       const controller = game.unexpectedParty;
       game.currentRoom = "bilbos_garden";
       game.player.position = "bilbos_garden";
+      controller.state.quietStartShown = true;
       controller.state.cooldown = 0;
       controller.advanceTurn();
     },
@@ -2637,7 +2638,7 @@ const gameCases = [
     },
     expectedIncluded: [
       /Fili and Kili/,
-      /(arrives together|come in together|duck through the round green door together)/i,
+      /(through the round green door together|duck through the round green door together|shed travel-cloaks)/i,
     ],
     notExpectedIncluded: ["Thorin"],
   },
@@ -2653,10 +2654,10 @@ const gameCases = [
       }
     },
     expectedIncluded: [
-      "Another pair arrives together: Fili and Kili stand at the round green door almost shoulder to shoulder.",
-      "Fili and Kili come in together, shedding travel-cloaks and adding at once to the cheerful disorder of Bag End.",
-      "Another pair arrives together: Dori and Nori stand at the round green door almost shoulder to shoulder.",
-      "Dori and Nori come in together, shedding travel-cloaks and adding at once to the cheerful disorder of Bag End.",
+      "Another knock comes close upon the last, and Fili and Kili are through the round green door together almost at once.",
+      "Fili and Kili shed travel-cloaks at once, adding to the cheerful disorder of Bag End.",
+      "Another knock comes close upon the last, and Dori and Nori are through the round green door together almost at once.",
+      "Dori and Nori shed travel-cloaks at once, adding to the cheerful disorder of Bag End.",
     ],
     notExpectedIncluded: [
       "Plates disappear almost as soon as they are set down, and the pantry is beginning to look heroically overmatched.",
@@ -2874,6 +2875,7 @@ const gameCases = [
     name: "unexpected party opening the door updates traversal state",
     drive(game) {
       const controller = game.unexpectedParty;
+      controller.state.quietStartShown = true;
       controller.state.cooldown = 0;
       controller.advanceTurn();
       controller.state.cooldown = 0;
@@ -10203,7 +10205,7 @@ const gameCases = [
       };
       try {
         game.speakNarrationText("This snug parlour is arranged for conversation rather than grandeur: deep chairs, a hearth laid ready, and several low tables already burdened with plates, cups, and evidence of hobbit forethought. Balin has claimed a chair and half the available table-space.", { force: true, interrupt: true });
-        game.speakNarrationText("Another pair arrives together: Fili and Kili stand at the round green door almost shoulder to shoulder.");
+        game.speakNarrationText("Another knock comes close upon the last, and Fili and Kili are through the round green door together almost at once.");
         game.speakNarrationText("From the kitchen comes the warm homely sound of cutlery, cupboard doors, and something sizzling in butter.");
         while (pending.length) pending.shift()?.onend?.();
         game.print(`Chunked narration spoken: ${window.speechSynthesis._spoken.length >= 3 ? "yes" : "no"}`, "system");
