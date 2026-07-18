@@ -5,8 +5,8 @@ Checks: 12
 {"label":"gandalf-quiet-hall","room":"hobbit_hole","phase":"quiet","image":"gandalf_glimpse_bag_end_quiet_start.png","effect":"party-glimpse","focus":"left"}
 {"label":"gandalf-quiet-garden","room":"bilbos_garden","phase":"quiet","image":"gandalf_glimpse_bag_end_quiet_start_garden.png","effect":"party-glimpse","focus":"left"}
 {"label":"first-knock-hall","room":"hobbit_hole","phase":"quiet","image":"Dwalin_glimpse_bag_end_start.png","effect":"party-glimpse","focus":"-"}
-{"label":"first-knock-garden","room":"bilbos_garden","phase":"quiet","image":"Dwalin_glimpse_bag_end_start.png","effect":"party-glimpse","focus":"-"}
-{"label":"gandalf-not-yet-garden","room":"bilbos_garden","phase":"quiet","image":"gandalf_glimpse_bag_end_not_yet_garden.png","effect":"party-glimpse","focus":"left"}
+{"label":"first-knock-garden","room":"bilbos_garden","phase":"arrivals","image":"Dwalin_glimpse_bag_end_start.png","effect":"party-glimpse","focus":"-"}
+{"label":"gandalf-not-yet-garden","room":"bilbos_garden","phase":"arrivals","image":"gandalf_glimpse_bag_end_not_yet_garden.png","effect":"party-glimpse","focus":"left"}
 {"label":"thorin-hall","room":"hobbit_hole","phase":"briefing","image":"Thorin_glimpse_bag_end_start.png","effect":"party-glimpse","focus":"-"}
 {"label":"thorin-garden","room":"bilbos_garden","phase":"briefing","image":"Thorin_glimpse_bag_end_start.png","effect":"party-glimpse","focus":"-"}
 {"label":"persistent-variants","phase":"arrivals","hobbit_hole":"hobbit_hole_party.png","bag_end_parlour":"bag_end_parlour_party.png","bag_end_kitchen":"bag_end_kitchen_party.png"}

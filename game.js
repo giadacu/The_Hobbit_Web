@@ -2947,6 +2947,7 @@
         thorinArrived: Boolean(savedState?.thorinArrived),
         questBriefingDone: Boolean(savedState?.questBriefingDone),
         quietStartShown: Boolean(savedState?.quietStartShown),
+        gandalfPresenceGlimpseCount: Math.max(0, Math.min(2, Number(savedState?.gandalfPresenceGlimpseCount) || 0)),
       };
       if (this.state.arrivalIndex < this.state.arrived.length) this.state.arrivalIndex = this.state.arrived.length;
       this.reconcileCharacters();
@@ -3096,6 +3097,25 @@
       return this.allowPartyGlimpses !== false;
     }
 
+    gandalfInCurrentRoom() {
+      return this.game.characters.gandalf?.position === this.game.currentRoom;
+    }
+
+    isGandalfPresenceGlimpseKind(kind = "") {
+      return kind === "quiet_start" || kind === "speech";
+    }
+
+    canShowGandalfPresenceGlimpse(kind = "speech") {
+      if (!this.isGandalfPresenceGlimpseKind(kind)) return true;
+      if (!this.gandalfInCurrentRoom()) return false;
+      return (this.state.gandalfPresenceGlimpseCount || 0) < 2;
+    }
+
+    noteGandalfPresenceGlimpse(kind = "") {
+      if (!this.isGandalfPresenceGlimpseKind(kind)) return;
+      this.state.gandalfPresenceGlimpseCount = Math.min(2, (this.state.gandalfPresenceGlimpseCount || 0) + 1);
+    }
+
     queuePartyGlimpse(pending) {
       this.pendingGlimpse = pending;
       return false;
@@ -3106,6 +3126,15 @@
       if (!pending || !this.partyGlimpsesAllowed()) return false;
       // Do not replace a glimpse already shown this command (e.g. blocked-exit not_yet).
       if (this.game.temporaryImage?.file) return false;
+      if (pending.type === "party" && pending.subject === "gandalf") {
+        const kind = pending.options?.kind || "briefing";
+        if (this.isGandalfPresenceGlimpseKind(kind) && !this.canShowGandalfPresenceGlimpse(kind)) {
+          // Keep queued until Gandalf shares the room and the presence budget remains.
+          if (!this.gandalfInCurrentRoom()) return false;
+          this.pendingGlimpse = null;
+          return false;
+        }
+      }
       this.pendingGlimpse = null;
       if (pending.type === "arrival") return this.maybeShowArrivalScene(pending.kind);
       return this.showPartyGlimpse(pending.subject || "companions", pending.options || {});
@@ -3131,7 +3160,7 @@
 
     gandalfGlimpseFile(kind = "briefing") {
       const inGarden = this.game.currentRoom === "bilbos_garden";
-      if (kind === "quiet_start") {
+      if (kind === "quiet_start" || kind === "speech") {
         return inGarden
           ? "gandalf_glimpse_bag_end_quiet_start_garden.png"
           : "gandalf_glimpse_bag_end_quiet_start.png";
@@ -3157,11 +3186,15 @@
       if (!this.partyGlimpsesAllowed()) {
         return this.queuePartyGlimpse({ type: "party", subject, options: { ...options } });
       }
+      const kind = options.kind || "briefing";
+      if (subject === "gandalf" && this.isGandalfPresenceGlimpseKind(kind) && !this.canShowGandalfPresenceGlimpse(kind)) {
+        return false;
+      }
       const file = subject === "gandalf"
-        ? this.gandalfGlimpseFile(options.kind || "briefing")
+        ? this.gandalfGlimpseFile(kind)
         : this.partyBackdropImage();
       if (!file) return false;
-      return this.game.showTemporaryImage(file, {
+      const shown = this.game.showTemporaryImage(file, {
         alt: subject === "gandalf"
           ? "A fleeting glimpse of Gandalf among the gathering"
           : "A fleeting glimpse of dwarves crowding Bag End",
@@ -3169,6 +3202,8 @@
         effect: "party-glimpse",
         focus: subject === "gandalf" ? "left" : "right",
       });
+      if (shown && subject === "gandalf") this.noteGandalfPresenceGlimpse(kind);
+      return shown;
     }
 
     advanceTurn(options = {}) {
@@ -3206,6 +3241,7 @@
 
     nextEvent() {
       if (!this.state.quietStartShown && this.state.arrivalIndex === 0 && !this.state.currentArrival) {
+        if (!this.gandalfInCurrentRoom()) return null;
         return {
           message: this.pick([
             "Gandalf lingers nearby with the look of someone waiting for a carefully arranged evening to begin.",
@@ -3692,6 +3728,9 @@
             "Best keep the kettle near at hand.",
           ], this.seededHash(`gandalf:${this.state.turnCounter}:${this.state.arrivalIndex}`))}'`,
           cooldown: this.pickCooldown(5, 7),
+          apply: () => {
+            this.showPartyGlimpse("gandalf", { kind: "speech" });
+          },
         });
       }
 

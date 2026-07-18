@@ -72,6 +72,11 @@ function snapshot(game, label) {
   };
 }
 
+function ensureQuietStart(game) {
+  if (game.characters.gandalf) game.characters.gandalf.position = game.currentRoom;
+  advanceUntil(game, () => Boolean(game.unexpectedParty?.state?.quietStartShown));
+}
+
 function testFirstKnockHall(log) {
   const game = bootGame();
   expect(game.currentRoom === "hobbit_hole", "Game should start in hobbit_hole.");
@@ -87,10 +92,15 @@ function testFirstKnockHall(log) {
 
 function testFirstKnockGarden(log) {
   const game = bootGame();
+  ensureQuietStart(game);
   game.execute("open round green door");
   game.execute("outside");
   expect(game.currentRoom === "bilbos_garden", "Player should reach bilbos_garden.");
-  advanceUntil(game, () => game.unexpectedParty?.state?.currentArrival?.dwarfId === "unexpected_party_dwalin" && game.unexpectedParty.state.currentArrival.stage === 1);
+  // After a move, the knock glimpse may flush on the next wait while stage already advanced.
+  advanceUntil(game, () => game.temporaryImage?.file === "Dwalin_glimpse_bag_end_start.png");
+  expect(game.unexpectedParty?.state?.arrived?.includes("unexpected_party_dwalin")
+    || game.unexpectedParty?.state?.currentArrival?.dwarfId === "unexpected_party_dwalin",
+  "Dwalin arrival should be underway or complete.");
   expectTempImage(game, "Dwalin_glimpse_bag_end_start.png", "first-knock-garden");
   expectPresentation(game, "party-glimpse", "", "first-knock-garden-presentation");
   log.push({
@@ -114,10 +124,12 @@ function testThorinHall(log) {
 
 function testThorinGarden(log) {
   const game = bootGame();
+  ensureQuietStart(game);
   game.execute("open round green door");
   game.execute("outside");
   expect(game.currentRoom === "bilbos_garden", "Player should reach bilbos_garden.");
-  advanceUntil(game, () => game.unexpectedParty?.state?.thorinStage === 2);
+  advanceUntil(game, () => game.temporaryImage?.file === "Thorin_glimpse_bag_end_start.png");
+  expect(game.unexpectedParty?.state?.thorinStage >= 1, "Thorin arrival should have begun.");
   expectTempImage(game, "Thorin_glimpse_bag_end_start.png", "thorin-garden");
   expectPresentation(game, "party-glimpse", "", "thorin-garden-presentation");
   log.push({
@@ -145,6 +157,7 @@ function testPersistentVariants(log) {
 
 function testNoWrongRoomCutscene(log) {
   const game = bootGame();
+  ensureQuietStart(game);
   game.execute("west");
   expect(game.currentRoom === "bag_end_parlour", "Player should reach bag_end_parlour.");
   advanceUntil(game, () => game.unexpectedParty?.state?.currentArrival?.dwarfId === "unexpected_party_dwalin" && game.unexpectedParty.state.currentArrival.stage === 1);
@@ -181,6 +194,8 @@ function testGandalfQuietStartGarden(log) {
   game.execute("open round green door");
   game.execute("outside");
   expect(game.currentRoom === "bilbos_garden", "Player should reach bilbos_garden.");
+  // Quiet-start glimpse requires Gandalf to share the room.
+  if (game.characters.gandalf) game.characters.gandalf.position = "bilbos_garden";
   advanceUntil(game, () => game.temporaryImage?.file === "gandalf_glimpse_bag_end_quiet_start_garden.png");
   expectTempImage(game, "gandalf_glimpse_bag_end_quiet_start_garden.png", "gandalf-quiet-garden-image");
   expectPresentation(game, "party-glimpse", "left", "gandalf-quiet-garden-presentation");
@@ -193,6 +208,7 @@ function testGandalfQuietStartGarden(log) {
 
 function testGandalfNotYetGarden(log) {
   const game = bootGame();
+  ensureQuietStart(game);
   game.execute("open round green door");
   game.execute("outside");
   expect(game.currentRoom === "bilbos_garden", "Player should reach bilbos_garden.");
@@ -223,6 +239,7 @@ function testGandalfBriefingGarden(log) {
   game.execute("open round green door");
   game.execute("outside");
   expect(game.currentRoom === "bilbos_garden", "Player should reach bilbos_garden.");
+  if (game.characters.gandalf) game.characters.gandalf.position = "bilbos_garden";
   advanceUntil(game, () => game.unexpectedParty?.state?.questBriefingDone);
   expectTempImage(game, "gandalf_glimpse_bag_end_briefing_garden.png", "gandalf-briefing-garden-image");
   expectPresentation(game, "party-glimpse", "left", "gandalf-briefing-garden-presentation");

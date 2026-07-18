@@ -8767,3 +8767,39 @@ Future debugging advice
   unexpectedParty.pendingGlimpse; it should flush on the next stationary
   advanceTurn.
 - Keep not_yet / blocked-travel glimpses separate from the move-suppress path.
+
+Case 183 - 2026-07-18 - Gandalf Bag End presence glimpses need co-presence and a tight budget
+---------------------------------------------------------------------------------------------
+
+Symptom
+-------
+The opening Gandalf glimpse could fire as a timed party beat even when Bilbo was
+not sharing a room with him, and ambient Gandalf speech had no linked glimpse
+rules (risking either silence or too many portraits).
+
+Root cause
+----------
+quiet_start was the first Unexpected Party event regardless of Gandalf's
+position. Presence imagery was not gated on co-presence or a per-evening cap.
+
+Resolution
+----------
+1. quiet_start waits until Gandalf is in the current room; arrivals do not
+   begin before that beat.
+2. Presence glimpses (quiet_start + ambient Gandalf says) require co-presence
+   and share a budget of at most 2 for the evening.
+3. not_yet and briefing glimpses remain uncapped story beats.
+4. Ambient Gandalf says may spend one of the remaining presence glimpses.
+
+Files touched
+-------------
+- game.js
+- scripts/playtest-bag-end-party-images.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- Presence kinds are quiet_start and speech; other Gandalf glimpse kinds do not
+  consume gandalfPresenceGlimpseCount.
+- If the party seems stuck before the first knock, check whether Bilbo and
+  Gandalf share a room (quiet_start gates arrivals).
