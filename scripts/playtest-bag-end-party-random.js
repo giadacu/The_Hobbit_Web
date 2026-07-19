@@ -83,6 +83,14 @@ function checkIncongruences(runId, game, step, lines) {
     note(runId, "crowd_art_too_early", `room image ${roomImage} with arrived=${arrived}`, ctx);
   }
 
+  if (
+    game.bagEndPartyKeepsFrontDoorOpen?.()
+    && ["hobbit_hole", "bilbos_garden"].includes(game.currentRoom)
+    && !game.doorOpenByName?.("round green door")
+  ) {
+    note(runId, "front_door_closed_during_party", "round green door closed while arrivals/briefing keep it open", ctx);
+  }
+
   if (HEARTH_SEEN.test(text) && game.currentRoom !== "bag_end_parlour") {
     note(runId, "balin_hearth_without_parlour", text.slice(0, 180), ctx);
   }

@@ -8906,3 +8906,36 @@ Future debugging advice
 -----------------------
 - If quiet_start text appears without its glimpse, inspect pendingGlimpses rather
   than only pendingGlimpse; an arrival entry must not erase the presence beat.
+
+Case 187 - 2026-07-19 - Round green door stays open while Unexpected Party is underway
+--------------------------------------------------------------------------------------
+
+Symptom
+-------
+Closing the round green door during arrivals/briefing left the door closed in
+state while hobbit_hole_party.png (and open-door garden art) still showed the
+disordered gathering, so close appeared to do nothing to the image.
+
+Root cause
+----------
+Crowd/party room images outrank door-open variants. Closing the door was still
+allowed, creating a silent state/art mismatch.
+
+Resolution
+----------
+1. During arrivals/briefing (bagEndPartyKeepsFrontDoorOpen), refuse close on the
+   round green door with hospitality/timing excuses; keep the door open.
+2. While crowd art is showing in the hall, also refuse open/close fuss with the
+   heavy wooden chest (those chest variants are masked by party art).
+3. After briefing, closing the door works again.
+
+Files touched
+-------------
+- game.js
+- scripts/playtest-bag-end-party-images.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- If a Bag End prop change seems ignored, check whether party crowd art still
+  outranks that contextual image rule for the current phase.

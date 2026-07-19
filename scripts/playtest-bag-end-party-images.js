@@ -201,6 +201,33 @@ function testEarlyArrivalsKeepQuietArt(log) {
   });
 }
 
+function testFrontDoorStaysOpenDuringParty(log) {
+  const game = bootGame();
+  advanceUntil(game, () => game.bagEndPartyHasEnteredHouse());
+  clearTemp(game);
+  expect(game.bagEndPartyKeepsFrontDoorOpen(), "Arrivals should keep the front door open.");
+  game.unexpectedParty?.setPartyDoorOpen(true);
+  const before = game.doorOpenByName("round green door");
+  expect(before, "Door should be open before close attempt.");
+  game.execute("close round green door");
+  expect(game.doorOpenByName("round green door"), "Close must be refused while the party is underway.");
+  expect(game.bagEndPartyKeepsFrontDoorOpen(), "Door-keep window should still be active.");
+  const crowd = game.bagEndPartyShowsCrowdArt();
+  if (crowd) {
+    expectRoomImage(game, "hobbit_hole", "hobbit_hole_party.png", "crowd-art-after-refused-close");
+  }
+  advanceUntil(game, () => game.bagEndPartyPhase() === "after_briefing", 120);
+  expect(!game.bagEndPartyKeepsFrontDoorOpen(), "After briefing the door may close again.");
+  game.unexpectedParty?.setPartyDoorOpen(true);
+  game.execute("close round green door");
+  expect(!game.doorOpenByName("round green door"), "Close should work after the party briefing.");
+  log.push({
+    label: "front-door-party-lock",
+    afterBriefingPhase: game.bagEndPartyPhase(),
+    closedAfterBriefing: !game.doorOpenByName("round green door"),
+  });
+}
+
 function testGandalfQuietStartHall(log) {
   const game = bootGame();
   advanceUntil(game, () => game.temporaryImage?.file === "gandalf_glimpse_bag_end_quiet_start.png");
@@ -286,6 +313,7 @@ function main() {
   testThorinGarden(log);
   testPersistentVariants(log);
   testEarlyArrivalsKeepQuietArt(log);
+  testFrontDoorStaysOpenDuringParty(log);
   testCompanionGlimpse(log);
   testGandalfBriefingHall(log);
   testGandalfBriefingGarden(log);

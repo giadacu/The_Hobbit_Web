@@ -3269,6 +3269,7 @@
         if (!this.canAdvance()) return false;
         this.ensureCharacters();
         this.reconcileCharacters();
+        if (this.game.bagEndPartyKeepsFrontDoorOpen()) this.setPartyDoorOpen(true);
         this.state.turnCounter += 1;
         if (this.state.cooldown > 0) {
           this.state.cooldown -= 1;
@@ -3892,6 +3893,8 @@
       const door = this.partyDoor();
       if (!door) return;
       door.open = Boolean(open);
+      if (open) door.locked = false;
+      this.game.setFlag(`${compact(door.name)}open`, Boolean(open));
     }
 
     arrivalProfile(dwarfId) {
@@ -5915,6 +5918,9 @@
       }
       const item = game.visibleSearch(objectName)?.item;
       if (!item) return game.print(game.heldItemMessage(objectName) || "I don't see that here.");
+      if (matches(item.name, "heavy wooden chest") && game.bagEndPartyBlocksHallPropFuss()) {
+        return game.print("There is scarcely room — or peace — to fuss with the heavy wooden chest while Bag End is full of guests.");
+      }
       if (!item.container && this.openNonContainerItem(item)) return;
       if (!item.container) return game.print(`The ${item.name} cannot be opened.`);
       if (item.noLid) return game.print(`The ${item.name} has no lid and is always open.`);
@@ -5990,12 +5996,19 @@
       if (request.all) return this.closeAll(request.target);
       const doorFound = game.findDoor(objectName);
       if (doorFound) {
+        if (matches(doorFound.door.name, "round green door") && game.bagEndPartyKeepsFrontDoorOpen()) {
+          game.unexpectedParty?.setPartyDoorOpen(true);
+          return game.print(game.bagEndPartyFrontDoorCloseMessage());
+        }
         doorFound.door.open = false;
         game.setFlag(`${compact(doorFound.door.name)}open`, false);
         return game.print(`${actorSubject(game.player, true)} ${actorVerb(game.player, "close")} the ${doorFound.door.name}.`);
       }
       const item = game.visibleSearch(objectName)?.item;
       if (!item) return game.print(game.heldItemMessage(objectName) || "I don't see that here.");
+      if (matches(item.name, "heavy wooden chest") && game.bagEndPartyBlocksHallPropFuss()) {
+        return game.print("There is scarcely room — or peace — to fuss with the heavy wooden chest while Bag End is full of guests.");
+      }
       if (!item.container && this.closeNonContainerItem(item)) return;
       if (!item.container) return game.print(`The ${item.name} cannot be closed.`);
       if (item.noLid) return game.print(`The ${item.name} has no lid.`);
@@ -14284,6 +14297,33 @@
       if (phase === "briefing") return true;
       if (phase !== "arrivals") return false;
       return (this.unexpectedParty?.state?.arrived?.length || 0) >= 3;
+    }
+
+    bagEndPartyKeepsFrontDoorOpen() {
+      const phase = this.bagEndPartyPhase();
+      return phase === "arrivals" || phase === "briefing";
+    }
+
+    bagEndPartyBlocksHallPropFuss() {
+      return this.bagEndPartyShowsCrowdArt() && this.currentRoom === "hobbit_hole";
+    }
+
+    bagEndPartyFrontDoorCloseMessage() {
+      const gandalfHere = this.characters.gandalf?.position === this.currentRoom;
+      if (gandalfHere) {
+        const lines = [
+          "Gandalf glances at the latch. 'Not yet, Bilbo. We are expecting more company.'",
+          "Gandalf lays a hand lightly on the door. 'Leave it open. The evening is not finished arriving.'",
+          "Gandalf says 'Hospitality first, Bilbo. Shutting the round green door now would be poor timing.'",
+        ];
+        return lines[Math.abs(hashString(`${this.storySeed || 0}:party-door-close:${this.turnCount || 0}`)) % lines.length];
+      }
+      const lines = [
+        "With dwarves still coming and going, shutting the round green door would be poor hospitality — and worse timing.",
+        "Another knock could come at any moment. Best leave the round green door open for now.",
+        "Bag End is mid-invasion; the round green door is better left open until the gathering settles.",
+      ];
+      return lines[Math.abs(hashString(`${this.storySeed || 0}:party-door-close:${this.turnCount || 0}`)) % lines.length];
     }
 
     bagEndQuestHasBegun() {
