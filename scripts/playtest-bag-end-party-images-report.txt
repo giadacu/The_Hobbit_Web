@@ -1,15 +1,16 @@
 Bag End party image playtest: PASS
 Images checked: 11
-Checks: 12
+Checks: 13
 
 {"label":"gandalf-quiet-hall","room":"hobbit_hole","phase":"quiet","image":"gandalf_glimpse_bag_end_quiet_start.png","effect":"party-glimpse","focus":"left"}
-{"label":"gandalf-quiet-garden","room":"bilbos_garden","phase":"quiet","image":"gandalf_glimpse_bag_end_quiet_start_garden.png","effect":"party-glimpse","focus":"left"}
+{"label":"gandalf-quiet-garden","room":"bilbos_garden","phase":"arrivals","image":"gandalf_glimpse_bag_end_quiet_start_garden.png","effect":"party-glimpse","focus":"left"}
 {"label":"first-knock-hall","room":"hobbit_hole","phase":"quiet","image":"Dwalin_glimpse_bag_end_start.png","effect":"party-glimpse","focus":"-"}
 {"label":"first-knock-garden","room":"bilbos_garden","phase":"arrivals","image":"Dwalin_glimpse_bag_end_start.png","effect":"party-glimpse","focus":"-"}
 {"label":"gandalf-not-yet-garden","room":"bilbos_garden","phase":"arrivals","image":"gandalf_glimpse_bag_end_not_yet_garden.png","effect":"party-glimpse","focus":"left"}
 {"label":"thorin-hall","room":"hobbit_hole","phase":"briefing","image":"Thorin_glimpse_bag_end_start.png","effect":"party-glimpse","focus":"-"}
 {"label":"thorin-garden","room":"bilbos_garden","phase":"briefing","image":"Thorin_glimpse_bag_end_start.png","effect":"party-glimpse","focus":"-"}
-{"label":"persistent-variants","phase":"arrivals","hobbit_hole":"hobbit_hole_party.png","bag_end_parlour":"bag_end_parlour_party.png","bag_end_kitchen":"bag_end_kitchen_party.png"}
+{"label":"persistent-variants","phase":"arrivals","arrived":4,"hobbit_hole":"hobbit_hole_party.png","bag_end_parlour":"bag_end_parlour_party.png","bag_end_kitchen":"bag_end_kitchen_party.png"}
+{"label":"early-arrivals-quiet-art","phase":"arrivals","arrived":0,"hobbit_hole":"hobbit_hole_open_door.png"}
 {"label":"companions-glimpse","room":"hobbit_hole","phase":"arrivals","image":"hobbit_hole_party.png","effect":"party-glimpse","focus":"right"}
 {"label":"gandalf-briefing-hall","room":"hobbit_hole","phase":"after_briefing","image":"gandalf_glimpse_bag_end_briefing.png","effect":"party-glimpse","focus":"left"}
 {"label":"gandalf-briefing-garden","room":"bilbos_garden","phase":"after_briefing","image":"gandalf_glimpse_bag_end_briefing_garden.png","effect":"party-glimpse","focus":"left"}

@@ -8784,8 +8784,8 @@ position. Presence imagery was not gated on co-presence or a per-evening cap.
 
 Resolution
 ----------
-1. quiet_start waits until Gandalf is in the current room; arrivals do not
-   begin before that beat.
+1. quiet_start requires Gandalf in the current room; arrivals are not stalled
+   if Bilbo is elsewhere (see Case 184).
 2. Presence glimpses (quiet_start + ambient Gandalf says) require co-presence
    and share a budget of at most 2 for the evening.
 3. not_yet and briefing glimpses remain uncapped story beats.
@@ -8801,5 +8801,108 @@ Future debugging advice
 -----------------------
 - Presence kinds are quiet_start and speech; other Gandalf glimpse kinds do not
   consume gandalfPresenceGlimpseCount.
-- If the party seems stuck before the first knock, check whether Bilbo and
-  Gandalf share a room (quiet_start gates arrivals).
+- quiet_start requires co-presence but must not gate dwarf arrivals; if Bilbo
+  is elsewhere, arrivals proceed and quiet_start may still fire later when they
+  share a room (until Thorin has arrived).
+
+Case 184 - 2026-07-19 - quiet_start must not stall Unexpected Party arrivals
+---------------------------------------------------------------------------
+
+Symptom
+-------
+Arrivals waited until Bilbo shared a room with Gandalf for quiet_start, which
+made Bag End feel stuck if the player explored other rooms first.
+
+Root cause
+----------
+Case 183 returned null from nextEvent when quiet_start was pending but Gandalf
+was not co-present, which blocked the rest of the party sequence.
+
+Resolution
+----------
+quiet_start still requires Gandalf in the current room (and may fire a little
+late between arrival beats), but if Bilbo is elsewhere the event list falls
+through so knocks and arrivals continue. Thorin's arrival ends the window for
+a deferred quiet_start.
+
+Files touched
+-------------
+- game.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- Do not return null solely to wait for Gandalf co-presence; that stalls the
+  whole Unexpected Party controller.
+
+Case 185 - 2026-07-19 - Bag End party text/art must respect Seen/Heard and crowd thresholds
+-------------------------------------------------------------------------------------------
+
+Symptom
+-------
+Feast-like atmosphere could fire before any dwarf arrived; party room images
+showed a full gathering as soon as the first visitor entered; Balin "settled by
+the hearth" while the hall image showed a crowd elsewhere; Gandalf presence
+glimpses could be queued on a move and then feel missing even when co-present.
+
+Root cause
+----------
+1. Pre-party atmosphere filtered only dwarf/song/laughter lines, leaving kitchen
+   feast sounds.
+2. Crowd art keyed off bagEndPartyPhase arrivals/briefing (= first house entry).
+3. Settle/feast/movement copy asserted Seen details without co-presence checks.
+4. Presence glimpses returned false when suppressed instead of a durable queue.
+
+Resolution
+----------
+1. Use bag_end_house_quiet atmosphere until bagEndPartyHasEnteredHouse().
+2. Gate *_party.png via bagEndPartyShowsCrowdArt() (arrived >= 3, or briefing).
+3. Balin settle / feast / off-screen moves use Seen vs Heard wording; hearth poses
+   are room-specific; companions glimpse only with crowd art when co-present.
+4. queuePartyGlimpse returns success; presence fails defer until co-presence;
+   group ambient may show companions once crowd art is on.
+
+Files touched
+-------------
+- game.js
+- scripts/playtest-bag-end-party-images.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- Do not switch Bag End crowd backdrops on first entry alone.
+- Narrate hearth/settle only in the shared room; otherwise use heard-from-elsewhere.
+- If a Gandalf presence glimpse is missing after a move, check pendingGlimpse flush
+  on the next stationary party advance.
+
+Case 186 - 2026-07-19 - Bag End pending glimpses must queue, not overwrite
+--------------------------------------------------------------------------
+
+Symptom
+-------
+Random Bag End play could print Gandalf's quiet_start text after returning to his
+room, then never show the presence glimpse (presence count stayed 0).
+
+Root cause
+----------
+pendingGlimpse was a single slot. A move-suppressed quiet_start queued Gandalf;
+a later suppressed arrival knock overwrote that slot. Flush also discarded the
+pending entry before a failed show, so the presence image was lost.
+
+Resolution
+----------
+1. Keep pendingGlimpses as a short queue; quiet_start stays at the front and is
+   not displaced by arrival/companions entries.
+2. Dequeue only after a successful show; keep unshowable arrivals for later.
+3. Hall companion poses no longer claim the parlour hearth.
+
+Files touched
+-------------
+- game.js
+- scripts/playtest-bag-end-party-random.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- If quiet_start text appears without its glimpse, inspect pendingGlimpses rather
+  than only pendingGlimpse; an arrival entry must not erase the presence beat.

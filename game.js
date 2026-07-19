@@ -957,6 +957,11 @@
       "A fragment of dwarven song rolls along the round passages before fading into murmured conversation.",
       "From the kitchen comes the warm homely sound of cutlery, cupboard doors, and something sizzling in butter.",
     ],
+    bag_end_house_quiet: [
+      "The round passages of Bag End hold only the small domestic sounds of a house still expecting an ordinary evening.",
+      "A floorboard creaks under your own weight, then the smial settles back into comfortable silence.",
+      "Somewhere a cupboard door clicks shut, nothing more urgent than a hobbit household keeping its usual order.",
+    ],
     bag_end_garden: [
       "Bees move lazily among the flowers, and the Hill feels hushed but homely in the mild evening air.",
       "A light breeze stirs the herbs and clipped borders, carrying soil, roses, and the quiet comfort of the Hill.",
@@ -1219,7 +1224,7 @@
         text: "a regiment of polished pegs still enjoying a last quiet hour of order",
       },
       {
-        when: ({ game }) => game.bagEndPartyPhase() === "arrivals" || game.bagEndPartyPhase() === "briefing",
+        when: ({ game }) => game.bagEndPartyShowsCrowdArt() || (game.unexpectedParty?.state?.arrived?.length || 0) >= 1,
         text: "a regiment of polished pegs now threatened by an oncoming invasion of dwarf-cloaks",
       },
       {
@@ -1544,7 +1549,7 @@
   const CONTEXTUAL_ROOM_IMAGE_RULES = {
     hobbit_hole: [
       {
-        when: ({ game }) => ["arrivals", "briefing"].includes(game.bagEndPartyPhase()),
+        when: ({ game }) => game.bagEndPartyShowsCrowdArt(),
         image: "hobbit_hole_party.png",
       },
       {
@@ -1577,13 +1582,13 @@
     ],
     bag_end_parlour: [
       {
-        when: ({ game }) => ["arrivals", "briefing"].includes(game.bagEndPartyPhase()),
+        when: ({ game }) => game.bagEndPartyShowsCrowdArt(),
         image: "bag_end_parlour_party.png",
       },
     ],
     bag_end_kitchen: [
       {
-        when: ({ game }) => ["arrivals", "briefing"].includes(game.bagEndPartyPhase()),
+        when: ({ game }) => game.bagEndPartyShowsCrowdArt(),
         image: "bag_end_kitchen_party.png",
       },
     ],
@@ -2950,6 +2955,8 @@
         gandalfPresenceGlimpseCount: Math.max(0, Math.min(2, Number(savedState?.gandalfPresenceGlimpseCount) || 0)),
       };
       if (this.state.arrivalIndex < this.state.arrived.length) this.state.arrivalIndex = this.state.arrived.length;
+      this.pendingGlimpse = null;
+      this.pendingGlimpses = [];
       this.reconcileCharacters();
     }
 
@@ -3117,27 +3124,67 @@
     }
 
     queuePartyGlimpse(pending) {
-      this.pendingGlimpse = pending;
-      return false;
+      if (!Array.isArray(this.pendingGlimpses)) {
+        this.pendingGlimpses = this.pendingGlimpse ? [this.pendingGlimpse] : [];
+      }
+      const kind = pending?.options?.kind || pending?.kind || "";
+      const isQuietStart = pending?.type === "party" && pending?.subject === "gandalf" && kind === "quiet_start";
+      if (isQuietStart) {
+        const already = this.pendingGlimpses.some(
+          (entry) => entry?.type === "party" && entry?.subject === "gandalf" && entry?.options?.kind === "quiet_start"
+        );
+        if (!already) this.pendingGlimpses.unshift(pending);
+      } else {
+        this.pendingGlimpses.push(pending);
+      }
+      if (this.pendingGlimpses.length > 4) this.pendingGlimpses.length = 4;
+      this.pendingGlimpse = this.pendingGlimpses[0] || null;
+      return true;
     }
 
     flushPendingGlimpse() {
-      const pending = this.pendingGlimpse;
-      if (!pending || !this.partyGlimpsesAllowed()) return false;
+      if (!Array.isArray(this.pendingGlimpses)) {
+        this.pendingGlimpses = this.pendingGlimpse ? [this.pendingGlimpse] : [];
+      }
+      if (!this.pendingGlimpses.length || !this.partyGlimpsesAllowed()) return false;
       // Do not replace a glimpse already shown this command (e.g. blocked-exit not_yet).
       if (this.game.temporaryImage?.file) return false;
-      if (pending.type === "party" && pending.subject === "gandalf") {
-        const kind = pending.options?.kind || "briefing";
-        if (this.isGandalfPresenceGlimpseKind(kind) && !this.canShowGandalfPresenceGlimpse(kind)) {
-          // Keep queued until Gandalf shares the room and the presence budget remains.
-          if (!this.gandalfInCurrentRoom()) return false;
-          this.pendingGlimpse = null;
-          return false;
+
+      for (let i = 0; i < this.pendingGlimpses.length; i += 1) {
+        const pending = this.pendingGlimpses[i];
+        if (pending.type === "party" && pending.subject === "gandalf") {
+          const kind = pending.options?.kind || "briefing";
+          if (this.isGandalfPresenceGlimpseKind(kind) && !this.canShowGandalfPresenceGlimpse(kind)) {
+            if (!this.gandalfInCurrentRoom()) continue;
+            // Budget spent: drop this presence glimpse only.
+            this.pendingGlimpses.splice(i, 1);
+            i -= 1;
+            continue;
+          }
+        }
+
+        let shown = false;
+        if (pending.type === "arrival") {
+          shown = this.maybeShowArrivalScene(pending.kind);
+        } else {
+          shown = this.showPartyGlimpse(pending.subject || "companions", pending.options || {});
+        }
+
+        if (shown) {
+          this.pendingGlimpses.splice(i, 1);
+          this.pendingGlimpse = this.pendingGlimpses[0] || null;
+          return true;
+        }
+
+        // Arrival/companions may be unshowable in this room; drop dead companions, keep arrivals.
+        if (pending.type === "party" && pending.subject === "companions") {
+          this.pendingGlimpses.splice(i, 1);
+          i -= 1;
         }
       }
-      this.pendingGlimpse = null;
-      if (pending.type === "arrival") return this.maybeShowArrivalScene(pending.kind);
-      return this.showPartyGlimpse(pending.subject || "companions", pending.options || {});
+
+      this.pendingGlimpse = this.pendingGlimpses[0] || null;
+      return false;
     }
 
     maybeShowArrivalScene(kind = "") {
@@ -3188,6 +3235,10 @@
       }
       const kind = options.kind || "briefing";
       if (subject === "gandalf" && this.isGandalfPresenceGlimpseKind(kind) && !this.canShowGandalfPresenceGlimpse(kind)) {
+        // Defer until co-presence; do not spend the beat silently while Gandalf is elsewhere.
+        if (!this.gandalfInCurrentRoom()) {
+          return this.queuePartyGlimpse({ type: "party", subject, options: { ...options } });
+        }
         return false;
       }
       const file = subject === "gandalf"
@@ -3240,8 +3291,13 @@
     }
 
     nextEvent() {
-      if (!this.state.quietStartShown && this.state.arrivalIndex === 0 && !this.state.currentArrival) {
-        if (!this.gandalfInCurrentRoom()) return null;
+      // Opening Gandalf beat only when co-present; do not stall arrivals if Bilbo is elsewhere.
+      if (
+        !this.state.quietStartShown
+        && !this.state.currentArrival
+        && !this.state.thorinArrived
+        && this.gandalfInCurrentRoom()
+      ) {
         return {
           message: this.pick([
             "Gandalf lingers nearby with the look of someone waiting for a carefully arranged evening to begin.",
@@ -3250,6 +3306,7 @@
           ], this.seededHash(`gandalf-quiet-start:${this.state.turnCounter}:${this.game.currentRoom}`)),
           cooldown: 2,
           apply: () => {
+            // Mark the beat done so arrivals are not stalled; keep/retry the image via queue if needed.
             this.state.quietStartShown = true;
             this.showPartyGlimpse("gandalf", { kind: "quiet_start" });
           },
@@ -3504,15 +3561,23 @@
           };
         }
         if (stage === 3) {
+          const roomId = this.game.currentRoom;
+          const message = roomId === "bag_end_parlour"
+            ? "Balin settles near the hearth, smiling as though he has already decided that Bag End is worth remembering."
+            : roomId === "hobbit_hole"
+              ? "Balin offers another courteous nod and withdraws toward the parlour fire."
+              : "From the parlour comes the easy murmur of Balin making himself at home by the fire.";
           return {
-            message: "Balin settles near the hearth, smiling as though he has already decided that Bag End is worth remembering.",
+            message,
             cooldown: 1,
             apply: () => {
               dwarf.position = "bag_end_parlour";
               if (!this.state.arrived.includes(dwarf.id)) this.state.arrived.push(dwarf.id);
               this.state.arrivalIndex = Math.min(this.roster.length, this.state.arrivalIndex + 1);
               this.state.currentArrival = null;
-              this.showPartyGlimpse("companions");
+              if (this.game.currentRoom === "bag_end_parlour" && this.game.bagEndPartyShowsCrowdArt()) {
+                this.showPartyGlimpse("companions");
+              }
             },
           };
         }
@@ -3629,6 +3694,9 @@
             "Bag End hums with dwarf voices, chair-scrapes, and the soft domestic protest of a smial being thoroughly occupied.",
           ], this.seededHash(`group:${this.state.turnCounter}:${visibleDwarves.length}`)),
           cooldown: this.pickCooldown(4, 6),
+          apply: () => {
+            if (this.game.bagEndPartyShowsCrowdArt()) this.showPartyGlimpse("companions");
+          },
         });
       }
 
@@ -3659,13 +3727,19 @@
                   `${dwarf.name} lifts the kettle lid a fraction and seems satisfied by what he learns.`,
                   `${dwarf.name} inhales deeply and looks toward the table as if called by destiny.`,
                 ]
+          : roomId === "bag_end_parlour"
+            ? [
+              `${dwarf.name} settles more comfortably into his seat.`,
+              `${dwarf.name} adjusts his cloak and claims a little more room by the hearth.`,
+              `${dwarf.name} warms his hands and looks thoroughly at home.`,
+              `${dwarf.name} studies the comfortable furniture with interest.`,
+            ]
           : [
             `${dwarf.name} settles more comfortably into his seat.`,
             `${dwarf.name} rises, stretches his legs, and looks about the room.`,
             `${dwarf.name} studies the comfortable furniture with interest.`,
             `${dwarf.name} glances toward the kitchen hopefully.`,
             `${dwarf.name} sniffs the air and seems encouraged by what he smells.`,
-            `${dwarf.name} adjusts his cloak and claims a little more room by the hearth.`,
           ];
         options.push({
           message: this.pick(roomActions, this.seededHash(`${dwarf.id}:room:${this.state.turnCounter}`)),
@@ -3693,14 +3767,25 @@
       }
 
       if (this.state.arrived.length >= 4 && ["hobbit_hole", "bag_end_dining_room", "bag_end_pantry", "bag_end_kitchen"].includes(roomId)) {
-        options.push({
-          message: this.pick([
-            "Snatches of dwarf-song roll from room to room, and the chorus grows louder with every fresh plate that vanishes.",
-            "Plates disappear almost as soon as they are set down, and the pantry is beginning to look heroically overmatched.",
-            "The house fills with laughter, song, and the steady domestic calamity of dwarves discovering how well Bilbo keeps his pantry.",
-          ], this.seededHash(`party-feast:${this.state.turnCounter}:${this.state.arrived.length}`)),
-          cooldown: this.pickCooldown(4, 6),
-        });
+        if (visibleDwarves.length) {
+          options.push({
+            message: this.pick([
+              "Snatches of dwarf-song roll from room to room, and the chorus grows louder with every fresh plate that vanishes.",
+              "Plates disappear almost as soon as they are set down, and the pantry is beginning to look heroically overmatched.",
+              "The house fills with laughter, song, and the steady domestic calamity of dwarves discovering how well Bilbo keeps his pantry.",
+            ], this.seededHash(`party-feast:${this.state.turnCounter}:${this.state.arrived.length}`)),
+            cooldown: this.pickCooldown(4, 6),
+          });
+        } else {
+          options.push({
+            message: this.pick([
+              "From elsewhere in Bag End come snatches of dwarf-song and the clatter of plates hard-pressed by appetite.",
+              "Somewhere deeper in the smial, laughter and cupboard doors announce that supper is already under siege.",
+              "Distant chair-scrapes and cheerful argument drift through the round passages from rooms you are not presently in.",
+            ], this.seededHash(`party-feast-heard:${this.state.turnCounter}:${this.state.arrived.length}`)),
+            cooldown: this.pickCooldown(4, 6),
+          });
+        }
       }
 
       const arrivingIds = new Set(this.currentArrivalIds());
@@ -3708,8 +3793,14 @@
       if (movable.length) {
         const dwarf = movable[Math.abs(this.seededHash(`move:${this.state.turnCounter}`)) % movable.length];
         const toRoom = this.nextBagEndRoomFor(dwarf.position, dwarf.id);
+        const playerSeesMove = dwarf.position === roomId || toRoom === roomId;
         options.push({
-          message: this.movementMessage(dwarf, dwarf.position, toRoom),
+          message: playerSeesMove
+            ? this.movementMessage(dwarf, dwarf.position, toRoom)
+            : this.pick([
+              `Somewhere in Bag End, boots and a cloak announce that ${dwarf.name} is shifting rooms.`,
+              `A brief bustle elsewhere suggests ${dwarf.name} has gone in search of room, food, or both.`,
+            ], this.seededHash(`${dwarf.id}:move-heard:${this.state.turnCounter}`)),
           cooldown: this.pickCooldown(3, 5),
           apply: () => {
             this.setPartyDoorOpen(true);
@@ -4577,7 +4668,15 @@
         return [contextualPose];
       }
       const posesByRegion = {
-        bag_end: ["stands near the hearth", "has claimed a chair and half the available table-space", "keeps one eye on the kitchen"],
+        bag_end: roomId === "bilbos_garden"
+          ? ["looks over the garden with mild approval", "lingers among the flowers as though weighing the evening air", "keeps an eye on the round green door"]
+          : roomId === "bag_end_cellar_room"
+            ? ["eyes the barrels with professional interest", "keeps close to the cool stores", "looks as though provisions matter more than ceremony here"]
+            : roomId === "bag_end_pantry"
+              ? ["inspects the shelves with cheerful gravity", "looks deeply encouraged by the state of the stores", "keeps one hopeful eye on the next jar"]
+              : roomId === "hobbit_hole"
+                ? ["keeps an eye on the round green door", "has claimed a stretch of hall and half a peg", "looks ready for whatever knock comes next"]
+              : ["stands near the hearth", "has claimed a chair and half the available table-space", "keeps one eye on the kitchen"],
         shire: ["looks almost at ease among the hedges and bright fields", "walks with unusual patience through the gentle country of the Shire", "seems, for a little while, content to let a peaceful road be merely peaceful"],
         green_dragon: ["waits like a traveller between one decision and the next", "keeps an eye on doors, windows, and whoever might be listening", "looks as though the inn is only a pause in a longer business"],
         journey: ["studies the road ahead", "rests with pack still within arm's reach", "keeps a wary eye on the country round about"],
@@ -14180,6 +14279,13 @@
       return (party.state?.currentArrival?.stage || 0) >= 2;
     }
 
+    bagEndPartyShowsCrowdArt() {
+      const phase = this.bagEndPartyPhase();
+      if (phase === "briefing") return true;
+      if (phase !== "arrivals") return false;
+      return (this.unexpectedParty?.state?.arrived?.length || 0) >= 3;
+    }
+
     bagEndQuestHasBegun() {
       return Boolean(this.unexpectedParty?.state?.questBriefingDone);
     }
@@ -14376,7 +14482,7 @@
       } else if (region === "bag_end_garden" && this.homewardJourneyStarted()) {
         pool = ATMOSPHERIC_EVENT_POOLS.homecoming_shire;
       } else if (region === "bag_end_house" && !this.bagEndPartyHasEnteredHouse()) {
-        pool = pool.filter((line) => !/\bdwarf\b|song|conversation|laughter/i.test(line));
+        pool = ATMOSPHERIC_EVENT_POOLS.bag_end_house_quiet || [];
       }
       if (!pool?.length) return false;
       const cooldownKey = `atmosphere_${region}_cooldown`;

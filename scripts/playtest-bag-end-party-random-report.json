@@ -1,0 +1,409 @@
+{
+  "seeds": 40,
+  "stepLimit": 100,
+  "issueCount": 0,
+  "byType": {},
+  "issues": [],
+  "runs": [
+    {
+      "seed": 20260719,
+      "steps": 44,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 1,
+      "quietStartGlimpseAt": 1,
+      "sharedGandalf": 30
+    },
+    {
+      "seed": 20260816,
+      "steps": 45,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 1,
+      "quietStartGlimpseAt": 1,
+      "sharedGandalf": 32
+    },
+    {
+      "seed": 20260913,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 12,
+      "quietStartGlimpseAt": 12,
+      "sharedGandalf": 26
+    },
+    {
+      "seed": 20261010,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 6,
+      "quietStartGlimpseAt": 6,
+      "sharedGandalf": 19
+    },
+    {
+      "seed": 20261107,
+      "steps": 45,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 1,
+      "quietStartGlimpseAt": 6,
+      "sharedGandalf": 21
+    },
+    {
+      "seed": 20261204,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 1,
+      "quietStartGlimpseAt": 1,
+      "sharedGandalf": 35
+    },
+    {
+      "seed": 20261301,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 1,
+      "quietStartGlimpseAt": 1,
+      "sharedGandalf": 31
+    },
+    {
+      "seed": 20261398,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 7,
+      "quietStartGlimpseAt": 7,
+      "sharedGandalf": 26
+    },
+    {
+      "seed": 20261495,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 1,
+      "quietStartGlimpseAt": 5,
+      "sharedGandalf": 26
+    },
+    {
+      "seed": 20261592,
+      "steps": 46,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 1,
+      "quietStartGlimpseAt": 2,
+      "sharedGandalf": 42
+    },
+    {
+      "seed": 20261689,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 2,
+      "quietStartGlimpseAt": 6,
+      "sharedGandalf": 28
+    },
+    {
+      "seed": 20261786,
+      "steps": 49,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 1,
+      "quietStartGlimpseAt": 1,
+      "sharedGandalf": 39
+    },
+    {
+      "seed": 20261883,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 9,
+      "quietStartGlimpseAt": 9,
+      "sharedGandalf": 24
+    },
+    {
+      "seed": 20261980,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 14,
+      "quietStartGlimpseAt": 15,
+      "sharedGandalf": 29
+    },
+    {
+      "seed": 20262077,
+      "steps": 48,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 2,
+      "quietStartGlimpseAt": 2,
+      "sharedGandalf": 30
+    },
+    {
+      "seed": 20262174,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 2,
+      "quietStartGlimpseAt": 2,
+      "sharedGandalf": 30
+    },
+    {
+      "seed": 20262271,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 1,
+      "quietStartGlimpseAt": 1,
+      "sharedGandalf": 28
+    },
+    {
+      "seed": 20262368,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 8,
+      "quietStartGlimpseAt": 9,
+      "sharedGandalf": 29
+    },
+    {
+      "seed": 20262465,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 3,
+      "quietStartGlimpseAt": 3,
+      "sharedGandalf": 30
+    },
+    {
+      "seed": 20262562,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 1,
+      "quietStartGlimpseAt": 6,
+      "sharedGandalf": 22
+    },
+    {
+      "seed": 20262659,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 1,
+      "quietStartGlimpseAt": 1,
+      "sharedGandalf": 33
+    },
+    {
+      "seed": 20262756,
+      "steps": 43,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 1,
+      "quietStartGlimpseAt": 1,
+      "sharedGandalf": 31
+    },
+    {
+      "seed": 20262853,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 5,
+      "quietStartGlimpseAt": 8,
+      "sharedGandalf": 31
+    },
+    {
+      "seed": 20262950,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 2,
+      "quietStartGlimpseAt": 2,
+      "sharedGandalf": 32
+    },
+    {
+      "seed": 20263047,
+      "steps": 45,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 1,
+      "quietStartGlimpseAt": 3,
+      "sharedGandalf": 21
+    },
+    {
+      "seed": 20263144,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 1,
+      "quietStartGlimpseAt": 1,
+      "sharedGandalf": 32
+    },
+    {
+      "seed": 20263241,
+      "steps": 45,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 1,
+      "quietStartGlimpseAt": 1,
+      "sharedGandalf": 31
+    },
+    {
+      "seed": 20263338,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 8,
+      "quietStartGlimpseAt": 8,
+      "sharedGandalf": 23
+    },
+    {
+      "seed": 20263435,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 1,
+      "quietStartGlimpseAt": 5,
+      "sharedGandalf": 24
+    },
+    {
+      "seed": 20263532,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 1,
+      "quietStartGlimpseAt": 4,
+      "sharedGandalf": 28
+    },
+    {
+      "seed": 20263629,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 2,
+      "quietStartGlimpseAt": 2,
+      "sharedGandalf": 29
+    },
+    {
+      "seed": 20263726,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 9,
+      "quietStartGlimpseAt": 9,
+      "sharedGandalf": 22
+    },
+    {
+      "seed": 20263823,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 1,
+      "quietStartGlimpseAt": 1,
+      "sharedGandalf": 26
+    },
+    {
+      "seed": 20263920,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 3,
+      "quietStartGlimpseAt": 4,
+      "sharedGandalf": 31
+    },
+    {
+      "seed": 20264017,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 6,
+      "quietStartGlimpseAt": 13,
+      "sharedGandalf": 27
+    },
+    {
+      "seed": 20264114,
+      "steps": 49,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 1,
+      "quietStartGlimpseAt": 1,
+      "sharedGandalf": 44
+    },
+    {
+      "seed": 20264211,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 3,
+      "quietStartGlimpseAt": 3,
+      "sharedGandalf": 27
+    },
+    {
+      "seed": 20264308,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 7,
+      "quietStartGlimpseAt": 10,
+      "sharedGandalf": 34
+    },
+    {
+      "seed": 20264405,
+      "steps": 45,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 1,
+      "quietStartGlimpseAt": 3,
+      "sharedGandalf": 35
+    },
+    {
+      "seed": 20264502,
+      "steps": 42,
+      "arrived": 12,
+      "thorin": true,
+      "briefing": true,
+      "quietStartTextAt": 2,
+      "quietStartGlimpseAt": 8,
+      "sharedGandalf": 26
+    }
+  ]
+}

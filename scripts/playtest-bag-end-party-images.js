@@ -141,14 +141,16 @@ function testThorinGarden(log) {
 
 function testPersistentVariants(log) {
   const game = bootGame();
-  advanceUntil(game, () => game.bagEndPartyPhase() === "arrivals");
+  advanceUntil(game, () => (game.unexpectedParty?.state?.arrived?.length || 0) >= 3);
   clearTemp(game);
+  expect(game.bagEndPartyShowsCrowdArt(), "Crowd art should unlock once enough dwarves have arrived.");
   expectRoomImage(game, "hobbit_hole", "hobbit_hole_party.png", "hobbit-hole-persistent");
   expectRoomImage(game, "bag_end_parlour", "bag_end_parlour_party.png", "parlour-persistent");
   expectRoomImage(game, "bag_end_kitchen", "bag_end_kitchen_party.png", "kitchen-persistent");
   log.push({
     label: "persistent-variants",
     phase: game.bagEndPartyPhase(),
+    arrived: game.unexpectedParty?.state?.arrived?.length || 0,
     hobbit_hole: game.contextualRoomImage(game.rooms.hobbit_hole),
     bag_end_parlour: game.contextualRoomImage(game.rooms.bag_end_parlour),
     bag_end_kitchen: game.contextualRoomImage(game.rooms.bag_end_kitchen),
@@ -167,13 +169,35 @@ function testNoWrongRoomCutscene(log) {
 
 function testCompanionGlimpse(log) {
   const game = bootGame();
-  advanceUntil(game, () => game.unexpectedParty?.state?.arrivalIndex >= 2 && !game.unexpectedParty?.state?.currentArrival);
+  advanceUntil(game, () => (game.unexpectedParty?.state?.arrived?.length || 0) >= 3);
+  clearTemp(game);
+  expect(game.bagEndPartyShowsCrowdArt(), "Companion glimpse needs crowd backdrop art.");
+  expect(game.currentRoom === "hobbit_hole", "Companion glimpse check expects the hall.");
+  const shown = game.unexpectedParty.showPartyGlimpse("companions");
+  expect(shown, "Companion glimpse should display once crowd art is available.");
   expectTempImage(game, "hobbit_hole_party.png", "companions-glimpse-image");
   expectPresentation(game, "party-glimpse", "right", "companions-glimpse-presentation");
   log.push({
     ...snapshot(game, "companions-glimpse"),
     effect: game.temporaryImage?.presentation?.effect || "-",
     focus: game.temporaryImage?.presentation?.focus || "-",
+  });
+}
+
+function testEarlyArrivalsKeepQuietArt(log) {
+  const game = bootGame();
+  advanceUntil(game, () => game.bagEndPartyHasEnteredHouse());
+  clearTemp(game);
+  expect(game.bagEndPartyPhase() === "arrivals", "Phase should be arrivals after first entry.");
+  expect((game.unexpectedParty?.state?.arrived?.length || 0) < 3, "Early arrivals should still be below crowd threshold.");
+  expect(!game.bagEndPartyShowsCrowdArt(), "Crowd art must stay off until enough dwarves arrive.");
+  const hallImage = game.contextualRoomImage(game.rooms.hobbit_hole);
+  expect(hallImage !== "hobbit_hole_party.png", `Early hall image should not be party crowd, got ${hallImage}`);
+  log.push({
+    label: "early-arrivals-quiet-art",
+    phase: game.bagEndPartyPhase(),
+    arrived: game.unexpectedParty?.state?.arrived?.length || 0,
+    hobbit_hole: hallImage,
   });
 }
 
@@ -261,6 +285,7 @@ function main() {
   testThorinHall(log);
   testThorinGarden(log);
   testPersistentVariants(log);
+  testEarlyArrivalsKeepQuietArt(log);
   testCompanionGlimpse(log);
   testGandalfBriefingHall(log);
   testGandalfBriefingGarden(log);
@@ -277,6 +302,7 @@ function main() {
   fs.writeFileSync(reportPath, `${lines.join("\n")}\n`, "utf8");
   console.log(`Bag End party image playtest passed (${REQUIRED_FILES.length} images, ${log.length} checks).`);
   console.log(`Report: ${reportPath}`);
+  process.exit(0);
 }
 
 try {
