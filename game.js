@@ -1296,6 +1296,20 @@
         text: "You are in a large dry cave. Its stone floor and arching roof still offer good shelter, yet the place no longer feels like a last necessity. Outside, the air has steadied, and the cave has become once more a prudent resting-place rather than a mercy snatched from hostile weather.",
       },
     ],
+    goblins_dungeon: [
+      {
+        when: ({ game }) => game.goblinHoldActive?.() && game.flags.goblin_hold_climbed,
+        text: "You are in the goblins' hold, perched on a companion's shoulders amid the bound company. Torch-smoke and a high iron ring in a pillar fill the cavern view; beneath you strong shoulders hold steady, Thorin's breath comes harsh nearby, and Gandalf's white glint waits beyond the ropes. Above your hands the thick prison-rope's knot is plain at last where a hobbit alone can reach it.",
+      },
+      {
+        when: ({ game }) => game.goblinHoldActive?.() && game.flags.goblin_hold_kneeling,
+        text: "You are in the goblins' hold, still snared with the company by a thick rough rope. A sturdy companion has managed to kneel and hunch within the bonds, offering a living step; Thorin strains beside you; Gandalf is held a little apart under watch. The same rope climbs from your wrists to an iron ring set high in a pillar—out of reach from the floor, but perhaps not from a hobbit lifted on strong shoulders.",
+      },
+      {
+        when: ({ game }) => game.goblinHoldActive?.(),
+        text: "You are in the goblins' hold beneath the mountains, foul with torch-smoke and the reek of old meat. Thorin, Gandalf, and the rest of the company are cinched with you in one thick prison-rope that binds wrists and ankles together and then climbs a stone pillar to an iron ring fixed high above—far beyond any dwarf's bound reach, though a hobbit lifted on strong shoulders might manage it. A greater goblin mouths threats from the shadows. Gandalf's look finds yours across the press—alert, waiting—but while the rope holds, an open stroke would be murder for you all.",
+      },
+    ],
     narrow_dangerous_path: [
       {
         when: ({ game }) => game.beornMountainStormActive(),
@@ -6816,6 +6830,10 @@
       const character = this.resolveAskForCharacterTarget(characterName, itemName);
       if (!character) return game.print(this.isolatedCompanionAppeal(characterName) || this.absentEncounteredCharacterMessage(characterName) || `There is no one named ${characterName} here.`);
       if (game.unexpectedParty?.blocksDirectInteraction(character, "item")) return;
+      if (game.handleGoblinHoldAskForHelp?.(character, itemName)) {
+        this.rememberConversationCharacter(character);
+        return;
+      }
       const special = this.specialAskForResponse(character, itemName);
       if (special) {
         this.rememberConversationCharacter(character);
@@ -6903,6 +6921,7 @@
       this.rememberConversationCharacter(character);
       this.rememberReferencedCharacter(order);
       if (game.handleCellarCompanionOrder(character, order)) return;
+      if (game.handleGoblinHoldAskOrder?.(character, order)) return;
       if (this.ordering.handleBardDragonCommand(character, order)) return;
       this.delegateCharacterOrder(character, order);
     }
@@ -7068,6 +7087,7 @@
         return;
       }
       this.rememberConversationCharacter(character);
+      if (game.handleGoblinHoldTalkHint?.(character)) return;
       const special = game.specialTalkResponse(character);
       if (special) {
         game.print(special);
@@ -10181,6 +10201,7 @@
 
     checkSpecialSituations() {
       this.checkGollumEncounter();
+      this.checkGoblinCapture();
       this.checkGoblinTunnelEncounter();
       this.checkDryCaveCrackEscape();
       this.checkWargEscape();
@@ -10194,6 +10215,17 @@
       this.checkEreborStandoff();
       this.checkSmaugDragonEndgameScenes();
       this.checkBagEndHomecoming();
+    }
+
+    checkGoblinCapture() {
+      return this.game.resolveGoblinCapture?.() || false;
+    }
+
+    goblinTunnelImmediateCapturePending() {
+      const game = this.game;
+      if (game.flags.goblin_capture_seen) return false;
+      if (typeof game.bilboHasRecoveredRing === "function" && game.bilboHasRecoveredRing()) return false;
+      return game.currentRoom === "dark_stuffy_passage_5";
     }
 
     checkGoblinTunnelEncounter() {
@@ -10684,6 +10716,15 @@
         const helper = game.encounters.bestGoblinTunnelHelper();
         if (helper && !attackers.has(helper.id)) return this.autoplayDirectedCharacterCommand(helper.name, `ask ${normalize(helper.name)} to attack ${goblin.name}`);
         return this.autoplayHas("majestic sword") ? `kill ${goblin.name} with sword` : `kill ${goblin.name}`;
+      }
+
+      if (beforeDragonDefeat && game.goblinHoldActive?.()) {
+        if (!game.flags.goblin_hold_climbed) {
+          const helper = game.goblinHoldHelper?.() || game.chooseGoblinHoldHelper?.("dwalin") || game.chooseGoblinHoldHelper?.();
+          if (helper) return `climb on ${normalize(helper.name)}`;
+          return "climb on shoulders";
+        }
+        return "cut rope";
       }
 
       if (game.currentRoom === "lower_halls" && game.liveDragon()) {
@@ -11262,6 +11303,7 @@
     examine(objectName = "") {
       const game = this.game;
       const text = normalize(objectName).replace(/^(?:around\s+)?for\s+/, "").replace(/^around\s+/, "");
+      if (game.handleGoblinHoldExamine?.(text)) return;
       if (!text || ["around", "room", "place", "area", "here", "surroundings"].includes(text)) {
         return this.inspectEnvironment("search", "area");
       }
@@ -13317,8 +13359,10 @@
         if (this.trySpecialAction(verb, object)) return false;
 
         if (!object && !commandsWithoutObject.has(verb)) {
-          this.print(this.missingObjectPrompt(verb));
-          return false;
+          if (!(verb === "climb" && this.goblinHoldActive?.())) {
+            this.print(this.missingObjectPrompt(verb));
+            return false;
+          }
         }
 
         const pronounPrompt = this.unresolvedPronounPrompt(parsed);
@@ -13331,6 +13375,7 @@
 
         this.commandRouter.dispatch(parsed);
         this.noteDryCaveCrackCommand(parsed);
+        this.noteGoblinHoldCommand(parsed);
         for (const reference of explicitReferences) {
           this.rememberClarifiedReference(reference.target, reference.choice);
         }
@@ -14493,6 +14538,7 @@
         || this.wargEscapeTravelGate(connection)
         || this.elvenCellarTravelGate(connection)
         || this.dryCaveCrackTravelGate(connection)
+        || this.goblinHoldTravelGate(connection)
         || this.beornMountainStormGate(connection)
         || this.beornDepartureGate(connection)
         || (
@@ -14562,6 +14608,7 @@
         if (!this.flags.drycavecrackloosened) return "The seam is there, but still too tight for passage. You need something hard and narrow enough to work into it.";
         return "The hidden stone has shifted, but not yet far enough to let you through. You must force it wider.";
       }
+      if (this.goblinHoldTravelGate(connection)) return this.goblinHoldBlockMessage();
       if (this.beornMountainStormGate(connection)) return this.beornMountainStormMessage(connection);
       if (this.beornDepartureGate(connection)) return this.beornDepartureBlockMessage(connection);
       if (!this.narrativeTravelBlock(connection)) return "";
@@ -15067,9 +15114,17 @@
     }
 
     debugMarkGoblinTunnelProgress() {
+      this.flags.goblin_capture_seen = true;
+      this.flags.goblin_capture_freed = true;
+      this.flags.goblin_hold_kneeling = false;
+      this.flags.goblin_hold_climbed = false;
+      this.flags.goblin_hold_helper = "";
+      this.flags.goblin_hold_pressure = 0;
       this.debugMarkVisitedPath([
         "large_dry_cave",
         "dark_stuffy_passage_5",
+        "goblins_dungeon",
+        "dark_winding_passage",
         "dark_stuffy_passage_6",
         "dark_stuffy_passage_14",
         "deep_dark_lake",
@@ -16176,6 +16231,7 @@
     }
 
     cutTrim(verb, objectName = "") {
+      if (this.handleGoblinHoldCutRope(objectName)) return;
       if (this.handleMirkwoodWebAction("cut", objectName)) return;
       const parsed = this.parseToolCommand(objectName);
       if (!parsed.targetName) return this.print(`${capitalize(verb)} what?`);
@@ -16637,6 +16693,9 @@
 
     climb(objectName) {
       const text = normalize(objectName);
+      if (this.goblinHoldActive?.()) {
+        if (this.handleGoblinHoldClimb(objectName || "shoulders")) return;
+      }
       if (!text) return this.print("Climb where?");
       if (this.wargEscapeActive() && this.currentRoom === "treeless_opening" && matchesAny(text, ["tree", "trees", "pine", "pines", "branch", "branches"])) {
         if (this.flags.warg_escape_in_trees) {
@@ -16690,6 +16749,7 @@
         this.print(this.gollumEscapeInterception("north"));
         return;
       }
+      if (verb === "untie" && this.handleGoblinHoldCutRope(objectName || "rope")) return;
       if (this.handleDryCaveCrackPhysicalAction(verb, objectName)) return;
       const battleText = normalize(objectName);
       if (verb === "help" && matchesAny(battleText, ["bard", "men", "men of the lake", "bowmen"])) {
@@ -17276,7 +17336,11 @@
         effectiveConnection.to === "elvenkings_halls"
         && this.hazards?.elvenHallsImmediateCapturePending?.()
       );
-      if (!skipRoomDescribeForImmediateElvenCapture) {
+      const skipRoomDescribeForImmediateGoblinCapture = (
+        effectiveConnection.to === "dark_stuffy_passage_5"
+        && this.hazards?.goblinTunnelImmediateCapturePending?.()
+      );
+      if (!skipRoomDescribeForImmediateElvenCapture && !skipRoomDescribeForImmediateGoblinCapture) {
         this.describeRoom();
       }
       this.noteMirkwoodTravel(previousRoom, effectiveConnection.to, direction);
@@ -18577,6 +18641,342 @@
       const ring = this.items.golden_ring;
       if (!ring) return false;
       return this.player.inventory.includes(ring.id) || this.player.worn.includes(ring.id);
+    }
+
+    goblinCapturePending() {
+      if (this.flags.goblin_capture_seen) return false;
+      if (this.bilboHasRecoveredRing()) return false;
+      return this.currentRoom === "dark_stuffy_passage_5";
+    }
+
+    goblinHoldActive(roomId = this.currentRoom) {
+      return Boolean(
+        this.flags.goblin_capture_seen
+        && !this.flags.goblin_capture_freed
+        && roomId === "goblins_dungeon"
+      );
+    }
+
+    goblinHoldHelper() {
+      const helperId = this.flags.goblin_hold_helper || "";
+      return helperId ? this.characters[helperId] || null : null;
+    }
+
+    chooseGoblinHoldHelper(preferredName = "") {
+      const inRoom = this.peopleInRoom("goblins_dungeon").filter((character) => (
+        character
+        && character.id !== this.player.id
+        && character.visible !== false
+        && character.friendly !== false
+        && !matches(character.name, "goblin")
+        && !matches(character.name, "gollum")
+      ));
+      if (preferredName) {
+        const named = inRoom.find((character) => matches(character.name, preferredName));
+        if (named) return named;
+      }
+      const preference = ["dwalin", "thorin", "balin", "fili", "kili", "gandalf"];
+      for (const name of preference) {
+        const found = inRoom.find((character) => matches(character.name, name));
+        if (found) return found;
+      }
+      return inRoom[0] || null;
+    }
+
+    relocateCompanyWithPlayer(destination, fromRoom = this.currentRoom) {
+      this.currentRoom = destination;
+      this.player.position = destination;
+      this.visitedRooms.add(destination);
+      for (const character of Object.values(this.characters)) {
+        if (!character || character.id === this.player.id) continue;
+        if (character.position !== fromRoom && !character.followingPlayer) continue;
+        if (character.visible === false) continue;
+        if (character.friendly === false) continue;
+        if (matches(character.name, "goblin") || matches(character.name, "gollum") || matches(character.name, "warg")) continue;
+        character.position = destination;
+        character.justEntered = false;
+      }
+    }
+
+    resolveGoblinCapture() {
+      if (!this.goblinCapturePending()) return false;
+      const fromRoom = this.currentRoom;
+      this.flags.goblin_capture_seen = true;
+      this.flags.goblin_capture_freed = false;
+      this.flags.goblin_hold_kneeling = false;
+      this.flags.goblin_hold_climbed = false;
+      this.flags.goblin_hold_helper = "";
+      this.flags.goblin_hold_pressure = 0;
+      this.recordAutosave("before being taken by the goblins", { key: "hazard:goblins:capture" });
+      this.print("Out of the dark behind you pour goblins—more than can be counted in the first panic—waving bent swords and yellow teeth.", "danger");
+      this.print("The company is borne down in a shouting heap before blades can be drawn cleanly.");
+      this.print("Rough hands bind and drag you, and the tunnels swallow the whole company like a throat.");
+      this.relocateCompanyWithPlayer("goblins_dungeon", fromRoom);
+      this.describeRoom();
+      this.showTemporaryImage("goblin_hold_company_bound.png", {
+        alt: "The company bound together by a prison-rope beneath the mountain",
+      });
+      this.print("A single thick rope has been put about the whole company: it bites wrists and ankles alike, then runs up the pillar to an iron ring fixed high in the stone, where the knot sits well above a dwarf's bound reach.");
+      this.print("Gandalf is watched too closely for wizardry, yet his eyes find yours as if a smaller hand might yet undo what strength cannot.");
+      this.print("You will need a living step: get a companion to help you up—kneel, crouch, boost, or simply climb onto sturdy shoulders—then cut the rope at that high knot.");
+      return true;
+    }
+
+    goblinHoldTravelGate(connection) {
+      if (!connection || !this.goblinHoldActive(connection.from)) return false;
+      return true;
+    }
+
+    goblinHoldBlockMessage() {
+      return "The prison-rope holds the company fast to the pillar. Until that high knot is cut, there is no leaving this hold.";
+    }
+
+    goblinHoldRopeTarget(text = "") {
+      return matchesAny(normalize(text), [
+        "rope", "prison rope", "prison-rope", "bond", "bonds", "binding", "bindings",
+        "knot", "cord", "cords", "ring", "iron ring", "pillar rope",
+      ]);
+    }
+
+    goblinHoldClimbTarget(text = "") {
+      const normalized = normalize(text).replace(/^(?:on|onto|up|up on|up onto)\s+/, "");
+      if (!normalized) return false;
+      if (matchesAny(normalized, ["shoulders", "shoulder", "back", "companion", "dwarf", "him"])) return true;
+      const helper = this.goblinHoldHelper() || this.chooseGoblinHoldHelper(normalized);
+      return Boolean(helper && matches(helper.name, normalized));
+    }
+
+    goblinHoldKneelOrder(order = "") {
+      return matchesAny(normalize(order), [
+        "kneel", "kneel down", "crouch", "stoop", "bend", "bend down", "hunch", "duck", "get down",
+        "help", "help me", "help me up", "help bilbo", "help bilbo up",
+        "boost", "boost me", "boost me up", "boost bilbo", "give me a boost", "give bilbo a boost",
+        "give me a hand", "give bilbo a hand", "lend a hand", "lend me a hand",
+        "make a step", "be a step", "make a stirrup", "give me a stirrup", "stirrup",
+        "let me climb", "let me up", "lift me", "lift me up", "hoist me", "hoist me up",
+        "lower yourself", "get low", "bend over", "offer shoulders", "shoulders",
+        "stand so i can climb", "let me stand on you", "let me climb on you",
+      ]);
+    }
+
+    goblinHoldHelpRequest(text = "") {
+      return matchesAny(normalize(text), [
+        "help", "boost", "hand", "a hand", "shoulders", "shoulder", "step", "stirrup",
+        "lift", "hoist", "kneel", "crouch", "up", "a boost", "assistance",
+      ]);
+    }
+
+    ensureGoblinHoldKneeling(character, options = {}) {
+      if (!character) return null;
+      if (this.flags.goblin_hold_kneeling) return this.goblinHoldHelper() || character;
+      this.flags.goblin_hold_helper = character.id;
+      this.flags.goblin_hold_kneeling = true;
+      if (!options.silent) {
+        this.print(`${sentenceDisplayCharacterName(character)} works a knee under himself inside the biting rope, shoulders hunched, making as low and steady a step as the bonds allow.`);
+      }
+      return character;
+    }
+
+    handleGoblinHoldAskOrder(character, order = "") {
+      if (!this.goblinHoldActive() || !character) return false;
+      if (!this.goblinHoldKneelOrder(order)) {
+        this.print(`${sentenceDisplayCharacterName(character)} is bound as tightly as you are. Try asking for help up, a boost, or to kneel—or simply climb onto sturdy shoulders.`);
+        this.advanceGoblinHoldPressure(1);
+        return true;
+      }
+      if (this.flags.goblin_hold_kneeling) {
+        const helper = this.goblinHoldHelper();
+        this.print(`${sentenceDisplayCharacterName(helper || character)} is already low within the bonds, offering what height a hobbit can use. Climb on.`);
+        return true;
+      }
+      if (character.friendly === false || matches(character.name, "goblin")) {
+        this.print("No goblin will kneel to help you.");
+        this.advanceGoblinHoldPressure(1);
+        return true;
+      }
+      this.ensureGoblinHoldKneeling(character);
+      this.print("The iron ring and its knot still hang high above—but no longer impossibly so, if you can climb.");
+      return true;
+    }
+
+    handleGoblinHoldAskForHelp(character, itemName = "") {
+      if (!this.goblinHoldActive() || !character) return false;
+      if (!this.goblinHoldHelpRequest(itemName)) return false;
+      return this.handleGoblinHoldAskOrder(character, "help me up");
+    }
+
+    handleGoblinHoldClimb(objectName = "") {
+      if (!this.goblinHoldActive()) return false;
+      const text = normalize(objectName);
+      if (!this.goblinHoldClimbTarget(text) && text) {
+        this.print("There is nothing useful to climb here but a willing companion's shoulders.");
+        this.advanceGoblinHoldPressure(1);
+        return true;
+      }
+      let helper = this.goblinHoldHelper();
+      if (text) helper = this.chooseGoblinHoldHelper(text.replace(/^(?:on|onto|up|up on|up onto)\s+/, "")) || helper;
+      if (!helper) helper = this.chooseGoblinHoldHelper();
+      if (!helper) {
+        this.print("There is no companion near enough to climb upon.");
+        return true;
+      }
+      if (!this.flags.goblin_hold_kneeling) {
+        this.ensureGoblinHoldKneeling(helper);
+        this.print(`Without waiting for more ceremony, you scramble onto ${displayCharacterName(helper)}'s shoulders while the bonds still bite.`);
+      } else if (this.flags.goblin_hold_climbed) {
+        this.print("You are already up on your companion's shoulders, close enough to work at the high knot.");
+        return true;
+      } else {
+        this.print(`With a hobbit's lightness you scramble onto ${displayCharacterName(helper)}'s shoulders, the prison-rope scraping as you rise.`);
+      }
+      this.flags.goblin_hold_helper = helper.id;
+      this.flags.goblin_hold_climbed = true;
+      this.showTemporaryImage("goblin_hold_bilbo_on_shoulders.png", {
+        alt: "Bilbo climbing a companion's shoulders to reach the high prison-rope knot",
+      });
+      this.print("Now the knot at the iron ring is under your hands—tight, greasy, and waiting for a blade or a desperate cut.");
+      return true;
+    }
+
+    handleGoblinHoldCutRope(objectName = "") {
+      if (!this.goblinHoldActive()) return false;
+      if (!this.goblinHoldRopeTarget(objectName) && normalize(objectName)) return false;
+      if (!normalize(objectName)) {
+        this.print("Cut what? The prison-rope's high knot is what holds the company.");
+        return true;
+      }
+      if (!this.flags.goblin_hold_climbed) {
+        if (!this.flags.goblin_hold_kneeling) {
+          this.print("The knot sits too high. Get a companion to help you up—or climb onto sturdy shoulders—before any blade can reach it.");
+        } else {
+          this.print("You can see the knot from here, but your bound arms will not stretch so far from the floor. Climb first.");
+        }
+        this.advanceGoblinHoldPressure(1);
+        return true;
+      }
+      return this.resolveGoblinHoldEscape();
+    }
+
+    handleGoblinHoldExamine(objectName = "") {
+      if (!this.goblinHoldActive()) return false;
+      const text = normalize(objectName);
+      if (this.goblinHoldRopeTarget(text)) {
+        if (this.flags.goblin_hold_climbed) {
+          this.print("Up close the prison-rope's knot is a greasy hitch about the iron ring. One firm cut would spill the whole binding.");
+        } else if (this.flags.goblin_hold_kneeling) {
+          this.print("The rope still runs from the company's wrists up the pillar to the high ring. Climb onto those offered shoulders and you can reach the knot.");
+        } else {
+          this.print("One thick rope binds the whole company and climbs to an iron ring high on the pillar. The knot is the heart of the snare. A hobbit might reach it from a companion's shoulders—ask for help up, or simply climb on.");
+        }
+        return true;
+      }
+      if (matchesAny(text, ["pillar", "ring", "iron ring", "hold", "cavern", "chamber"])) {
+        this.print("The hold is all smoke, stone, and that high iron ring. The living danger is the rope—and the goblins watching while it holds.");
+        return true;
+      }
+      return false;
+    }
+
+    handleGoblinHoldTalkHint(character) {
+      if (!this.goblinHoldActive() || !character) return false;
+      if (matches(character.name, "gandalf")) {
+        if (!this.flags.goblin_hold_kneeling) {
+          this.print("Gandalf's whisper barely stirs his beard: 'I cannot strike first. Get help up—or climb a dwarf's shoulders—then cut the rope at the ring.'");
+        } else if (!this.flags.goblin_hold_climbed) {
+          this.print("Gandalf mouths silently: 'Up. The knot. Quickly.'");
+        } else {
+          this.print("Gandalf's eyes flick to the iron ring. The meaning is plain: cut.");
+        }
+        return true;
+      }
+      if (!this.flags.goblin_hold_kneeling && matchesAny(character.name, ["dwalin", "thorin", "balin", "fili", "kili", "dori", "nori", "ori", "oin", "gloin", "bifur", "bofur", "bombur"])) {
+        this.print(`${sentenceDisplayCharacterName(character)} mutters through clenched teeth, 'Ask me to help you up, or climb on my shoulders if you dare, Master Baggins.'`);
+        return true;
+      }
+      return false;
+    }
+
+    goblinHoldPressure() {
+      return Math.max(0, Number(this.flags.goblin_hold_pressure || 0));
+    }
+
+    goblinHoldCommandPressure(verb = "", objectText = "") {
+      if (!this.goblinHoldActive() || this.endgame) return 0;
+      const normalizedVerb = normalize(verb);
+      if (!normalizedVerb) return 0;
+      if ([
+        "save", "load", "help", "tips", "commands", "verbs", "inventory", "i",
+        "look", "examine", "inspect", "search", "listen", "ask", "talk", "speak",
+        "say", "tell",
+      ].includes(normalizedVerb)) return 0;
+      if (normalizedVerb === "wait") return 2;
+      if (["attack", "kill", "fight", "break", "smash", "throw", "shout", "scream"].includes(normalizedVerb)) return 2;
+      if (normalizedVerb === "cut" || normalizedVerb === "climb" || normalizedVerb === "untie") return 0;
+      return 1;
+    }
+
+    advanceGoblinHoldPressure(amount = 1) {
+      if (!this.goblinHoldActive() || this.endgame) return false;
+      const delta = Math.max(0, Number(amount) || 0);
+      if (!delta) return false;
+      const previous = this.goblinHoldPressure();
+      const next = previous + delta;
+      this.flags.goblin_hold_pressure = next;
+      if (next >= 5) {
+        this.killByGoblinHold();
+        return true;
+      }
+      const threshold = [4, 3, 2, 1].find((value) => previous < value && next >= value);
+      const line = {
+        1: "A goblin cuff stings a nearby shoulder. They are growing impatient with their sport.",
+        2: "The greater goblin leans forward, sniffing at the huddled company as if deciding which throat to try first.",
+        3: "Harsh laughter rises. Blades scrape. The watch on Gandalf tightens.",
+        4: "A goblin steps in with a bent sword raised. Another heartbeat of delay will be the last.",
+      }[threshold];
+      if (line) this.print(line, threshold >= 3 ? "danger" : "");
+      return Boolean(line);
+    }
+
+    noteGoblinHoldCommand(parsed = null) {
+      if (!this.goblinHoldActive() || this.endgame) return false;
+      const verb = normalize(parsed?.verb || "");
+      const objectText = normalize(parsed?.object || "");
+      const amount = this.goblinHoldCommandPressure(verb, objectText);
+      if (!amount) return false;
+      return this.advanceGoblinHoldPressure(amount);
+    }
+
+    killByGoblinHold() {
+      if (this.endgame) return true;
+      this.print("Too late.", "danger");
+      this.print("The greater goblin tires of talk. Blades fall among the bound company before the rope can be undone.");
+      this.endGame("The goblins butcher the company in their own hold while the prison-rope still holds.", {
+        fatal: true,
+        deathImage: "bilbo_goblins_around_him_death.png",
+      });
+      return true;
+    }
+
+    resolveGoblinHoldEscape() {
+      if (!this.goblinHoldActive()) return false;
+      const helper = this.goblinHoldHelper();
+      this.print("You saw at the greasy knot until the prison-rope parts with a sudden ugly snap.");
+      this.print("Bonds spill slack about the company; dwarves surge up with a roar of released fury.");
+      this.print("Then a white light bursts among the goblins, and Gandalf's voice cracks like a whip through the cavern.");
+      this.print("In the sudden uproar swords flash, goblins shriek, and the company is driven stumbling out of the hold into a dark winding passage before the whole place can close upon you again.");
+      this.flags.goblin_capture_freed = true;
+      this.flags.goblin_hold_pressure = 0;
+      this.flags.goblin_hold_climbed = false;
+      this.flags.goblin_hold_kneeling = false;
+      if (helper) this.flags.goblin_hold_helper = helper.id;
+      this.relocateCompanyWithPlayer("dark_winding_passage", "goblins_dungeon");
+      this.describeRoom();
+      this.recordProgressAutosave(
+        "autosave_milestone_goblin_capture_survived",
+        "after escaping the goblins' hold",
+        "milestone:goblins:capture-survived",
+      );
+      return true;
     }
 
     dryCaveCrackEscapeResolved() {

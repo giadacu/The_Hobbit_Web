@@ -8939,3 +8939,53 @@ Future debugging advice
 -----------------------
 - If a Bag End prop change seems ignored, check whether party crowd art still
   outranks that contextual image rule for the current phase.
+
+
+Case 188 - 2026-07-26 - Compact goblin capture beat before the tunnel maze
+--------------------------------------------------------------------------
+
+Symptom
+-------
+The Misty Mountains chapter jumped from entering the dry-cave crack into free
+tunnel exploration, with no capture-and-hold sequence before the later ambush
+and Gollum scenes.
+
+Root cause
+----------
+`goblins_dungeon` existed as a navigable room, and later systems covered the
+hulking-goblin ambush plus dry-cave escape, but nothing forced a one-time
+capture into the hold.
+
+Resolution
+----------
+1. On first arrival in `dark_stuffy_passage_5` before Bilbo has the ring, run a
+   capture into `goblins_dungeon` and leave the company held by a prison-rope.
+2. Escape is interactive: get height somehow, then cut the high knot at the
+   iron ring; only then does Gandalf's light open the flight to
+   `dark_winding_passage`. Accepted phrasings include ask to kneel / crouch /
+   boost / help me up, ask for help/boost/hand, or simply `climb on <companion>`
+   (which auto-kneels then climbs in one step).
+3. Room prose names the company and the rope explicitly because the hold image
+   shows empty stone, not figures. Transient images fill that gap:
+   `goblin_hold_company_bound.png` on capture, `goblin_hold_bilbo_on_shoulders.png`
+   on successful climb.
+4. Gate with `goblin_capture_seen` / `goblin_capture_freed`; mark both in
+   `debugMarkGoblinTunnelProgress()`.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- If capture never fires, confirm the player entered `dark_stuffy_passage_5`
+  without `goblin_capture_seen` and without the ring.
+- If players cannot escape, try climb-on-companion or ask-for-help synonyms,
+  then cut rope; confirm a helper companion is actually in `goblins_dungeon`.
+- Bare `climb` is allowed while the hold is active (missing-object gate is
+  bypassed); elsewhere it still asks "Climb where?".
+- If it fires after `jump gollum`/`jump beorn`, check
+  `debugMarkGoblinTunnelProgress()` still sets both capture flags.
+

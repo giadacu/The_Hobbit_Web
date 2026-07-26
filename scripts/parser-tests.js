@@ -8555,6 +8555,121 @@ const gameCases = [
     ],
   },
   {
+    name: "goblin capture holds the company until the prison-rope is cut",
+    setup(game) {
+      movePlayerTo(game, "large_dry_cave");
+      placeCharacterWithPlayer(game, "thorin");
+      placeCharacterWithPlayer(game, "gandalf");
+      game.characters.thorin.movementMode = "follow";
+      game.characters.thorin.followingPlayer = true;
+      game.characters.gandalf.movementMode = "follow";
+      game.characters.gandalf.followingPlayer = true;
+      giveItemToCharacter(game, "brass_lantern", game.player.id);
+      game.flags.lanternon = true;
+      game.flags.lanternturns = 20;
+      const crevice = game.doors.porta_large_dry_cave_dark_stuffy_passage_5;
+      if (crevice) {
+        crevice.open = true;
+        crevice.locked = false;
+      }
+    },
+    drive(game) {
+      const start = outputLines.length;
+      game.execute("down");
+      const captured = outputLines.slice(start);
+      game.print(`Goblin hold room: ${game.currentRoom}`);
+      game.print(`Goblin capture seen: ${game.flags.goblin_capture_seen ? "yes" : "no"}`);
+      game.print(`Goblin capture freed after catch: ${game.flags.goblin_capture_freed ? "yes" : "no"}`);
+      game.print(`Goblin hold text: ${captured.some((line) => /prison-rope|iron ring/i.test(line)) ? "yes" : "no"}`);
+      game.execute("ask thorin to kneel");
+      game.print(`Goblin hold kneeling: ${game.flags.goblin_hold_kneeling ? "yes" : "no"}`);
+      game.execute("climb on thorin");
+      game.print(`Goblin hold climbed: ${game.flags.goblin_hold_climbed ? "yes" : "no"}`);
+      const escapeStart = outputLines.length;
+      game.execute("cut rope");
+      const escaped = outputLines.slice(escapeStart);
+      game.print(`Goblin escape room: ${game.currentRoom}`);
+      game.print(`Goblin capture freed: ${game.flags.goblin_capture_freed ? "yes" : "no"}`);
+      game.print(`Goblin rescue text: ${escaped.some((line) => /Gandalf's voice cracks/i.test(line)) ? "yes" : "no"}`);
+      game.print(`Thorin after escape: ${game.characters.thorin?.position || "none"}`);
+      game.print(`Gandalf after escape: ${game.characters.gandalf?.position || "none"}`);
+      const secondStart = outputLines.length;
+      movePlayerTo(game, "dark_stuffy_passage_5");
+      game.flags.goblin_capture_freed = true;
+      game.checkSpecialSituations();
+      const secondPass = outputLines.slice(secondStart);
+      game.print(`Goblin capture repeats: ${secondPass.some((line) => /pour goblins/i.test(line)) ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Goblin hold room: goblins_dungeon",
+      "Goblin capture seen: yes",
+      "Goblin capture freed after catch: no",
+      "Goblin hold text: yes",
+      "Goblin hold kneeling: yes",
+      "Goblin hold climbed: yes",
+      "Goblin escape room: dark_winding_passage",
+      "Goblin capture freed: yes",
+      "Goblin rescue text: yes",
+      "Thorin after escape: dark_winding_passage",
+      "Gandalf after escape: dark_winding_passage",
+      "Goblin capture repeats: no",
+    ],
+  },
+  {
+    name: "goblin hold accepts climb-only and help synonyms",
+    setup(game) {
+      movePlayerTo(game, "goblins_dungeon");
+      placeCharacterWithPlayer(game, "thorin");
+      placeCharacterWithPlayer(game, "gandalf");
+      game.flags.goblin_capture_seen = true;
+      game.flags.goblin_capture_freed = false;
+      game.flags.goblin_hold_kneeling = false;
+      game.flags.goblin_hold_climbed = false;
+      game.flags.goblin_hold_helper = "";
+      game.flags.goblin_hold_pressure = 0;
+    },
+    drive(game) {
+      game.execute("ask thorin for help");
+      game.print(`Ask-for-help kneel: ${game.flags.goblin_hold_kneeling ? "yes" : "no"}`);
+      game.flags.goblin_hold_kneeling = false;
+      game.flags.goblin_hold_climbed = false;
+      game.flags.goblin_hold_helper = "";
+      game.execute("ask thorin to boost me");
+      game.print(`Ask-boost kneel: ${game.flags.goblin_hold_kneeling ? "yes" : "no"}`);
+      game.flags.goblin_hold_kneeling = false;
+      game.flags.goblin_hold_climbed = false;
+      game.flags.goblin_hold_helper = "";
+      game.execute("climb on thorin");
+      game.print(`Climb-only kneel: ${game.flags.goblin_hold_kneeling ? "yes" : "no"}`);
+      game.print(`Climb-only climbed: ${game.flags.goblin_hold_climbed ? "yes" : "no"}`);
+      game.flags.goblin_hold_kneeling = false;
+      game.flags.goblin_hold_climbed = false;
+      game.flags.goblin_hold_helper = "";
+      game.execute("ask thorin to kneel");
+      game.execute("climb");
+      game.print(`Bare-climb climbed: ${game.flags.goblin_hold_climbed ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Ask-for-help kneel: yes",
+      "Ask-boost kneel: yes",
+      "Climb-only kneel: yes",
+      "Climb-only climbed: yes",
+      "Bare-climb climbed: yes",
+    ],
+  },
+  {
+    name: "jump gollum marks goblin capture as already resolved",
+    drive(game) {
+      game.execute("jump gollum");
+      game.print(`Jump gollum capture seen: ${game.flags.goblin_capture_seen ? "yes" : "no"}`);
+      game.print(`Jump gollum capture freed: ${game.flags.goblin_capture_freed ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Jump gollum capture seen: yes",
+      "Jump gollum capture freed: yes",
+    ],
+  },
+  {
     name: "event-driven hazard entries keep a single safe moment",
     setup(game) {
       for (let index = localStorage.length - 1; index >= 0; index -= 1) {
