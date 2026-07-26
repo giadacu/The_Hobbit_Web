@@ -12,7 +12,7 @@ window.HOBBIT_DATA = {
       "id": "dreary",
       "name": "Dreary",
       "description": "You are in a gloomy empty land with dreary hills ahead. Shadows cling to the barren earth, where withered grass and ancient stones lie scattered. The hills rise ominously, their somber peaks shrouded in mist, whispering secrets of old. The air is heavy with forgotten tales, and a pervasive melancholy hangs over the desolate landscape.",
-      "image": "Dreary.jpeg",
+      "image": "dreary.png",
       "transformedImage": null,
       "sound": "relaxed"
     },
@@ -28,7 +28,7 @@ window.HOBBIT_DATA = {
       "id": "hidden_path",
       "name": "Hidden Path",
       "description": "You are in a hidden path with trolls' footprints. The narrow trail winds through dense, ancient forest. The ground is soft and mossy, marked by deep, unmistakable imprints. Vines and roots intertwine overhead, creating natural arches. The air is thick with the scent of damp foliage, whispering tales of the lumbering giants that once roamed here.",
-      "image": "hidden_path.jpeg",
+      "image": "hidden_path.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -52,7 +52,7 @@ window.HOBBIT_DATA = {
       "id": "misty_mountain",
       "name": "Misty Mountain",
       "description": "You are on a hard dangerous path in the Misty Mountains. The trail is narrow and treacherous, winding along sheer cliffs and through dark, foreboding ravines. Jagged rocks and loose gravel make every step perilous. The air is cold and thin, filled with swirling mists that obscure your vision. Echoes of distant, ominous sounds create an atmosphere of constant tension and unease. Each breath is a struggle, each step a challenge as you navigate this harsh, unforgiving terrain.",
-      "image": "misty_mountain.jpeg",
+      "image": "misty_mountain.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -60,7 +60,7 @@ window.HOBBIT_DATA = {
       "id": "narrow_path_1",
       "name": "Narrow Path 1",
       "description": "You are on a narrow path. The trail twists and turns, revealing hidden crevices and small caves that offer brief shelter from the relentless wind. In these moments of reprieve, you can hear the distant echoes of the mountain, a symphony of natural sounds that speak of solitude and grandeur.",
-      "image": "narrow_path_1.jpeg",
+      "image": "narrow_path_1.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -68,7 +68,7 @@ window.HOBBIT_DATA = {
       "id": "narrow_path_2",
       "name": "Narrow Path 2",
       "description": "The narrow path resumes its climb, now a narrow, winding trail that skirts the edge of sheer cliffs and traverses steep, rocky inclines. Each step requires careful footing, the loose gravel and sharp stones adding to the challenge.",
-      "image": "narrow_path_2.jpeg",
+      "image": "narrow_path_2.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -76,7 +76,7 @@ window.HOBBIT_DATA = {
       "id": "narrow_path_3",
       "name": "Narrow Path 3",
       "description": "You are on a narrow path. The rugged terrain stretches out around you, a stark contrast to the lush forest and tranquil lake far below. The wind is a constant, fierce presence, carrying the chill of high altitudes and the scent of untouched wilderness.",
-      "image": "narrow_path_3.jpeg",
+      "image": "narrow_path_3.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -84,7 +84,7 @@ window.HOBBIT_DATA = {
       "id": "narrow_path_4",
       "name": "Narrow Path 4",
       "description": "You are on a narrow path. The barren mountain stands as a testament to the enduring strength of nature, a place where the earth's bones are laid bare and the spirit of adventure thrives.",
-      "image": "narrow_path_4.jpeg",
+      "image": "narrow_path_4.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -92,7 +92,7 @@ window.HOBBIT_DATA = {
       "id": "narrow_path_5",
       "name": "Narrow Path 5",
       "description": "You are on a narrow path. The view here is breathtaking, vast expanses of rocky crags and sheer cliffs, with the valley spread out far below. The wind howls around you, a constant reminder of the mountain's raw power.",
-      "image": "narrow_path_5.jpeg",
+      "image": "narrow_path_5.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -100,7 +100,7 @@ window.HOBBIT_DATA = {
       "id": "steep_path_6",
       "name": "Steep Path 6",
       "description": "The path is now a rugged trail, etched into the mountainside and flanked by steep drops that plunge into shadowy ravines. The mountain's peak, shrouded in mist, seems both daunting and enticing, a silent sentinel watching over the world below.",
-      "image": "steep_path_1.jpeg",
+      "image": "steep_path_6.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -108,7 +108,7 @@ window.HOBBIT_DATA = {
       "id": "steep_path_7",
       "name": "Steep Path 7",
       "description": "You are on a steep path that becomes narrower and more challenging, winding its way up the rocky slopes. The ground underfoot shifts from soft earth to uneven stone, and you must watch your step carefully. Jagged rocks jut out from the mountainside, creating natural obstacles that require careful navigation.",
-      "image": "steep_path_2.jpeg",
+      "image": "steep_path_7.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -116,7 +116,7 @@ window.HOBBIT_DATA = {
       "id": "steep_path_8",
       "name": "Steep Path 8",
       "description": "You are on a path that begins to climb more steeply, leading you towards the looming presence of the barren mountain. The trees thin out, replaced by hardy shrubs and patches of rugged grass clinging to the rocky terrain.",
-      "image": "steep_path_3.jpeg",
+      "image": "steep_path_8.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -124,7 +124,7 @@ window.HOBBIT_DATA = {
       "id": "deep_misty_valley_1",
       "name": "Deep Misty Valley 1",
       "description": "You are in a deep misty valley. Enigmatic shadows dance upon ancient stones, whispering tales of forgotten times. The air is thick with enchantment, and the echoes of long-lost voices resonate through the verdant gloom, casting a timeless spell upon all who wander through its mystical embrace.",
-      "image": "deep_misty_1.jpeg",
+      "image": "deep_misty_valley_1.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -132,7 +132,7 @@ window.HOBBIT_DATA = {
       "id": "deep_misty_valley_2",
       "name": "Deep Misty Valley 2",
       "description": "You are in a deep misty valley. Shadows shift beneath the dense canopy, whispering secrets of a bygone age. Enveloped in an ethereal haze, the valley pulses with a primordial magic, drawing wanderers into its enigmatic depths.",
-      "image": "deep_misty_2.jpeg",
+      "image": "deep_misty_valley_2.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -140,7 +140,7 @@ window.HOBBIT_DATA = {
       "id": "narrow_path_6",
       "name": "Narrow Path 6",
       "description": "You are on a narrow path. Winding through the heart of the ancient mountain, a narrow path threads its way like a silver ribbon. Flanked by towering trees whose gnarled roots grip the earth, the path is dappled with the gentle glow of filtered sunlight.",
-      "image": "narrow_path_6.jpeg",
+      "image": "narrow_path_6.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -148,7 +148,7 @@ window.HOBBIT_DATA = {
       "id": "narrow_path_7",
       "name": "Narrow Path 7",
       "description": "You are on a narrow path. Amidst the towering, ancient trees of Middle-earth, a narrow path winds like a silver thread. Enshrouded in mist and shadow, it weaves through dense thickets and moss-covered stones. The air is thick with the scent of pine and earth, and the whispers of forgotten tales seem to echo from the gnarled branches overhead.",
-      "image": "narrow_path_7.jpeg",
+      "image": "narrow_path_7.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -156,7 +156,7 @@ window.HOBBIT_DATA = {
       "id": "narrow_path_8",
       "name": "Narrow Path 8",
       "description": "You are on a narrow path. Occasionally, the path narrows further, forcing you to navigate around protruding roots and low-hanging branches.",
-      "image": "narrow_path_8.jpeg",
+      "image": "narrow_path_8.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -164,7 +164,7 @@ window.HOBBIT_DATA = {
       "id": "narrow_path_9",
       "name": "Narrow Path 9",
       "description": "You are on a narrow path. The path reveals a series of gentle curves and slight inclines, each turn offering new vistas of the enchanting landscape.",
-      "image": "narrow_path_9.jpeg",
+      "image": "narrow_path_9.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -172,7 +172,7 @@ window.HOBBIT_DATA = {
       "id": "narrow_path_10",
       "name": "Narrow Path 10",
       "description": "You are on a narrow path. The landscape is dotted with scattered boulders and patches of lichen, the only signs of life in this harsh environment. The path becomes a test of endurance, each step bringing you closer to the summit and further from the lush world you left behind.",
-      "image": "narrow_path_10.jpeg",
+      "image": "narrow_path_10.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -180,7 +180,7 @@ window.HOBBIT_DATA = {
       "id": "narrow_place",
       "name": "Narrow place",
       "description": "You are in a narrow place with a dreadful drop into a dim valley. The path clings precariously to the cliffside, barely wide enough to navigate. Below, the valley is shrouded in shadow, its depths obscured by swirling mists. The sheer drop is dizzying, and the wind howls around you, adding to the sense of peril. Jagged rocks and twisted roots jut out, ready to catch the unwary. A foreboding silence hangs over the valley, broken only by the distant calls of unseen creatures.",
-      "image": "ravine_1.jpeg",
+      "image": "narrow_place.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -188,7 +188,7 @@ window.HOBBIT_DATA = {
       "id": "large_dry_cave",
       "name": "Large Dry Cave",
       "description": "You are in a large dry cave. The vast cavern is illuminated by light filtering through ceiling cracks. Smooth, dry ground contrasts with the dampness outside. Stalactites and stalagmites stand like ancient sentinels. The air is cool and still, with a faint earthy scent. Echoes of distant drips resonate, creating an atmosphere of timeless solitude and mystery.",
-      "image": "large_dry_cave.jpeg",
+      "image": "large_dry_cave.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -196,7 +196,7 @@ window.HOBBIT_DATA = {
       "id": "goblins_dungeon",
       "name": "Goblins Dungeon",
       "description": "You are in a goblins dungeon. Dimly lit, with rugged stone walls covered in moss and vines stretching into shadows. Flickering torches cast eerie light on the damp floor, revealing scattered bones and rusted chains. Narrow tunnels branch off from a central chamber. The air is thick with mold and decay, with faint, ominous sounds echoing from deeper within.",
-      "image": "goblins_dungeon.jpeg",
+      "image": "goblins_dungeon.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -204,7 +204,7 @@ window.HOBBIT_DATA = {
       "id": "dark_winding_passage",
       "name": "Dark winding passage",
       "description": "You are in a dark winding passage. The narrow corridor twists and turns, with rugged stone walls covered in moss. Flickering torches cast eerie shadows on the damp floor, revealing scattered bones and rusted chains. The air is thick with the scent of mold and decay, with faint, ominous sounds echoing from deeper within the labyrinthine passageways.",
-      "image": "dark_winding.jpeg",
+      "image": "dark_winding_passage.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -212,7 +212,7 @@ window.HOBBIT_DATA = {
       "id": "big_cavern",
       "name": "Big Cavern",
       "description": "You are in a big cavern. The vast space is dimly lit by scattered torches, revealing towering stone pillars and stalactites hanging from the ceiling. The floor is uneven and littered with debris. Echoes of dripping water and distant, ominous sounds create an eerie atmosphere in the expansive, shadowy chamber. Moss and vines cover the rugged stone walls.",
-      "image": "big_cavern.jpeg",
+      "image": "big_cavern.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -220,7 +220,7 @@ window.HOBBIT_DATA = {
       "id": "dark_stuffy_passage_1",
       "name": "Dark Stuffy Passage 1",
       "description": "Dust hangs thick in this cramped black passage, and faint dripping echoes somewhere beyond the reach of your hands.",
-      "image": "dark_stuffy_1.jpeg",
+      "image": "dark_stuffy_passage_1.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -228,7 +228,7 @@ window.HOBBIT_DATA = {
       "id": "dark_stuffy_passage_2",
       "name": "Dark Stuffy Passage 2",
       "description": "The walls draw close here, damp and oppressive, until every breath feels heavier than the last.",
-      "image": "dark_stuffy_2.jpeg",
+      "image": "dark_stuffy_passage_2.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -236,7 +236,7 @@ window.HOBBIT_DATA = {
       "id": "dark_stuffy_passage_3",
       "name": "Dark Stuffy Passage 3",
       "description": "Darkness presses in on every side, and only the small betraying sound of your own footsteps disturbs it.",
-      "image": "dark_stuffy_3.jpeg",
+      "image": "dark_stuffy_passage_3.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -244,7 +244,7 @@ window.HOBBIT_DATA = {
       "id": "dark_stuffy_passage_4",
       "name": "Dark Stuffy Passage 4",
       "description": "A musty reek of mold clings to this tunnel, and the low roof gives the unpleasant sense of stooping toward you.",
-      "image": "dark_stuffy_4.jpeg",
+      "image": "dark_stuffy_passage_4.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -252,7 +252,7 @@ window.HOBBIT_DATA = {
       "id": "inside_goblins_gate",
       "name": "Inside goblin's gate",
       "description": "You are inside goblin's gate, in a damp pillared hall lit by sickly torchlight. Moss streaks the stone, a rough table holds bones and stolen trinkets, and a shadowy stair climbs upward into the goblins' deeper ways.",
-      "image": "inside_goblins_gate.jpeg",
+      "image": "inside_goblins_gate.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -260,7 +260,7 @@ window.HOBBIT_DATA = {
       "id": "dark_stuffy_passage_5",
       "name": "Dark Stuffy Passage 5",
       "description": "The air in this passage is stale and dead, carrying an old sour smell that seems unwilling to disperse.",
-      "image": "dark_stuffy_5.jpeg",
+      "image": "dark_stuffy_passage_5.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -268,7 +268,7 @@ window.HOBBIT_DATA = {
       "id": "dark_stuffy_passage_6",
       "name": "Dark Stuffy Passage 6",
       "description": "Shadows mass thickly in the cramped passage, and the narrow stone throws every small sound back at you.",
-      "image": "dark_stuffy_6.jpeg",
+      "image": "dark_stuffy_passage_6.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -276,7 +276,7 @@ window.HOBBIT_DATA = {
       "id": "dark_stuffy_passage_7",
       "name": "Dark Stuffy Passage 7",
       "description": "Rough cold stone hems you in here, close enough to touch on either side and too close for comfort.",
-      "image": "dark_stuffy_7.jpeg",
+      "image": "dark_stuffy_passage_7.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -284,7 +284,7 @@ window.HOBBIT_DATA = {
       "id": "dark_stuffy_passage_8",
       "name": "Dark Stuffy Passage 8",
       "description": "The air lies suffocatingly still, as though even the darkness had weight enough to bear down on you.",
-      "image": "dark_stuffy_8.jpeg",
+      "image": "dark_stuffy_passage_8.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -292,7 +292,7 @@ window.HOBBIT_DATA = {
       "id": "dark_stuffy_passage_9",
       "name": "Dark Stuffy Passage 9",
       "description": "A thick uneasy silence holds this passage, broken only now and then by some distant furtive scurrying.",
-      "image": "dark_stuffy_9.jpeg",
+      "image": "dark_stuffy_passage_9.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -300,7 +300,7 @@ window.HOBBIT_DATA = {
       "id": "dark_stuffy_passage_10",
       "name": "Dark Stuffy Passage 10",
       "description": "There is scarcely room to move freely here, and each careful step kicks fresh dust into the close air.",
-      "image": "dark_stuffy_10.jpeg",
+      "image": "dark_stuffy_passage_10.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -308,7 +308,7 @@ window.HOBBIT_DATA = {
       "id": "dark_stuffy_passage_11",
       "name": "Dark Stuffy Passage 11",
       "description": "No breath of air reaches this place, and the closeness of it makes breathing feel like work.",
-      "image": "dark_stuffy_11.jpeg",
+      "image": "dark_stuffy_passage_11.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -316,7 +316,7 @@ window.HOBBIT_DATA = {
       "id": "dark_stuffy_passage_12",
       "name": "Dark Stuffy Passage 12",
       "description": "The darkness here feels nearly solid, and the passage ahead seems longer than any honest tunnel ought to be.",
-      "image": "dark_stuffy_12.jpeg",
+      "image": "dark_stuffy_passage_12.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -324,7 +324,7 @@ window.HOBBIT_DATA = {
       "id": "dark_stuffy_passage_13",
       "name": "Dark Stuffy Passage 13",
       "description": "Heat sits heavily in this black passage, turning every breath thick and unpleasantly warm.",
-      "image": "dark_stuffy_13.jpeg",
+      "image": "dark_stuffy_passage_13.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -332,7 +332,7 @@ window.HOBBIT_DATA = {
       "id": "deep_dark_lake",
       "name": "Deep Dark Lake",
       "description": "You are in a deep dark lake. The narrow path weaves through ancient, towering stones, their surfaces etched with cryptic runes and cloaked in creeping ivy. Dim, flickering torches cast long, wavering shadows, hinting at secrets long forgotten. The air is thick with the scent of earth and time, while distant whispers and the faint drip of water echo through the oppressive darkness, evoking a sense of timeless, foreboding mystery.",
-      "image": "dark_deep_lake.jpeg",
+      "image": "deep_dark_lake.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -340,7 +340,7 @@ window.HOBBIT_DATA = {
       "id": "dark_stuffy_passage_14",
       "name": "Dark Stuffy Passage 14",
       "description": "The passage smells of damp rot and old wood, a stale breath that only deepens the unease of the place.",
-      "image": "dark_stuffy_14.jpeg",
+      "image": "dark_stuffy_passage_14.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -348,7 +348,7 @@ window.HOBBIT_DATA = {
       "id": "dark_stuffy_passage_15",
       "name": "Dark Stuffy Passage 15",
       "description": "The narrow confines make your own heartbeat sound louder than it should, as though the dark were listening back.",
-      "image": "dark_stuffy_15.jpeg",
+      "image": "dark_stuffy_passage_15.png",
       "transformedImage": null,
       "sound": "suspence"
     },
@@ -356,7 +356,7 @@ window.HOBBIT_DATA = {
       "id": "narrow_dangerous_path",
       "name": "Narrow dangerous path",
       "description": "You are on a narrow dangerous path. The treacherous trail clings to the side of a sheer cliff, with loose gravel underfoot threatening your every step. Jagged rocks jut out from the cliff face, and below, a dizzying drop into shadowy depths. A cold wind howls through the crags, carrying with it the scent of pine and the distant roar of a hidden waterfall. Faint, eerie sounds seem to emanate from the rocks themselves, filling the air with an ancient, unsettling presence.",
-      "image": "ravine_2.jpeg",
+      "image": "narrow_dangerous_path.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -364,7 +364,7 @@ window.HOBBIT_DATA = {
       "id": "beorns_house",
       "name": "Beorns House",
       "description": "You are in Beorn's house. The great wooden hall is spacious, filled with the scent of honey and fresh bread. Massive beams support the high ceiling, and the walls are adorned with tapestries depicting wild landscapes and fierce creatures. A large hearth crackles warmly, casting a golden glow on the rustic furnishings. Simple yet sturdy wooden tables and chairs fill the room, while animal skins and fur rugs add to the cozy, natural atmosphere. The air is alive with the sounds of the forest outside, blending harmoniously with the soft hum of bees and the gentle rustle of leaves.",
-      "image": "Beorns.jpeg",
+      "image": "beorns_house.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -372,7 +372,7 @@ window.HOBBIT_DATA = {
       "id": "outside_goblins_gate",
       "name": "Outside goblin's gate",
       "description": "You are outside goblin's gate, where a blackened arch of iron and stone closes the mouth of the tunnels. Green torches burn with an unhealthy light, cruel spikes and old trophies mark the goblins' dominion, and the rock face above seems to lean outward as though listening.",
-      "image": "goblins_gate.jpeg",
+      "image": "outside_goblins_gate.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -388,7 +388,7 @@ window.HOBBIT_DATA = {
       "id": "great_river",
       "name": "Great river",
       "description": "You are at the Great River. The river flows swiftly, its wide waters glistening under the sun. Flanked by lush forests and rolling hills, it winds majestically through Middle-earth. The river's current is strong, carrying whispers of ancient lore. Birds soar above, while its banks teem with vibrant life, a vital artery of the land.",
-      "image": "great_river.jpeg",
+      "image": "great_river.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -396,7 +396,7 @@ window.HOBBIT_DATA = {
       "id": "mountains",
       "name": "Mountains",
       "description": "You are at the mountains. They rise majestically, their snow-capped peaks piercing the sky. Rugged and imposing, they stand as ancient sentinels, shrouded in mist and mystery. Deep valleys and hidden passes wind through their craggy terrain, while cascading waterfalls and alpine meadows add splashes of life and color to their austere beauty.",
-      "image": "mountains.jpeg",
+      "image": "mountains.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -404,7 +404,7 @@ window.HOBBIT_DATA = {
       "id": "forest_river",
       "name": "Forest river",
       "description": "You are at forest river. The river winds gracefully through the dense woodland, its clear waters sparkling in the dappled sunlight. Overhung by ancient trees, its banks are lush with ferns and wildflowers. The gentle sound of flowing water harmonizes with the songs of birds, creating a serene and enchanting atmosphere deep within the forest.",
-      "image": "forest_river.jpeg",
+      "image": "forest_river.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -428,7 +428,7 @@ window.HOBBIT_DATA = {
       "id": "forest",
       "name": "Forest",
       "description": "You are in a forest, a realm of towering trees and dappled light, where the air is rich with the scent of pine and earth. Birds sing melodiously, and the underbrush is alive with the rustle of unseen creatures. Sunbeams filter through the canopy, casting a serene glow on the lush, green floor.",
-      "image": "forest.jpeg",
+      "image": "forest.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -436,7 +436,7 @@ window.HOBBIT_DATA = {
       "id": "waterfall",
       "name": "Waterfall",
       "description": "You are at the waterfall. The waterfall cascades down in a thunderous rush, its waters sparkling in the sunlight. Mist rises from the base, creating rainbows in the air. Surrounded by lush greenery and moss-covered rocks, the waterfall's roar is a symphony of nature, its beauty both powerful and serene.",
-      "image": "waterfall.jpeg",
+      "image": "waterfall.png",
       "transformedImage": null,
       "sound": "adventure"
     },
@@ -444,7 +444,7 @@ window.HOBBIT_DATA = {
       "id": "running_river",
       "name": "Running River",
       "description": "You are at a running river. The river flows swiftly, its clear waters shimmering under the sunlight. The sound of the rushing current fills the air, harmonizing with the rustle of leaves. Flanked by lush banks of ferns and wildflowers, the river winds its way through the landscape, a lively artery of natural beauty and tranquility.",
-      "image": "running_river.jpeg",
+      "image": "running_river.png",
       "transformedImage": null,
       "sound": "adventure"
     },

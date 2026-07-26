@@ -50,7 +50,7 @@ function bootGame() {
     "scene-compass-south-east", "scene-compass-south", "scene-compass-south-west",
     "scene-compass-west", "scene-compass-north-west", "scene-compass-up", "scene-compass-down",
     "music-player", "inventory-list", "inventory-status", "exits-list", "people-list",
-    "layout-switch", "layout-divider", "layout-mode-1", "layout-mode-2", "save-panel",
+    "layout-switch", "layout-divider", "layout-mode-1", "layout-mode-2", "layout-fullscreen", "save-panel",
     "save-panel-backdrop", "save-panel-close", "save-panel-title", "save-panel-latest-autosave",
     "save-panel-autosave-list", "mobile-scene-handle",
   ]) elements.set(id, makeElement(id));

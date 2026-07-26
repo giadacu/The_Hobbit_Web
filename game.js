@@ -163,6 +163,7 @@
   const layoutDivider = $("layout-divider");
   const layoutMode1Button = $("layout-mode-1");
   const layoutMode2Button = $("layout-mode-2");
+  const layoutFullscreenButton = $("layout-fullscreen");
   const savePanel = $("save-panel");
   const savePanelBackdrop = $("save-panel-backdrop");
   const savePanelClose = $("save-panel-close");
@@ -8232,6 +8233,103 @@
       this.syncMobileSceneDrawer();
     }
 
+    fullscreenElement() {
+      return document.fullscreenElement
+        || document.webkitFullscreenElement
+        || document.msFullscreenElement
+        || null;
+    }
+
+    fullscreenSupported() {
+      const root = document.documentElement;
+      if (!root) return false;
+      return Boolean(
+        root.requestFullscreen
+        || root.webkitRequestFullscreen
+        || root.webkitRequestFullScreen
+        || root.msRequestFullscreen
+      );
+    }
+
+    isFullscreenActive() {
+      return Boolean(this.fullscreenElement());
+    }
+
+    async enterFullscreen() {
+      const root = document.documentElement;
+      if (!root) return false;
+      try {
+        if (typeof root.requestFullscreen === "function") {
+          try {
+            await root.requestFullscreen({ navigationUI: "hide" });
+          } catch (_) {
+            await root.requestFullscreen();
+          }
+          return true;
+        }
+        if (typeof root.webkitRequestFullscreen === "function") {
+          root.webkitRequestFullscreen();
+          return true;
+        }
+        if (typeof root.webkitRequestFullScreen === "function") {
+          root.webkitRequestFullScreen();
+          return true;
+        }
+        if (typeof root.msRequestFullscreen === "function") {
+          root.msRequestFullscreen();
+          return true;
+        }
+      } catch (_) {
+        return false;
+      }
+      return false;
+    }
+
+    async exitFullscreen() {
+      try {
+        if (typeof document.exitFullscreen === "function" && this.fullscreenElement()) {
+          await document.exitFullscreen();
+          return true;
+        }
+        if (typeof document.webkitExitFullscreen === "function" && this.fullscreenElement()) {
+          document.webkitExitFullscreen();
+          return true;
+        }
+        if (typeof document.webkitCancelFullScreen === "function" && this.fullscreenElement()) {
+          document.webkitCancelFullScreen();
+          return true;
+        }
+        if (typeof document.msExitFullscreen === "function" && this.fullscreenElement()) {
+          document.msExitFullscreen();
+          return true;
+        }
+      } catch (_) {
+        return false;
+      }
+      return false;
+    }
+
+    async toggleFullscreen() {
+      if (this.isFullscreenActive()) return this.exitFullscreen();
+      return this.enterFullscreen();
+    }
+
+    syncFullscreenButton() {
+      const button = layoutFullscreenButton;
+      if (!button) return;
+      const supported = this.fullscreenSupported();
+      button.hidden = !supported;
+      if (!supported) return;
+      const active = this.isFullscreenActive();
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+      button.setAttribute("aria-label", active ? "Exit fullscreen" : "Enter fullscreen");
+      button.title = active ? "Exit fullscreen" : "Fullscreen";
+      const enterIcon = button.querySelector(".layout-switch__fullscreen-icon--enter");
+      const exitIcon = button.querySelector(".layout-switch__fullscreen-icon--exit");
+      if (enterIcon) enterIcon.hidden = active;
+      if (exitIcon) exitIcon.hidden = !active;
+    }
+
     setLayoutMode(mode) {
       this.applyLayoutMode(mode);
       localStorage.setItem(LAYOUT_PREF_KEY, this.game.layoutModePreference);
@@ -12757,6 +12855,16 @@
       };
       bindLayoutButton(layoutMode1Button, "1");
       bindLayoutButton(layoutMode2Button, "2");
+      if (layoutFullscreenButton) {
+        layoutFullscreenButton.addEventListener("click", () => {
+          this.layout.toggleFullscreen().finally(() => this.layout.syncFullscreenButton());
+        });
+        const syncFullscreen = () => this.layout.syncFullscreenButton();
+        document.addEventListener("fullscreenchange", syncFullscreen);
+        document.addEventListener("webkitfullscreenchange", syncFullscreen);
+        document.addEventListener("MSFullscreenChange", syncFullscreen);
+        this.layout.syncFullscreenButton();
+      }
       sceneMapBack?.addEventListener("click", () => this.layout.sceneMapBack());
       sceneMapZoomOut?.addEventListener("click", () => this.layout.adjustSceneMapZoom(-SCENE_MAP_ZOOM_STEP));
       sceneMapZoomReset?.addEventListener("click", () => this.layout.resetSceneMapZoom());

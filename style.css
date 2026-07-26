@@ -120,6 +120,30 @@ input {
   border-color: var(--accent);
 }
 
+.layout-switch__fullscreen {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+}
+
+.layout-switch__fullscreen[hidden] {
+  display: none !important;
+}
+
+.layout-switch__fullscreen-icon {
+  display: inline-flex;
+  line-height: 0;
+}
+
+.layout-switch__fullscreen-icon[hidden] {
+  display: none !important;
+}
+
+.layout-switch__fullscreen-icon svg {
+  display: block;
+}
+
 @media (hover: none), (pointer: coarse) {
   .layout-switch--auto-hide {
     opacity: 1;

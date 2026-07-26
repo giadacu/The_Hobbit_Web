@@ -32,6 +32,18 @@
       <div class="layout-switch__buttons" role="group" aria-label="Choose layout">
         <button id="layout-mode-1" type="button">1</button>
         <button id="layout-mode-2" type="button">2</button>
+        <button id="layout-fullscreen" type="button" class="layout-switch__fullscreen" aria-pressed="false" aria-label="Enter fullscreen" title="Fullscreen" hidden>
+          <span class="layout-switch__fullscreen-icon layout-switch__fullscreen-icon--enter" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16" focusable="false">
+              <path fill="currentColor" d="M7 3H3v4h2V5h2V3zm14 0h-4v2h2v2h2V3zM5 17H3v4h4v-2H5v-2zm16 0h-2v2h-2v2h4v-4z"/>
+            </svg>
+          </span>
+          <span class="layout-switch__fullscreen-icon layout-switch__fullscreen-icon--exit" aria-hidden="true" hidden>
+            <svg viewBox="0 0 24 24" width="16" height="16" focusable="false">
+              <path fill="currentColor" d="M9 3H7v4H3v2h6V3zm8 0h-2v6h6V7h-4V3zM9 15H3v2h4v4h2v-6zm12 0h-6v6h2v-4h4v-2z"/>
+            </svg>
+          </span>
+        </button>
       </div>
     </div>
     <main id="game-shell" class="game-shell">

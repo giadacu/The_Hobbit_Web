@@ -91,6 +91,7 @@ function bootSplitter() {
     "layout-divider",
     "layout-mode-1",
     "layout-mode-2",
+    "layout-fullscreen",
     "save-panel",
     "save-panel-backdrop",
     "save-panel-close",

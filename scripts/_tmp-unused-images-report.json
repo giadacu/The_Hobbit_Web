@@ -1,0 +1,314 @@
+{
+  "deleteCount": 73,
+  "deleteMB": 44.18,
+  "delete": [
+    {
+      "file": "_tmp_a.png",
+      "reason": "temp/old artifact"
+    },
+    {
+      "file": "_tmp_b.png",
+      "reason": "temp/old artifact"
+    },
+    {
+      "file": "_tmp_c.png",
+      "reason": "temp/old artifact"
+    },
+    {
+      "file": "_tmp_diffmask_mask.png",
+      "reason": "temp/old artifact"
+    },
+    {
+      "file": "_tmp_diffmask.png",
+      "reason": "temp/old artifact"
+    },
+    {
+      "file": "Beorns.jpeg",
+      "reason": "replaced by beorns_house.png"
+    },
+    {
+      "file": "Beorns1.jpeg",
+      "reason": "unused duplicate variant"
+    },
+    {
+      "file": "big_cavern.jpeg",
+      "reason": "replaced by big_cavern.png"
+    },
+    {
+      "file": "dark_deep_lake.jpeg",
+      "reason": "replaced by deep_dark_lake.png"
+    },
+    {
+      "file": "dark_stuffy_1.jpeg",
+      "reason": "replaced by dark_stuffy_passage_1.png"
+    },
+    {
+      "file": "dark_stuffy_10.jpeg",
+      "reason": "replaced by dark_stuffy_passage_10.png"
+    },
+    {
+      "file": "dark_stuffy_11.jpeg",
+      "reason": "replaced by dark_stuffy_passage_11.png"
+    },
+    {
+      "file": "dark_stuffy_12.jpeg",
+      "reason": "replaced by dark_stuffy_passage_12.png"
+    },
+    {
+      "file": "dark_stuffy_13.jpeg",
+      "reason": "replaced by dark_stuffy_passage_13.png"
+    },
+    {
+      "file": "dark_stuffy_14.jpeg",
+      "reason": "replaced by dark_stuffy_passage_14.png"
+    },
+    {
+      "file": "dark_stuffy_15.jpeg",
+      "reason": "replaced by dark_stuffy_passage_15.png"
+    },
+    {
+      "file": "dark_stuffy_2.jpeg",
+      "reason": "replaced by dark_stuffy_passage_2.png"
+    },
+    {
+      "file": "dark_stuffy_3.jpeg",
+      "reason": "replaced by dark_stuffy_passage_3.png"
+    },
+    {
+      "file": "dark_stuffy_4.jpeg",
+      "reason": "replaced by dark_stuffy_passage_4.png"
+    },
+    {
+      "file": "dark_stuffy_5.jpeg",
+      "reason": "replaced by dark_stuffy_passage_5.png"
+    },
+    {
+      "file": "dark_stuffy_6.jpeg",
+      "reason": "replaced by dark_stuffy_passage_6.png"
+    },
+    {
+      "file": "dark_stuffy_7.jpeg",
+      "reason": "replaced by dark_stuffy_passage_7.png"
+    },
+    {
+      "file": "dark_stuffy_8.jpeg",
+      "reason": "replaced by dark_stuffy_passage_8.png"
+    },
+    {
+      "file": "dark_stuffy_9.jpeg",
+      "reason": "replaced by dark_stuffy_passage_9.png"
+    },
+    {
+      "file": "dark_winding.jpeg",
+      "reason": "replaced by dark_winding_passage.png"
+    },
+    {
+      "file": "deep_misty_1.jpeg",
+      "reason": "replaced by deep_misty_valley_1.png"
+    },
+    {
+      "file": "deep_misty_2.jpeg",
+      "reason": "replaced by deep_misty_valley_2.png"
+    },
+    {
+      "file": "dragon_old.jpeg",
+      "reason": "temp/old artifact"
+    },
+    {
+      "file": "Dreary.jpeg",
+      "reason": "replaced by dreary.png"
+    },
+    {
+      "file": "elvenkings.png",
+      "reason": "replaced by elvenkings_halls.png"
+    },
+    {
+      "file": "forest_river.jpeg",
+      "reason": "replaced by forest_river.png"
+    },
+    {
+      "file": "forest.jpeg",
+      "reason": "replaced by forest.png"
+    },
+    {
+      "file": "Gandalf_glimpse_bag_end_start.png",
+      "reason": "old bag-end art"
+    },
+    {
+      "file": "Gate_Lonely_Mountain.jpeg",
+      "reason": "replaced by front_gate.png"
+    },
+    {
+      "file": "goblins_dungeon.jpeg",
+      "reason": "replaced by goblins_dungeon.png"
+    },
+    {
+      "file": "goblins_gate.jpeg",
+      "reason": "replaced by outside_goblins_gate.png"
+    },
+    {
+      "file": "great_river.jpeg",
+      "reason": "replaced by great_river.png"
+    },
+    {
+      "file": "hidden_path.jpeg",
+      "reason": "replaced by hidden_path.png"
+    },
+    {
+      "file": "hobbit_hole1.jpeg",
+      "reason": "unused duplicate variant"
+    },
+    {
+      "file": "inside_goblins_gate.jpeg",
+      "reason": "replaced by inside_goblins_gate.png"
+    },
+    {
+      "file": "large_dry_cave.jpeg",
+      "reason": "replaced by large_dry_cave.png"
+    },
+    {
+      "file": "misty_mountain.jpeg",
+      "reason": "replaced by misty_mountain.png"
+    },
+    {
+      "file": "mountains.jpeg",
+      "reason": "replaced by mountains.png"
+    },
+    {
+      "file": "narrow_path_1.jpeg",
+      "reason": "replaced by narrow_path_1.png"
+    },
+    {
+      "file": "narrow_path_10.jpeg",
+      "reason": "replaced by narrow_path_10.png"
+    },
+    {
+      "file": "narrow_path_2.jpeg",
+      "reason": "replaced by narrow_path_2.png"
+    },
+    {
+      "file": "narrow_path_3.jpeg",
+      "reason": "replaced by narrow_path_3.png"
+    },
+    {
+      "file": "narrow_path_4.jpeg",
+      "reason": "replaced by narrow_path_4.png"
+    },
+    {
+      "file": "narrow_path_5.jpeg",
+      "reason": "replaced by narrow_path_5.png"
+    },
+    {
+      "file": "narrow_path_6.jpeg",
+      "reason": "replaced by narrow_path_6.png"
+    },
+    {
+      "file": "narrow_path_7.jpeg",
+      "reason": "replaced by narrow_path_7.png"
+    },
+    {
+      "file": "narrow_path_8.jpeg",
+      "reason": "replaced by narrow_path_8.png"
+    },
+    {
+      "file": "narrow_path_9.jpeg",
+      "reason": "replaced by narrow_path_9.png"
+    },
+    {
+      "file": "ravine_1.jpeg",
+      "reason": "replaced by narrow_place.png"
+    },
+    {
+      "file": "ravine_2.jpeg",
+      "reason": "replaced by narrow_dangerous_path.png"
+    },
+    {
+      "file": "Rivendell.jpeg",
+      "reason": "replaced by rivendell.png"
+    },
+    {
+      "file": "running_river.jpeg",
+      "reason": "replaced by running_river.png"
+    },
+    {
+      "file": "separator4old.png",
+      "reason": "temp/old artifact"
+    },
+    {
+      "file": "separator5old.png",
+      "reason": "temp/old artifact"
+    },
+    {
+      "file": "steep_path_1.jpeg",
+      "reason": "replaced by steep_path_6.png"
+    },
+    {
+      "file": "steep_path_2.jpeg",
+      "reason": "replaced by steep_path_7.png"
+    },
+    {
+      "file": "steep_path_3.jpeg",
+      "reason": "replaced by steep_path_8.png"
+    },
+    {
+      "file": "treeless_opening_open_ground.jpeg",
+      "reason": "replaced by treeless_opening_open_ground.png"
+    },
+    {
+      "file": "treeless_opening_warg_ground.jpeg",
+      "reason": "superseded same stem"
+    },
+    {
+      "file": "treeless_opening_warg_trees.jpeg",
+      "reason": "superseded same stem"
+    },
+    {
+      "file": "treeless_opening.jpeg",
+      "reason": "replaced by treeless_opening_open_ground.png"
+    },
+    {
+      "file": "trolls_cave.jpeg",
+      "reason": "replaced by trolls_cave_loot.png"
+    },
+    {
+      "file": "trolls_stone_old.jpeg",
+      "reason": "temp/old artifact"
+    },
+    {
+      "file": "unexpected_party_first_knock_garden.png",
+      "reason": "old bag-end art"
+    },
+    {
+      "file": "unexpected_party_first_knock.png",
+      "reason": "old bag-end art"
+    },
+    {
+      "file": "unexpected_party_thorin_at_door_garden.png",
+      "reason": "old bag-end art"
+    },
+    {
+      "file": "unexpected_party_thorin_at_door_hall.png",
+      "reason": "old bag-end art"
+    },
+    {
+      "file": "waterfall.jpeg",
+      "reason": "replaced by waterfall.png"
+    }
+  ],
+  "uncertain": [
+    "Dragon.jpeg",
+    "Hobbit_map.png",
+    "Separator3.png",
+    "The_end.jpeg",
+    "Trolls.jpeg",
+    "dreadful_drop.jpeg",
+    "map.jpeg",
+    "ravine_3.jpeg",
+    "ravine_4.jpeg",
+    "separator4.png",
+    "separator5.png",
+    "trolls_stone.jpeg",
+    "yellowtunnell.jpeg"
+  ],
+  "uncertainMB": 8.2
+}
