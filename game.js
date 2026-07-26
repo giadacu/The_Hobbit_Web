@@ -1613,6 +1613,16 @@
         image: "bag_end_guest_room_open_trunk.png",
       },
     ],
+    goblins_dungeon: [
+      {
+        when: ({ game }) => game.goblinHoldActive?.() && game.flags.goblin_hold_climbed,
+        image: "goblin_hold_bilbo_on_shoulders.png",
+      },
+      {
+        when: ({ game }) => game.goblinHoldActive?.(),
+        image: "goblin_hold_company_bound.png",
+      },
+    ],
     erebor_hidden_door: [
       {
         when: ({ game }) => game.flags.secretdoorsun && game.doorOpenByName("secret door"),
@@ -7059,7 +7069,10 @@
       if (greeting?.mode === "broadcast") return game.hello();
       if (greeting?.mode === "targeted") {
         const character = this.resolveCharacterTarget(greeting.targetName);
-        if (!character) return game.print(this.isolatedCompanionAppeal(greeting.targetName) || this.absentEncounteredCharacterMessage(greeting.targetName) || "You speak, but only silence meets your words.");
+        if (!character) {
+          if (game.handleGoblinHoldWatcherTalk?.(greeting.targetName)) return;
+          return game.print(this.isolatedCompanionAppeal(greeting.targetName) || this.absentEncounteredCharacterMessage(greeting.targetName) || "You speak, but only silence meets your words.");
+        }
         if (character.friendly === false) return this.respondToTalk(character);
         if (game.unexpectedParty?.blocksDirectInteraction(character, "talk")) return;
         this.rememberConversationCharacter(character);
@@ -7073,7 +7086,10 @@
         return game.print(`You could speak to ${joinNames(visiblePeople.map((character) => displayCharacterName(character)))}.`);
       }
       const character = this.resolveCharacterTarget(parsed.characterName);
-      if (!character) return game.print(this.isolatedCompanionAppeal(parsed.characterName) || this.absentEncounteredCharacterMessage(parsed.characterName) || "You speak, but only silence meets your words.");
+      if (!character) {
+        if (game.handleGoblinHoldWatcherTalk?.(parsed.characterName)) return;
+        return game.print(this.isolatedCompanionAppeal(parsed.characterName) || this.absentEncounteredCharacterMessage(parsed.characterName) || "You speak, but only silence meets your words.");
+      }
       if (character.friendly === false) return this.respondToTalk(character);
       if (game.speechBlockedByInvisibility(character, parsed.order)) return game.print(`${sentenceDisplayCharacterName(character)} says 'who's talking?'`);
       if (game.unexpectedParty?.blocksDirectInteraction(character, parsed.order ? "order" : "talk")) return;
@@ -10656,6 +10672,14 @@
       return false;
     }
 
+    autoplayInGoblinTunnelChapter() {
+      const game = this.game;
+      if (game.flags.goblin_capture_freed || game.flags.goblin_capture_seen) return true;
+      if (IMMERSION_GOBLIN_ROOMS.has(game.currentRoom)) return true;
+      if (/^dark_stuffy_passage_\d+$/.test(game.currentRoom || "")) return true;
+      return Boolean(game.visitedRooms?.has("dark_winding_passage") || game.visitedRooms?.has("deep_dark_lake"));
+    }
+
     nextAutoplayCommand() {
       const game = this.game;
       const beforeDragonDefeat = !game.flags.dragondefeated;
@@ -10727,6 +10751,19 @@
         return "cut rope";
       }
 
+      // After the goblin-hold escape (or while still in the tunnel chapter), do not
+      // backtrack to Bag End for early loot; push on toward the lake and the ring.
+      if (beforeDragonDefeat && this.autoplayInGoblinTunnelChapter()) {
+        if (this.autoplayShouldLightLantern()) return "light lantern";
+        if (!this.autoplayHas("golden ring")) {
+          if (game.currentRoom === "deep_dark_lake") {
+            // fall through to the lake-specific handling below
+          } else {
+            return this.autoplayRouteCommandTo("deep_dark_lake");
+          }
+        }
+      }
+
       if (game.currentRoom === "lower_halls" && game.liveDragon()) {
         if (!game.smaugWeakSpotKnown() && game.player.noticeable !== false && this.autoplayHas("golden ring")) {
           return "wear ring";
@@ -10746,7 +10783,7 @@
         }
       }
 
-      if (beforeDragonDefeat && !this.autoplayHas("firestone")) {
+      if (beforeDragonDefeat && !this.autoplayHas("firestone") && !this.autoplayInGoblinTunnelChapter()) {
         if (game.currentRoom !== "bag_end_guest_room") return this.autoplayRouteCommandTo("bag_end_guest_room");
         const guestTrunk = game.items.guest_room_trunk;
         const ornateBox = game.items.ornate_box;
@@ -10758,7 +10795,7 @@
         return "take firestone";
       }
 
-      if (beforeDragonDefeat && !this.autoplayHas("sturdy key")) {
+      if (beforeDragonDefeat && !this.autoplayHas("sturdy key") && !this.autoplayInGoblinTunnelChapter()) {
         if (game.currentRoom !== "hobbit_hole") return this.autoplayRouteCommandTo("hobbit_hole");
         const bottomDrawer = game.items.bottom_drawer;
         if (bottomDrawer && !bottomDrawer.open) return "open bottom drawer";
@@ -10766,7 +10803,7 @@
         return "take sturdy key";
       }
 
-      if (beforeDragonDefeat && !this.autoplayHas("brass lantern")) {
+      if (beforeDragonDefeat && !this.autoplayHas("brass lantern") && !this.autoplayInGoblinTunnelChapter()) {
         if (game.currentRoom !== "bilbos_garden") return this.autoplayRouteCommandTo("bilbos_garden");
         const shed = game.items.garden_shed;
         if (shed?.locked) return "unlock garden shed";
@@ -10777,7 +10814,7 @@
 
       if (beforeDragonDefeat && this.autoplayShouldLightLantern()) return "light lantern";
 
-      if (beforeDragonDefeat && !game.flags.seenpony) {
+      if (beforeDragonDefeat && !game.flags.seenpony && !this.autoplayInGoblinTunnelChapter()) {
         if (!game.bagEndQuestHasBegun()) return "wait";
         const thorin = Object.values(game.characters).find((character) => matches(character.name, "thorin"));
         if (game.currentRoom !== "green_dragon_inn") return this.autoplayRouteCommandTo("green_dragon_inn");
@@ -10785,7 +10822,7 @@
         return this.autoplayDirectedCharacterCommand("thorin", "say to thorin \"look through window\"");
       }
 
-      if (beforeDragonDefeat && !game.visitedRooms.has("dreary") && game.currentRoom !== "dreary") {
+      if (beforeDragonDefeat && !game.visitedRooms.has("dreary") && game.currentRoom !== "dreary" && !this.autoplayInGoblinTunnelChapter()) {
         if (game.currentRoom !== "green_dragon_inn_outside") return this.autoplayRouteCommandTo("green_dragon_inn_outside");
         if (game.flags.ponybranchperched) return game.flags.ponyready ? "jump" : "wait";
         if (game.flags.ponydeparturepending) return "east";
@@ -10793,14 +10830,14 @@
         return "climb branch";
       }
 
-      if (beforeDragonDefeat && !this.autoplayHas("large key") && !game.flags.largekeyspent) {
+      if (beforeDragonDefeat && !this.autoplayHas("large key") && !game.flags.largekeyspent && !this.autoplayInGoblinTunnelChapter()) {
         if (!game.visitedTrollsClearing) return this.autoplayRouteCommandTo("trolls_clearing");
         if (game.currentRoom !== "trolls_clearing") return this.autoplayRouteCommandTo("trolls_clearing");
         if (!game.trollsTransformed) return "carefully take large key and south west";
         return "take large key";
       }
 
-      if (beforeDragonDefeat && !this.autoplayHas("majestic sword")) {
+      if (beforeDragonDefeat && !this.autoplayHas("majestic sword") && !this.autoplayInGoblinTunnelChapter()) {
         if (game.currentRoom !== "trolls_cave") return this.autoplayRouteCommandTo("trolls_cave");
         const chest = game.items.arcane_chest;
         if (!chest.visible) return game.hasActiveLantern() ? "examine discarded armor" : "carefully examine discarded armor";
@@ -10811,20 +10848,20 @@
         return "take sword";
       }
 
-      if (beforeDragonDefeat && !this.autoplayHas("sturdy rope")) {
+      if (beforeDragonDefeat && !this.autoplayHas("sturdy rope") && !this.autoplayInGoblinTunnelChapter()) {
         if (game.currentRoom !== "trolls_cave") return this.autoplayRouteCommandTo("trolls_cave");
         const prepRopeLoad = this.autoplayRequiredPickupPrepCommand("sturdy rope");
         if (prepRopeLoad) return prepRopeLoad;
         return "take rope";
       }
 
-      if (beforeDragonDefeat && !game.flags.mapread) {
+      if (beforeDragonDefeat && !game.flags.mapread && !this.autoplayInGoblinTunnelChapter()) {
         if (game.currentRoom !== "rivendell") return this.autoplayRouteCommandTo("rivendell");
         if (!game.flags.rivendell_progress_talk) return this.autoplayDirectedCharacterCommand("elrond", "talk to elrond");
         if (!game.flags.rivendell_progress_quest) return this.autoplayDirectedCharacterCommand("elrond", "ask elrond about journey");
       }
 
-      if (beforeDragonDefeat && game.rivendellPreparationsComplete() && !game.playerHasQuestMap()) {
+      if (beforeDragonDefeat && game.rivendellPreparationsComplete() && !game.playerHasQuestMap() && !this.autoplayInGoblinTunnelChapter()) {
         if (game.currentRoom !== "rivendell") return this.autoplayRouteCommandTo("rivendell");
         const mapHolder = game.findVisibleCharacterHolding("curious map")?.character;
         if (mapHolder) return `ask ${normalize(mapHolder.name)} for map`;
@@ -12083,6 +12120,9 @@
       const roomName = game.room().name;
       const adverb = game.splitter.lastAdverb;
       const normalizedObject = normalize(objectText);
+      if (["cut", "trim", "untie"].includes(verb) && game.goblinHoldActive?.()) {
+        if (game.handleGoblinHoldCutRope?.(objectText)) return true;
+      }
       if (game.currentRoom === "cellar") {
         if (verb === "throw" && /\bbarrel\b/.test(normalizedObject)) return game.handleCellarBarrelThrow(objectText);
         if ((verb === "jump" || verb === "climb") && /\bbarrel\b/.test(normalizedObject)) return game.handleCellarBarrelBoard(objectText);
@@ -13749,7 +13789,11 @@
       this.visitedRooms.add(this.currentRoom);
       this.revealLanternDiscoveries({ silent: true });
       if (this.roomIsDark()) {
-        this.print("It is pitch dark here. You cannot see the room, its exits, or anything else. You can only feel your way and move by guesswork.");
+        if (config.afterGoblinHoldEscape || this.temporaryImage?.file === "goblin_hold_gandalf_breaks_free.png") {
+          this.print("Gandalf's white flare dies behind you. The winding passage closes into ordinary dark, and for a moment you can only feel your way.");
+        } else {
+          this.print("It is pitch dark here. You cannot see the room, its exits, or anything else. You can only feel your way and move by guesswork.");
+        }
         if (config.initial) {
           this.print('Type "tips" for a hint, "commands" or "verbs" for recognized words, or "load" to open your safe moments.', "system");
         }
@@ -16111,6 +16155,7 @@
     }
 
     attack(command) {
+      if (this.handleGoblinHoldWatcherAttack?.(command)) return;
       const actor = this.player;
       const targetName = command.split(" with ")[0];
       const weaponName = command.includes(" with ") ? command.split(" with ").slice(1).join(" with ") : "";
@@ -18698,6 +18743,22 @@
       }
     }
 
+    clearGoblinHoldEscapeHostiles() {
+      let cleared = false;
+      for (const character of Object.values(this.characters)) {
+        if (!character || character.friendly !== false) continue;
+        if (!matches(character.name, "goblin")) continue;
+        if (!["dark_winding_passage", "goblins_dungeon"].includes(character.position)) continue;
+        character.attackFlag = 0;
+        character.justEntered = false;
+        character.hasMetPlayer = false;
+        // Drive them deeper into the tunnels so the flight from the hold is not an instant lethal meet.
+        character.position = "big_cavern";
+        cleared = true;
+      }
+      return cleared;
+    }
+
     resolveGoblinCapture() {
       if (!this.goblinCapturePending()) return false;
       const fromRoom = this.currentRoom;
@@ -18709,13 +18770,13 @@
       this.flags.goblin_hold_pressure = 0;
       this.recordAutosave("before being taken by the goblins", { key: "hazard:goblins:capture" });
       this.print("Out of the dark behind you pour goblins—more than can be counted in the first panic—waving bent swords and yellow teeth.", "danger");
+      this.showTemporaryImage("goblin_hold_company_seized.png", {
+        alt: "Goblins seize the company in the dark tunnels",
+      });
       this.print("The company is borne down in a shouting heap before blades can be drawn cleanly.");
       this.print("Rough hands bind and drag you, and the tunnels swallow the whole company like a throat.");
       this.relocateCompanyWithPlayer("goblins_dungeon", fromRoom);
       this.describeRoom();
-      this.showTemporaryImage("goblin_hold_company_bound.png", {
-        alt: "The company bound together by a prison-rope beneath the mountain",
-      });
       this.print("A single thick rope has been put about the whole company: it bites wrists and ankles alike, then runs up the pillar to an iron ring fixed high in the stone, where the knot sits well above a dwarf's bound reach.");
       this.print("Gandalf is watched too closely for wizardry, yet his eyes find yours as if a smaller hand might yet undo what strength cannot.");
       this.print("You will need a living step: get a companion to help you up—kneel, crouch, boost, or simply climb onto sturdy shoulders—then cut the rope at that high knot.");
@@ -18736,6 +18797,28 @@
         "rope", "prison rope", "prison-rope", "bond", "bonds", "binding", "bindings",
         "knot", "cord", "cords", "ring", "iron ring", "pillar rope",
       ]);
+    }
+
+    goblinHoldWatcherTarget(text = "") {
+      return matchesAny(normalize(text).replace(/^(?:the|a|an)\s+/, ""), [
+        "goblin", "goblins", "greater goblin", "great goblin", "watcher", "guard", "guards",
+      ]);
+    }
+
+    handleGoblinHoldWatcherAttack(command = "") {
+      if (!this.goblinHoldActive()) return false;
+      const targetName = normalize(String(command || "").split(" with ")[0] || "");
+      if (!this.goblinHoldWatcherTarget(targetName)) return false;
+      this.print("Your arms are bound with the rest. A stroke now would only bring the greater goblin's blade down on the whole company—free the prison-rope first.");
+      return true;
+    }
+
+    handleGoblinHoldWatcherTalk(name = "") {
+      if (!this.goblinHoldActive()) return false;
+      if (!this.goblinHoldWatcherTarget(name)) return false;
+      this.print("The greater goblin only snarls from the smoke. Words will not loosen the rope.");
+      this.advanceGoblinHoldPressure(1);
+      return true;
     }
 
     goblinHoldClimbTarget(text = "") {
@@ -18874,6 +18957,10 @@
         this.print("The hold is all smoke, stone, and that high iron ring. The living danger is the rope—and the goblins watching while it holds.");
         return true;
       }
+      if (this.goblinHoldWatcherTarget(text)) {
+        this.print("The greater goblin watches from the smoke—close enough to smell, too well attended for any open fight while the prison-rope holds.");
+        return true;
+      }
       return false;
     }
 
@@ -18952,7 +19039,13 @@
       this.print("The greater goblin tires of talk. Blades fall among the bound company before the rope can be undone.");
       this.endGame("The goblins butcher the company in their own hold while the prison-rope still holds.", {
         fatal: true,
-        deathImage: "bilbo_goblins_around_him_death.png",
+        deathImage: "goblin_hold_bound_butchered_death.png",
+      });
+      // Prefer the bound-hold death art; until it exists, keep the bound company image rather than the standing ambush death.
+      this.showEndgameSceneImage("goblin_hold_bound_butchered_death.png", {
+        fallback: "goblin_hold_company_bound.png",
+        alt: "The bound company butchered in the goblins' hold",
+        dismissOnNextCommand: false,
       });
       return true;
     }
@@ -18963,14 +19056,19 @@
       this.print("You saw at the greasy knot until the prison-rope parts with a sudden ugly snap.");
       this.print("Bonds spill slack about the company; dwarves surge up with a roar of released fury.");
       this.print("Then a white light bursts among the goblins, and Gandalf's voice cracks like a whip through the cavern.");
+      this.showTemporaryImage("goblin_hold_gandalf_breaks_free.png", {
+        alt: "Gandalf's light bursts as the company breaks free of the goblin hold",
+      });
       this.print("In the sudden uproar swords flash, goblins shriek, and the company is driven stumbling out of the hold into a dark winding passage before the whole place can close upon you again.");
       this.flags.goblin_capture_freed = true;
       this.flags.goblin_hold_pressure = 0;
       this.flags.goblin_hold_climbed = false;
       this.flags.goblin_hold_kneeling = false;
       if (helper) this.flags.goblin_hold_helper = helper.id;
+      this.clearGoblinHoldEscapeHostiles();
       this.relocateCompanyWithPlayer("dark_winding_passage", "goblins_dungeon");
-      this.describeRoom();
+      this.describeRoom({ afterGoblinHoldEscape: true });
+      this.print("The nearer watchers have been driven back by the tumult; for a moment the winding way ahead is clear of blades.");
       this.recordProgressAutosave(
         "autosave_milestone_goblin_capture_survived",
         "after escaping the goblins' hold",

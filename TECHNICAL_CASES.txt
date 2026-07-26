@@ -8965,10 +8965,12 @@ Resolution
    `dark_winding_passage`. Accepted phrasings include ask to kneel / crouch /
    boost / help me up, ask for help/boost/hand, or simply `climb on <companion>`
    (which auto-kneels then climbs in one step).
-3. Room prose names the company and the rope explicitly because the hold image
-   shows empty stone, not figures. Transient images fill that gap:
-   `goblin_hold_company_bound.png` on capture, `goblin_hold_bilbo_on_shoulders.png`
-   on successful climb.
+3. Room prose names the company and the rope explicitly because the base hold
+   image shows empty stone, not figures. Visual beat sequence:
+   - `goblin_hold_company_seized.png` temporary on ambush
+   - `goblin_hold_company_bound.png` contextual while held (after seize dismisses)
+   - `goblin_hold_bilbo_on_shoulders.png` temporary on climb + contextual while perched
+   - `goblin_hold_gandalf_breaks_free.png` temporary on cut-rope escape
 4. Gate with `goblin_capture_seen` / `goblin_capture_freed`; mark both in
    `debugMarkGoblinTunnelProgress()`.
 
@@ -8986,6 +8988,22 @@ Future debugging advice
   then cut rope; confirm a helper companion is actually in `goblins_dungeon`.
 - Bare `climb` is allowed while the hold is active (missing-object gate is
   bypassed); elsewhere it still asks "Climb where?".
+- The greater goblin is narrative-only (no character entity). Attack/talk/examine
+  of goblin/greater goblin must be intercepted in the hold, or the parser says
+  "no one named goblin here".
+- Hold-pressure death uses `goblin_hold_bound_butchered_death.png` (fallback
+  `goblin_hold_company_bound.png`), not the standing `bilbo_goblins_around_him_death.png`.
+- Escape into `dark_winding_passage` must clear/scatter the placed `horrible_goblin`
+  (and any other goblin hostiles in hold/winding). Otherwise lighting the lantern
+  after the lantern burns out during the hold becomes an instant lethal ambush.
+- `cut rope` while held must run before specialActions: a legacy `cut/rope/with/sword`
+  action matches when Bilbo carries a sword, then `specialActionUnavailable` looks up
+  portable "rope" and answers "You do not have the sturdy rope." (`cut knot` bypassed it).
+- After escape, `describeRoom({ afterGoblinHoldEscape: true })` avoids the stock
+  "pitch dark" line against the Gandalf-flare temporary image.
+- Autoplay in the goblin-tunnel chapter (`autoplayInGoblinTunnelChapter`) must not
+  backtrack to Bag End/trolls/Rivendell for early loot; light lantern then route to
+  `deep_dark_lake` for the ring.
 - If it fires after `jump gollum`/`jump beorn`, check
   `debugMarkGoblinTunnelProgress()` still sets both capture flags.
 

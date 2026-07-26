@@ -1,5 +1,5 @@
 window.IMAGE_MANIFEST = {
-  "generatedAt": "2026-07-26T10:51:46.296Z",
+  "generatedAt": "2026-07-26T11:36:10.053Z",
   "imageDir": "assets/local-images/",
   "rooms": {
     "hobbit_hole": "hobbit_hole.jpeg",
@@ -279,6 +279,8 @@ window.IMAGE_MANIFEST = {
     "bag_end_parlour_party": "bag_end_parlour_party.png",
     "bag_end_kitchen_party": "bag_end_kitchen_party.png",
     "bag_end_guest_room_open_trunk": "bag_end_guest_room_open_trunk.png",
+    "goblin_hold_bilbo_on_shoulders": "goblin_hold_bilbo_on_shoulders.png",
+    "goblin_hold_company_bound": "goblin_hold_company_bound.png",
     "erebor_narrow_open_door": "erebor_narrow_open_door.png",
     "erebor_narrow_revealed_door": "erebor_narrow_revealed_door.png",
     "mirkwood_enchanted_stream_temptation": "mirkwood_enchanted_stream_temptation.png",
