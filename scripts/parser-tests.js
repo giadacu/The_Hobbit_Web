@@ -8713,6 +8713,34 @@ const gameCases = [
     ],
   },
   {
+    name: "gollum lake glimpses show on reveal and first correct answer",
+    drive(game) {
+      game.execute("jump gollum");
+      game.flags.gollum_glimpse_reveal_seen = false;
+      game.flags.gollum_glimpse_riddle_seen = false;
+      game.gollumState.met = false;
+      game.clearTemporaryImage?.({ render: false });
+      game.execute("look");
+      game.print(`Reveal glimpse: ${game.temporaryImage?.file || "none"}`);
+      game.print(`Reveal flag: ${game.flags.gollum_glimpse_reveal_seen ? "yes" : "no"}`);
+      game.execute("ask gollum a riddle");
+      const riddle = game.currentGollumRiddle();
+      const answer = riddle?.answers?.[0] || "egg";
+      game.execute(`answer ${answer}`);
+      game.print(`Riddle glimpse: ${game.temporaryImage?.file || "none"}`);
+      game.print(`Riddle flag: ${game.flags.gollum_glimpse_riddle_seen ? "yes" : "no"}`);
+      game.execute(`answer ${game.currentGollumRiddle()?.answers?.[0] || "teeth"}`);
+      game.print(`Riddle glimpse repeats: ${game.flags.gollum_glimpse_riddle_seen ? "no-retrigger-ok" : "missing-flag"}`);
+    },
+    expectedIncluded: [
+      "Reveal glimpse: gollum_glimpse_lake_reveal.png",
+      "Reveal flag: yes",
+      "Riddle glimpse: gollum_glimpse_lake_riddle.png",
+      "Riddle flag: yes",
+      "Riddle glimpse repeats: no-retrigger-ok",
+    ],
+  },
+  {
     name: "jump gollum marks goblin capture as already resolved",
     drive(game) {
       game.execute("jump gollum");

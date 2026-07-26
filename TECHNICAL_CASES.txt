@@ -9007,3 +9007,38 @@ Future debugging advice
 - If it fires after `jump gollum`/`jump beorn`, check
   `debugMarkGoblinTunnelProgress()` still sets both capture flags.
 
+
+Case 189 - 2026-07-26 - Gollum lake glimpses during the riddle contest
+----------------------------------------------------------------------
+
+Symptom
+-------
+The Gollum encounter at `deep_dark_lake` had only room art and death images;
+unlike Bag End Gandalf glimpses, the riddle contest had no fleeting character
+beats.
+
+Resolution
+----------
+1. `showGollumLakeGlimpse("reveal"|"riddle")` uses `party-glimpse` temporary
+   images: `gollum_glimpse_lake_reveal.png` on first meet,
+   `gollum_glimpse_lake_riddle.png` after the first correct answer.
+2. One-shot flags: `gollum_glimpse_reveal_seen`, `gollum_glimpse_riddle_seen`.
+3. Hooks in `checkGollumEncounter` and `handleGollumAnswer`.
+4. Bare `look` at `deep_dark_lake` while unmet also calls `checkGollumEncounter`
+   (jump/autoplay leave the meet for look; room-entry checks do not run on look).
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+- assets/local-images/gollum_glimpse_lake_reveal.png
+- assets/local-images/gollum_glimpse_lake_riddle.png
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- If glimpses never show, confirm `currentRoom === deep_dark_lake` and that the
+  flags are not already set by a prior save/jump.
+- Reveal fires on room entry via `checkSpecialSituations`, or on bare `look`
+  while unmet; riddle fires on the first successful answer.
+- Autoplay after `jump gollum` issues `look` until `gollumState.met` is true.

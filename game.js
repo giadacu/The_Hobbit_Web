@@ -9776,12 +9776,14 @@
         game.gollumState.currentRiddleIndex += 1;
         const nextRiddle = riddles[game.gollumState.currentRiddleIndex];
         game.print(`Gollum nods reluctantly. 'Right, precious. Right.' ${nextRiddle.question}`);
+        game.showGollumLakeGlimpse?.("riddle");
         return true;
       }
       game.gollumState.awaitingAnswer = false;
       game.gollumState.awaitingPlayerRiddle = true;
       game.gollumState.playerRiddleHintCount = 0;
       game.print("Gollum narrows his pale eyes. 'Baggins has answered. Now Baggins asks, yes. Ask it, precious, ask it.'");
+      game.showGollumLakeGlimpse?.("riddle");
       return true;
     }
 
@@ -10268,6 +10270,7 @@
         }
         game.print("No answering voice of Gandalf or the dwarves reaches you here. Blind passages and black water have cut you off from the company.");
         for (const line of game.gollumRevealLines()) game.print(line);
+        game.showGollumLakeGlimpse?.("reveal");
         return;
       }
 
@@ -11324,7 +11327,12 @@
       const text = normalize(objectName).replace(/^(?:around\s+)?for\s+/, "").replace(/^around\s+/, "");
       if (!text && game.handleDryCaveCrackInspection("look", "area")) return;
       if (!text || ["around", "room", "place", "area", "here", "surroundings"].includes(text)) {
-        return game.describeRoom({ full: true });
+        game.describeRoom({ full: true });
+        // Jump/autoplay leave Gollum unmet until a bare look; room-entry checks do not run on look alone.
+        if (game.currentRoom === "deep_dark_lake" && !game.gollumState?.met) {
+          game.checkGollumEncounter?.();
+        }
+        return;
       }
       const direction = text.match(/^(across|at|in|inside|into|under|behind|through|over|around)\s+(.+)$/);
       if (direction) {
@@ -13990,6 +13998,31 @@
       this.sceneMapCurrentIndicatorTimer = null;
       this.render();
       return true;
+    }
+
+    showGollumLakeGlimpse(kind = "reveal") {
+      if (this.currentRoom !== "deep_dark_lake") return false;
+      if (kind === "reveal") {
+        if (this.flags.gollum_glimpse_reveal_seen) return false;
+        this.flags.gollum_glimpse_reveal_seen = true;
+        return this.showTemporaryImage("gollum_glimpse_lake_reveal.png", {
+          alt: "A pale figure glimpsed on the black underground lake",
+          dismissOnNextCommand: true,
+          effect: "party-glimpse",
+          focus: "right",
+        });
+      }
+      if (kind === "riddle") {
+        if (this.flags.gollum_glimpse_riddle_seen) return false;
+        this.flags.gollum_glimpse_riddle_seen = true;
+        return this.showTemporaryImage("gollum_glimpse_lake_riddle.png", {
+          alt: "Gollum leaning close during the riddle-game",
+          dismissOnNextCommand: true,
+          effect: "party-glimpse",
+          focus: "center",
+        });
+      }
+      return false;
     }
 
     showEndgameSceneImage(imageName, options = {}) {
