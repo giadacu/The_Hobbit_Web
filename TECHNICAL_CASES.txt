@@ -9042,3 +9042,8 @@ Future debugging advice
 - Reveal fires on room entry via `checkSpecialSituations`, or on bare `look`
   while unmet; riddle fires on the first successful answer.
 - Autoplay after `jump gollum` issues `look` until `gollumState.met` is true.
+- Gollum lake glimpses are suppressed while `roomIsDark()` (lantern out). That
+  guard is Gollum-only; Bag End `party-glimpse` images are not blocked by lantern
+  state. Flags are not burned when skipped for darkness, so a later lit beat can
+  still show the riddle glimpse. Render also hides an active `gollum_glimpse_lake_*`
+  temporary if the room goes dark (lantern burnout clears it).

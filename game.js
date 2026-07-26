@@ -7177,9 +7177,12 @@
       const game = this.game;
       const room = game.room();
       const scene = roomImage.closest(".scene");
-      if (game.temporaryImage?.file) {
+      const tempFile = game.temporaryImage?.file || "";
+      // Only lake Gollum glimpses yield to pitch dark. Bag End party-glimpses stay visible (those rooms are never dark).
+      const hideGollumGlimpseInDark = game.roomIsDark() && /^gollum_glimpse_lake_/i.test(tempFile);
+      if (tempFile && !hideGollumGlimpseInDark) {
         roomImage.removeAttribute("hidden");
-        const src = assetUrl(IMAGE_ROOT, game.temporaryImage.file);
+        const src = assetUrl(IMAGE_ROOT, tempFile);
         this.swapRoomImage(scene, src, game.temporaryImage.presentation);
         roomImage.alt = game.temporaryImage.alt || room.name || "Story image";
       } else if (game.roomIsDark()) {
@@ -14002,6 +14005,8 @@
 
     showGollumLakeGlimpse(kind = "reveal") {
       if (this.currentRoom !== "deep_dark_lake") return false;
+      // Lake only: no glimpse over pitch dark. Bag End party-glimpses are unaffected (always lit).
+      if (this.roomIsDark()) return false;
       if (kind === "reveal") {
         if (this.flags.gollum_glimpse_reveal_seen) return false;
         this.flags.gollum_glimpse_reveal_seen = true;
@@ -20640,6 +20645,9 @@
       this.flags.lanternon = false;
       this.flags.lanternturns = 0;
       this.print("The brass lantern flickers and goes out.");
+      if (/^gollum_glimpse_lake_/i.test(this.temporaryImage?.file || "")) {
+        this.clearTemporaryImage({ render: false });
+      }
     }
 
     unrecognized(command) {

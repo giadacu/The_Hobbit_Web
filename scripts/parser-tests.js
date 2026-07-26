@@ -8741,6 +8741,33 @@ const gameCases = [
     ],
   },
   {
+    name: "gollum lake glimpses stay dark when the lantern is out",
+    drive(game) {
+      game.execute("jump gollum");
+      game.flags.lanternon = false;
+      game.flags.lanternturns = 0;
+      game.flags.gollum_glimpse_reveal_seen = false;
+      game.flags.gollum_glimpse_riddle_seen = false;
+      game.gollumState.met = false;
+      game.clearTemporaryImage?.({ render: false });
+      game.execute("look");
+      game.print(`Dark reveal glimpse: ${game.temporaryImage?.file || "none"}`);
+      game.print(`Dark reveal flag: ${game.flags.gollum_glimpse_reveal_seen ? "yes" : "no"}`);
+      game.print(`Dark met: ${game.gollumState.met ? "yes" : "no"}`);
+      game.execute("ask gollum a riddle");
+      game.execute(`answer ${game.currentGollumRiddle()?.answers?.[0] || "egg"}`);
+      game.print(`Dark riddle glimpse: ${game.temporaryImage?.file || "none"}`);
+      game.print(`Dark riddle flag: ${game.flags.gollum_glimpse_riddle_seen ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Dark reveal glimpse: none",
+      "Dark reveal flag: no",
+      "Dark met: yes",
+      "Dark riddle glimpse: none",
+      "Dark riddle flag: no",
+    ],
+  },
+  {
     name: "jump gollum marks goblin capture as already resolved",
     drive(game) {
       game.execute("jump gollum");
