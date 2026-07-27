@@ -1370,6 +1370,12 @@
         text: "You are among the prison cells beneath the Elvenking's halls, where stout timbers, lantern-light, and the smell of river-damp make captivity feel orderly rather than merciful. More than one dwarvish cough, mutter, or angry thump carries from behind the doors, and it is plain enough that you are not the only prisoner these halls are keeping apart.",
       },
     ],
+    place_of_black_spiders: [
+      {
+        when: ({ game }) => !game.flags.mirkwooddwarvesfreed,
+        text: "You are in a place of black spiders beneath Mirkwood's foulest boughs, where great webs bind tree to tree from root to crown and several heavy cocoon-shapes hang among them in obscene stillness. The air is warm and close with must and old poison, and from inside the silk come muffled dwarvish cries that make plain enough who the spiders mean to keep for later.",
+      },
+    ],
     cellar: [
       {
         when: ({ game }) => game.flags.barrel_company_launched,
@@ -4556,7 +4562,10 @@
     visibleCompanions(roomId = this.game.currentRoom) {
       return [...this.questDwarfIds(), "gandalf", "bard"]
         .map((id) => this.game.characters[id])
-        .filter((character) => character && character.visible !== false && character.position === roomId);
+        .filter((character) => character
+          && character.visible !== false
+          && character.position === roomId
+          && !this.game.shouldSuppressRoomPresenceNarration(character, roomId));
     }
 
     companionPoseRegion(roomId = this.game.currentRoom) {
@@ -13764,6 +13773,12 @@
       return visible;
     }
 
+    shouldSuppressRoomPresenceNarration(character, roomId = this.currentRoom) {
+      if (!character || this.flags.mirkwooddwarvesfreed) return false;
+      if (!["mirkwood_spider_grove", "place_of_black_spiders"].includes(roomId)) return false;
+      return Boolean(this.companionDirector?.questDwarfIds().includes(character.id));
+    }
+
     connectionsFromVisible(roomId) {
       const seen = new Set();
       return this.connectionsFrom(roomId).filter((connection) => {
@@ -13823,7 +13838,11 @@
       const objects = this.itemsInRoom(this.currentRoom).filter((item) => item.visible && this.shouldListRoomItem(item));
       const objectText = objects.length ? `You see: ${objects.map((item) => this.inventoryItemLabel(item)).join(", ")}.` : "";
       const aftermathText = this.aftermath?.roomSummary(this.currentRoom) || "";
-      const people = this.visiblePeopleInRoom().filter((p) => p.name !== "You" && p.visible);
+      const people = this.visiblePeopleInRoom().filter((p) => (
+        p.name !== "You"
+        && p.visible
+        && !this.shouldSuppressRoomPresenceNarration(p, this.currentRoom)
+      ));
       const arrivingPeople = people.filter((p) => p.justEntered);
       const companionNarrative = this.companionDirector?.roomCompanionNarrative(this.currentRoom) || "";
       const narratedCompanionIds = this.companionDirector?.narratedCompanionIds(this.currentRoom) || new Set();

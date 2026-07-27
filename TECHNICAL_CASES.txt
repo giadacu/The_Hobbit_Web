@@ -9047,3 +9047,49 @@ Future debugging advice
   state. Flags are not burned when skipped for darkness, so a later lit beat can
   still show the riddle glimpse. Render also hides an active `gollum_glimpse_lake_*`
   temporary if the room goes dark (lantern burnout clears it).
+
+
+Case 190 - 2026-07-27 - Black-spider rescue room failed to establish trapped dwarves
+-------------------------------------------------------------------------------------
+
+Symptom
+-------
+At `place_of_black_spiders`, the player could see ordinary room/companion
+description, then type `help dwarves` and suddenly rescue webbed dwarves that
+the scene had not clearly established as trapped there.
+
+Root cause
+----------
+Two presentation layers disagreed:
+
+1. `attemptMirkwoodDwarfRescue()` already allowed `help dwarves` in
+   `place_of_black_spiders`.
+2. The explicit cocoon/dwarvish-cry setup existed on entry to
+   `mirkwood_spider_grove`, but `place_of_black_spiders` used only generic
+   spider-room prose.
+3. Standard companion-room narration still described dwarves as visibly present
+   in the room before rescue, which contradicted the rescue reveal.
+
+Resolution
+----------
+- Added a pre-rescue contextual description for `place_of_black_spiders` that
+  explicitly mentions cocoon-shapes and muffled dwarvish cries.
+- Added `shouldSuppressRoomPresenceNarration()` so pre-rescue spider rooms do
+  not narrate trapped dwarves as free-standing companions in room text.
+- Applied that suppression to both companion highlight narration and the
+  friendly-people room listing.
+- Added parser regression coverage for the new setup text and the absence of
+  free-companion narration in the rescue room.
+
+Files touched
+-------------
+- `game.js`
+- `scripts/parser-tests.js`
+- `TECHNICAL_CASES.txt`
+
+Future debugging advice
+-----------------------
+- If an action depends on off-screen or constrained NPC state, make sure the
+  room text establishes that state before the command becomes solvable there.
+- Treat companion-presence narration and scripted peril scenes as separate
+  layers; if they overlap, explicitly suppress one or reconcile both.

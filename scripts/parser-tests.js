@@ -5402,6 +5402,26 @@ const gameCases = [
     ],
   },
   {
+    name: "place of black spiders frames the rescue before help dwarves and hides free-companion narration",
+    setup(game) {
+      movePlayerTo(game, "place_of_black_spiders");
+      game.flags.mirkwooddwarvesfreed = false;
+      game.companionDirector.sync();
+    },
+    drive(game) {
+      game.describeRoom({ full: true });
+    },
+    expectedIncluded: [
+      "cocoon-shapes hang among them in obscene stillness",
+      "muffled dwarvish cries",
+    ],
+    notExpectedIncluded: [
+      "Thorin ",
+      "Balin ",
+      "Dwalin ",
+    ],
+  },
+  {
     name: "cellar escape checkpoint opens with cellar room description not mirkwood jump text",
     setup(game) {
       const { cellarEscapeSetup } = require("./route-transcript-lib");
