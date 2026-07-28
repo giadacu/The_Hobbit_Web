@@ -326,6 +326,24 @@ Cinematic high-fantasy digital painting, painterly realism, dramatic atmospheric
 Cinematic high-fantasy digital painting, painterly realism, dramatic atmospheric lighting, rich environmental detail, no text, no characters, no UI, widescreen 16:9 landscape composition, The Hobbit adventure game illustration style. Image aspect ratio must be 16:9. Beorn's house interior as a great welcoming wooden hall: massive timber beams, high roof, broad hearth glowing warmly, sturdy tables and chairs, honey and fresh bread atmosphere, tapestries of wild lands, animal skins used as rustic furnishing, forest light from the doorway, warmth and strength after a dangerous journey.
 ```
 
+### P4.10 - `beorn_glimpse_house.png` (temporary party-glimpse)
+
+One-shot character glimpse during `beginBeornHospitalityScene()` at `beorns_house`. Not a room image.
+
+```text
+Cinematic high-fantasy digital painting, painterly realism, dramatic atmospheric lighting, rich environmental detail, no text, no UI, widescreen 16:9 landscape composition, The Hobbit adventure game illustration style. Image aspect ratio must be 16:9. A fleeting character glimpse of Beorn inside his great wooden hall: a towering broad-shouldered man of the wild, dark hair and thick beard, stern watchful face, simple rough tunic and leather belt, standing near the long table as if briefly caught in firelight. Match the warm timber hall atmosphere — massive curved beams, stone hearth glow, bread and honey on the board, animal skins and rustic chairs — but keep Beorn as the clear foreground subject, a partial-to-medium figure glimpse rather than a full establishing room shot. Warm golden firelight, forest daylight from a doorway behind, hospitable yet powerful mood, no other people, no hobbits, no dwarves.
+```
+
+
+
+### P3.extra - `elrond_glimpse_rivendell.png` (temporary party-glimpse)
+
+One-shot character glimpse on first `noteElrondPreparationInteraction()` while preparations are incomplete. Not a room image.
+
+```text
+Cinematic high-fantasy digital painting, painterly realism, dramatic atmospheric lighting, rich environmental detail, no text, no UI, widescreen 16:9 landscape composition, The Hobbit adventure game illustration style. Image aspect ratio must be 16:9. A fleeting character glimpse of Elrond, Lord of Rivendell, offering quiet counsel: an ageless noble elf-lord with dark hair, wise calm face, subtle silver circlet, elegant dark-blue and grey elven robes, standing or seated near warm firelight in an elven hall. Match Rivendell's Hall of Fire atmosphere — carved organic stone arches, tree-and-vine reliefs, roaring hearth, candlelight, soft rugs and carved chairs — but keep Elrond as the clear foreground subject, a partial-to-medium figure glimpse rather than a full empty room shot. Warm golden firelight, serene dignified mood, no other people, no hobbits, no dwarves, no wizards.
+```
+
 ---
 
 ## Checklist post-sostituzione
@@ -344,4 +362,4 @@ Cinematic high-fantasy digital painting, painterly realism, dramatic atmospheric
 | P1 | 2 | Pre-trolls e sentieri nascosti |
 | P2 | 17 | Misty Mountains, creste e vallate |
 | P3 | 21 | Caverne goblin e tunnel soffocanti |
-| P4 | 9 | Fuga all'aperto e arrivo da Beorn |
+| P4 | 10 | Fuga all'aperto, arrivo da Beorn, glimpse hospitality |

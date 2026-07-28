@@ -1,5 +1,5 @@
 window.IMAGE_MANIFEST = {
-  "generatedAt": "2026-07-26T15:16:09.599Z",
+  "generatedAt": "2026-07-28T20:06:46.982Z",
   "imageDir": "assets/local-images/",
   "rooms": {
     "hobbit_hole": "hobbit_hole.jpeg",

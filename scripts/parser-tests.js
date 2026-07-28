@@ -8761,6 +8761,154 @@ const gameCases = [
     ],
   },
   {
+    name: "beorn house glimpse shows once with hospitality",
+    drive(game) {
+      game.execute("jump beorn");
+      game.print(`Beorn hospitality glimpse: ${game.temporaryImage?.file || "none"}`);
+      game.print(`Beorn glimpse flag: ${game.flags.beorn_glimpse_house_seen ? "yes" : "no"}`);
+      game.print(`Beorn dinner seen: ${game.flags.beorn_dinner_seen ? "yes" : "no"}`);
+      game.execute("look");
+      game.print(`Beorn glimpse after look: ${game.temporaryImage?.file || "none"}`);
+      game.flags.beorn_dinner_seen = false;
+      game.flags.beorn_glimpse_house_seen = false;
+      game.clearTemporaryImage?.({ render: false });
+      game.debugSetCharacterRoom("beorn", "beorn_great_hall");
+      game.beginBeornHospitalityScene();
+      game.print(`Beorn glimpse without co-presence: ${game.temporaryImage?.file || "none"}`);
+      game.print(`Beorn glimpse flag without co-presence: ${game.flags.beorn_glimpse_house_seen ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Beorn hospitality glimpse: beorn_glimpse_house.png",
+      "Beorn glimpse flag: yes",
+      "Beorn dinner seen: yes",
+      "Beorn glimpse after look: none",
+      "Beorn glimpse without co-presence: none",
+      "Beorn glimpse flag without co-presence: no",
+    ],
+  },
+  {
+    name: "elrond rivendell glimpse shows once on first counsel",
+    drive(game) {
+      game.execute("jump rivendell");
+      game.flags.elrond_glimpse_rivendell_seen = false;
+      game.clearTemporaryImage?.({ render: false });
+      game.execute("talk to elrond");
+      game.print(`Elrond counsel glimpse: ${game.temporaryImage?.file || "none"}`);
+      game.print(`Elrond glimpse flag: ${game.flags.elrond_glimpse_rivendell_seen ? "yes" : "no"}`);
+      game.execute("look");
+      game.print(`Elrond glimpse after look: ${game.temporaryImage?.file || "none"}`);
+      game.execute("talk to elrond");
+      game.print(`Elrond glimpse repeats: ${game.flags.elrond_glimpse_rivendell_seen && !game.temporaryImage?.file ? "no-retrigger-ok" : "unexpected"}`);
+      game.flags.elrond_glimpse_rivendell_seen = false;
+      game.clearTemporaryImage?.({ render: false });
+      game.debugSetCharacterRoom("elrond", "rivendell_library");
+      game.noteElrondPreparationInteraction(game.characters.elrond, { mode: "talk" });
+      game.print(`Elrond glimpse without co-presence: ${game.temporaryImage?.file || "none"}`);
+      game.print(`Elrond glimpse flag without co-presence: ${game.flags.elrond_glimpse_rivendell_seen ? "yes" : "no"}`);
+    },
+    expectedIncluded: [
+      "Elrond counsel glimpse: elrond_glimpse_rivendell.png",
+      "Elrond glimpse flag: yes",
+      "Elrond glimpse after look: none",
+      "Elrond glimpse repeats: no-retrigger-ok",
+      "Elrond glimpse without co-presence: none",
+      "Elrond glimpse flag without co-presence: no",
+    ],
+  },
+  {
+    name: "bard laketown glimpse shows once on barrel arrival",
+    drive(game) {
+      game.execute("jump laketown");
+      game.flags.laketown_barrel_arrival_seen = false;
+      game.flags.bard_glimpse_laketown_seen = false;
+      game.clearTemporaryImage?.({ render: false });
+      game.beginLaketownBarrelArrival();
+      game.print(`Bard arrival glimpse: ${game.temporaryImage?.file || "none"}`);
+      game.print(`Bard glimpse flag: ${game.flags.bard_glimpse_laketown_seen ? "yes" : "no"}`);
+      game.print(`Bard in town: ${game.characters.bard?.position === "wooden_town" ? "yes" : "no"}`);
+      game.execute("look");
+      game.print(`Bard glimpse after look: ${game.temporaryImage?.file || "none"}`);
+      game.flags.laketown_barrel_arrival_seen = false;
+      game.flags.bard_glimpse_laketown_seen = false;
+      game.clearTemporaryImage?.({ render: false });
+      game.debugSetCharacterRoom("bard", "laketown_docks");
+      game.beginLaketownBarrelArrival();
+      game.print(`Bard re-placed for arrival: ${game.characters.bard?.position === "wooden_town" ? "yes" : "no"}`);
+      game.print(`Bard second arrival glimpse: ${game.temporaryImage?.file || "none"}`);
+    },
+    expectedIncluded: [
+      "Bard arrival glimpse: bard_glimpse_laketown.png",
+      "Bard glimpse flag: yes",
+      "Bard in town: yes",
+      "Bard glimpse after look: none",
+      "Bard re-placed for arrival: yes",
+      "Bard second arrival glimpse: bard_glimpse_laketown.png",
+    ],
+  },
+  {
+    name: "butler cellar glimpse shows once on feast opportunity",
+    drive(game) {
+      game.execute("jump laketown");
+      game.debugMovePlayer("cellar", { markRoute: true });
+      game.flags.cellar_feast_scene_seen = false;
+      game.flags.butler_glimpse_cellar_seen = false;
+      game.clearTemporaryImage?.({ render: false });
+      game.beginCellarEscapeOpportunity();
+      game.print(`Butler feast glimpse: ${game.temporaryImage?.file || "none"}`);
+      game.print(`Butler glimpse flag: ${game.flags.butler_glimpse_cellar_seen ? "yes" : "no"}`);
+      game.print(`Butler in cellar: ${game.characters.butler?.position === "cellar" ? "yes" : "no"}`);
+      game.execute("look");
+      game.print(`Butler glimpse after look: ${game.temporaryImage?.file || "none"}`);
+      game.flags.cellar_feast_scene_seen = false;
+      game.flags.butler_glimpse_cellar_seen = false;
+      game.clearTemporaryImage?.({ render: false });
+      game.debugSetCharacterRoom("butler", "elvenkings_halls");
+      game.beginCellarEscapeOpportunity();
+      game.print(`Butler re-placed for feast: ${game.characters.butler?.position === "cellar" ? "yes" : "no"}`);
+      game.print(`Butler second feast glimpse: ${game.temporaryImage?.file || "none"}`);
+    },
+    expectedIncluded: [
+      "Butler feast glimpse: butler_glimpse_cellar.png",
+      "Butler glimpse flag: yes",
+      "Butler in cellar: yes",
+      "Butler glimpse after look: none",
+      "Butler re-placed for feast: yes",
+      "Butler second feast glimpse: butler_glimpse_cellar.png",
+    ],
+  },
+  {
+    name: "wood elf capture glimpse shows once in the halls",
+    drive(game) {
+      game.execute("jump mirkwood");
+      game.debugMovePlayer("elvenkings_halls", { markRoute: true });
+      game.flags.elvenking_prisoner_seen = false;
+      game.flags.wood_elf_glimpse_capture_seen = false;
+      game.flags.mirkwoodjourneycomplete = true;
+      game.flags.elven_halls_ring_wait_turns = 0;
+      if (game.player.wearingRing) {
+        game.player.wearingRing = false;
+        game.player.noticeable = true;
+      }
+      game.debugSetCharacterRoom("wood_elf", "elvenkings_halls");
+      game.characters.wood_elf.visible = true;
+      game.clearTemporaryImage?.({ render: false });
+      game.checkKidnapping();
+      game.print(`Wood-elf capture glimpse: ${game.temporaryImage?.file || "none"}`);
+      game.print(`Wood-elf glimpse flag: ${game.flags.wood_elf_glimpse_capture_seen ? "yes" : "no"}`);
+      game.print(`Capture room: ${game.currentRoom}`);
+      game.print(`Prisoner seen: ${game.flags.elvenking_prisoner_seen ? "yes" : "no"}`);
+      game.execute("look");
+      game.print(`Wood-elf glimpse after look: ${game.temporaryImage?.file || "none"}`);
+    },
+    expectedIncluded: [
+      "Wood-elf capture glimpse: wood_elf_glimpse_capture.png",
+      "Wood-elf glimpse flag: yes",
+      "Capture room: dark_dungeon",
+      "Prisoner seen: yes",
+      "Wood-elf glimpse after look: none",
+    ],
+  },
+  {
     name: "gollum lake glimpses stay dark when the lantern is out",
     drive(game) {
       game.execute("jump gollum");

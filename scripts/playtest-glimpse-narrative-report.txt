@@ -1,0 +1,70 @@
+Glimpse + narrative coherence playtest
+Asserts: 37/37 passed
+Corridors: 120 (strategies mixed/optimal/failure, seeds=10)
+Unique narrative issues: 0
+--- Direct glimpse asserts ---
+PASS glimpse:beorn :: image=beorn_glimpse_house.png
+PASS glimpse:beorn :: flag set
+PASS glimpse:beorn :: dinner seen
+PASS glimpse:beorn :: hospitality prose present
+PASS glimpse:beorn :: Beorn co-present
+PASS glimpse:beorn :: dismissed on next command
+PASS glimpse:elrond :: image=elrond_glimpse_rivendell.png
+PASS glimpse:elrond :: flag set
+PASS glimpse:elrond :: counsel prose present
+PASS glimpse:elrond :: second counsel does not require re-glimpse
+PASS glimpse:elrond :: flag remains one-shot
+PASS glimpse:elrond :: no re-glimpse after wandering
+PASS glimpse:elrond :: talk progress retained
+PASS glimpse:bard :: image=bard_glimpse_laketown.png
+PASS glimpse:bard :: flag set
+PASS glimpse:bard :: arrival prose names Bard
+PASS glimpse:bard :: Bard placed in town
+PASS glimpse:bard :: dismissed
+PASS glimpse:bard :: Bard still addressable after glimpse
+PASS glimpse:butler :: image=butler_glimpse_cellar.png
+PASS glimpse:butler :: flag set
+PASS glimpse:butler :: feast prose present
+PASS glimpse:butler :: butler placed
+PASS glimpse:butler :: feast flag persists through waits
+PASS glimpse:wood-elf :: image=wood_elf_glimpse_capture.png
+PASS glimpse:wood-elf :: flag set
+PASS glimpse:wood-elf :: capture prose present
+PASS glimpse:wood-elf :: questioning prose present
+PASS glimpse:wood-elf :: moved to dungeon
+PASS glimpse:wood-elf :: prisoner flag set
+PASS glimpse:wood-elf :: dismissed
+PASS coherence:ring-delay-capture :: still in halls after first ring wait
+PASS coherence:ring-delay-capture :: no capture glimpse while still hidden
+PASS coherence:ring-delay-capture :: not prisoner yet
+PASS coherence:ring-delay-capture :: eventually captured after ring delay
+PASS coherence:ring-delay-capture :: glimpse fires on actual capture
+PASS coherence:ring-delay-capture :: ends in dungeon
+--- Corridor snapshot ---
+corridor:rivendell-counsel:mixed:116 steps=46 room=rivendell glimpses[b=0,e=1,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:mixed:135 steps=57 room=rivendell glimpses[b=0,e=1,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:mixed:154 steps=9 room=rivendell glimpses[b=0,e=1,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:mixed:173 steps=68 room=rivendell glimpses[b=0,e=1,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:mixed:192 steps=6 room=rivendell glimpses[b=0,e=1,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:mixed:211 steps=83 room=rivendell glimpses[b=0,e=1,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:mixed:230 steps=143 room=rivendell glimpses[b=0,e=1,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:mixed:249 steps=7 room=rivendell glimpses[b=0,e=1,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:mixed:268 steps=13 room=rivendell glimpses[b=0,e=1,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:mixed:287 steps=136 room=rivendell glimpses[b=0,e=1,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:optimal:122 steps=2 room=rivendell glimpses[b=0,e=1,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:optimal:141 steps=2 room=rivendell glimpses[b=0,e=1,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:optimal:160 steps=2 room=rivendell glimpses[b=0,e=1,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:optimal:179 steps=2 room=rivendell glimpses[b=0,e=1,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:optimal:198 steps=2 room=rivendell glimpses[b=0,e=1,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:optimal:217 steps=2 room=rivendell glimpses[b=0,e=1,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:optimal:236 steps=2 room=rivendell glimpses[b=0,e=1,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:optimal:255 steps=2 room=rivendell glimpses[b=0,e=1,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:optimal:274 steps=2 room=rivendell glimpses[b=0,e=1,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:optimal:293 steps=2 room=rivendell glimpses[b=0,e=1,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:failure:122 steps=160 room=rivendell_bridge glimpses[b=0,e=0,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:failure:141 steps=160 room=rivendell_guest_chambers glimpses[b=0,e=0,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:failure:160 steps=160 room=rivendell_bridge glimpses[b=0,e=0,bard=0,butler=0,elf=0] death=0
+corridor:rivendell-counsel:failure:179 steps=160 room=rivendell_library glimpses[b=0,e=0,bard=0,butler=0,elf=0] death=0
+... and 96 more corridor runs
+--- Narrative / coherence issues ---
+(none)

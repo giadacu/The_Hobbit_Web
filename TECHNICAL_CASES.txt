@@ -9093,3 +9093,165 @@ Future debugging advice
   room text establishes that state before the command becomes solvable there.
 - Treat companion-presence narration and scripted peril scenes as separate
   layers; if they overlap, explicitly suppress one or reconcile both.
+
+
+Case 191 - 2026-07-28 - Beorn house hospitality glimpse
+-------------------------------------------------------
+
+Symptom
+-------
+Arrival at `beorns_house` had hospitality prose and room art with no fleeting
+character beat for Beorn himself (room PNGs stay character-free).
+
+Resolution
+----------
+1. Added `showBeornHouseGlimpse()` (Gollum-style one-shot):
+   `beorn_glimpse_house.png` via `party-glimpse`, flag
+   `beorn_glimpse_house_seen`, requires Beorn co-present in `beorns_house`.
+2. Hooked from `beginBeornHospitalityScene()` (also fires on `jump beorn`).
+3. Dedicated asset + prompt in `docs/image-regen-pre-trolls-to-beorn.md` (P4.10).
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+- assets/local-images/beorn_glimpse_house.png
+- docs/image-regen-pre-trolls-to-beorn.md
+- assets/image-manifest.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- If the glimpse is missing after jump/arrival, check co-presence
+  (`characters.beorn.position === beorns_house`) and that the flag is unset.
+- Do not crop `beorns_house.png` for this beat; it has no Beorn figure.
+- Dismisses on the next command like other party-glimpses.
+
+
+Case 192 - 2026-07-28 - Elrond Rivendell counsel glimpse
+--------------------------------------------------------
+
+Symptom
+-------
+Rivendell preparations had counsel prose and empty room art; Elrond himself
+never appeared as a fleeting character beat.
+
+Resolution
+----------
+1. Added `showElrondRivendellGlimpse()` (Beorn/Gollum-style one-shot):
+   `elrond_glimpse_rivendell.png` via `party-glimpse`, flag
+   `elrond_glimpse_rivendell_seen`, requires Elrond co-present in a Rivendell
+   preparation room.
+2. Hooked from `noteElrondPreparationInteraction()` so the first counsel
+   interaction (`talk to elrond`, ask topics, etc.) shows the glimpse.
+3. Prompt archived in `docs/image-regen-pre-trolls-to-beorn.md`.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+- assets/local-images/elrond_glimpse_rivendell.png
+- docs/image-regen-pre-trolls-to-beorn.md
+- assets/image-manifest.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- If the glimpse is missing after talk/ask, confirm preparations are incomplete,
+  Elrond is co-present, and `elrond_glimpse_rivendell_seen` is unset.
+- Map revelation still replaces the temporary image with Thror's map when that
+  beat fires on the same interaction (progress >= 2 / show-map).
+
+Case 193 - 2026-07-28 - Bard Lake-town arrival glimpse
+------------------------------------------------------
+
+Symptom
+-------
+`beginLaketownBarrelArrival()` named Bard in prose while `wooden_town` room art
+stayed character-free; Bard only appeared later in endgame scenes.
+
+Resolution
+----------
+1. Added `showBardLaketownGlimpse()`: `bard_glimpse_laketown.png` via
+   `party-glimpse`, flag `bard_glimpse_laketown_seen`, requires Bard in
+   `wooden_town`.
+2. Hooked from non-silent `beginLaketownBarrelArrival()`, which also places
+   Bard at `wooden_town` so the narrative and co-presence match.
+3. `jump laketown` stays silent (no glimpse); real arrival or a non-silent
+   begin call shows it once.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+- assets/local-images/bard_glimpse_laketown.png
+- docs/image-regen-mirkwood-onward.md
+- assets/image-manifest.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- Silent jump presets will not show the glimpse; reset
+  `laketown_barrel_arrival_seen` / `bard_glimpse_laketown_seen` to retest.
+- Arrival places Bard in town before the glimpse; do not require a prior Bard
+  position for the beat to fire.
+
+Case 194 - 2026-07-28 - Butler cellar feast glimpse
+---------------------------------------------------
+
+Symptom
+-------
+`beginCellarEscapeOpportunity()` established the tipsy butler in prose while
+`cellar` room art stayed character-free.
+
+Resolution
+----------
+1. Added `showButlerCellarGlimpse()`: `butler_glimpse_cellar.png` via
+   `party-glimpse`, flag `butler_glimpse_cellar_seen`, requires butler in
+   `cellar`.
+2. Hooked from `beginCellarEscapeOpportunity()` after butler placement.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+- assets/local-images/butler_glimpse_cellar.png
+- docs/image-regen-mirkwood-onward.md
+- assets/image-manifest.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- Feast scene already places the butler in the cellar before the glimpse.
+- One-shot flag: `butler_glimpse_cellar_seen`.
+
+Case 195 - 2026-07-28 - Wood-elf capture glimpse
+------------------------------------------------
+
+Symptom
+-------
+`checkKidnapping()` captured Bilbo in the Elvenking's halls with prose only;
+`elvenkings_halls` room art stayed character-free.
+
+Resolution
+----------
+1. Added `showWoodElfCaptureGlimpse()`: `wood_elf_glimpse_capture.png` via
+   `party-glimpse`, flag `wood_elf_glimpse_capture_seen`, requires wood elf
+   co-present in `elvenkings_halls`.
+2. Hooked from `checkKidnapping()` after "The wood elf captures you." and
+   before the move to `dark_dungeon`.
+
+Files touched
+-------------
+- game.js
+- scripts/parser-tests.js
+- assets/local-images/wood_elf_glimpse_capture.png
+- docs/image-regen-mirkwood-onward.md
+- assets/image-manifest.js
+- TECHNICAL_CASES.txt
+
+Future debugging advice
+-----------------------
+- Glimpse fires while still in the halls; dungeon move follows immediately.
+- Ring invisibility can delay capture; the glimpse only fires on the actual
+  capture beat.

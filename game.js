@@ -10535,6 +10535,7 @@
       game.print("You are led at last before the Elvenking, who questions you coolly about your name, your companions, and what business has brought such travelers through his wood.");
       game.print("Bilbo keeps his own counsel. At that the king's face grows no harsher, only more remote, and he orders that you be shut up in darkness until you learn either trust or weariness.");
       game.print("The wood elf captures you.");
+      game.showWoodElfCaptureGlimpse();
       game.player.position = "dark_dungeon";
       game.currentRoom = "dark_dungeon";
       woodElf.position = game.rooms.elven_guard_post
@@ -14047,6 +14048,75 @@
         });
       }
       return false;
+    }
+
+    showBeornHouseGlimpse() {
+      if (this.currentRoom !== "beorns_house") return false;
+      if (this.flags.beorn_glimpse_house_seen) return false;
+      const beorn = this.characters?.beorn;
+      if (!beorn || beorn.position !== "beorns_house" || beorn.visible === false) return false;
+      this.flags.beorn_glimpse_house_seen = true;
+      return this.showTemporaryImage("beorn_glimpse_house.png", {
+        alt: "A brief glimpse of Beorn in his great wooden hall",
+        dismissOnNextCommand: true,
+        effect: "party-glimpse",
+        focus: "center",
+      });
+    }
+
+    showElrondRivendellGlimpse() {
+      if (!this.inRivendellForPreparations()) return false;
+      if (this.flags.elrond_glimpse_rivendell_seen) return false;
+      if (!this.visibleElrondHere()) return false;
+      this.flags.elrond_glimpse_rivendell_seen = true;
+      return this.showTemporaryImage("elrond_glimpse_rivendell.png", {
+        alt: "A brief glimpse of Elrond offering counsel in Rivendell",
+        dismissOnNextCommand: true,
+        effect: "party-glimpse",
+        focus: "center",
+      });
+    }
+
+    showBardLaketownGlimpse() {
+      if (this.currentRoom !== "wooden_town") return false;
+      if (this.flags.bard_glimpse_laketown_seen) return false;
+      const bard = this.characters?.bard;
+      if (!bard || bard.position !== "wooden_town" || bard.visible === false) return false;
+      this.flags.bard_glimpse_laketown_seen = true;
+      return this.showTemporaryImage("bard_glimpse_laketown.png", {
+        alt: "A brief glimpse of Bard on the Lake-town landing",
+        dismissOnNextCommand: true,
+        effect: "party-glimpse",
+        focus: "center",
+      });
+    }
+
+    showButlerCellarGlimpse() {
+      if (this.currentRoom !== "cellar") return false;
+      if (this.flags.butler_glimpse_cellar_seen) return false;
+      const butler = this.cellarButler();
+      if (!butler || butler.position !== "cellar" || butler.visible === false) return false;
+      this.flags.butler_glimpse_cellar_seen = true;
+      return this.showTemporaryImage("butler_glimpse_cellar.png", {
+        alt: "A brief glimpse of the tipsy butler among the wine-casks",
+        dismissOnNextCommand: true,
+        effect: "party-glimpse",
+        focus: "center",
+      });
+    }
+
+    showWoodElfCaptureGlimpse() {
+      if (this.currentRoom !== "elvenkings_halls") return false;
+      if (this.flags.wood_elf_glimpse_capture_seen) return false;
+      const woodElf = this.characters?.wood_elf;
+      if (!woodElf || woodElf.position !== "elvenkings_halls" || woodElf.visible === false) return false;
+      this.flags.wood_elf_glimpse_capture_seen = true;
+      return this.showTemporaryImage("wood_elf_glimpse_capture.png", {
+        alt: "A brief glimpse of the wood elf as he seizes you in the halls",
+        dismissOnNextCommand: true,
+        effect: "party-glimpse",
+        focus: "center",
+      });
     }
 
     showEndgameSceneImage(imageName, options = {}) {
@@ -18035,6 +18105,7 @@
       this.flags.beorn_dinner_seen = true;
       this.print("Before long the uncanny order of Beorn's house declares itself more plainly: great dogs pad in on their hind legs with trays, while sheep and horses move about the yard and door with the grave purpose of servants that know their business.");
       this.print("Beorn gives no explanation worth calling one. Yet the board is soon spread with bread, honey, cream, and a prodigious supper, and for a while the whole house feels less strange than magnificently, stubbornly hospitable.");
+      this.showBeornHouseGlimpse();
       return true;
     }
 
@@ -18051,6 +18122,7 @@
       this.print("The king's feasting has told on the place below. From the upper halls come muffled laughter and the last wandering echoes of song, while in the cellar the air is heavy with spilled wine, wet wood, and the comfortable slackness of servants kept too long at a good table.");
       this.print("Empty barrels stand ready by the running water, and the butler's vigilance has plainly been dulled by duty, fatigue, and a cup or two beyond strict necessity. If there is ever to be a moment for desperate barrel-work, it is near enough to this one.");
       this.print("Every now and then the butler turns toward the stair or the casks and leaves some other corner unwatched for a heartbeat. Any barrel-work will have to be done in such stolen instants.");
+      this.showButlerCellarGlimpse();
       return true;
     }
 
@@ -18079,6 +18151,12 @@
         this.print("Soon other barrels are being hooked in and broken open amid spluttering outrage, and the dwarves come out of them one after another stiff, bruised, furious, and indisputably alive.");
       }
       this.print("Bard is among the first to look on you without foolishness. He takes the measure of your condition, the Mountain beyond the water, and the rumor already racing ahead of both.");
+      const bard = this.characters?.bard;
+      if (bard) {
+        bard.position = "wooden_town";
+        bard.visible = true;
+      }
+      this.showBardLaketownGlimpse();
       return true;
     }
 
@@ -19910,6 +19988,8 @@
       if (!this.inRivendellForPreparations()) return false;
       if (!this.visibleElrondHere()) return false;
       if (this.rivendellPreparationsComplete()) return false;
+
+      this.showElrondRivendellGlimpse();
 
       const mode = String(details.mode || "");
       const topic = normalize(String(details.topic || ""));

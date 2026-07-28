@@ -1,21 +1,21 @@
 Elvenking Halls onward — random playtest report
-Date: 2026-07-12T12:02:17.510Z
-Runs: 60 (mixed, failure, optimal, 20 seeds each)
-Step limit: 400
+Date: 2026-07-28T20:14:11.964Z
+Runs: 36 (mixed, failure, optimal, 12 seeds each)
+Step limit: 220
 
 Unique issues: 0
 
 No automated narrative/sequence issues detected.
 
 Milestone reach (across all runs):
-  laketown: 20/60
-  frontGate: 20/60
-  dragon: 20/60
-  epilogue: 20/60
-  death: 20/60
-  softlock: 0/60
+  laketown: 12/36
+  frontGate: 12/36
+  dragon: 12/36
+  epilogue: 12/36
+  death: 12/36
+  softlock: 0/36
 
-Stalled/death runs: 40
+Stalled/death runs: 24
   mixed:1: room=cellar steps=133 death=true
     tail: inventory (elvenkings_halls->elvenkings_halls) | south (elvenkings_halls->cellar) | south east (cellar->elven_underground_river) | north west (elven_underground_river->cellar) | inventory (cellar->cellar) | jump trap door (cellar->cellar)
   mixed:18: room=cellar steps=7 death=true

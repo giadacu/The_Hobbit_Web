@@ -106,6 +106,22 @@ Cinematic high-fantasy digital painting, painterly realism, dramatic atmospheric
 Cinematic high-fantasy digital painting, painterly realism, dramatic atmospheric lighting, rich environmental detail, no text, no characters, no UI, widescreen 16:9 landscape composition, The Hobbit adventure game illustration style. Image aspect ratio must be 16:9. Cool blue-grey torchlight, damp stone, iron rings, wooden barrels, ordered cold restraint. Single sturdy wooden barrel bobbing on a dark underground river channel beneath the Elvenking's halls, close stone walls, lantern reflections on black water, claustrophobic escape route, current moving away from the cellar.
 ```
 
+
+### P2.extra · `butler_glimpse_cellar.png` (temporary party-glimpse)
+
+One-shot character glimpse during `beginCellarEscapeOpportunity()` at `cellar`. Not a room image.
+
+```text
+Cinematic high-fantasy digital painting, painterly realism, dramatic atmospheric lighting, rich environmental detail, no text, no UI, widescreen 16:9 landscape composition, The Hobbit adventure game illustration style. Image aspect ratio must be 16:9. A fleeting character glimpse of the Elvenking's wine butler in the underground cellar: a wood-elf servant with fair features and pointed ears, slightly flushed and tipsy after the feast, elegant but work-stained elven servant clothes, holding or leaning near a wine cup or cask. Match the cellar atmosphere — damp stone arches, great wooden barrels, lantern glow, spilled wine stains on stone, trap door and underground water channel suggested in the background — but keep the butler as the clear foreground subject, a partial-to-medium figure glimpse rather than a full empty cellar shot. Warm lantern light against cool stone, comic yet tense mood of a distracted watchman, no other people, no hobbits, no dwarves, no blood, spilled wine only.
+```
+
+### P2.extra2 · `wood_elf_glimpse_capture.png` (temporary party-glimpse)
+
+One-shot character glimpse during `checkKidnapping()` capture at `elvenkings_halls`. Not a room image.
+
+```text
+Cinematic high-fantasy digital painting, painterly realism, dramatic atmospheric lighting, rich environmental detail, no text, no UI, widescreen 16:9 landscape composition, The Hobbit adventure game illustration style. Image aspect ratio must be 16:9. A fleeting character glimpse of a stern Woodland Realm wood-elf guard capturing an intruder: fair features, pointed ears, cold watchful eyes, leaf-brown and green forest-elf clothing with practical leather, bow or short blade faintly suggested, hand raised in a commanding halt. Match the Elvenking's halls atmosphere — carved wood, lantern-light, tall pillars, secret beauty under watch — but keep the wood-elf as the clear foreground subject, a partial-to-medium figure glimpse rather than a full empty hall shot. Cool forest lantern light, tense authoritative mood of arrest, no other people, no hobbits, no dwarves, no king on throne dominating the frame.
+```
 ---
 
 ## Priorità 3 — Lake-town (hub)
@@ -128,6 +144,14 @@ Cinematic high-fantasy digital painting, painterly realism, dramatic atmospheric
 Cinematic high-fantasy digital painting, painterly realism, dramatic atmospheric lighting, rich environmental detail, no text, no characters, no UI, widescreen 16:9 landscape composition, The Hobbit adventure game illustration style. Image aspect ratio must be 16:9. Timber halls and jetties above dark lake water, nets, ropes, casks, humid frontier town atmosphere. Fast river below Lake-town after the barrel escape: rushing current, rocky banks, dangerous white water, spray and noise, rocky gorge, urgency of downstream flight, no town visible.
 ```
 
+
+### P3.extra · `bard_glimpse_laketown.png` (temporary party-glimpse)
+
+One-shot character glimpse during non-silent `beginLaketownBarrelArrival()` at `wooden_town`. Not a room image.
+
+```text
+Cinematic high-fantasy digital painting, painterly realism, dramatic atmospheric lighting, rich environmental detail, no text, no UI, widescreen 16:9 landscape composition, The Hobbit adventure game illustration style. Image aspect ratio must be 16:9. A fleeting character glimpse of Bard the Bowman at Lake-town: a stern capable man of the lake with dark hair and beard, weathered practical clothes, leather coat, bow faintly suggested at his side or across his back, standing on a wooden jetty or plankway. Match Lake-town atmosphere — dark timber halls on stilts over black water, ropes nets and boats, Lonely Mountain distant under a cold cloudy sky, lantern warmth in windows — but keep Bard as the clear foreground subject, a partial-to-medium figure glimpse rather than a full town establishing shot. Cool northern light with warm lantern accents, sober watchful mood, no crowds, no dwarves, no hobbits, no dragons.
+```
 ---
 
 ## Priorità 4 — Avvicinamento e esterno Erebor
